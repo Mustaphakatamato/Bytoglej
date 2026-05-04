@@ -1,0 +1,1699 @@
+<!DOCTYPE html>
+<html lang="da">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>LegetøjsByt — Bytte legetøj mellem institutioner</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;500;600;700;800;900&family=Nunito+Sans:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+  <script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+  <script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+  <script type="text/babel">
+// ─── TWEAKS PANEL (inlined) ───────────────────────────────────────────────────
+
+const __TWEAKS_STYLE = `
+  .twk-panel{position:fixed;right:16px;bottom:16px;z-index:2147483646;width:280px;
+    max-height:calc(100vh - 32px);display:flex;flex-direction:column;
+    background:rgba(250,249,247,.78);color:#29261b;
+    -webkit-backdrop-filter:blur(24px) saturate(160%);backdrop-filter:blur(24px) saturate(160%);
+    border:.5px solid rgba(255,255,255,.6);border-radius:14px;
+    box-shadow:0 1px 0 rgba(255,255,255,.5) inset,0 12px 40px rgba(0,0,0,.18);
+    font:11.5px/1.4 ui-sans-serif,system-ui,-apple-system,sans-serif;overflow:hidden}
+  .twk-hd{display:flex;align-items:center;justify-content:space-between;
+    padding:10px 8px 10px 14px;cursor:move;user-select:none}
+  .twk-hd b{font-size:12px;font-weight:600;letter-spacing:.01em}
+  .twk-x{appearance:none;border:0;background:transparent;color:rgba(41,38,27,.55);
+    width:22px;height:22px;border-radius:6px;cursor:default;font-size:13px;line-height:1}
+  .twk-x:hover{background:rgba(0,0,0,.06);color:#29261b}
+  .twk-body{padding:2px 14px 14px;display:flex;flex-direction:column;gap:10px;
+    overflow-y:auto;overflow-x:hidden;min-height:0;
+    scrollbar-width:thin;scrollbar-color:rgba(0,0,0,.15) transparent}
+  .twk-body::-webkit-scrollbar{width:8px}
+  .twk-body::-webkit-scrollbar-track{background:transparent;margin:2px}
+  .twk-body::-webkit-scrollbar-thumb{background:rgba(0,0,0,.15);border-radius:4px;
+    border:2px solid transparent;background-clip:content-box}
+  .twk-body::-webkit-scrollbar-thumb:hover{background:rgba(0,0,0,.25);
+    border:2px solid transparent;background-clip:content-box}
+  .twk-row{display:flex;flex-direction:column;gap:5px}
+  .twk-row-h{flex-direction:row;align-items:center;justify-content:space-between;gap:10px}
+  .twk-lbl{display:flex;justify-content:space-between;align-items:baseline;
+    color:rgba(41,38,27,.72)}
+  .twk-lbl>span:first-child{font-weight:500}
+  .twk-val{color:rgba(41,38,27,.5);font-variant-numeric:tabular-nums}
+  .twk-sect{font-size:10px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;
+    color:rgba(41,38,27,.45);padding:10px 0 0}
+  .twk-sect:first-child{padding-top:0}
+  .twk-field{appearance:none;width:100%;height:26px;padding:0 8px;
+    border:.5px solid rgba(0,0,0,.1);border-radius:7px;
+    background:rgba(255,255,255,.6);color:inherit;font:inherit;outline:none}
+  .twk-field:focus{border-color:rgba(0,0,0,.25);background:rgba(255,255,255,.85)}
+  .twk-slider{appearance:none;-webkit-appearance:none;width:100%;height:4px;margin:6px 0;
+    border-radius:999px;background:rgba(0,0,0,.12);outline:none}
+  .twk-slider::-webkit-slider-thumb{-webkit-appearance:none;appearance:none;
+    width:14px;height:14px;border-radius:50%;background:#fff;
+    border:.5px solid rgba(0,0,0,.12);box-shadow:0 1px 3px rgba(0,0,0,.2);cursor:default}
+  .twk-slider::-moz-range-thumb{width:14px;height:14px;border-radius:50%;
+    background:#fff;border:.5px solid rgba(0,0,0,.12);box-shadow:0 1px 3px rgba(0,0,0,.2);cursor:default}
+  .twk-toggle{position:relative;width:32px;height:18px;border:0;border-radius:999px;
+    background:rgba(0,0,0,.15);transition:background .15s;cursor:default;padding:0}
+  .twk-toggle[data-on="1"]{background:#34c759}
+  .twk-toggle i{position:absolute;top:2px;left:2px;width:14px;height:14px;border-radius:50%;
+    background:#fff;box-shadow:0 1px 2px rgba(0,0,0,.25);transition:transform .15s}
+  .twk-toggle[data-on="1"] i{transform:translateX(14px)}
+  .twk-swatch{appearance:none;-webkit-appearance:none;width:56px;height:22px;
+    border:.5px solid rgba(0,0,0,.1);border-radius:6px;padding:0;cursor:default;
+    background:transparent;flex-shrink:0}
+  .twk-swatch::-webkit-color-swatch-wrapper{padding:0}
+  .twk-swatch::-webkit-color-swatch{border:0;border-radius:5.5px}
+  .twk-swatch::-moz-color-swatch{border:0;border-radius:5.5px}
+`;
+
+function useTweaks(defaults) {
+  const [values, setValues] = React.useState(defaults);
+  const setTweak = React.useCallback((keyOrEdits, val) => {
+    const edits = typeof keyOrEdits === 'object' && keyOrEdits !== null
+      ? keyOrEdits : { [keyOrEdits]: val };
+    setValues((prev) => ({ ...prev, ...edits }));
+  }, []);
+  return [values, setTweak];
+}
+
+function TweaksPanel({ title = 'Tweaks', children }) {
+  const [open, setOpen] = React.useState(false);
+  const dragRef = React.useRef(null);
+  const offsetRef = React.useRef({ x: 16, y: 16 });
+  const PAD = 16;
+
+  const clampToViewport = React.useCallback(() => {
+    const panel = dragRef.current;
+    if (!panel) return;
+    const w = panel.offsetWidth, h = panel.offsetHeight;
+    const maxRight = Math.max(PAD, window.innerWidth - w - PAD);
+    const maxBottom = Math.max(PAD, window.innerHeight - h - PAD);
+    offsetRef.current = {
+      x: Math.min(maxRight, Math.max(PAD, offsetRef.current.x)),
+      y: Math.min(maxBottom, Math.max(PAD, offsetRef.current.y)),
+    };
+    panel.style.right = offsetRef.current.x + 'px';
+    panel.style.bottom = offsetRef.current.y + 'px';
+  }, []);
+
+  React.useEffect(() => {
+    if (!open) return;
+    clampToViewport();
+    const ro = typeof ResizeObserver !== 'undefined' ? new ResizeObserver(clampToViewport) : null;
+    if (ro) { ro.observe(document.documentElement); return () => ro.disconnect(); }
+    window.addEventListener('resize', clampToViewport);
+    return () => window.removeEventListener('resize', clampToViewport);
+  }, [open, clampToViewport]);
+
+  const dismiss = () => setOpen(false);
+
+  const onDragStart = (e) => {
+    const panel = dragRef.current;
+    if (!panel) return;
+    const r = panel.getBoundingClientRect();
+    const sx = e.clientX, sy = e.clientY;
+    const startRight = window.innerWidth - r.right;
+    const startBottom = window.innerHeight - r.bottom;
+    const move = (ev) => {
+      offsetRef.current = { x: startRight - (ev.clientX - sx), y: startBottom - (ev.clientY - sy) };
+      clampToViewport();
+    };
+    const up = () => { window.removeEventListener('mousemove', move); window.removeEventListener('mouseup', up); };
+    window.addEventListener('mousemove', move);
+    window.addEventListener('mouseup', up);
+  };
+
+  return (
+    <>
+      <style>{__TWEAKS_STYLE}</style>
+      <button onClick={() => setOpen(o => !o)} style={{
+        position:'fixed', right:16, bottom:16, zIndex:2147483645,
+        background:'#1c1a17', color:'#fff', border:'none', borderRadius:10,
+        padding:'8px 16px', fontSize:13, fontWeight:700, cursor:'pointer',
+        fontFamily:'ui-sans-serif,system-ui,sans-serif',
+        display: open ? 'none' : 'flex', alignItems:'center', gap:6,
+        boxShadow:'0 4px 16px rgba(0,0,0,0.3)'
+      }}>⚙️ Tweaks</button>
+      {open && (
+        <div ref={dragRef} className="twk-panel" style={{ right: offsetRef.current.x, bottom: offsetRef.current.y }}>
+          <div className="twk-hd" onMouseDown={onDragStart}>
+            <b>{title}</b>
+            <button className="twk-x" onMouseDown={(e) => e.stopPropagation()} onClick={dismiss}>✕</button>
+          </div>
+          <div className="twk-body">{children}</div>
+        </div>
+      )}
+    </>
+  );
+}
+
+function TweakSection({ label, children }) {
+  return (<><div className="twk-sect">{label}</div>{children}</>);
+}
+
+function TweakRow({ label, value, children, inline = false }) {
+  return (
+    <div className={inline ? 'twk-row twk-row-h' : 'twk-row'}>
+      <div className="twk-lbl">
+        <span>{label}</span>
+        {value != null && <span className="twk-val">{value}</span>}
+      </div>
+      {children}
+    </div>
+  );
+}
+
+function TweakSlider({ label, value, min = 0, max = 100, step = 1, unit = '', onChange }) {
+  return (
+    <TweakRow label={label} value={`${value}${unit}`}>
+      <input type="range" className="twk-slider" min={min} max={max} step={step}
+             value={value} onChange={(e) => onChange(Number(e.target.value))} />
+    </TweakRow>
+  );
+}
+
+function TweakToggle({ label, value, onChange }) {
+  return (
+    <div className="twk-row twk-row-h">
+      <div className="twk-lbl"><span>{label}</span></div>
+      <button type="button" className="twk-toggle" data-on={value ? '1' : '0'}
+              role="switch" aria-checked={!!value} onClick={() => onChange(!value)}><i /></button>
+    </div>
+  );
+}
+
+function TweakText({ label, value, placeholder, onChange }) {
+  return (
+    <TweakRow label={label}>
+      <input className="twk-field" type="text" value={value} placeholder={placeholder}
+             onChange={(e) => onChange(e.target.value)} />
+    </TweakRow>
+  );
+}
+
+function TweakColor({ label, value, onChange }) {
+  return (
+    <div className="twk-row twk-row-h">
+      <div className="twk-lbl"><span>{label}</span></div>
+      <input type="color" className="twk-swatch" value={value} onChange={(e) => onChange(e.target.value)} />
+    </div>
+  );
+}
+  </script>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    html { scroll-behavior: smooth; }
+    body { font-family: 'Nunito Sans', sans-serif; background: #fffcf8; color: #1c1a17; -webkit-font-smoothing: antialiased; overflow-x: hidden; }
+    input:focus { outline: 2px solid #2A7D4F; outline-offset: 1px; }
+    ::placeholder { color: #bbb; }
+    button { cursor: pointer; }
+    a { cursor: pointer; }
+  </style>
+</head>
+<body>
+<div id="root"></div>
+<script type="text/babel">
+const { useState, useEffect, useRef, useCallback } = React;
+
+// ─── TWEAK DEFAULTS ──────────────────────────────────────────────────────────
+const TWEAK_DEFAULTS = /*EDITMODE-BEGIN*/{
+  "primaryColor": "#2A7D4F",
+  "accentColor": "#F4831F",
+  "accentColor2": "#3B82C4",
+  "heroHeadline": "Giv legetøjet nyt liv",
+  "heroSub": "Markedspladsen hvor danske institutioner køber, bytter og byder på brugt legetøj",
+  "showStats": true,
+  "roundness": 32
+}/*EDITMODE-END*/;
+
+// ─── DATA ─────────────────────────────────────────────────────────────────────
+const ALL_LISTINGS = [
+  { id:1, title:"LEGO Duplo stor kasse", type:"byt", institution:"Solsikken Vuggestue", city:"Aarhus", age:"1-3 år", price:null, img:"duplo", condition:"God", desc:"Stor kasse med blandede LEGO Duplo klodser. Ca. 200 stk. Enkelte stykker mangler, men det meste er intakt. Farverige og velegnede til de mindste.", bids:3 },
+  { id:2, title:"Træ-køkken med tilbehør", type:"køb", institution:"Regnbuen Børnehave", city:"København", age:"3-6 år", price:350, img:"kitchen", condition:"Meget god", desc:"Flot træ-køkken med medfølgende tilbehør: gryder, tallerkener, madvarer i træ. Lettere slitage på toppen. Afhentes i København NV.", bids:null },
+  { id:3, title:"Sandkasse-sæt (30 dele)", type:"byd", institution:"Havet SFO", city:"Odense", age:"3-8 år", price:null, img:"sand", condition:"Acceptabel", desc:"Komplet sandkasse-sæt med spande, former, skovle og harver. Sættes til salg da institutionen har fået nye. Startbud: 100 kr.", bids:7 },
+  { id:4, title:"Balancecykler × 4", type:"køb", institution:"Lindebjerg Skole", city:"Aalborg", age:"2-5 år", price:800, img:"bikes", condition:"God", desc:"4 stk. balancecykler i god stand. To er røde, to er blå. Alle har fungerende bremser. Sælges samlet.", bids:null },
+  { id:5, title:"Puslespil-samling (15 stk)", type:"byt", institution:"Månen Børnehave", city:"Esbjerg", age:"4-8 år", price:null, img:"puzzles", condition:"God", desc:"15 puslespil i varierende størrelser (24-100 brikker). De fleste er komplette. Ønsker at bytte mod motorik-legetøj eller kreative materialer.", bids:null },
+  { id:6, title:"Motorik-pude sæt", type:"byd", institution:"Stjernerne SFO", city:"Randers", age:"1-4 år", price:null, img:"motor", condition:"Ny", desc:"Næsten nyt sæt motorik-puder. 8 stk. i forskellige former og farver. Bruges til bevægelse og balance. Startbud: 200 kr.", bids:2 },
+  { id:7, title:"Rollespils-kostumer (20 stk)", type:"byt", institution:"Eventyrhaven Børnehave", city:"Vejle", age:"3-7 år", price:null, img:"costumes", condition:"God", desc:"20 rollespilskostumer inkl. prinsesse, ridder, dyrekostumer mv. Ønsker at bytte mod naturmaterialer eller bøger.", bids:null },
+  { id:8, title:"Klatrevæg-modul", type:"køb", institution:"Bakkeskolen SFO", city:"Kolding", age:"6-12 år", price:1200, img:"climb", condition:"Meget god", desc:"Fritstående klatrevæg-modul i træ. 180 cm høj, 120 cm bred. Alle greb intakte. Demonteret klar til afhentning.", bids:null },
+];
+
+const EMOJIS = { duplo:"🧱", kitchen:"🍳", sand:"🏖️", bikes:"🚲", puzzles:"🧩", motor:"🎯", costumes:"🎭", climb:"🧗" };
+const IMGCOLORS = { duplo:"#FFD166", kitchen:"#06D6A0", sand:"#FFB347", bikes:"#A78BFA", puzzles:"#EF476F", motor:"#118AB2", costumes:"#F4831F", climb:"#4CAF50" };
+
+const TYPE_CFG = {
+  køb: { label:"Køb", color:"#2A7D4F", bg:"#E8F5EE" },
+  byd: { label:"Byd", color:"#3B82C4", bg:"#E8F0FB" },
+  byt: { label:"Byt", color:"#F4831F", bg:"#FEF0E3" },
+};
+
+// ─── SHARED COMPONENTS ───────────────────────────────────────────────────────
+function Badge({ type }) {
+  const cfg = TYPE_CFG[type] || {};
+  return (
+    <span style={{
+      background: cfg.bg, color: cfg.color,
+      fontFamily:"'Nunito', sans-serif", fontWeight:700, fontSize:12,
+      padding:"3px 10px", borderRadius:99, display:"inline-block",
+      whiteSpace:"nowrap"
+    }}>{cfg.label}</span>
+  );
+}
+
+function Btn({ children, variant="primary", onClick, style={}, color="#2A7D4F", radius=12 }) {
+  const [hov, setHov] = useState(false);
+  const base = {
+    border:"none", borderRadius:radius, padding:"11px 24px",
+    fontSize:14, fontWeight:700, fontFamily:"'Nunito',sans-serif",
+    transition:"all 0.15s", display:"inline-flex", alignItems:"center", gap:8,
+    ...style
+  };
+  if (variant === "primary") return (
+    <button onClick={onClick}
+      onMouseEnter={()=>setHov(true)} onMouseLeave={()=>setHov(false)}
+      style={{ ...base, background:color, color:"#fff", boxShadow: hov ? `0 6px 20px ${color}60` : "none", transform: hov?"translateY(-1px)":"none" }}>
+      {children}
+    </button>
+  );
+  if (variant === "outline") return (
+    <button onClick={onClick}
+      onMouseEnter={()=>setHov(true)} onMouseLeave={()=>setHov(false)}
+      style={{ ...base, background: hov ? "#f5f5f5" : "#fff", color:"#333", border:"1.5px solid #ddd" }}>
+      {children}
+    </button>
+  );
+  if (variant === "ghost") return (
+    <button onClick={onClick}
+      onMouseEnter={()=>setHov(true)} onMouseLeave={()=>setHov(false)}
+      style={{ ...base, background:"transparent", color: hov ? color : "#666", padding:"8px 12px" }}>
+      {children}
+    </button>
+  );
+}
+
+// ─── MODAL ────────────────────────────────────────────────────────────────────
+function Modal({ open, onClose, children, title }) {
+  useEffect(() => {
+    if (open) document.body.style.overflow = "hidden";
+    else document.body.style.overflow = "";
+    return () => { document.body.style.overflow = ""; };
+  }, [open]);
+  if (!open) return null;
+  return (
+    <div onClick={onClose} style={{
+      position:"fixed", inset:0, background:"rgba(0,0,0,0.5)",
+      zIndex:1000, display:"flex", alignItems:"center", justifyContent:"center",
+      padding:24, backdropFilter:"blur(4px)"
+    }}>
+      <div onClick={e=>e.stopPropagation()} style={{
+        background:"#fff", borderRadius:20, padding:36, width:"100%",
+        maxWidth:480, boxShadow:"0 24px 60px rgba(0,0,0,0.2)",
+        maxHeight:"90vh", overflowY:"auto"
+      }}>
+        <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", marginBottom:24 }}>
+          <h2 style={{ fontFamily:"'Nunito',sans-serif", fontWeight:800, fontSize:22 }}>{title}</h2>
+          <button onClick={onClose} style={{
+            background:"#f5f5f5", border:"none", borderRadius:99,
+            width:32, height:32, fontSize:16, display:"flex",
+            alignItems:"center", justifyContent:"center", cursor:"pointer"
+          }}>✕</button>
+        </div>
+        {children}
+      </div>
+    </div>
+  );
+}
+
+// ─── TOAST ────────────────────────────────────────────────────────────────────
+function Toast({ msg, onDone }) {
+  useEffect(() => {
+    const t = setTimeout(onDone, 2800);
+    return () => clearTimeout(t);
+  }, []);
+  return (
+    <div style={{
+      position:"fixed", bottom:32, left:"50%", transform:"translateX(-50%)",
+      background:"#1c1a17", color:"#fff", borderRadius:99,
+      padding:"12px 24px", fontWeight:700, fontSize:14,
+      fontFamily:"'Nunito',sans-serif", zIndex:2000,
+      boxShadow:"0 8px 32px rgba(0,0,0,0.3)",
+      display:"flex", alignItems:"center", gap:10, whiteSpace:"nowrap"
+    }}>
+      <span style={{ fontSize:18 }}>✅</span> {msg}
+    </div>
+  );
+}
+
+// ─── NAV ──────────────────────────────────────────────────────────────────────
+function Nav({ page, setPage, tweaks, loggedIn, setLoggedIn }) {
+  const [scrolled, setScrolled] = useState(false);
+  useEffect(() => {
+    const fn = () => setScrolled(window.scrollY > 20);
+    window.addEventListener("scroll", fn);
+    return () => window.removeEventListener("scroll", fn);
+  }, []);
+
+  const navBg = (page === "home" && !scrolled)
+    ? "transparent"
+    : "rgba(255,252,248,0.96)";
+  const hasShadow = page !== "home" || scrolled;
+
+  return (
+    <nav style={{
+      position:"fixed", top:0, left:0, right:0, zIndex:500,
+      background: navBg,
+      backdropFilter: hasShadow ? "blur(12px)" : "none",
+      boxShadow: hasShadow ? "0 1px 0 rgba(0,0,0,0.06)" : "none",
+      transition:"all 0.25s", padding:"0 24px"
+    }}>
+      <div style={{
+        maxWidth:1140, margin:"0 auto",
+        display:"flex", alignItems:"center", height:68, gap:24
+      }}>
+        {/* Logo */}
+        <div onClick={()=>setPage("home")} style={{ display:"flex", alignItems:"center", gap:10, cursor:"pointer", flexShrink:0 }}>
+          <div style={{
+            width:36, height:36, borderRadius:10, background:tweaks.primaryColor,
+            display:"flex", alignItems:"center", justifyContent:"center", fontSize:20
+          }}>♻️</div>
+          <span style={{ fontFamily:"'Nunito',sans-serif", fontWeight:900, fontSize:20, letterSpacing:"-0.5px" }}>
+            <span style={{ color:tweaks.primaryColor }}>Legetøjs</span><span style={{ color:"#1c1a17" }}>Byt</span>
+          </span>
+        </div>
+
+        {/* Center links */}
+        <div style={{ display:"flex", gap:6, flex:1, justifyContent:"center" }}>
+          {[["opslag","Opslag"],["hvordan","Sådan virker det"]].map(([p,label]) => (
+            <button key={p} onClick={()=>setPage(p)} style={{
+              background:"none", border:"none", padding:"8px 14px",
+              fontSize:14, fontWeight:600, color: page===p ? tweaks.primaryColor : "#555",
+              borderRadius:8, cursor:"pointer", fontFamily:"'Nunito Sans',sans-serif",
+              borderBottom: page===p ? `2px solid ${tweaks.primaryColor}` : "2px solid transparent",
+              transition:"all 0.15s"
+            }}>{label}</button>
+          ))}
+        </div>
+
+        {/* Right */}
+        <div style={{ display:"flex", gap:10, alignItems:"center", flexShrink:0 }}>
+          {loggedIn
+            ? <>
+                <button onClick={()=>setPage("dashboard")} style={{
+                  background:"none", border:"none", fontWeight:600, fontSize:14,
+                  color:"#555", cursor:"pointer", padding:"8px 12px",
+                  borderRadius:8, fontFamily:"'Nunito Sans',sans-serif"
+                }}>Min institution</button>
+                <div style={{
+                  width:36, height:36, borderRadius:"50%", background:tweaks.primaryColor,
+                  display:"flex", alignItems:"center", justifyContent:"center",
+                  color:"#fff", fontWeight:800, fontSize:14, cursor:"pointer",
+                  fontFamily:"'Nunito',sans-serif"
+                }} onClick={()=>setLoggedIn(false)}>M</div>
+              </>
+            : <>
+                <Btn variant="ghost" onClick={()=>setPage("login")} color={tweaks.primaryColor} radius={tweaks.roundness}>Log ind</Btn>
+                <Btn variant="primary" onClick={()=>setPage("signup")} color={tweaks.primaryColor} radius={tweaks.roundness * 0.7}>
+                  Tilmeld institution
+                </Btn>
+              </>
+          }
+        </div>
+      </div>
+    </nav>
+  );
+}
+
+// ─── HOME PAGE ────────────────────────────────────────────────────────────────
+function HeroSection({ setPage, tweaks }) {
+  const [search, setSearch] = useState("");
+  const [activeType, setActiveType] = useState("alle");
+  const types = ["alle","Køb","Byd","Byt"];
+
+  function handleSearch(e) {
+    e.preventDefault();
+    setPage("opslag");
+  }
+
+  return (
+    <section style={{
+      minHeight:"100vh", display:"flex", alignItems:"center",
+      background:`linear-gradient(150deg,#fffcf8 0%,#f0f9f4 50%,#fff8f0 100%)`,
+      padding:"100px 24px 60px", position:"relative", overflow:"hidden"
+    }}>
+      <div style={{ position:"absolute", top:-80, right:-80, width:500, height:500, borderRadius:"50%", background:tweaks.primaryColor, opacity:0.06, pointerEvents:"none" }} />
+      <div style={{ position:"absolute", bottom:-100, left:-60, width:380, height:380, borderRadius:"50%", background:tweaks.accentColor, opacity:0.07, pointerEvents:"none" }} />
+      <div style={{ position:"absolute", top:"35%", right:"12%", width:160, height:160, borderRadius:"50%", background:tweaks.accentColor2, opacity:0.08, pointerEvents:"none" }} />
+
+      <div style={{ maxWidth:1140, margin:"0 auto", width:"100%" }}>
+        <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:60, alignItems:"center" }}>
+          <div>
+            <div style={{
+              display:"inline-flex", alignItems:"center", gap:8, background:"#fff",
+              border:"1.5px solid #e8e8e8", borderRadius:99, padding:"6px 16px",
+              marginBottom:28, fontSize:13, fontWeight:700, color:"#555"
+            }}>
+              <span style={{ width:8, height:8, borderRadius:"50%", background:tweaks.primaryColor, display:"inline-block" }}></span>
+              CVR-verificerede institutioner
+            </div>
+            <h1 style={{
+              fontFamily:"'Nunito',sans-serif", fontWeight:900,
+              fontSize:"clamp(36px,5vw,62px)", lineHeight:1.1,
+              letterSpacing:"-2px", marginBottom:20
+            }}>{tweaks.heroHeadline}</h1>
+            <p style={{ fontSize:18, color:"#666", lineHeight:1.65, marginBottom:36, maxWidth:460 }}>
+              {tweaks.heroSub}
+            </p>
+            <form onSubmit={handleSearch}>
+              <div style={{
+                background:"#fff", borderRadius:tweaks.roundness + 4,
+                boxShadow:"0 4px 24px rgba(0,0,0,0.10)", padding:8, marginBottom:16
+              }}>
+                <div style={{ display:"flex", gap:8 }}>
+                  <input value={search} onChange={e=>setSearch(e.target.value)}
+                    placeholder="Søg efter LEGO, cykel, køkken..."
+                    style={{
+                      flex:1, border:"none", outline:"none", fontSize:15,
+                      padding:"10px 16px", background:"transparent",
+                      fontFamily:"'Nunito Sans',sans-serif", color:"#1c1a17"
+                    }}
+                  />
+                  <button type="submit" style={{
+                    background:tweaks.primaryColor, color:"#fff", border:"none",
+                    borderRadius:tweaks.roundness, padding:"10px 24px",
+                    fontSize:15, fontWeight:700, fontFamily:"'Nunito',sans-serif"
+                  }}>Søg</button>
+                </div>
+              </div>
+            </form>
+            <div style={{ display:"flex", gap:8, flexWrap:"wrap" }}>
+              {types.map(t => (
+                <button key={t} onClick={()=>setActiveType(t)} style={{
+                  padding:"7px 18px", borderRadius:99,
+                  border: activeType===t ? "none" : "1.5px solid #ddd",
+                  background: activeType===t ? tweaks.primaryColor : "#fff",
+                  color: activeType===t ? "#fff" : "#555",
+                  fontSize:13, fontWeight:700, fontFamily:"'Nunito',sans-serif",
+                  transition:"all 0.15s"
+                }}>{t}</button>
+              ))}
+            </div>
+          </div>
+
+          {/* Right preview cards */}
+          <div style={{ display:"flex", flexDirection:"column", gap:16 }}>
+            <div style={{
+              background:"#fff", borderRadius:tweaks.roundness * 1.5,
+              padding:28, boxShadow:"0 8px 40px rgba(0,0,0,0.08)", position:"relative"
+            }}>
+              {[
+                { emoji:"🧸", title:"Bamse-samling × 8", type:"byt", inst:"Solen Vuggestue" },
+                { emoji:"🏗️", title:"Træklodser 500 stk", type:"køb", inst:"Egebjerget Børnehave" },
+                { emoji:"🛴", title:"Løbehjul × 6", type:"byd", inst:"Parkskolen SFO" },
+              ].map((item,i) => (
+                <div key={i} onClick={()=>setPage("opslag")} style={{
+                  display:"flex", alignItems:"center", gap:12, padding:"12px 14px",
+                  borderRadius:tweaks.roundness, background:i===1?"#f8faf8":"#fff",
+                  border:"1.5px solid #f0f0f0", marginBottom:i<2?10:0, cursor:"pointer",
+                  transition:"transform 0.15s", userSelect:"none"
+                }}>
+                  <div style={{
+                    width:44, height:44, borderRadius:12,
+                    background:["#FFF3D4","#E8F5EE","#E8F0FB"][i],
+                    display:"flex", alignItems:"center", justifyContent:"center",
+                    fontSize:24, flexShrink:0
+                  }}>{item.emoji}</div>
+                  <div style={{ flex:1 }}>
+                    <div style={{ fontFamily:"'Nunito',sans-serif", fontWeight:700, fontSize:14, marginBottom:2 }}>{item.title}</div>
+                    <div style={{ fontSize:12, color:"#999" }}>{item.inst}</div>
+                  </div>
+                  <Badge type={item.type} />
+                </div>
+              ))}
+              <div style={{
+                position:"absolute", top:-14, right:-10, background:"#fff",
+                borderRadius:12, boxShadow:"0 4px 16px rgba(0,0,0,0.12)",
+                padding:"8px 14px", display:"flex", alignItems:"center", gap:8
+              }}>
+                <span style={{ fontSize:18 }}>🎉</span>
+                <span style={{ fontFamily:"'Nunito',sans-serif", fontWeight:700, fontSize:12 }}>Nyt match fundet!</span>
+              </div>
+            </div>
+            <div style={{
+              background:"#fff", borderRadius:tweaks.roundness, padding:"14px 20px",
+              boxShadow:"0 2px 12px rgba(0,0,0,0.06)", display:"flex", alignItems:"center", gap:12
+            }}>
+              <div style={{
+                width:40, height:40, borderRadius:10, background:"#E8F5EE",
+                display:"flex", alignItems:"center", justifyContent:"center", fontSize:20, flexShrink:0
+              }}>✅</div>
+              <div style={{ flex:1 }}>
+                <div style={{ fontFamily:"'Nunito',sans-serif", fontWeight:700, fontSize:13 }}>CVR-verificeret</div>
+                <div style={{ fontSize:12, color:"#888" }}>Kun godkendte institutioner handler her</div>
+              </div>
+              <div style={{ textAlign:"right" }}>
+                <div style={{ fontFamily:"'Nunito',sans-serif", fontWeight:900, fontSize:20, color:tweaks.primaryColor }}>100%</div>
+                <div style={{ fontSize:11, color:"#aaa" }}>verificeret</div>
+              </div>
+            </div>
+            <Btn variant="primary" color={tweaks.primaryColor} radius={tweaks.roundness}
+              onClick={()=>setPage("opslag")} style={{ justifyContent:"center", fontSize:15, padding:"14px" }}>
+              Se alle opslag →
+            </Btn>
+          </div>
+        </div>
+      </div>
+    </section>
+  );
+}
+
+function StatsBar({ tweaks }) {
+  if (!tweaks.showStats) return null;
+  const stats = [
+    { n:"1.200+", label:"Institutioner", icon:"🏫" },
+    { n:"4.800+", label:"Aktive opslag", icon:"📦" },
+    { n:"12.000+", label:"Handler gennemført", icon:"🤝" },
+    { n:"98 ton", label:"Sparet legetøj", icon:"♻️" },
+  ];
+  return (
+    <section style={{ background:tweaks.primaryColor, padding:"36px 24px" }}>
+      <div style={{ maxWidth:1140, margin:"0 auto", display:"grid", gridTemplateColumns:"repeat(4,1fr)", gap:24, textAlign:"center" }}>
+        {stats.map((s,i) => (
+          <div key={i}>
+            <div style={{ fontSize:28, marginBottom:4 }}>{s.icon}</div>
+            <div style={{ fontFamily:"'Nunito',sans-serif", fontWeight:900, fontSize:32, color:"#fff", lineHeight:1 }}>{s.n}</div>
+            <div style={{ fontSize:14, color:"rgba(255,255,255,0.75)", marginTop:4, fontWeight:600 }}>{s.label}</div>
+          </div>
+        ))}
+      </div>
+    </section>
+  );
+}
+
+function HowItWorksSection({ tweaks }) {
+  const steps = [
+    { n:"01", icon:"🏢", title:"Registrér din institution", desc:"Angiv jeres CVR-nummer. Vi verificerer automatisk at I er en godkendt institution (vuggestue, børnehave, skole, SFO)." },
+    { n:"02", icon:"📸", title:"Opret et opslag", desc:"Tag billeder af legetøjet, beskriv tilstanden, vælg om det skal købes, byttes eller budes på." },
+    { n:"03", icon:"🚚", title:"Aftal og få hentet", desc:"Institutioner nær jer kontakter jer. Aftal afhentning eller brug vores transportservice." },
+  ];
+  return (
+    <section style={{ padding:"100px 24px", background:"#fffcf8" }}>
+      <div style={{ maxWidth:1140, margin:"0 auto" }}>
+        <div style={{ textAlign:"center", marginBottom:60 }}>
+          <h2 style={{ fontFamily:"'Nunito',sans-serif", fontWeight:800, fontSize:"clamp(28px,4vw,44px)", letterSpacing:"-0.5px" }}>Sådan virker det</h2>
+          <p style={{ color:"#888", marginTop:12, fontSize:17 }}>Kom i gang på under 5 minutter</p>
+        </div>
+        <div style={{ display:"grid", gridTemplateColumns:"repeat(3,1fr)", gap:32 }}>
+          {steps.map((s,i) => (
+            <div key={i} style={{
+              background:"#fff", borderRadius:tweaks.roundness * 1.2, padding:32,
+              boxShadow:"0 2px 16px rgba(0,0,0,0.06)", position:"relative", overflow:"hidden"
+            }}>
+              <div style={{
+                position:"absolute", top:-8, right:16,
+                fontFamily:"'Nunito',sans-serif", fontWeight:900, fontSize:80,
+                color:"#f5f5f5", lineHeight:1, userSelect:"none"
+              }}>{s.n}</div>
+              <div style={{
+                width:56, height:56, borderRadius:tweaks.roundness, background:"#f5f5f5",
+                display:"flex", alignItems:"center", justifyContent:"center", fontSize:28, marginBottom:20
+              }}>{s.icon}</div>
+              <h3 style={{ fontFamily:"'Nunito',sans-serif", fontWeight:800, fontSize:18, marginBottom:10 }}>{s.title}</h3>
+              <p style={{ color:"#777", lineHeight:1.65, fontSize:14 }}>{s.desc}</p>
+            </div>
+          ))}
+        </div>
+      </div>
+    </section>
+  );
+}
+
+function TradeTypesSection({ tweaks, setPage }) {
+  const [active, setActive] = useState("køb");
+  const types = {
+    køb: { label:"Køb", icon:"🏷️", color:tweaks.primaryColor, bg:"#E8F5EE", headline:"Find brugt legetøj til fast pris", desc:"Browse tusindvis af opslag fra verificerede institutioner. Køb direkte — alt fra LEGO og trælegetøj til udeudstyr og motorik-redskaber.", points:["Fast pris — ingen forhandling","Institutionsfaktura tilgængelig","Geosøgning — find tæt på jer","Søg på alder, type og mærke"] },
+    byd: { label:"Byd", icon:"📊", color:tweaks.accentColor2, bg:"#E8F0FB", headline:"Giv et bud og spar penge", desc:"Institutioner sætter startpris og lader interesserede byde. Perfekt til sjældent eller eftertragtet legetøj.", points:["Byd hvad I synes det er værd","Automatisk notifikation ved overbud","Tidsbegrænset auktion","Institutioner kan acceptere / afvise"] },
+    byt: { label:"Byt", icon:"🔄", color:tweaks.accentColor, bg:"#FEF0E3", headline:"Skab cirkulær økonomi", desc:"Har I noget I ikke bruger? Tilbyd det i bytte for noget I mangler. Smart, bæredygtigt — og gratis!", points:["Ingen penge involveret","Foreslå det I vil bytte med","Perfekt til sæsonudstyr","Platform-verificeret byttehandel"] },
+  };
+  const cfg = types[active];
+
+  return (
+    <section style={{ padding:"80px 24px", background:"#f8f5f0" }}>
+      <div style={{ maxWidth:1140, margin:"0 auto" }}>
+        <div style={{ textAlign:"center", marginBottom:48 }}>
+          <h2 style={{ fontFamily:"'Nunito',sans-serif", fontWeight:800, fontSize:"clamp(26px,3.5vw,42px)", letterSpacing:"-0.5px" }}>Tre måder at handle på</h2>
+          <p style={{ color:"#888", marginTop:10, fontSize:16 }}>Vælg den der passer jer bedst — eller brug alle tre</p>
+        </div>
+        <div style={{ display:"flex", gap:12, justifyContent:"center", marginBottom:40, flexWrap:"wrap" }}>
+          {Object.entries(types).map(([key,t]) => (
+            <button key={key} onClick={()=>setActive(key)} style={{
+              padding:"12px 28px", borderRadius:tweaks.roundness * 0.8, border:"none",
+              background: active===key ? t.color : "#fff",
+              color: active===key ? "#fff" : "#555",
+              fontFamily:"'Nunito',sans-serif", fontWeight:700, fontSize:16,
+              transition:"all 0.2s",
+              boxShadow: active===key ? `0 4px 16px ${t.color}50` : "0 2px 8px rgba(0,0,0,0.06)"
+            }}>{t.icon} {t.label}</button>
+          ))}
+        </div>
+        <div style={{
+          background:"#fff", borderRadius:tweaks.roundness * 1.5, padding:40,
+          boxShadow:"0 4px 24px rgba(0,0,0,0.07)",
+          display:"grid", gridTemplateColumns:"1fr 1fr", gap:40, alignItems:"center"
+        }}>
+          <div>
+            <div style={{
+              display:"inline-flex", alignItems:"center", gap:8, background:cfg.bg,
+              color:cfg.color, borderRadius:99, padding:"6px 16px",
+              fontFamily:"'Nunito',sans-serif", fontWeight:800, fontSize:14, marginBottom:20
+            }}>{cfg.icon} {cfg.label}</div>
+            <h3 style={{ fontFamily:"'Nunito',sans-serif", fontWeight:900, fontSize:28, marginBottom:14, letterSpacing:"-0.5px" }}>{cfg.headline}</h3>
+            <p style={{ color:"#666", lineHeight:1.7, fontSize:15, marginBottom:24 }}>{cfg.desc}</p>
+            <div style={{ display:"flex", flexDirection:"column", gap:10, marginBottom:28 }}>
+              {cfg.points.map((p,i) => (
+                <div key={i} style={{ display:"flex", alignItems:"center", gap:10 }}>
+                  <div style={{
+                    width:22, height:22, borderRadius:"50%", background:cfg.bg,
+                    color:cfg.color, display:"flex", alignItems:"center", justifyContent:"center",
+                    fontSize:12, fontWeight:700, flexShrink:0
+                  }}>✓</div>
+                  <span style={{ fontSize:14, color:"#555", fontWeight:600 }}>{p}</span>
+                </div>
+              ))}
+            </div>
+            <Btn variant="primary" color={cfg.color} radius={tweaks.roundness} onClick={()=>setPage("opslag")}>
+              Se {cfg.label}-opslag →
+            </Btn>
+          </div>
+          <div style={{
+            background:cfg.bg, borderRadius:tweaks.roundness, height:260,
+            display:"flex", flexDirection:"column", alignItems:"center", justifyContent:"center", gap:12
+          }}>
+            <span style={{ fontSize:80 }}>{cfg.icon}</span>
+            <span style={{ fontFamily:"monospace", fontSize:11, color:"#aaa" }}>[ {cfg.label}-illustration ]</span>
+          </div>
+        </div>
+      </div>
+    </section>
+  );
+}
+
+function ListingsPreview({ setPage, setActiveListing, tweaks }) {
+  const [filter, setFilter] = useState("alle");
+  const shown = filter==="alle" ? ALL_LISTINGS.slice(0,6) : ALL_LISTINGS.filter(l=>l.type===filter).slice(0,6);
+
+  return (
+    <section style={{ padding:"80px 24px", background:"#fffcf8" }}>
+      <div style={{ maxWidth:1140, margin:"0 auto" }}>
+        <div style={{ display:"flex", alignItems:"flex-end", justifyContent:"space-between", marginBottom:36, flexWrap:"wrap", gap:16 }}>
+          <div>
+            <h2 style={{ fontFamily:"'Nunito',sans-serif", fontWeight:800, fontSize:"clamp(24px,3vw,38px)", letterSpacing:"-0.5px" }}>Nyeste opslag</h2>
+            <p style={{ color:"#888", marginTop:6, fontSize:15 }}>Fra verificerede institutioner over hele Danmark</p>
+          </div>
+          <div style={{ display:"flex", gap:8 }}>
+            {["alle","køb","byd","byt"].map(f => (
+              <button key={f} onClick={()=>setFilter(f)} style={{
+                padding:"7px 18px", borderRadius:99,
+                border: filter===f ? "none" : "1.5px solid #ddd",
+                background: filter===f ? tweaks.primaryColor : "#fff",
+                color: filter===f ? "#fff" : "#555",
+                fontSize:13, fontWeight:700, fontFamily:"'Nunito',sans-serif",
+                transition:"all 0.15s", textTransform:"capitalize"
+              }}>{f}</button>
+            ))}
+          </div>
+        </div>
+        <div style={{ display:"grid", gridTemplateColumns:"repeat(auto-fill,minmax(260px,1fr))", gap:20 }}>
+          {shown.map(l => (
+            <ListingCard key={l.id} listing={l} tweaks={tweaks}
+              onClick={()=>{ setActiveListing(l); setPage("listing"); }} />
+          ))}
+        </div>
+        <div style={{ textAlign:"center", marginTop:40 }}>
+          <Btn variant="outline" onClick={()=>setPage("opslag")} radius={tweaks.roundness} style={{ padding:"13px 36px", fontSize:15 }}>
+            Se alle opslag →
+          </Btn>
+        </div>
+      </div>
+    </section>
+  );
+}
+
+function TrustSection({ setPage, tweaks }) {
+  return (
+    <section style={{ padding:"80px 24px", background:`linear-gradient(135deg,${tweaks.primaryColor} 0%,#1a5c38 100%)` }}>
+      <div style={{ maxWidth:1140, margin:"0 auto", display:"grid", gridTemplateColumns:"1fr 1fr", gap:60, alignItems:"center" }}>
+        <div>
+          <h2 style={{ fontFamily:"'Nunito',sans-serif", fontWeight:900, fontSize:"clamp(26px,3.5vw,42px)", color:"#fff", letterSpacing:"-0.5px", marginBottom:16 }}>
+            Kun for certificerede institutioner
+          </h2>
+          <p style={{ color:"rgba(255,255,255,0.8)", fontSize:17, lineHeight:1.65, marginBottom:32 }}>
+            Vi verificerer automatisk alle institutioner via CVR-registeret og branchekoderne. Ingen privatpersoner. Ingen usikre handler.
+          </p>
+          <div style={{ display:"flex", flexDirection:"column", gap:14 }}>
+            {[
+              ["🔍","Automatisk CVR-opslag","Vi tjekker branchekode og aktiv status med det samme"],
+              ["🏫","Godkendte institutioner","Vuggestuer, børnehaver, skoler, SFO'er og klubber"],
+              ["🔒","Sikker datahåndtering","GDPR-compliant og sikker drift"],
+            ].map(([icon,title,desc],i) => (
+              <div key={i} style={{
+                display:"flex", gap:16, alignItems:"flex-start",
+                background:"rgba(255,255,255,0.1)", borderRadius:tweaks.roundness, padding:"14px 18px"
+              }}>
+                <span style={{ fontSize:24, lineHeight:1 }}>{icon}</span>
+                <div>
+                  <div style={{ color:"#fff", fontWeight:700, fontSize:14, marginBottom:3, fontFamily:"'Nunito',sans-serif" }}>{title}</div>
+                  <div style={{ color:"rgba(255,255,255,0.7)", fontSize:13 }}>{desc}</div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+        {/* Signup form */}
+        <div style={{ background:"#fff", borderRadius:tweaks.roundness * 1.5, padding:36, boxShadow:"0 20px 60px rgba(0,0,0,0.2)" }}>
+          <h3 style={{ fontFamily:"'Nunito',sans-serif", fontWeight:800, fontSize:22, marginBottom:6 }}>Tilmeld jer i dag</h3>
+          <p style={{ color:"#888", fontSize:14, marginBottom:24 }}>Gratis at oprette profil. Ingen binding.</p>
+          <div style={{ display:"flex", flexDirection:"column", gap:14 }}>
+            {[
+              { label:"CVR-nummer", placeholder:"12345678", type:"text" },
+              { label:"Din e-mail", placeholder:"navn@institution.dk", type:"email" },
+              { label:"Vælg et kodeord", placeholder:"••••••••", type:"password" },
+            ].map((f,i) => (
+              <div key={i}>
+                <label style={{ display:"block", fontSize:13, fontWeight:700, color:"#333", marginBottom:6 }}>{f.label}</label>
+                <input type={f.type} placeholder={f.placeholder} readOnly style={{
+                  width:"100%", padding:"12px 14px", borderRadius:tweaks.roundness * 0.7,
+                  border:"1.5px solid #e5e5e5", fontSize:14, outline:"none",
+                  fontFamily:"'Nunito Sans',sans-serif", background:"#fafafa"
+                }} />
+              </div>
+            ))}
+            <div style={{
+              background:"#f0f9f4", border:"1.5px solid #c8e8d4",
+              borderRadius:tweaks.roundness * 0.6, padding:"10px 14px",
+              display:"flex", alignItems:"center", gap:10
+            }}>
+              <span style={{ fontSize:16 }}>✅</span>
+              <span style={{ fontSize:12, color:"#2A7D4F", fontWeight:600 }}>CVR bekræftes automatisk — ingen ventetid</span>
+            </div>
+            <Btn variant="primary" color={tweaks.primaryColor} radius={tweaks.roundness}
+              onClick={()=>setPage("signup")} style={{ justifyContent:"center", padding:"14px", fontSize:15 }}>
+              Opret institution gratis
+            </Btn>
+          </div>
+        </div>
+      </div>
+    </section>
+  );
+}
+
+function FooterSection({ setPage, tweaks }) {
+  return (
+    <footer style={{ background:"#1c1a17", color:"#aaa", padding:"60px 24px 36px" }}>
+      <div style={{ maxWidth:1140, margin:"0 auto" }}>
+        <div style={{ display:"grid", gridTemplateColumns:"2fr 1fr 1fr 1fr", gap:48, marginBottom:48 }}>
+          <div>
+            <div style={{ display:"flex", alignItems:"center", gap:10, marginBottom:16 }}>
+              <div style={{ width:32, height:32, borderRadius:8, background:tweaks.primaryColor, display:"flex", alignItems:"center", justifyContent:"center" }}>
+                <span style={{ fontSize:16 }}>♻️</span>
+              </div>
+              <span style={{ fontFamily:"'Nunito',sans-serif", fontWeight:900, fontSize:18, color:"#fff" }}>LegetøjsByt</span>
+            </div>
+            <p style={{ fontSize:14, lineHeight:1.65, maxWidth:260 }}>
+              Danmarks markedsplads for brugt institutionslegetøj. CVR-verificeret, sikkert og bæredygtigt.
+            </p>
+          </div>
+          {[
+            { title:"Platform", links:[["opslag","Opslag"],["opslag","Institutioner"],["hvordan","Sådan virker det"]] },
+            { title:"Support", links:[["home","Hjælpecenter"],["home","Kontakt os"],["home","Sikkerhed"],["home","GDPR"]] },
+            { title:"Om os", links:[["home","Om LegetøjsByt"],["home","Presse"],["home","Partnere"],["home","Karriere"]] },
+          ].map((col,i) => (
+            <div key={i}>
+              <div style={{ color:"#fff", fontWeight:700, fontSize:14, marginBottom:14, fontFamily:"'Nunito',sans-serif" }}>{col.title}</div>
+              <div style={{ display:"flex", flexDirection:"column", gap:8 }}>
+                {col.links.map(([p,l]) => (
+                  <a key={l} onClick={()=>setPage(p)} style={{ color:"#888", fontSize:14, cursor:"pointer" }}>{l}</a>
+                ))}
+              </div>
+            </div>
+          ))}
+        </div>
+        <div style={{ borderTop:"1px solid #333", paddingTop:24, display:"flex", justifyContent:"space-between", fontSize:13, flexWrap:"wrap", gap:12 }}>
+          <span>© 2025 LegetøjsByt ApS · CVR: 12345678</span>
+          <span>Lavet med ♻️ i Danmark</span>
+        </div>
+      </div>
+    </footer>
+  );
+}
+
+// ─── LISTING CARD ─────────────────────────────────────────────────────────────
+function ListingCard({ listing, tweaks, onClick }) {
+  const [hov, setHov] = useState(false);
+  const bg = IMGCOLORS[listing.img] || "#eee";
+  return (
+    <div onMouseEnter={()=>setHov(true)} onMouseLeave={()=>setHov(false)} onClick={onClick} style={{
+      background:"#fff", borderRadius:tweaks.roundness, overflow:"hidden", cursor:"pointer",
+      boxShadow: hov ? "0 12px 32px rgba(0,0,0,0.12)" : "0 2px 12px rgba(0,0,0,0.06)",
+      transition:"box-shadow 0.2s,transform 0.2s", transform:hov?"translateY(-4px)":"none"
+    }}>
+      <div style={{ height:160, background:bg, display:"flex", alignItems:"center", justifyContent:"center", position:"relative" }}>
+        <span style={{ opacity:0.15, fontSize:11, fontFamily:"monospace", position:"absolute", top:8, left:10, color:"#000" }}>
+          [ foto: {listing.title} ]
+        </span>
+        <span style={{ fontSize:56 }}>{EMOJIS[listing.img]}</span>
+        {listing.bids && (
+          <div style={{
+            position:"absolute", top:8, right:8, background:"#fff",
+            borderRadius:99, padding:"2px 10px", fontSize:11, fontWeight:700,
+            color:tweaks.accentColor2, fontFamily:"'Nunito',sans-serif"
+          }}>{listing.bids} bud</div>
+        )}
+      </div>
+      <div style={{ padding:"14px 16px 16px" }}>
+        <div style={{ display:"flex", alignItems:"center", gap:8, marginBottom:8 }}>
+          <Badge type={listing.type} />
+          <span style={{ fontSize:12, color:"#888", marginLeft:"auto" }}>{listing.city}</span>
+        </div>
+        <div style={{ fontFamily:"'Nunito',sans-serif", fontWeight:700, fontSize:15, marginBottom:4, lineHeight:1.3 }}>{listing.title}</div>
+        <div style={{ fontSize:12, color:"#888", marginBottom:10 }}>{listing.institution}</div>
+        <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between" }}>
+          <span style={{ background:"#f5f5f5", borderRadius:6, padding:"2px 8px", fontSize:11, color:"#555", fontWeight:600 }}>
+            {listing.age}
+          </span>
+          {listing.price
+            ? <span style={{ fontFamily:"'Nunito',sans-serif", fontWeight:800, fontSize:16, color:tweaks.primaryColor }}>{listing.price} kr.</span>
+            : <span style={{ fontSize:12, color:"#aaa" }}>Ingen fast pris</span>
+          }
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ─── OPSLAG LIST PAGE ─────────────────────────────────────────────────────────
+function OpslagPage({ setPage, setActiveListing, tweaks }) {
+  const [filter, setFilter] = useState("alle");
+  const [search, setSearch] = useState("");
+  const [city, setCity] = useState("alle");
+  const cities = ["alle","Aarhus","København","Odense","Aalborg","Esbjerg","Randers","Vejle","Kolding"];
+
+  const shown = ALL_LISTINGS.filter(l => {
+    const matchType = filter==="alle" || l.type===filter;
+    const matchCity = city==="alle" || l.city===city;
+    const matchSearch = !search || l.title.toLowerCase().includes(search.toLowerCase()) || l.institution.toLowerCase().includes(search.toLowerCase());
+    return matchType && matchCity && matchSearch;
+  });
+
+  return (
+    <div style={{ minHeight:"100vh", paddingTop:80, background:"#fffcf8" }}>
+      {/* Header */}
+      <div style={{ background:"#fff", borderBottom:"1px solid #f0f0f0", padding:"28px 24px" }}>
+        <div style={{ maxWidth:1140, margin:"0 auto" }}>
+          <h1 style={{ fontFamily:"'Nunito',sans-serif", fontWeight:900, fontSize:32, letterSpacing:"-0.5px", marginBottom:16 }}>Opslag</h1>
+          <div style={{ display:"flex", gap:12, flexWrap:"wrap", alignItems:"center" }}>
+            <div style={{
+              flex:1, minWidth:220, background:"#f8f8f8", borderRadius:tweaks.roundness * 0.7,
+              display:"flex", alignItems:"center", padding:"10px 16px", gap:10, border:"1.5px solid #ebebeb"
+            }}>
+              <span style={{ color:"#aaa", fontSize:16 }}>🔍</span>
+              <input value={search} onChange={e=>setSearch(e.target.value)}
+                placeholder="Søg i opslag..." style={{
+                  border:"none", background:"transparent", outline:"none",
+                  fontSize:14, fontFamily:"'Nunito Sans',sans-serif", flex:1
+                }} />
+            </div>
+            <select value={city} onChange={e=>setCity(e.target.value)} style={{
+              padding:"11px 16px", borderRadius:tweaks.roundness * 0.7, border:"1.5px solid #ebebeb",
+              fontSize:14, background:"#f8f8f8", fontFamily:"'Nunito Sans',sans-serif",
+              outline:"none", cursor:"pointer"
+            }}>
+              {cities.map(c => <option key={c} value={c}>{c==="alle" ? "Alle byer" : c}</option>)}
+            </select>
+            {["alle","køb","byd","byt"].map(f => (
+              <button key={f} onClick={()=>setFilter(f)} style={{
+                padding:"10px 20px", borderRadius:99,
+                border: filter===f ? "none" : "1.5px solid #ddd",
+                background: filter===f ? tweaks.primaryColor : "#fff",
+                color: filter===f ? "#fff" : "#555",
+                fontSize:13, fontWeight:700, fontFamily:"'Nunito',sans-serif",
+                transition:"all 0.15s", textTransform:"capitalize"
+              }}>{f}</button>
+            ))}
+          </div>
+        </div>
+      </div>
+
+      <div style={{ maxWidth:1140, margin:"0 auto", padding:"36px 24px" }}>
+        <p style={{ color:"#888", fontSize:14, marginBottom:24 }}>{shown.length} opslag fundet</p>
+        {shown.length === 0 ? (
+          <div style={{ textAlign:"center", padding:"80px 0", color:"#aaa" }}>
+            <div style={{ fontSize:56, marginBottom:16 }}>🔍</div>
+            <div style={{ fontFamily:"'Nunito',sans-serif", fontWeight:700, fontSize:18 }}>Ingen opslag fundet</div>
+            <p style={{ marginTop:8, fontSize:14 }}>Prøv at ændre dine filtre</p>
+          </div>
+        ) : (
+          <div style={{ display:"grid", gridTemplateColumns:"repeat(auto-fill,minmax(260px,1fr))", gap:20 }}>
+            {shown.map(l => (
+              <ListingCard key={l.id} listing={l} tweaks={tweaks}
+                onClick={()=>{ setActiveListing(l); setPage("listing"); }} />
+            ))}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ─── LISTING DETAIL PAGE ──────────────────────────────────────────────────────
+function ListingDetailPage({ listing, setPage, tweaks, showToast }) {
+  const [buyModal, setBuyModal] = useState(false);
+  const [bidModal, setBidModal] = useState(false);
+  const [swapModal, setSwapModal] = useState(false);
+  const [bidAmount, setBidAmount] = useState("");
+  const [swapOffer, setSwapOffer] = useState("");
+  const [msgText, setMsgText] = useState("");
+  const bg = IMGCOLORS[listing.img] || "#eee";
+
+  function handleBuy() {
+    setBuyModal(false);
+    showToast("Køb bekræftet! Institutionen kontakter jer snart.");
+  }
+  function handleBid() {
+    setBidModal(false);
+    showToast(`Bud på ${bidAmount} kr. afsendt!`);
+  }
+  function handleSwap() {
+    setSwapModal(false);
+    showToast("Bytteforslag sendt! Institutionen vender tilbage.");
+  }
+  function handleMsg(e) {
+    e.preventDefault();
+    setMsgText("");
+    showToast("Besked sendt!");
+  }
+
+  return (
+    <div style={{ minHeight:"100vh", paddingTop:80, background:"#fffcf8" }}>
+      {/* Back */}
+      <div style={{ maxWidth:1140, margin:"0 auto", padding:"24px 24px 0" }}>
+        <button onClick={()=>setPage("opslag")} style={{
+          background:"none", border:"none", fontSize:14, fontWeight:600,
+          color:"#555", cursor:"pointer", display:"flex", alignItems:"center", gap:6,
+          fontFamily:"'Nunito Sans',sans-serif"
+        }}>← Tilbage til opslag</button>
+      </div>
+
+      <div style={{ maxWidth:1140, margin:"0 auto", padding:"24px" }}>
+        <div style={{ display:"grid", gridTemplateColumns:"1fr 380px", gap:40, alignItems:"start" }}>
+          {/* Left */}
+          <div>
+            {/* Image */}
+            <div style={{
+              height:380, background:bg, borderRadius:tweaks.roundness * 1.5,
+              display:"flex", alignItems:"center", justifyContent:"center",
+              marginBottom:28, position:"relative", overflow:"hidden"
+            }}>
+              <span style={{ opacity:0.12, fontSize:13, fontFamily:"monospace", position:"absolute", top:12, left:16, color:"#000" }}>
+                [ produktfoto: {listing.title} ]
+              </span>
+              <span style={{ fontSize:100 }}>{EMOJIS[listing.img]}</span>
+            </div>
+
+            <div style={{ display:"flex", gap:10, marginBottom:20 }}>
+              <Badge type={listing.type} />
+              <span style={{ fontSize:13, color:"#888", display:"flex", alignItems:"center", gap:4 }}>📍 {listing.city}</span>
+              <span style={{ fontSize:13, color:"#888", display:"flex", alignItems:"center", gap:4 }}>👶 {listing.age}</span>
+              <span style={{ fontSize:13, color:listing.condition==="Ny"?"#2A7D4F":"#888", fontWeight:600 }}>
+                Stand: {listing.condition}
+              </span>
+            </div>
+
+            <h1 style={{ fontFamily:"'Nunito',sans-serif", fontWeight:900, fontSize:30, letterSpacing:"-0.5px", marginBottom:8 }}>{listing.title}</h1>
+            <p style={{ color:"#888", fontSize:14, marginBottom:20 }}>Opslået af <strong style={{ color:"#333" }}>{listing.institution}</strong></p>
+            <p style={{ color:"#555", lineHeight:1.75, fontSize:15, marginBottom:32 }}>{listing.desc}</p>
+
+            {/* Message */}
+            <div style={{ background:"#fff", borderRadius:tweaks.roundness, padding:24, boxShadow:"0 2px 12px rgba(0,0,0,0.06)" }}>
+              <h3 style={{ fontFamily:"'Nunito',sans-serif", fontWeight:800, fontSize:18, marginBottom:16 }}>Send besked til institutionen</h3>
+              <form onSubmit={handleMsg}>
+                <textarea value={msgText} onChange={e=>setMsgText(e.target.value)}
+                  placeholder="Hej, vi er interesserede i ..."
+                  rows={3} style={{
+                    width:"100%", padding:"12px 14px", borderRadius:tweaks.roundness * 0.7,
+                    border:"1.5px solid #e5e5e5", fontSize:14, resize:"vertical",
+                    fontFamily:"'Nunito Sans',sans-serif", marginBottom:12, outline:"none"
+                  }} />
+                <Btn variant="primary" color={tweaks.primaryColor} radius={tweaks.roundness}
+                  style={{ padding:"11px 24px" }}>Send besked</Btn>
+              </form>
+            </div>
+          </div>
+
+          {/* Right sticky panel */}
+          <div style={{ position:"sticky", top:96 }}>
+            <div style={{ background:"#fff", borderRadius:tweaks.roundness * 1.2, padding:28, boxShadow:"0 4px 24px rgba(0,0,0,0.10)", marginBottom:16 }}>
+              {listing.price && (
+                <div style={{ fontFamily:"'Nunito',sans-serif", fontWeight:900, fontSize:36, color:tweaks.primaryColor, marginBottom:8 }}>
+                  {listing.price} kr.
+                </div>
+              )}
+              {listing.bids && (
+                <div style={{ color:"#888", fontSize:13, marginBottom:16 }}>
+                  <strong style={{ color:tweaks.accentColor2, fontFamily:"'Nunito',sans-serif" }}>{listing.bids} bud</strong> afgivet
+                </div>
+              )}
+
+              <div style={{ display:"flex", flexDirection:"column", gap:10 }}>
+                {listing.type === "køb" && (
+                  <Btn variant="primary" color={tweaks.primaryColor} radius={tweaks.roundness}
+                    onClick={()=>setBuyModal(true)} style={{ justifyContent:"center", padding:"14px", fontSize:15 }}>
+                    🏷️ Køb nu
+                  </Btn>
+                )}
+                {listing.type === "byd" && (
+                  <Btn variant="primary" color={tweaks.accentColor2} radius={tweaks.roundness}
+                    onClick={()=>setBidModal(true)} style={{ justifyContent:"center", padding:"14px", fontSize:15 }}>
+                    📊 Afgiv bud
+                  </Btn>
+                )}
+                {listing.type === "byt" && (
+                  <Btn variant="primary" color={tweaks.accentColor} radius={tweaks.roundness}
+                    onClick={()=>setSwapModal(true)} style={{ justifyContent:"center", padding:"14px", fontSize:15 }}>
+                    🔄 Foreslå bytte
+                  </Btn>
+                )}
+                <Btn variant="outline" radius={tweaks.roundness}
+                  style={{ justifyContent:"center", padding:"13px", fontSize:14 }}>
+                  ♡ Gem opslag
+                </Btn>
+              </div>
+
+              <div style={{ borderTop:"1px solid #f0f0f0", marginTop:20, paddingTop:16, display:"flex", flexDirection:"column", gap:10 }}>
+                {[["🏢","Institution",listing.institution],["📍","By",listing.city],["👶","Aldersgruppe",listing.age],["⭐","Stand",listing.condition]].map(([icon,label,val],i) => (
+                  <div key={i} style={{ display:"flex", justifyContent:"space-between", fontSize:13 }}>
+                    <span style={{ color:"#888" }}>{icon} {label}</span>
+                    <span style={{ fontWeight:600 }}>{val}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* CVR badge */}
+            <div style={{
+              background:"#E8F5EE", borderRadius:tweaks.roundness, padding:"14px 18px",
+              display:"flex", gap:10, alignItems:"center"
+            }}>
+              <span style={{ fontSize:20 }}>✅</span>
+              <div>
+                <div style={{ fontFamily:"'Nunito',sans-serif", fontWeight:700, fontSize:13, color:"#2A7D4F" }}>CVR-verificeret institution</div>
+                <div style={{ fontSize:12, color:"#5a9a74" }}>Handler sker sikkert via platformen</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Modals */}
+      <Modal open={buyModal} onClose={()=>setBuyModal(false)} title="Bekræft køb">
+        <div style={{ display:"flex", flexDirection:"column", gap:16 }}>
+          <div style={{ background:"#f8f8f8", borderRadius:12, padding:16 }}>
+            <div style={{ fontFamily:"'Nunito',sans-serif", fontWeight:700, fontSize:16 }}>{listing.title}</div>
+            <div style={{ color:"#888", fontSize:13, marginTop:4 }}>{listing.institution} · {listing.city}</div>
+          </div>
+          <div style={{ display:"flex", justifyContent:"space-between", fontSize:15, fontWeight:600 }}>
+            <span>Pris</span>
+            <span style={{ color:tweaks.primaryColor, fontFamily:"'Nunito',sans-serif", fontWeight:900, fontSize:18 }}>{listing.price} kr.</span>
+          </div>
+          <div style={{ background:"#fffbef", border:"1.5px solid #ffe08a", borderRadius:10, padding:"12px 14px", fontSize:13, color:"#7a6000" }}>
+            💡 Betaling og afhentning aftales direkte med institutionen. Platformen verificerer blot handlen.
+          </div>
+          <Btn variant="primary" color={tweaks.primaryColor} radius={tweaks.roundness}
+            onClick={handleBuy} style={{ justifyContent:"center", padding:"14px", fontSize:15 }}>
+            Bekræft køb
+          </Btn>
+          <Btn variant="ghost" onClick={()=>setBuyModal(false)} style={{ justifyContent:"center" }}>Annuller</Btn>
+        </div>
+      </Modal>
+
+      <Modal open={bidModal} onClose={()=>setBidModal(false)} title="Afgiv bud">
+        <div style={{ display:"flex", flexDirection:"column", gap:16 }}>
+          <div style={{ background:"#f8f8f8", borderRadius:12, padding:16 }}>
+            <div style={{ fontFamily:"'Nunito',sans-serif", fontWeight:700, fontSize:16 }}>{listing.title}</div>
+            <div style={{ color:"#888", fontSize:13, marginTop:4 }}>{listing.bids} nuværende bud</div>
+          </div>
+          <div>
+            <label style={{ display:"block", fontSize:13, fontWeight:700, marginBottom:8 }}>Dit bud (kr.)</label>
+            <input type="number" value={bidAmount} onChange={e=>setBidAmount(e.target.value)}
+              placeholder="Fx 150" style={{
+                width:"100%", padding:"12px 14px", borderRadius:12, border:"1.5px solid #e5e5e5",
+                fontSize:16, fontFamily:"'Nunito',sans-serif", fontWeight:700, outline:"none"
+              }} />
+          </div>
+          <div style={{ background:"#E8F0FB", borderRadius:10, padding:"12px 14px", fontSize:13, color:"#1e4a8a" }}>
+            📊 Institutionen modtager dit bud og vender tilbage inden for 2 hverdage.
+          </div>
+          <Btn variant="primary" color={tweaks.accentColor2} radius={tweaks.roundness}
+            onClick={handleBid} style={{ justifyContent:"center", padding:"14px", fontSize:15 }}>
+            Send bud
+          </Btn>
+          <Btn variant="ghost" onClick={()=>setBidModal(false)} style={{ justifyContent:"center" }}>Annuller</Btn>
+        </div>
+      </Modal>
+
+      <Modal open={swapModal} onClose={()=>setSwapModal(false)} title="Foreslå bytte">
+        <div style={{ display:"flex", flexDirection:"column", gap:16 }}>
+          <div style={{ background:"#FEF0E3", borderRadius:12, padding:16 }}>
+            <div style={{ fontSize:13, color:"#c05a0a", fontWeight:600, marginBottom:4 }}>De tilbyder:</div>
+            <div style={{ fontFamily:"'Nunito',sans-serif", fontWeight:700, fontSize:16 }}>{listing.title}</div>
+          </div>
+          <div>
+            <label style={{ display:"block", fontSize:13, fontWeight:700, marginBottom:8 }}>I tilbyder til gengæld:</label>
+            <textarea value={swapOffer} onChange={e=>setSwapOffer(e.target.value)}
+              placeholder="Beskriv hvad I tilbyder i bytte, fx: '6 stk. bamser i god stand + et sæt kreativt materiale'"
+              rows={4} style={{
+                width:"100%", padding:"12px 14px", borderRadius:12, border:"1.5px solid #e5e5e5",
+                fontSize:14, resize:"none", fontFamily:"'Nunito Sans',sans-serif", outline:"none"
+              }} />
+          </div>
+          <div style={{ background:"#FEF0E3", borderRadius:10, padding:"12px 14px", fontSize:13, color:"#8a3e0a" }}>
+            🔄 Bytteforslaget sendes til institutionen, som kan acceptere, afslå eller komme med et modsvar.
+          </div>
+          <Btn variant="primary" color={tweaks.accentColor} radius={tweaks.roundness}
+            onClick={handleSwap} style={{ justifyContent:"center", padding:"14px", fontSize:15 }}>
+            Send bytteforslag
+          </Btn>
+          <Btn variant="ghost" onClick={()=>setSwapModal(false)} style={{ justifyContent:"center" }}>Annuller</Btn>
+        </div>
+      </Modal>
+    </div>
+  );
+}
+
+// ─── LOGIN PAGE ───────────────────────────────────────────────────────────────
+function LoginPage({ setPage, setLoggedIn, tweaks }) {
+  const [email, setEmail] = useState("");
+  const [pass, setPass] = useState("");
+  const [loading, setLoading] = useState(false);
+
+  function handleSubmit(e) {
+    e.preventDefault();
+    setLoading(true);
+    setTimeout(() => { setLoggedIn(true); setPage("dashboard"); }, 1200);
+  }
+
+  return (
+    <div style={{ minHeight:"100vh", display:"flex", alignItems:"center", justifyContent:"center", padding:"80px 24px", background:"linear-gradient(150deg,#fffcf8 0%,#f0f9f4 100%)" }}>
+      <div style={{ width:"100%", maxWidth:440 }}>
+        <div onClick={()=>setPage("home")} style={{ display:"flex", alignItems:"center", gap:10, cursor:"pointer", marginBottom:36, justifyContent:"center" }}>
+          <div style={{ width:40, height:40, borderRadius:12, background:tweaks.primaryColor, display:"flex", alignItems:"center", justifyContent:"center", fontSize:22 }}>♻️</div>
+          <span style={{ fontFamily:"'Nunito',sans-serif", fontWeight:900, fontSize:22, letterSpacing:"-0.5px" }}>
+            <span style={{ color:tweaks.primaryColor }}>Legetøjs</span>Byt
+          </span>
+        </div>
+        <div style={{ background:"#fff", borderRadius:tweaks.roundness * 1.5, padding:40, boxShadow:"0 8px 40px rgba(0,0,0,0.08)" }}>
+          <h1 style={{ fontFamily:"'Nunito',sans-serif", fontWeight:900, fontSize:28, marginBottom:8, textAlign:"center" }}>Velkommen tilbage</h1>
+          <p style={{ color:"#888", fontSize:14, textAlign:"center", marginBottom:28 }}>Log ind med jeres institutions-konto</p>
+          <form onSubmit={handleSubmit} style={{ display:"flex", flexDirection:"column", gap:16 }}>
+            <div>
+              <label style={{ display:"block", fontSize:13, fontWeight:700, marginBottom:6 }}>E-mail</label>
+              <input type="email" value={email} onChange={e=>setEmail(e.target.value)}
+                placeholder="navn@institution.dk"
+                style={{ width:"100%", padding:"12px 14px", borderRadius:tweaks.roundness * 0.7, border:"1.5px solid #e5e5e5", fontSize:14, fontFamily:"'Nunito Sans',sans-serif", outline:"none" }} />
+            </div>
+            <div>
+              <label style={{ display:"block", fontSize:13, fontWeight:700, marginBottom:6 }}>Kodeord</label>
+              <input type="password" value={pass} onChange={e=>setPass(e.target.value)}
+                placeholder="••••••••"
+                style={{ width:"100%", padding:"12px 14px", borderRadius:tweaks.roundness * 0.7, border:"1.5px solid #e5e5e5", fontSize:14, fontFamily:"'Nunito Sans',sans-serif", outline:"none" }} />
+            </div>
+            <a onClick={()=>{}} style={{ fontSize:13, color:tweaks.primaryColor, fontWeight:600, textAlign:"right", cursor:"pointer" }}>Glemt kodeord?</a>
+            <button type="submit" style={{
+              background: loading ? "#aaa" : tweaks.primaryColor, color:"#fff",
+              border:"none", borderRadius:tweaks.roundness, padding:"14px",
+              fontSize:15, fontWeight:700, fontFamily:"'Nunito',sans-serif",
+              cursor: loading ? "wait" : "pointer", transition:"all 0.2s"
+            }}>{loading ? "Logger ind..." : "Log ind"}</button>
+          </form>
+          <div style={{ textAlign:"center", marginTop:20, fontSize:13, color:"#888" }}>
+            Ikke tilmeldt? <a onClick={()=>setPage("signup")} style={{ color:tweaks.primaryColor, fontWeight:700, cursor:"pointer" }}>Opret institution</a>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ─── SIGNUP PAGE ──────────────────────────────────────────────────────────────
+function SignupPage({ setPage, setLoggedIn, tweaks }) {
+  const [step, setStep] = useState(1);
+  const [cvr, setCvr] = useState("");
+  const [cvrStatus, setCvrStatus] = useState(null); // null | "checking" | "ok" | "err"
+  const [cvrData, setCvrData] = useState(null);
+  const [email, setEmail] = useState("");
+  const [pass, setPass] = useState("");
+  const [name, setName] = useState("");
+
+  function checkCvr() {
+    if (cvr.length !== 8) return;
+    setCvrStatus("checking");
+    setTimeout(() => {
+      if (cvr === "00000000") {
+        setCvrStatus("err");
+      } else {
+        setCvrStatus("ok");
+        setCvrData({ name:"Solsikken Vuggestue & Børnehave", address:"Rosenvej 14, 8000 Aarhus", type:"Vuggestue/Børnehave" });
+      }
+    }, 1400);
+  }
+
+  function handleDone() {
+    setLoggedIn(true);
+    setPage("dashboard");
+  }
+
+  const steps = ["CVR-verificering","Opret konto","Færdig!"];
+
+  return (
+    <div style={{ minHeight:"100vh", display:"flex", alignItems:"center", justifyContent:"center", padding:"80px 24px", background:"linear-gradient(150deg,#fffcf8 0%,#f0f9f4 100%)" }}>
+      <div style={{ width:"100%", maxWidth:520 }}>
+        {/* Logo */}
+        <div onClick={()=>setPage("home")} style={{ display:"flex", alignItems:"center", gap:10, cursor:"pointer", marginBottom:32, justifyContent:"center" }}>
+          <div style={{ width:40, height:40, borderRadius:12, background:tweaks.primaryColor, display:"flex", alignItems:"center", justifyContent:"center", fontSize:22 }}>♻️</div>
+          <span style={{ fontFamily:"'Nunito',sans-serif", fontWeight:900, fontSize:22, letterSpacing:"-0.5px" }}>
+            <span style={{ color:tweaks.primaryColor }}>Legetøjs</span>Byt
+          </span>
+        </div>
+
+        {/* Steps indicator */}
+        <div style={{ display:"flex", gap:0, marginBottom:32, background:"#fff", borderRadius:tweaks.roundness, padding:"6px", boxShadow:"0 2px 12px rgba(0,0,0,0.06)" }}>
+          {steps.map((s,i) => (
+            <div key={i} style={{
+              flex:1, textAlign:"center", padding:"10px 8px",
+              borderRadius:tweaks.roundness - 4,
+              background: step===i+1 ? tweaks.primaryColor : "transparent",
+              transition:"all 0.2s"
+            }}>
+              <div style={{ fontSize:12, fontWeight:700, fontFamily:"'Nunito',sans-serif", color:step===i+1?"#fff":step>i+1?tweaks.primaryColor:"#bbb" }}>
+                {step > i+1 ? "✓ " : `${i+1}. `}{s}
+              </div>
+            </div>
+          ))}
+        </div>
+
+        <div style={{ background:"#fff", borderRadius:tweaks.roundness * 1.5, padding:40, boxShadow:"0 8px 40px rgba(0,0,0,0.08)" }}>
+          {/* Step 1: CVR */}
+          {step === 1 && (
+            <div>
+              <h2 style={{ fontFamily:"'Nunito',sans-serif", fontWeight:900, fontSize:26, marginBottom:8 }}>Verificér jeres institution</h2>
+              <p style={{ color:"#888", fontSize:14, marginBottom:28 }}>Vi bruger CVR-nummeret til at bekræfte at I er en godkendt institution.</p>
+              <div style={{ marginBottom:16 }}>
+                <label style={{ display:"block", fontSize:13, fontWeight:700, marginBottom:6 }}>CVR-nummer (8 cifre)</label>
+                <div style={{ display:"flex", gap:10 }}>
+                  <input value={cvr} onChange={e=>setCvr(e.target.value.replace(/\D/g,"").slice(0,8))}
+                    placeholder="12345678" maxLength={8}
+                    style={{
+                      flex:1, padding:"12px 14px", borderRadius:tweaks.roundness * 0.7,
+                      border:"1.5px solid " + (cvrStatus==="err"?"#ef4444":cvrStatus==="ok"?"#2A7D4F":"#e5e5e5"),
+                      fontSize:16, letterSpacing:2, fontFamily:"'Nunito',sans-serif",
+                      fontWeight:700, outline:"none"
+                    }} />
+                  <Btn variant="primary" color={tweaks.primaryColor} radius={tweaks.roundness}
+                    onClick={checkCvr} style={{ flexShrink:0 }}>
+                    {cvrStatus==="checking" ? "Tjekker..." : "Tjek CVR"}
+                  </Btn>
+                </div>
+              </div>
+
+              {cvrStatus === "checking" && (
+                <div style={{ background:"#f8f8f8", borderRadius:10, padding:"12px 16px", fontSize:13, color:"#888", display:"flex", gap:10 }}>
+                  <span>⏳</span> Slår CVR op i Erhvervsstyrelsens register...
+                </div>
+              )}
+              {cvrStatus === "err" && (
+                <div style={{ background:"#FEF2F2", border:"1.5px solid #fca5a5", borderRadius:10, padding:"12px 16px", fontSize:13, color:"#b91c1c" }}>
+                  ❌ CVR-nummeret er ikke fundet eller institutionen er ikke aktiv. Kontrollér nummeret.
+                </div>
+              )}
+              {cvrStatus === "ok" && cvrData && (
+                <div>
+                  <div style={{ background:"#E8F5EE", border:"1.5px solid #a7d7b8", borderRadius:10, padding:"16px", marginBottom:20 }}>
+                    <div style={{ display:"flex", gap:10, alignItems:"flex-start" }}>
+                      <span style={{ fontSize:20 }}>✅</span>
+                      <div>
+                        <div style={{ fontFamily:"'Nunito',sans-serif", fontWeight:800, fontSize:15, color:"#1a5c38", marginBottom:4 }}>Institution verificeret!</div>
+                        <div style={{ fontSize:14, fontWeight:700 }}>{cvrData.name}</div>
+                        <div style={{ fontSize:13, color:"#555", marginTop:2 }}>{cvrData.address}</div>
+                        <div style={{ display:"inline-block", background:"#d1fae5", color:"#065f46", fontSize:11, fontWeight:700, borderRadius:6, padding:"2px 8px", marginTop:6 }}>{cvrData.type}</div>
+                      </div>
+                    </div>
+                  </div>
+                  <Btn variant="primary" color={tweaks.primaryColor} radius={tweaks.roundness}
+                    onClick={()=>setStep(2)} style={{ justifyContent:"center", width:"100%", padding:"14px", fontSize:15 }}>
+                    Fortsæt →
+                  </Btn>
+                </div>
+              )}
+              <div style={{ textAlign:"center", marginTop:20, fontSize:13, color:"#888" }}>
+                Allerede tilmeldt? <a onClick={()=>setPage("login")} style={{ color:tweaks.primaryColor, fontWeight:700, cursor:"pointer" }}>Log ind</a>
+              </div>
+            </div>
+          )}
+
+          {/* Step 2: Account */}
+          {step === 2 && (
+            <div>
+              <h2 style={{ fontFamily:"'Nunito',sans-serif", fontWeight:900, fontSize:26, marginBottom:8 }}>Opret jeres konto</h2>
+              <p style={{ color:"#888", fontSize:14, marginBottom:28 }}>Disse oplysninger bruges til at logge ind og kommunikere med andre institutioner.</p>
+              <div style={{ display:"flex", flexDirection:"column", gap:14 }}>
+                <div>
+                  <label style={{ display:"block", fontSize:13, fontWeight:700, marginBottom:6 }}>Kontaktpersonens navn</label>
+                  <input value={name} onChange={e=>setName(e.target.value)} placeholder="Fornavn Efternavn"
+                    style={{ width:"100%", padding:"12px 14px", borderRadius:tweaks.roundness * 0.7, border:"1.5px solid #e5e5e5", fontSize:14, fontFamily:"'Nunito Sans',sans-serif", outline:"none" }} />
+                </div>
+                <div>
+                  <label style={{ display:"block", fontSize:13, fontWeight:700, marginBottom:6 }}>E-mail</label>
+                  <input type="email" value={email} onChange={e=>setEmail(e.target.value)} placeholder="navn@institution.dk"
+                    style={{ width:"100%", padding:"12px 14px", borderRadius:tweaks.roundness * 0.7, border:"1.5px solid #e5e5e5", fontSize:14, fontFamily:"'Nunito Sans',sans-serif", outline:"none" }} />
+                </div>
+                <div>
+                  <label style={{ display:"block", fontSize:13, fontWeight:700, marginBottom:6 }}>Vælg kodeord</label>
+                  <input type="password" value={pass} onChange={e=>setPass(e.target.value)} placeholder="Mindst 8 tegn"
+                    style={{ width:"100%", padding:"12px 14px", borderRadius:tweaks.roundness * 0.7, border:"1.5px solid #e5e5e5", fontSize:14, fontFamily:"'Nunito Sans',sans-serif", outline:"none" }} />
+                </div>
+                <div style={{ background:"#f8f8f8", borderRadius:10, padding:"12px 14px", fontSize:12, color:"#888" }}>
+                  🔒 Vi deler aldrig dine oplysninger med tredjeparter. Læs vores <a style={{ color:tweaks.primaryColor, fontWeight:600 }}>privatlivspolitik</a>.
+                </div>
+                <Btn variant="primary" color={tweaks.primaryColor} radius={tweaks.roundness}
+                  onClick={()=>setStep(3)} style={{ justifyContent:"center", padding:"14px", fontSize:15 }}>
+                  Opret institution →
+                </Btn>
+                <button onClick={()=>setStep(1)} style={{ background:"none", border:"none", color:"#888", fontSize:13, cursor:"pointer" }}>← Tilbage</button>
+              </div>
+            </div>
+          )}
+
+          {/* Step 3: Done */}
+          {step === 3 && (
+            <div style={{ textAlign:"center" }}>
+              <div style={{ fontSize:72, marginBottom:16 }}>🎉</div>
+              <h2 style={{ fontFamily:"'Nunito',sans-serif", fontWeight:900, fontSize:28, marginBottom:10 }}>Velkommen til LegetøjsByt!</h2>
+              <p style={{ color:"#888", fontSize:15, lineHeight:1.65, marginBottom:32 }}>
+                Jeres institution er nu oprettet og verificeret. I kan straks begynde at browse og oprette opslag.
+              </p>
+              <div style={{ display:"flex", flexDirection:"column", gap:10 }}>
+                <Btn variant="primary" color={tweaks.primaryColor} radius={tweaks.roundness}
+                  onClick={handleDone} style={{ justifyContent:"center", padding:"14px", fontSize:15 }}>
+                  Gå til min institution →
+                </Btn>
+                <Btn variant="outline" radius={tweaks.roundness}
+                  onClick={()=>setPage("opslag")} style={{ justifyContent:"center", padding:"13px", fontSize:14 }}>
+                  Browse opslag
+                </Btn>
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ─── DASHBOARD PAGE ───────────────────────────────────────────────────────────
+function DashboardPage({ setPage, tweaks, showToast }) {
+  const [newOpslagOpen, setNewOpslagOpen] = useState(false);
+  const [opslagStep, setOpslagStep] = useState(1);
+  const [formData, setFormData] = useState({ title:"", type:"køb", price:"", age:"3-6 år", desc:"", condition:"God" });
+
+  function handleCreate() {
+    setNewOpslagOpen(false);
+    setOpslagStep(1);
+    showToast("Opslag oprettet og publiceret!");
+  }
+
+  const myListings = ALL_LISTINGS.slice(0,3);
+
+  return (
+    <div style={{ minHeight:"100vh", paddingTop:80, background:"#f8f5f0" }}>
+      <div style={{ maxWidth:1140, margin:"0 auto", padding:"36px 24px" }}>
+        {/* Header */}
+        <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", marginBottom:36 }}>
+          <div>
+            <h1 style={{ fontFamily:"'Nunito',sans-serif", fontWeight:900, fontSize:30, letterSpacing:"-0.5px" }}>Min institution</h1>
+            <p style={{ color:"#888", fontSize:14, marginTop:4 }}>Solsikken Vuggestue · CVR: 12345678 · Aarhus</p>
+          </div>
+          <Btn variant="primary" color={tweaks.primaryColor} radius={tweaks.roundness}
+            onClick={()=>setNewOpslagOpen(true)} style={{ fontSize:15, padding:"12px 24px" }}>
+            + Opret opslag
+          </Btn>
+        </div>
+
+        {/* Stats */}
+        <div style={{ display:"grid", gridTemplateColumns:"repeat(4,1fr)", gap:16, marginBottom:32 }}>
+          {[
+            { icon:"📦", n:3, label:"Aktive opslag" },
+            { icon:"🤝", n:7, label:"Handler" },
+            { icon:"💬", n:2, label:"Ulæste beskeder" },
+            { icon:"⭐", n:"4.8", label:"Rating" },
+          ].map((s,i) => (
+            <div key={i} style={{ background:"#fff", borderRadius:tweaks.roundness, padding:"20px 24px", boxShadow:"0 2px 12px rgba(0,0,0,0.06)" }}>
+              <div style={{ fontSize:24, marginBottom:6 }}>{s.icon}</div>
+              <div style={{ fontFamily:"'Nunito',sans-serif", fontWeight:900, fontSize:28, lineHeight:1 }}>{s.n}</div>
+              <div style={{ fontSize:13, color:"#888", marginTop:4 }}>{s.label}</div>
+            </div>
+          ))}
+        </div>
+
+        {/* My listings */}
+        <div style={{ background:"#fff", borderRadius:tweaks.roundness * 1.2, padding:28, boxShadow:"0 2px 12px rgba(0,0,0,0.06)" }}>
+          <h2 style={{ fontFamily:"'Nunito',sans-serif", fontWeight:800, fontSize:20, marginBottom:20 }}>Mine opslag</h2>
+          <div style={{ display:"flex", flexDirection:"column", gap:12 }}>
+            {myListings.map(l => (
+              <div key={l.id} style={{
+                display:"flex", alignItems:"center", gap:16, padding:"14px 16px",
+                border:"1.5px solid #f0f0f0", borderRadius:tweaks.roundness * 0.8
+              }}>
+                <div style={{
+                  width:52, height:52, borderRadius:10,
+                  background:IMGCOLORS[l.img], display:"flex", alignItems:"center",
+                  justifyContent:"center", fontSize:28, flexShrink:0
+                }}>{EMOJIS[l.img]}</div>
+                <div style={{ flex:1 }}>
+                  <div style={{ fontFamily:"'Nunito',sans-serif", fontWeight:700, fontSize:14 }}>{l.title}</div>
+                  <div style={{ fontSize:12, color:"#888", marginTop:2 }}>{l.city} · {l.age}</div>
+                </div>
+                <Badge type={l.type} />
+                <div style={{ fontSize:13, color:"#2A7D4F", fontWeight:700, fontFamily:"'Nunito',sans-serif" }}>
+                  {l.price ? `${l.price} kr.` : l.bids ? `${l.bids} bud` : "Intet bud"}
+                </div>
+                <button style={{
+                  background:"#f5f5f5", border:"none", borderRadius:8, padding:"6px 14px",
+                  fontSize:12, fontWeight:600, cursor:"pointer"
+                }}>Rediger</button>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+
+      {/* New listing modal */}
+      <Modal open={newOpslagOpen} onClose={()=>{ setNewOpslagOpen(false); setOpslagStep(1); }} title={`Opret opslag — Trin ${opslagStep}/2`}>
+        {opslagStep === 1 && (
+          <div style={{ display:"flex", flexDirection:"column", gap:14 }}>
+            <div>
+              <label style={{ display:"block", fontSize:13, fontWeight:700, marginBottom:6 }}>Titel</label>
+              <input value={formData.title} onChange={e=>setFormData({...formData,title:e.target.value})}
+                placeholder="Fx: LEGO Duplo stor kasse" style={{ width:"100%", padding:"11px 14px", borderRadius:10, border:"1.5px solid #e5e5e5", fontSize:14, fontFamily:"'Nunito Sans',sans-serif", outline:"none" }} />
+            </div>
+            <div>
+              <label style={{ display:"block", fontSize:13, fontWeight:700, marginBottom:8 }}>Handelsform</label>
+              <div style={{ display:"flex", gap:8 }}>
+                {["køb","byd","byt"].map(t => (
+                  <button key={t} onClick={()=>setFormData({...formData,type:t})} style={{
+                    flex:1, padding:"10px", borderRadius:10, border:"none",
+                    background: formData.type===t ? TYPE_CFG[t].bg : "#f5f5f5",
+                    color: formData.type===t ? TYPE_CFG[t].color : "#888",
+                    fontFamily:"'Nunito',sans-serif", fontWeight:700, fontSize:13,
+                    border: formData.type===t ? `2px solid ${TYPE_CFG[t].color}` : "2px solid transparent"
+                  }}>{TYPE_CFG[t].label}</button>
+                ))}
+              </div>
+            </div>
+            {formData.type === "køb" && (
+              <div>
+                <label style={{ display:"block", fontSize:13, fontWeight:700, marginBottom:6 }}>Pris (kr.)</label>
+                <input type="number" value={formData.price} onChange={e=>setFormData({...formData,price:e.target.value})}
+                  placeholder="Fx 250" style={{ width:"100%", padding:"11px 14px", borderRadius:10, border:"1.5px solid #e5e5e5", fontSize:14, fontFamily:"'Nunito Sans',sans-serif", outline:"none" }} />
+              </div>
+            )}
+            <div>
+              <label style={{ display:"block", fontSize:13, fontWeight:700, marginBottom:6 }}>Aldersgruppe</label>
+              <select value={formData.age} onChange={e=>setFormData({...formData,age:e.target.value})} style={{ width:"100%", padding:"11px 14px", borderRadius:10, border:"1.5px solid #e5e5e5", fontSize:14, fontFamily:"'Nunito Sans',sans-serif", outline:"none", background:"#fff" }}>
+                {["0-1 år","1-3 år","3-6 år","6-10 år","10+ år"].map(a => <option key={a}>{a}</option>)}
+              </select>
+            </div>
+            <Btn variant="primary" color={tweaks.primaryColor} radius={12}
+              onClick={()=>setOpslagStep(2)} style={{ justifyContent:"center", padding:"13px", fontSize:14 }}>
+              Næste →
+            </Btn>
+          </div>
+        )}
+        {opslagStep === 2 && (
+          <div style={{ display:"flex", flexDirection:"column", gap:14 }}>
+            <div>
+              <label style={{ display:"block", fontSize:13, fontWeight:700, marginBottom:6 }}>Beskrivelse</label>
+              <textarea value={formData.desc} onChange={e=>setFormData({...formData,desc:e.target.value})}
+                placeholder="Beskriv legetøjets stand, hvad der medfølger, eventuelle fejl..." rows={4}
+                style={{ width:"100%", padding:"11px 14px", borderRadius:10, border:"1.5px solid #e5e5e5", fontSize:14, resize:"none", fontFamily:"'Nunito Sans',sans-serif", outline:"none" }} />
+            </div>
+            <div>
+              <label style={{ display:"block", fontSize:13, fontWeight:700, marginBottom:6 }}>Stand</label>
+              <div style={{ display:"flex", gap:8, flexWrap:"wrap" }}>
+                {["Ny","Meget god","God","Acceptabel"].map(c => (
+                  <button key={c} onClick={()=>setFormData({...formData,condition:c})} style={{
+                    padding:"8px 16px", borderRadius:99,
+                    border: formData.condition===c ? `2px solid ${tweaks.primaryColor}` : "2px solid #e5e5e5",
+                    background: formData.condition===c ? "#E8F5EE" : "#fff",
+                    color: formData.condition===c ? tweaks.primaryColor : "#555",
+                    fontSize:13, fontWeight:600, fontFamily:"'Nunito',sans-serif"
+                  }}>{c}</button>
+                ))}
+              </div>
+            </div>
+            {/* Photo placeholder */}
+            <div style={{
+              border:"2px dashed #ddd", borderRadius:12, padding:"28px 20px",
+              textAlign:"center", background:"#fafafa"
+            }}>
+              <div style={{ fontSize:36, marginBottom:8 }}>📸</div>
+              <div style={{ fontWeight:700, fontSize:14, marginBottom:4 }}>Tilføj billeder</div>
+              <div style={{ fontSize:12, color:"#aaa" }}>Klik for at uploade (maks 10 billeder)</div>
+            </div>
+            <div style={{ display:"flex", gap:10 }}>
+              <button onClick={()=>setOpslagStep(1)} style={{ flex:1, padding:"13px", borderRadius:12, background:"#f5f5f5", border:"none", fontWeight:700, cursor:"pointer", fontFamily:"'Nunito',sans-serif" }}>← Tilbage</button>
+              <Btn variant="primary" color={tweaks.primaryColor} radius={12}
+                onClick={handleCreate} style={{ flex:2, justifyContent:"center", padding:"13px", fontSize:14 }}>
+                Publicer opslag ✓
+              </Btn>
+            </div>
+          </div>
+        )}
+      </Modal>
+    </div>
+  );
+}
+
+// ─── HOW IT WORKS PAGE ────────────────────────────────────────────────────────
+function HowItWorksPage({ setPage, tweaks }) {
+  return (
+    <div style={{ minHeight:"100vh", paddingTop:80, background:"#fffcf8" }}>
+      <div style={{ maxWidth:900, margin:"0 auto", padding:"60px 24px" }}>
+        <div style={{ textAlign:"center", marginBottom:60 }}>
+          <h1 style={{ fontFamily:"'Nunito',sans-serif", fontWeight:900, fontSize:42, letterSpacing:"-1px", marginBottom:12 }}>Sådan virker LegetøjsByt</h1>
+          <p style={{ color:"#888", fontSize:18, lineHeight:1.65, maxWidth:560, margin:"0 auto" }}>
+            En tryg markedsplads kun for verificerede institutioner
+          </p>
+        </div>
+        {[
+          { n:"01", icon:"🏢", color:"#E8F5EE", title:"Registrér jeres institution", desc:"Angiv jeres CVR-nummer — vi slår det automatisk op i Erhvervsstyrelsens register og bekræfter at I er en godkendt institution (vuggestue, børnehave, skole, SFO eller klub). Det tager under 30 sekunder." },
+          { n:"02", icon:"📸", color:"#E8F0FB", title:"Opret et opslag", desc:"Beskriv legetøjet, tag billeder, og vælg om det skal sælges til fast pris, byder på auktion, eller byttes. Opslaget er synligt for alle verificerede institutioner i hele landet." },
+          { n:"03", icon:"🤝", color:"#FEF0E3", title:"Kom i kontakt", desc:"Interesserede institutioner sender jer en besked, afgiver et bud eller foreslår et bytte. I modtager notifikationer på e-mail og kan svare direkte fra platformen." },
+          { n:"04", icon:"🚚", color:"#E8F5EE", title:"Aftal afhentning", desc:"Aftaling sker direkte via vores beskedsystem. I vælger selv om I vil afhente, sende med pakkeprivat, eller bruge vores transportservice (kører faste ruter i Jylland og på Sjælland)." },
+        ].map((s,i) => (
+          <div key={i} style={{
+            display:"flex", gap:28, marginBottom:32, alignItems:"flex-start",
+            background:"#fff", borderRadius:tweaks.roundness * 1.2, padding:28,
+            boxShadow:"0 2px 16px rgba(0,0,0,0.06)"
+          }}>
+            <div style={{
+              width:64, height:64, borderRadius:tweaks.roundness, background:s.color,
+              display:"flex", alignItems:"center", justifyContent:"center",
+              fontSize:32, flexShrink:0
+            }}>{s.icon}</div>
+            <div>
+              <div style={{ fontSize:11, fontWeight:800, color:"#bbb", letterSpacing:2, marginBottom:6 }}>TRIN {s.n}</div>
+              <h3 style={{ fontFamily:"'Nunito',sans-serif", fontWeight:800, fontSize:20, marginBottom:8 }}>{s.title}</h3>
+              <p style={{ color:"#666", lineHeight:1.75, fontSize:15 }}>{s.desc}</p>
+            </div>
+          </div>
+        ))}
+        <div style={{ textAlign:"center", marginTop:48 }}>
+          <Btn variant="primary" color={tweaks.primaryColor} radius={tweaks.roundness}
+            onClick={()=>setPage("signup")} style={{ fontSize:16, padding:"15px 40px" }}>
+            Tilmeld institution gratis →
+          </Btn>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ─── HOME PAGE ─────────────────────────────────────────────────────────────
+function HomePage({ setPage, setActiveListing, tweaks }) {
+  return (
+    <>
+      <HeroSection setPage={setPage} tweaks={tweaks} />
+      <StatsBar tweaks={tweaks} />
+      <HowItWorksSection tweaks={tweaks} />
+      <TradeTypesSection tweaks={tweaks} setPage={setPage} />
+      <ListingsPreview setPage={setPage} setActiveListing={setActiveListing} tweaks={tweaks} />
+      <TrustSection setPage={setPage} tweaks={tweaks} />
+      <FooterSection setPage={setPage} tweaks={tweaks} />
+    </>
+  );
+}
+
+// ─── APP ──────────────────────────────────────────────────────────────────────
+function App() {
+  const [tweaks, setTweak] = useTweaks(TWEAK_DEFAULTS);
+  const [page, setPage] = useState("home");
+  const [activeListing, setActiveListing] = useState(null);
+  const [loggedIn, setLoggedIn] = useState(false);
+  const [toast, setToast] = useState(null);
+
+  function showToast(msg) { setToast(msg); }
+  function navigate(p) {
+    setPage(p);
+    window.scrollTo({ top:0, behavior:"smooth" });
+  }
+
+  return (
+    <div>
+      <Nav page={page} setPage={navigate} tweaks={tweaks} loggedIn={loggedIn} setLoggedIn={setLoggedIn} />
+
+      {page === "home" && <HomePage setPage={navigate} setActiveListing={setActiveListing} tweaks={tweaks} />}
+      {page === "opslag" && <OpslagPage setPage={navigate} setActiveListing={setActiveListing} tweaks={tweaks} />}
+      {page === "listing" && activeListing && <ListingDetailPage listing={activeListing} setPage={navigate} tweaks={tweaks} showToast={showToast} />}
+      {page === "login" && <LoginPage setPage={navigate} setLoggedIn={setLoggedIn} tweaks={tweaks} />}
+      {page === "signup" && <SignupPage setPage={navigate} setLoggedIn={setLoggedIn} tweaks={tweaks} />}
+      {page === "dashboard" && <DashboardPage setPage={navigate} tweaks={tweaks} showToast={showToast} />}
+      {page === "hvordan" && <HowItWorksPage setPage={navigate} tweaks={tweaks} />}
+
+      {toast && <Toast msg={toast} onDone={()=>setToast(null)} />}
+
+      <TweaksPanel>
+        <TweakSection label="Farver">
+          <TweakColor label="Primærfarve" value={tweaks.primaryColor} onChange={v=>setTweak("primaryColor",v)} />
+          <TweakColor label="Accent (orange)" value={tweaks.accentColor} onChange={v=>setTweak("accentColor",v)} />
+          <TweakColor label="Accent (blå)" value={tweaks.accentColor2} onChange={v=>setTweak("accentColor2",v)} />
+        </TweakSection>
+        <TweakSection label="Hero tekst">
+          <TweakText label="Overskrift" value={tweaks.heroHeadline} onChange={v=>setTweak("heroHeadline",v)} />
+          <TweakText label="Underoverskrift" value={tweaks.heroSub} onChange={v=>setTweak("heroSub",v)} />
+        </TweakSection>
+        <TweakSection label="Layout">
+          <TweakSlider label="Hjørnerunding" value={tweaks.roundness} onChange={v=>setTweak("roundness",v)} min={4} max={32} step={2} />
+          <TweakToggle label="Vis statistik-bar" value={tweaks.showStats} onChange={v=>setTweak("showStats",v)} />
+        </TweakSection>
+      </TweaksPanel>
+    </div>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById("root")).render(<App />);
+</script>
+</body>
+</html>
