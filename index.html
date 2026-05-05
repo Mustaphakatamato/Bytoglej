@@ -714,6 +714,36 @@ function LoginPage({ setPage, setLoggedIn }) {
   );
 }
 
+// ─── SIGNUP HELPERS (udenfor komponenten så de ikke remountes ved re-render) ───
+function SField({label, hint, children}) {
+  return (
+    <div>
+      <label style={{display:'block',fontSize:13,fontWeight:700,marginBottom:5}}>
+        {label}{hint&&<span style={{fontWeight:400,color:'#aaa',marginLeft:6}}>{hint}</span>}
+      </label>
+      {children}
+    </div>
+  );
+}
+function SInput({value, onChange, type='text', placeholder, ...rest}) {
+  return (
+    <input type={type} value={value} onChange={onChange} placeholder={placeholder}
+      style={{width:'100%',padding:'11px 14px',borderRadius:12,border:'1.5px solid #e5e5e5',fontSize:14,fontFamily:"'Nunito Sans',sans-serif",outline:'none'}} {...rest} />
+  );
+}
+function SChoiceGroup({value, onChange, options, primary}) {
+  return (
+    <div style={{display:'flex',gap:8,flexWrap:'wrap'}}>
+      {options.map(o=>(
+        <button key={o} type="button" onClick={()=>onChange(o)}
+          style={{padding:'9px 16px',borderRadius:20,border:`2px solid ${value===o?primary:'#e5e5e5'}`,background:value===o?primary:'#fff',color:value===o?'#fff':'#444',fontSize:13,fontWeight:600,cursor:'pointer',transition:'all 0.15s'}}>
+          {o}
+        </button>
+      ))}
+    </div>
+  );
+}
+
 // ─── SIGNUP ───────────────────────────────────────────────────────────────────
 function SignupPage({ setPage, setLoggedIn, showToast }) {
   const [step, setStep]           = useState(1);
@@ -789,34 +819,6 @@ function SignupPage({ setPage, setLoggedIn, showToast }) {
     else { setLoggedIn(true); setPage('dashboard'); showToast('Velkommen til LegetøjsByt! 🎉'); }
   }
 
-  const F = ({label, children, hint}) => (
-    <div>
-      <label style={{display:'block',fontSize:13,fontWeight:700,marginBottom:5}}>{label}{hint&&<span style={{fontWeight:400,color:'#aaa',marginLeft:6}}>{hint}</span>}</label>
-      {children}
-    </div>
-  );
-  const Input = ({k, type='text', ph, ...rest}) => (
-    <input type={type} value={form[k]} onChange={e=>set(k,e.target.value)} placeholder={ph}
-      style={{width:'100%',padding:'11px 14px',borderRadius:12,border:'1.5px solid #e5e5e5',fontSize:14,fontFamily:"'Nunito Sans',sans-serif",outline:'none'}} {...rest} />
-  );
-  const Select = ({k, options}) => (
-    <select value={form[k]} onChange={e=>set(k,e.target.value)}
-      style={{width:'100%',padding:'11px 14px',borderRadius:12,border:`1.5px solid ${form[k]?'#e5e5e5':'#e5e5e5'}`,fontSize:14,fontFamily:"'Nunito Sans',sans-serif",outline:'none',background:'#fff',appearance:'none',cursor:'pointer'}}>
-      <option value="">Vælg…</option>
-      {options.map(o=><option key={o} value={o}>{o}</option>)}
-    </select>
-  );
-  const ChoiceGroup = ({k, options}) => (
-    <div style={{display:'flex',gap:8,flexWrap:'wrap'}}>
-      {options.map(o=>(
-        <button key={o} type="button" onClick={()=>set(k,o)}
-          style={{padding:'9px 16px',borderRadius:20,border:`2px solid ${form[k]===o?PRIMARY:'#e5e5e5'}`,background:form[k]===o?PRIMARY:'#fff',color:form[k]===o?'#fff':'#444',fontSize:13,fontWeight:600,cursor:'pointer',transition:'all 0.15s'}}>
-          {o}
-        </button>
-      ))}
-    </div>
-  );
-
   const steps = ['CVR','Om institutionen','Leder & kontakt','Opret konto'];
   const stepTitles = ['Verificér institution','Om institutionen','Institutionsleder','Opret konto'];
   const stepSubs   = ['Vi slår institutionen op via CVR-registret','Fortæl os lidt mere om jer','Hvem er den daglige leder?','Vælg login til platformen'];
@@ -859,7 +861,7 @@ function SignupPage({ setPage, setLoggedIn, showToast }) {
           {/* ── Step 1: CVR ── */}
           {step===1 && (
             <div style={{display:'flex',flexDirection:'column',gap:16}}>
-              <F label="CVR-nummer (8 cifre)">
+              <SField label="CVR-nummer (8 cifre)">
                 <div style={{display:'flex',gap:10}}>
                   <input value={cvr} onChange={e=>setCvr(e.target.value.replace(/\D/g,'').slice(0,8))} placeholder="12345678" maxLength={8}
                     onKeyDown={e=>e.key==='Enter'&&checkCvr()}
@@ -868,7 +870,7 @@ function SignupPage({ setPage, setLoggedIn, showToast }) {
                     {cvrStatus==='checking'?<><Spinner/>Tjekker…</>:'Slå op'}
                   </Btn>
                 </div>
-              </F>
+              </SField>
               {cvrStatus==='err' && <div style={{background:'#FEF2F2',border:'1.5px solid #fca5a5',borderRadius:10,padding:'12px 16px',fontSize:13,color:'#b91c1c'}}>❌ CVR-nummeret ikke fundet i registret. Kontrollér nummeret.</div>}
               {cvrStatus==='ok' && cvrData && (
                 <div>
@@ -891,22 +893,22 @@ function SignupPage({ setPage, setLoggedIn, showToast }) {
           {/* ── Step 2: Om institutionen ── */}
           {step===2 && (
             <div style={{display:'flex',flexDirection:'column',gap:18}}>
-              <F label="Institutionstype">
-                <ChoiceGroup k="inst_type" options={['Vuggestue','Børnehave','Integreret institution','SFO / KSFO','Andet']} />
-              </F>
-              <F label="Driftsform">
-                <ChoiceGroup k="ownership" options={['Offentlig','Privat','Selvejende']} />
-              </F>
+              <SField label="Institutionstype">
+                <SChoiceGroup value={form.inst_type} onChange={v=>set('inst_type',v)} primary={PRIMARY} options={['Vuggestue','Børnehave','Integreret institution','SFO / KSFO','Andet']} />
+              </SField>
+              <SField label="Driftsform">
+                <SChoiceGroup value={form.ownership} onChange={v=>set('ownership',v)} primary={PRIMARY} options={['Offentlig','Privat','Selvejende']} />
+              </SField>
               <div style={{display:'grid',gridTemplateColumns:'1fr 120px',gap:12}}>
-                <F label="Adresse"><Input k="address" ph="Vejnavn og husnummer" /></F>
-                <F label="Postnr."><Input k="zipcode" ph="1234" /></F>
+                <SField label="Adresse"><SInput value={form.address} onChange={e=>set('address',e.target.value)} placeholder="Vejnavn og husnummer" /></SField>
+                <SField label="Postnr."><SInput value={form.zipcode} onChange={e=>set('zipcode',e.target.value)} placeholder="1234" /></SField>
               </div>
-              <F label="By"><Input k="city" ph="Fx København" /></F>
+              <SField label="By"><SInput value={form.city} onChange={e=>set('city',e.target.value)} placeholder="Fx København" /></SField>
               <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:12}}>
-                <F label="Institutionens telefon"><Input k="inst_phone" ph="+45 12 34 56 78" /></F>
-                <F label="Antal indskrevne børn"><Input k="children_count" type="number" ph="Fx 60" /></F>
+                <SField label="Institutionens telefon"><SInput value={form.inst_phone} onChange={e=>set('inst_phone',e.target.value)} placeholder="+45 12 34 56 78" /></SField>
+                <SField label="Antal indskrevne børn"><SInput value={form.children_count} onChange={e=>set('children_count',e.target.value)} type="number" placeholder="Fx 60" /></SField>
               </div>
-              <F label="Hjemmeside" hint="(valgfri)"><Input k="website" ph="https://min-institution.dk" /></F>
+              <SField label="Hjemmeside" hint="(valgfri)"><SInput value={form.website} onChange={e=>set('website',e.target.value)} placeholder="https://min-institution.dk" /></SField>
               {authError && <div style={{background:'#FEF2F2',border:'1.5px solid #fca5a5',borderRadius:10,padding:'12px 16px',fontSize:13,color:'#b91c1c'}}>❌ {authError}</div>}
               <div style={{display:'flex',gap:10,marginTop:4}}>
                 <Btn variant="outline" radius={22} onClick={()=>setStep(1)} style={{padding:'12px 20px',fontSize:14}}>← Tilbage</Btn>
@@ -921,10 +923,10 @@ function SignupPage({ setPage, setLoggedIn, showToast }) {
               <div style={{background:'#f8f5f0',borderRadius:12,padding:'12px 16px',fontSize:13,color:'#666'}}>
                 ℹ️ Disse oplysninger vises ikke offentligt, men bruges ved henvendelse om opslag.
               </div>
-              <F label="Institutionslederens fulde navn"><Input k="leader_name" ph="Fornavn Efternavn" /></F>
+              <SField label="Institutionslederens fulde navn"><SInput value={form.leader_name} onChange={e=>set('leader_name',e.target.value)} placeholder="Fornavn Efternavn" /></SField>
               <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:12}}>
-                <F label="Telefon"><Input k="leader_phone" ph="+45 12 34 56 78" /></F>
-                <F label="E-mail"><Input k="leader_email" type="email" ph="leder@institution.dk" /></F>
+                <SField label="Telefon"><SInput value={form.leader_phone} onChange={e=>set('leader_phone',e.target.value)} placeholder="+45 12 34 56 78" /></SField>
+                <SField label="E-mail"><SInput value={form.leader_email} onChange={e=>set('leader_email',e.target.value)} type="email" placeholder="leder@institution.dk" /></SField>
               </div>
               {authError && <div style={{background:'#FEF2F2',border:'1.5px solid #fca5a5',borderRadius:10,padding:'12px 16px',fontSize:13,color:'#b91c1c'}}>❌ {authError}</div>}
               <div style={{display:'flex',gap:10,marginTop:4}}>
@@ -940,9 +942,9 @@ function SignupPage({ setPage, setLoggedIn, showToast }) {
               <div style={{background:'#f8f5f0',borderRadius:12,padding:'12px 16px',fontSize:13,color:'#666'}}>
                 ℹ️ Det er disse oplysninger I logger ind med. Det kan være den samme person som lederen, eller en administrator.
               </div>
-              <F label="Dit fulde navn"><Input k="contact_name" ph="Fornavn Efternavn" /></F>
-              <F label="E-mail (bruges til login)"><Input k="email" type="email" ph="din@email.dk" /></F>
-              <F label="Kodeord" hint="(mindst 6 tegn)"><Input k="pass" type="password" ph="••••••••" /></F>
+              <SField label="Dit fulde navn"><SInput value={form.contact_name} onChange={e=>set('contact_name',e.target.value)} placeholder="Fornavn Efternavn" /></SField>
+              <SField label="E-mail (bruges til login)"><SInput value={form.email} onChange={e=>set('email',e.target.value)} type="email" placeholder="din@email.dk" /></SField>
+              <SField label="Kodeord" hint="(mindst 6 tegn)"><SInput value={form.pass} onChange={e=>set('pass',e.target.value)} type="password" placeholder="••••••••" /></SField>
               {authError && <div style={{background:'#FEF2F2',border:'1.5px solid #fca5a5',borderRadius:10,padding:'12px 16px',fontSize:13,color:'#b91c1c'}}>❌ {authError}</div>}
               <div style={{display:'flex',gap:10,marginTop:4}}>
                 <Btn variant="outline" radius={22} onClick={()=>setStep(3)} style={{padding:'12px 20px',fontSize:14}}>← Tilbage</Btn>
