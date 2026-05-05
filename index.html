@@ -1086,10 +1086,25 @@ function DashboardPage({ setPage, showToast, allListings, onListingCreated, inst
     setNewOpen(false); resetModal();
     showToast('Opslag publiceret! 🎉');
     onListingCreated();
+    // Genindlæs egne opslag direkte så dashboardet opdateres med det samme
+    if (institution?.name) {
+      const { data } = await db.from('listings').select('*').eq('institution_name', institution.name).eq('is_active', true).order('created_at', { ascending: false });
+      if (data) setMyListings(data);
+    }
   }
 
-  const myListings = allListings.filter(l=>l.institution_name===(institution?.name));
+  const [myListings, setMyListings] = useState([]);
   const favListings = allListings.filter(l=>favs?.includes(l.id));
+
+  useEffect(() => {
+    if (!institution?.name) return;
+    db.from('listings')
+      .select('*')
+      .eq('institution_name', institution.name)
+      .eq('is_active', true)
+      .order('created_at', { ascending: false })
+      .then(({ data }) => { if (data) setMyListings(data); });
+  }, [institution?.name, allListings]);
 
   return (
     <div style={{ minHeight:'100vh', paddingTop:80, background:'#f8f5f0' }} className="page-enter">
