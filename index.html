@@ -716,14 +716,20 @@ function LoginPage({ setPage, setLoggedIn }) {
 
 // ─── SIGNUP ───────────────────────────────────────────────────────────────────
 function SignupPage({ setPage, setLoggedIn, showToast }) {
-  const [step, setStep]         = useState(1);
-  const [cvr, setCvr]           = useState('');
+  const [step, setStep]           = useState(1);
+  const [cvr, setCvr]             = useState('');
   const [cvrStatus, setCvrStatus] = useState(null);
-  const [cvrData, setCvrData]   = useState(null);
-  const [form, setForm]         = useState({ name:'', email:'', pass:'' });
-  const [saving, setSaving]     = useState(false);
+  const [cvrData, setCvrData]     = useState(null);
+  const [saving, setSaving]       = useState(false);
   const [authError, setAuthError] = useState(null);
   const [needsConfirm, setNeedsConfirm] = useState(false);
+  const [form, setForm] = useState({
+    inst_type:'', ownership:'', address:'', zipcode:'', city:'',
+    children_count:'', inst_phone:'', website:'',
+    leader_name:'', leader_phone:'', leader_email:'',
+    contact_name:'', email:'', pass:''
+  });
+  const set = (k,v) => setForm(f=>({...f,[k]:v}));
 
   async function checkCvr() {
     if (cvr.length!==8) return;
@@ -733,116 +739,243 @@ function SignupPage({ setPage, setLoggedIn, showToast }) {
       const data = await res.json();
       if (!data || data.error) throw new Error('ikke fundet');
       setCvrStatus('ok');
-      setCvrData({
-        name: data.name,
-        address: `${data.address}, ${data.zipcode} ${data.city}`,
-        city: data.city || 'Danmark',
-        type: data.company_type || 'Institution'
-      });
-    } catch {
-      setCvrStatus('err');
-    }
+      const cd = { name:data.name, address:data.address||'', zipcode:data.zipcode||'', city:data.city||'', type:data.company_type||'Institution' };
+      setCvrData(cd);
+      setForm(f=>({...f, address:cd.address, zipcode:cd.zipcode, city:cd.city}));
+    } catch { setCvrStatus('err'); }
   }
 
-  async function handleDone() {
-    if (!form.email || form.pass.length < 6) { setAuthError('Udfyld e-mail og mindst 6-tegns kodeord'); return; }
+  function validateStep2() {
+    if (!form.inst_type) return 'Vælg institutionstype';
+    if (!form.ownership) return 'Vælg driftsform';
+    if (!form.address.trim()) return 'Udfyld adresse';
+    if (!form.city.trim()) return 'Udfyld by';
+    return null;
+  }
+  function validateStep3() {
+    if (!form.leader_name.trim()) return 'Udfyld institutionslederens navn';
+    if (!form.leader_phone.trim()) return 'Udfyld telefonnummer';
+    if (!form.leader_email.trim() || !form.leader_email.includes('@')) return 'Udfyld gyldig e-mail';
+    return null;
+  }
+  function validateStep4() {
+    if (!form.contact_name.trim()) return 'Udfyld dit navn';
+    if (!form.email.trim() || !form.email.includes('@')) return 'Udfyld gyldig e-mail';
+    if (form.pass.length < 6) return 'Kodeord skal være mindst 6 tegn';
+    return null;
+  }
+
+  async function handleCreate() {
+    const err = validateStep4();
+    if (err) { setAuthError(err); return; }
     setSaving(true); setAuthError(null);
     const { data, error } = await db.auth.signUp({
       email: form.email, password: form.pass,
-      options: { data: { full_name: form.name } }
+      options: { data: { full_name: form.contact_name } }
     });
     if (error) { setAuthError(error.message); setSaving(false); return; }
-    await db.from('institutions').insert({ cvr, name:cvrData.name, address:cvrData.address, type:cvrData.type, email:form.email, city:cvrData.city||'Danmark' });
+    await db.from('institutions').insert({
+      cvr, name: cvrData.name,
+      institution_type: form.inst_type,
+      ownership_type: form.ownership,
+      address: form.address, zipcode: form.zipcode, city: form.city,
+      children_count: Number(form.children_count)||null,
+      phone: form.inst_phone||null, website: form.website||null,
+      leader_name: form.leader_name, leader_phone: form.leader_phone, leader_email: form.leader_email,
+      contact_name: form.contact_name, email: form.email
+    });
     setSaving(false);
-    if (data.user && !data.session) {
-      setNeedsConfirm(true); setStep(3);
-    } else {
-      setLoggedIn(true); setPage('dashboard');
-      showToast('Velkommen til LegetøjsByt! 🎉');
-    }
+    if (data.user && !data.session) { setNeedsConfirm(true); setStep(5); }
+    else { setLoggedIn(true); setPage('dashboard'); showToast('Velkommen til LegetøjsByt! 🎉'); }
   }
 
-  const steps = ['CVR-verificering','Opret konto','Færdig!'];
+  const F = ({label, children, hint}) => (
+    <div>
+      <label style={{display:'block',fontSize:13,fontWeight:700,marginBottom:5}}>{label}{hint&&<span style={{fontWeight:400,color:'#aaa',marginLeft:6}}>{hint}</span>}</label>
+      {children}
+    </div>
+  );
+  const Input = ({k, type='text', ph, ...rest}) => (
+    <input type={type} value={form[k]} onChange={e=>set(k,e.target.value)} placeholder={ph}
+      style={{width:'100%',padding:'11px 14px',borderRadius:12,border:'1.5px solid #e5e5e5',fontSize:14,fontFamily:"'Nunito Sans',sans-serif",outline:'none'}} {...rest} />
+  );
+  const Select = ({k, options}) => (
+    <select value={form[k]} onChange={e=>set(k,e.target.value)}
+      style={{width:'100%',padding:'11px 14px',borderRadius:12,border:`1.5px solid ${form[k]?'#e5e5e5':'#e5e5e5'}`,fontSize:14,fontFamily:"'Nunito Sans',sans-serif",outline:'none',background:'#fff',appearance:'none',cursor:'pointer'}}>
+      <option value="">Vælg…</option>
+      {options.map(o=><option key={o} value={o}>{o}</option>)}
+    </select>
+  );
+  const ChoiceGroup = ({k, options}) => (
+    <div style={{display:'flex',gap:8,flexWrap:'wrap'}}>
+      {options.map(o=>(
+        <button key={o} type="button" onClick={()=>set(k,o)}
+          style={{padding:'9px 16px',borderRadius:20,border:`2px solid ${form[k]===o?PRIMARY:'#e5e5e5'}`,background:form[k]===o?PRIMARY:'#fff',color:form[k]===o?'#fff':'#444',fontSize:13,fontWeight:600,cursor:'pointer',transition:'all 0.15s'}}>
+          {o}
+        </button>
+      ))}
+    </div>
+  );
+
+  const steps = ['CVR','Om institutionen','Leder & kontakt','Opret konto'];
+  const stepTitles = ['Verificér institution','Om institutionen','Institutionsleder','Opret konto'];
+  const stepSubs   = ['Vi slår institutionen op via CVR-registret','Fortæl os lidt mere om jer','Hvem er den daglige leder?','Vælg login til platformen'];
+
   return (
-    <div style={{ minHeight:'100vh', display:'flex', alignItems:'center', justifyContent:'center', padding:'80px 24px', background:'linear-gradient(150deg,#fffcf8 0%,#f0f9f4 100%)' }} className="page-enter">
-      <div style={{ width:'100%', maxWidth:520 }}>
-        <div onClick={()=>setPage('home')} style={{ display:'flex', alignItems:'center', gap:10, cursor:'pointer', marginBottom:32, justifyContent:'center' }}>
-          <div style={{ width:40, height:40, borderRadius:12, background:PRIMARY, display:'flex', alignItems:'center', justifyContent:'center', fontSize:22 }}>♻️</div>
-          <span style={{ fontFamily:"'Nunito',sans-serif", fontWeight:900, fontSize:22 }}><span style={{ color:PRIMARY }}>Legetøjs</span>Byt</span>
+    <div style={{minHeight:'100vh',display:'flex',alignItems:'center',justifyContent:'center',padding:'80px 24px 40px',background:'linear-gradient(150deg,#fffcf8 0%,#f0f9f4 100%)'}} className="page-enter">
+      <div style={{width:'100%',maxWidth:560}}>
+        <div onClick={()=>setPage('home')} style={{display:'flex',alignItems:'center',gap:10,cursor:'pointer',marginBottom:28,justifyContent:'center'}}>
+          <div style={{width:40,height:40,borderRadius:12,background:PRIMARY,display:'flex',alignItems:'center',justifyContent:'center',fontSize:22}}>♻️</div>
+          <span style={{fontFamily:"'Nunito',sans-serif",fontWeight:900,fontSize:22}}><span style={{color:PRIMARY}}>Legetøjs</span>Byt</span>
         </div>
-        <div style={{ display:'flex', marginBottom:32, background:'#fff', borderRadius:16, padding:'6px', boxShadow:'0 2px 12px rgba(0,0,0,0.06)' }}>
-          {steps.map((s,i)=>(
-            <div key={i} style={{ flex:1, textAlign:'center', padding:'10px 8px', borderRadius:12, background:step===i+1?PRIMARY:'transparent', transition:'all 0.2s' }}>
-              <div style={{ fontSize:12, fontWeight:700, color:step===i+1?'#fff':step>i+1?PRIMARY:'#bbb' }}>{step>i+1?'✓ ':`${i+1}. `}{s}</div>
+
+        {step<=4 && (
+          <div style={{display:'flex',alignItems:'center',marginBottom:28,gap:0}}>
+            {steps.map((s,i)=>{
+              const done = step>i+1, active = step===i+1;
+              return (
+                <React.Fragment key={i}>
+                  <div style={{display:'flex',flexDirection:'column',alignItems:'center',flex:1,minWidth:0}}>
+                    <div style={{width:32,height:32,borderRadius:'50%',background:done?PRIMARY:active?PRIMARY:'#e5e5e5',display:'flex',alignItems:'center',justifyContent:'center',fontSize:14,fontWeight:800,color:done||active?'#fff':'#aaa',transition:'all 0.2s',boxShadow:active?`0 0 0 4px ${PRIMARY}33`:'none'}}>
+                      {done?'✓':i+1}
+                    </div>
+                    <div style={{fontSize:11,fontWeight:600,color:active?PRIMARY:done?PRIMARY:'#bbb',marginTop:4,textAlign:'center',whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis',maxWidth:80}}>{s}</div>
+                  </div>
+                  {i<steps.length-1 && <div style={{flex:2,height:2,background:step>i+1?PRIMARY:'#e5e5e5',transition:'all 0.3s',marginBottom:20}}/>}
+                </React.Fragment>
+              );
+            })}
+          </div>
+        )}
+
+        <div style={{background:'#fff',borderRadius:24,padding:40,boxShadow:'0 8px 40px rgba(0,0,0,0.08)'}}>
+          {step<=4 && (
+            <div style={{marginBottom:28}}>
+              <h2 style={{fontFamily:"'Nunito',sans-serif",fontWeight:900,fontSize:24,marginBottom:4}}>{stepTitles[step-1]}</h2>
+              <p style={{color:'#888',fontSize:14}}>{stepSubs[step-1]}</p>
             </div>
-          ))}
-        </div>
-        <div style={{ background:'#fff', borderRadius:24, padding:40, boxShadow:'0 8px 40px rgba(0,0,0,0.08)' }}>
+          )}
+
+          {/* ── Step 1: CVR ── */}
           {step===1 && (
-            <div>
-              <h2 style={{ fontFamily:"'Nunito',sans-serif", fontWeight:900, fontSize:26, marginBottom:8 }}>Verificér jeres institution</h2>
-              <p style={{ color:'#888', fontSize:14, marginBottom:28 }}>Vi bruger CVR-nummeret til at bekræfte at I er en godkendt institution.</p>
-              <label style={{ display:'block', fontSize:13, fontWeight:700, marginBottom:6 }}>CVR-nummer (8 cifre)</label>
-              <div style={{ display:'flex', gap:10, marginBottom:16 }}>
-                <input value={cvr} onChange={e=>setCvr(e.target.value.replace(/\D/g,'').slice(0,8))} placeholder="12345678" maxLength={8} onKeyDown={e=>e.key==='Enter'&&checkCvr()} style={{ flex:1, padding:'12px 14px', borderRadius:12, border:`1.5px solid ${cvrStatus==='err'?'#ef4444':cvrStatus==='ok'?PRIMARY:'#e5e5e5'}`, fontSize:16, letterSpacing:2, fontWeight:700, outline:'none' }} />
-                <Btn variant="primary" color={PRIMARY} radius={22} onClick={checkCvr}>{cvrStatus==='checking'?<><Spinner/>Tjekker…</>:'Tjek CVR'}</Btn>
-              </div>
-              {cvrStatus==='err' && <div style={{ background:'#FEF2F2', border:'1.5px solid #fca5a5', borderRadius:10, padding:'12px 16px', fontSize:13, color:'#b91c1c' }}>❌ CVR-nummeret ikke fundet. Kontrollér nummeret.</div>}
+            <div style={{display:'flex',flexDirection:'column',gap:16}}>
+              <F label="CVR-nummer (8 cifre)">
+                <div style={{display:'flex',gap:10}}>
+                  <input value={cvr} onChange={e=>setCvr(e.target.value.replace(/\D/g,'').slice(0,8))} placeholder="12345678" maxLength={8}
+                    onKeyDown={e=>e.key==='Enter'&&checkCvr()}
+                    style={{flex:1,padding:'11px 14px',borderRadius:12,border:`1.5px solid ${cvrStatus==='err'?'#ef4444':cvrStatus==='ok'?PRIMARY:'#e5e5e5'}`,fontSize:17,letterSpacing:3,fontWeight:700,outline:'none'}} />
+                  <Btn variant="primary" color={PRIMARY} radius={22} onClick={checkCvr} disabled={cvr.length!==8||cvrStatus==='checking'}>
+                    {cvrStatus==='checking'?<><Spinner/>Tjekker…</>:'Slå op'}
+                  </Btn>
+                </div>
+              </F>
+              {cvrStatus==='err' && <div style={{background:'#FEF2F2',border:'1.5px solid #fca5a5',borderRadius:10,padding:'12px 16px',fontSize:13,color:'#b91c1c'}}>❌ CVR-nummeret ikke fundet i registret. Kontrollér nummeret.</div>}
               {cvrStatus==='ok' && cvrData && (
                 <div>
-                  <div style={{ background:'#E8F5EE', border:'1.5px solid #a7d7b8', borderRadius:12, padding:16, marginBottom:20 }}>
-                    <div style={{ display:'flex', gap:10 }}>
-                      <span style={{ fontSize:20 }}>✅</span>
+                  <div style={{background:'#E8F5EE',border:'1.5px solid #a7d7b8',borderRadius:14,padding:18,marginBottom:20}}>
+                    <div style={{display:'flex',gap:12,alignItems:'flex-start'}}>
+                      <div style={{fontSize:28,lineHeight:1}}>✅</div>
                       <div>
-                        <div style={{ fontFamily:"'Nunito',sans-serif", fontWeight:800, fontSize:15, color:'#1a5c38', marginBottom:4 }}>Institution verificeret!</div>
-                        <div style={{ fontSize:14, fontWeight:700 }}>{cvrData.name}</div>
-                        <div style={{ fontSize:13, color:'#555', marginTop:2 }}>{cvrData.address}</div>
+                        <div style={{fontFamily:"'Nunito',sans-serif",fontWeight:800,fontSize:14,color:'#1a5c38',marginBottom:6}}>Fundet i CVR-registret</div>
+                        <div style={{fontWeight:700,fontSize:15}}>{cvrData.name}</div>
+                        <div style={{fontSize:13,color:'#555',marginTop:3}}>{cvrData.address}, {cvrData.zipcode} {cvrData.city}</div>
                       </div>
                     </div>
                   </div>
-                  <Btn variant="primary" color={PRIMARY} radius={22} onClick={()=>setStep(2)} style={{ justifyContent:'center', width:'100%', padding:'14px', fontSize:15 }}>Fortsæt →</Btn>
+                  <Btn variant="primary" color={PRIMARY} radius={22} onClick={()=>setStep(2)} style={{justifyContent:'center',width:'100%',padding:'13px',fontSize:15}}>Fortsæt →</Btn>
                 </div>
               )}
             </div>
           )}
+
+          {/* ── Step 2: Om institutionen ── */}
           {step===2 && (
-            <div>
-              <h2 style={{ fontFamily:"'Nunito',sans-serif", fontWeight:900, fontSize:26, marginBottom:8 }}>Opret jeres konto</h2>
-              <p style={{ color:'#888', fontSize:14, marginBottom:28 }}>Brug disse oplysninger til at logge ind.</p>
-              <div style={{ display:'flex', flexDirection:'column', gap:14 }}>
-                {[{k:'name',label:'Kontaktpersonens navn',ph:'Fornavn Efternavn',type:'text'},{k:'email',label:'E-mail',ph:'navn@institution.dk',type:'email'},{k:'pass',label:'Kodeord',ph:'Mindst 6 tegn',type:'password'}].map(f=>(
-                  <div key={f.k}>
-                    <label style={{ display:'block', fontSize:13, fontWeight:700, marginBottom:6 }}>{f.label}</label>
-                    <input type={f.type} value={form[f.k]} onChange={e=>setForm({...form,[f.k]:e.target.value})} placeholder={f.ph} style={{ width:'100%', padding:'12px 14px', borderRadius:12, border:'1.5px solid #e5e5e5', fontSize:14, fontFamily:"'Nunito Sans',sans-serif", outline:'none' }} />
-                  </div>
-                ))}
-                {authError && <div style={{ background:'#FEF2F2', border:'1.5px solid #fca5a5', borderRadius:10, padding:'12px 16px', fontSize:13, color:'#b91c1c' }}>❌ {authError}</div>}
-                <Btn variant="primary" color={PRIMARY} radius={22} onClick={handleDone} disabled={saving} style={{ justifyContent:'center', padding:'14px', fontSize:15 }}>{saving?<><Spinner/>Opretter…</>:'Opret institution →'}</Btn>
-                <button onClick={()=>setStep(1)} style={{ background:'none', border:'none', color:'#888', fontSize:13, cursor:'pointer' }}>← Tilbage</button>
+            <div style={{display:'flex',flexDirection:'column',gap:18}}>
+              <F label="Institutionstype">
+                <ChoiceGroup k="inst_type" options={['Vuggestue','Børnehave','Integreret institution','SFO / KSFO','Andet']} />
+              </F>
+              <F label="Driftsform">
+                <ChoiceGroup k="ownership" options={['Offentlig','Privat','Selvejende']} />
+              </F>
+              <div style={{display:'grid',gridTemplateColumns:'1fr 120px',gap:12}}>
+                <F label="Adresse"><Input k="address" ph="Vejnavn og husnummer" /></F>
+                <F label="Postnr."><Input k="zipcode" ph="1234" /></F>
+              </div>
+              <F label="By"><Input k="city" ph="Fx København" /></F>
+              <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:12}}>
+                <F label="Institutionens telefon"><Input k="inst_phone" ph="+45 12 34 56 78" /></F>
+                <F label="Antal indskrevne børn"><Input k="children_count" type="number" ph="Fx 60" /></F>
+              </div>
+              <F label="Hjemmeside" hint="(valgfri)"><Input k="website" ph="https://min-institution.dk" /></F>
+              {authError && <div style={{background:'#FEF2F2',border:'1.5px solid #fca5a5',borderRadius:10,padding:'12px 16px',fontSize:13,color:'#b91c1c'}}>❌ {authError}</div>}
+              <div style={{display:'flex',gap:10,marginTop:4}}>
+                <Btn variant="outline" radius={22} onClick={()=>setStep(1)} style={{padding:'12px 20px',fontSize:14}}>← Tilbage</Btn>
+                <Btn variant="primary" color={PRIMARY} radius={22} onClick={()=>{ const e=validateStep2(); if(e){setAuthError(e);}else{setAuthError(null);setStep(3);} }} style={{flex:1,justifyContent:'center',padding:'13px',fontSize:15}}>Fortsæt →</Btn>
               </div>
             </div>
           )}
+
+          {/* ── Step 3: Institutionsleder ── */}
           {step===3 && (
-            <div style={{ textAlign:'center' }}>
+            <div style={{display:'flex',flexDirection:'column',gap:18}}>
+              <div style={{background:'#f8f5f0',borderRadius:12,padding:'12px 16px',fontSize:13,color:'#666'}}>
+                ℹ️ Disse oplysninger vises ikke offentligt, men bruges ved henvendelse om opslag.
+              </div>
+              <F label="Institutionslederens fulde navn"><Input k="leader_name" ph="Fornavn Efternavn" /></F>
+              <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:12}}>
+                <F label="Telefon"><Input k="leader_phone" ph="+45 12 34 56 78" /></F>
+                <F label="E-mail"><Input k="leader_email" type="email" ph="leder@institution.dk" /></F>
+              </div>
+              {authError && <div style={{background:'#FEF2F2',border:'1.5px solid #fca5a5',borderRadius:10,padding:'12px 16px',fontSize:13,color:'#b91c1c'}}>❌ {authError}</div>}
+              <div style={{display:'flex',gap:10,marginTop:4}}>
+                <Btn variant="outline" radius={22} onClick={()=>setStep(2)} style={{padding:'12px 20px',fontSize:14}}>← Tilbage</Btn>
+                <Btn variant="primary" color={PRIMARY} radius={22} onClick={()=>{ const e=validateStep3(); if(e){setAuthError(e);}else{setAuthError(null);setStep(4);} }} style={{flex:1,justifyContent:'center',padding:'13px',fontSize:15}}>Fortsæt →</Btn>
+              </div>
+            </div>
+          )}
+
+          {/* ── Step 4: Login-konto ── */}
+          {step===4 && (
+            <div style={{display:'flex',flexDirection:'column',gap:18}}>
+              <div style={{background:'#f8f5f0',borderRadius:12,padding:'12px 16px',fontSize:13,color:'#666'}}>
+                ℹ️ Det er disse oplysninger I logger ind med. Det kan være den samme person som lederen, eller en administrator.
+              </div>
+              <F label="Dit fulde navn"><Input k="contact_name" ph="Fornavn Efternavn" /></F>
+              <F label="E-mail (bruges til login)"><Input k="email" type="email" ph="din@email.dk" /></F>
+              <F label="Kodeord" hint="(mindst 6 tegn)"><Input k="pass" type="password" ph="••••••••" /></F>
+              {authError && <div style={{background:'#FEF2F2',border:'1.5px solid #fca5a5',borderRadius:10,padding:'12px 16px',fontSize:13,color:'#b91c1c'}}>❌ {authError}</div>}
+              <div style={{display:'flex',gap:10,marginTop:4}}>
+                <Btn variant="outline" radius={22} onClick={()=>setStep(3)} style={{padding:'12px 20px',fontSize:14}}>← Tilbage</Btn>
+                <Btn variant="primary" color={PRIMARY} radius={22} onClick={handleCreate} disabled={saving} style={{flex:1,justifyContent:'center',padding:'13px',fontSize:15}}>
+                  {saving?<><Spinner/>Opretter…</>:'Opret institution →'}
+                </Btn>
+              </div>
+            </div>
+          )}
+
+          {/* ── Step 5: Bekræftelse ── */}
+          {step===5 && (
+            <div style={{textAlign:'center'}}>
               {needsConfirm ? <>
-                <div style={{ fontSize:72, marginBottom:16 }}>📧</div>
-                <h2 style={{ fontFamily:"'Nunito',sans-serif", fontWeight:900, fontSize:26, marginBottom:10 }}>Bekræft din e-mail</h2>
-                <p style={{ color:'#555', fontSize:15, lineHeight:1.65, marginBottom:8 }}>Vi har sendt en bekræftelsesmail til</p>
-                <p style={{ fontWeight:700, fontSize:15, color:PRIMARY, marginBottom:24 }}>{form.email}</p>
-                <p style={{ color:'#888', fontSize:13, lineHeight:1.65, marginBottom:32 }}>Klik på linket i mailen for at aktivere din konto. Tjek evt. spam-mappen.</p>
-                <Btn variant="outline" radius={22} onClick={()=>setPage('login')} style={{ justifyContent:'center', padding:'13px', fontSize:14 }}>Gå til login →</Btn>
+                <div style={{fontSize:72,marginBottom:16}}>📧</div>
+                <h2 style={{fontFamily:"'Nunito',sans-serif",fontWeight:900,fontSize:26,marginBottom:10}}>Bekræft din e-mail</h2>
+                <p style={{color:'#555',fontSize:15,lineHeight:1.65,marginBottom:8}}>Vi har sendt en bekræftelsesmail til</p>
+                <p style={{fontWeight:700,fontSize:15,color:PRIMARY,marginBottom:24}}>{form.email}</p>
+                <p style={{color:'#888',fontSize:13,lineHeight:1.65,marginBottom:32}}>Klik på linket i mailen for at aktivere kontoen. Tjek evt. spam-mappen.</p>
+                <Btn variant="outline" radius={22} onClick={()=>setPage('login')} style={{justifyContent:'center',padding:'13px',fontSize:14}}>Gå til login →</Btn>
               </> : <>
-                <div style={{ fontSize:72, marginBottom:16 }}>🎉</div>
-                <h2 style={{ fontFamily:"'Nunito',sans-serif", fontWeight:900, fontSize:28, marginBottom:10 }}>Velkommen til LegetøjsByt!</h2>
-                <p style={{ color:'#888', fontSize:15, lineHeight:1.65, marginBottom:32 }}>Jeres institution er nu oprettet og verificeret.</p>
-                <div style={{ display:'flex', flexDirection:'column', gap:10 }}>
-                  <Btn variant="primary" color={PRIMARY} radius={22} onClick={()=>{ setLoggedIn(true); setPage('dashboard'); showToast('Velkommen! 🎉'); }} style={{ justifyContent:'center', padding:'14px', fontSize:15 }}>Gå til min institution →</Btn>
-                  <Btn variant="outline" radius={22} onClick={()=>setPage('opslag')} style={{ justifyContent:'center', padding:'13px', fontSize:14 }}>Browse opslag</Btn>
+                <div style={{fontSize:72,marginBottom:16}}>🎉</div>
+                <h2 style={{fontFamily:"'Nunito',sans-serif",fontWeight:900,fontSize:28,marginBottom:10}}>Velkommen til LegetøjsByt!</h2>
+                <p style={{color:'#888',fontSize:15,lineHeight:1.65,marginBottom:32}}>{cvrData?.name} er nu oprettet og verificeret.</p>
+                <div style={{display:'flex',flexDirection:'column',gap:10}}>
+                  <Btn variant="primary" color={PRIMARY} radius={22} onClick={()=>{ setLoggedIn(true); setPage('dashboard'); showToast('Velkommen! 🎉'); }} style={{justifyContent:'center',padding:'14px',fontSize:15}}>Gå til min institution →</Btn>
+                  <Btn variant="outline" radius={22} onClick={()=>setPage('opslag')} style={{justifyContent:'center',padding:'13px',fontSize:14}}>Browse opslag</Btn>
                 </div>
               </>}
             </div>
           )}
         </div>
+        <p style={{textAlign:'center',marginTop:20,fontSize:13,color:'#888'}}>Allerede tilmeldt? <a onClick={()=>setPage('login')} style={{color:PRIMARY,fontWeight:700,cursor:'pointer'}}>Log ind her</a></p>
       </div>
     </div>
   );
