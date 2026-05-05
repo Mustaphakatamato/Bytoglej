@@ -209,8 +209,11 @@ function ListingCard({ listing, onClick, favs, toggleFav }) {
   const isFav = favs.includes(listing.id);
   return (
     <div className="card" onClick={onClick} style={{ background:'#fff', borderRadius:18, overflow:'hidden', cursor:'pointer', boxShadow:'0 2px 14px rgba(0,0,0,0.07)', position:'relative' }}>
-      <div style={{ height:164, background:listing.color||'#FFD166', display:'flex', alignItems:'center', justifyContent:'center', position:'relative' }}>
-        <span style={{ fontSize:62 }}>{listing.emoji||'🧸'}</span>
+      <div style={{ height:164, background:listing.images?.[0]?'#e8e6e3':listing.color||'#FFD166', display:'flex', alignItems:'center', justifyContent:'center', position:'relative', overflow:'hidden' }}>
+        {listing.images?.[0]
+          ? <img src={listing.images[0]} alt="" style={{ width:'100%', height:'100%', objectFit:'cover', display:'block' }} />
+          : <span style={{ fontSize:62 }}>{listing.emoji||'🧸'}</span>
+        }
         {listing.bid_count > 0 && (
           <div style={{ position:'absolute', top:10, left:10, background:'rgba(255,255,255,0.95)', borderRadius:99, padding:'3px 10px', fontSize:11, fontWeight:700, color:ACCENT2 }}>🔥 {listing.bid_count} bud</div>
         )}
@@ -520,6 +523,39 @@ function OpslagPage({ listings, loading, setPage, setActiveListing, favs, toggle
   );
 }
 
+// ─── IMAGE GALLERY ────────────────────────────────────────────────────────────
+function ImageGallery({ images, color, emoji }) {
+  const [active, setActive] = useState(0);
+  if (!images || images.length === 0) {
+    return <div style={{ height:380, background:color||'#FFD166', borderRadius:24, display:'flex', alignItems:'center', justifyContent:'center', marginBottom:28, fontSize:120 }}>{emoji||'🧸'}</div>;
+  }
+  return (
+    <div style={{ marginBottom:28 }}>
+      <div style={{ position:'relative', height:380, borderRadius:24, overflow:'hidden', background:'#f0eeeb' }}>
+        <img src={images[active]} alt="" style={{ width:'100%', height:'100%', objectFit:'cover', display:'block' }} />
+        {images.length > 1 && <>
+          <button onClick={()=>setActive(i=>(i-1+images.length)%images.length)}
+            style={{ position:'absolute', left:12, top:'50%', transform:'translateY(-50%)', width:40, height:40, borderRadius:'50%', background:'rgba(255,255,255,0.92)', border:'none', fontSize:18, cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center', boxShadow:'0 2px 8px rgba(0,0,0,0.15)' }}>‹</button>
+          <button onClick={()=>setActive(i=>(i+1)%images.length)}
+            style={{ position:'absolute', right:12, top:'50%', transform:'translateY(-50%)', width:40, height:40, borderRadius:'50%', background:'rgba(255,255,255,0.92)', border:'none', fontSize:18, cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center', boxShadow:'0 2px 8px rgba(0,0,0,0.15)' }}>›</button>
+          <div style={{ position:'absolute', bottom:12, left:'50%', transform:'translateX(-50%)', display:'flex', gap:6 }}>
+            {images.map((_,i)=><div key={i} onClick={()=>setActive(i)} style={{ width:i===active?20:8, height:8, borderRadius:4, background:i===active?'#fff':'rgba(255,255,255,0.5)', cursor:'pointer', transition:'all 0.2s' }} />)}
+          </div>
+        </>}
+      </div>
+      {images.length > 1 && (
+        <div style={{ display:'flex', gap:8, marginTop:10, overflowX:'auto', paddingBottom:4 }}>
+          {images.map((src,i)=>(
+            <div key={i} onClick={()=>setActive(i)} style={{ width:72, height:72, borderRadius:12, overflow:'hidden', flexShrink:0, cursor:'pointer', border:`2.5px solid ${i===active?'#06D6A0':'transparent'}`, transition:'border-color 0.15s' }}>
+              <img src={src} alt="" style={{ width:'100%', height:'100%', objectFit:'cover' }} />
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ─── LISTING DETAIL ───────────────────────────────────────────────────────────
 function ListingDetailPage({ listing, setPage, showToast }) {
   const [buyModal,  setBuyModal]  = useState(false);
@@ -572,7 +608,7 @@ function ListingDetailPage({ listing, setPage, showToast }) {
       <div style={{ maxWidth:1140, margin:'0 auto', padding:'20px 24px' }}>
         <div style={{ display:'grid', gridTemplateColumns:'1fr 380px', gap:40, alignItems:'start' }}>
           <div>
-            <div style={{ height:380, background:listing.color||'#FFD166', borderRadius:24, display:'flex', alignItems:'center', justifyContent:'center', marginBottom:28, fontSize:120 }}>{listing.emoji||'🧸'}</div>
+            <ImageGallery images={listing.images} color={listing.color} emoji={listing.emoji} />
             <div style={{ display:'flex', gap:10, marginBottom:20, flexWrap:'wrap' }}>
               <Badge type={listing.type} />
               <span style={{ fontSize:13, color:'#888' }}>📍 {listing.city}</span>
@@ -988,24 +1024,56 @@ function DashboardPage({ setPage, showToast, allListings, onListingCreated, inst
   const [newOpen,    setNewOpen]    = useState(false);
   const [step,       setStep]       = useState(1);
   const [saving,     setSaving]     = useState(false);
+  const [imgFiles,   setImgFiles]   = useState([]);
+  const [imgPreviews,setImgPreviews]= useState([]);
+  const [tipsOpen,   setTipsOpen]   = useState(false);
   const [form, setForm] = useState({ title:'', type:'køb', price:'', age_group:'3-6 år', description:'', condition:'God', city:'København', emoji:'🧸', color:'#FFD166' });
+  const fileRef = React.useRef(null);
+
+  function handleFileSelect(e) {
+    const files = Array.from(e.target.files);
+    const toAdd = files.slice(0, 6 - imgFiles.length);
+    setImgFiles(f=>[...f,...toAdd]);
+    setImgPreviews(p=>[...p,...toAdd.map(f=>URL.createObjectURL(f))]);
+    e.target.value = '';
+  }
+  function removeImg(i) {
+    URL.revokeObjectURL(imgPreviews[i]);
+    setImgFiles(f=>f.filter((_,j)=>j!==i));
+    setImgPreviews(p=>p.filter((_,j)=>j!==i));
+  }
+  function resetModal() {
+    imgPreviews.forEach(URL.revokeObjectURL);
+    setImgFiles([]); setImgPreviews([]); setTipsOpen(false);
+    setStep(1);
+    setForm({ title:'', type:'køb', price:'', age_group:'3-6 år', description:'', condition:'God', city:'København', emoji:'🧸', color:'#FFD166' });
+  }
 
   async function handleCreate() {
     if (!form.title.trim()) return;
     setSaving(true);
-    const { error } = await db.from('listings').insert({
+    const { data: listing, error } = await db.from('listings').insert({
       title: form.title, type: form.type,
       price: form.type==='køb' ? Number(form.price)||null : null,
       age_group: form.age_group, description: form.description,
       condition: form.condition, city: form.city,
       institution_name: institution?.name || 'Min Institution',
       emoji: form.emoji, color: form.color,
-      bid_count: 0, is_active: true
-    });
+      images: [], bid_count: 0, is_active: true
+    }).select().single();
+    if (error) { showToast('Noget gik galt — prøv igen', 'error'); setSaving(false); return; }
+    if (imgFiles.length > 0) {
+      const urls = [];
+      for (const file of imgFiles) {
+        const ext = file.name.split('.').pop().toLowerCase();
+        const path = `${listing.id}/${Date.now()}_${Math.random().toString(36).slice(2)}.${ext}`;
+        const { data: up } = await db.storage.from('listing-images').upload(path, file, { contentType: file.type });
+        if (up) { const { data:{publicUrl} } = db.storage.from('listing-images').getPublicUrl(up.path); urls.push(publicUrl); }
+      }
+      if (urls.length > 0) await db.from('listings').update({ images: urls }).eq('id', listing.id);
+    }
     setSaving(false);
-    if (error) { showToast('Noget gik galt — prøv igen', 'error'); return; }
-    setNewOpen(false); setStep(1);
-    setForm({ title:'', type:'køb', price:'', age_group:'3-6 år', description:'', condition:'God', city:'København', emoji:'🧸', color:'#FFD166' });
+    setNewOpen(false); resetModal();
     showToast('Opslag publiceret! 🎉');
     onListingCreated();
   }
@@ -1057,7 +1125,7 @@ function DashboardPage({ setPage, showToast, allListings, onListingCreated, inst
         </div>
       </div>
 
-      <Modal open={newOpen} onClose={()=>{setNewOpen(false);setStep(1);}} title={`Nyt opslag — trin ${step}/2`}>
+      <Modal open={newOpen} onClose={()=>{setNewOpen(false);resetModal();}} title={`Nyt opslag — trin ${step}/2`}>
         {step===1 && (
           <div style={{ display:'flex', flexDirection:'column', gap:14 }}>
             <div>
@@ -1112,24 +1180,90 @@ function DashboardPage({ setPage, showToast, allListings, onListingCreated, inst
           </div>
         )}
         {step===2 && (
-          <div style={{ display:'flex', flexDirection:'column', gap:14 }}>
-            <div style={{ background:form.color, borderRadius:16, height:110, display:'flex', alignItems:'center', justifyContent:'center', fontSize:56 }}>{form.emoji}</div>
+          <div style={{ display:'flex', flexDirection:'column', gap:16 }}>
             <div>
               <label style={{ display:'block', fontSize:13, fontWeight:700, marginBottom:6 }}>Beskrivelse</label>
-              <textarea value={form.description} onChange={e=>setForm({...form,description:e.target.value})} placeholder="Beskriv legetøjets stand, hvad der medfølger…" rows={4} style={{ width:'100%', padding:'11px 14px', borderRadius:10, border:'1.5px solid #e5e5e5', fontSize:14, resize:'none', fontFamily:"'Nunito Sans',sans-serif", outline:'none' }} />
+              <textarea value={form.description} onChange={e=>setForm({...form,description:e.target.value})} placeholder="Beskriv legetøjets stand, hvad der medfølger, mål osv." rows={3} style={{ width:'100%', padding:'11px 14px', borderRadius:10, border:'1.5px solid #e5e5e5', fontSize:14, resize:'none', fontFamily:"'Nunito Sans',sans-serif", outline:'none' }} />
             </div>
             <div>
               <label style={{ display:'block', fontSize:13, fontWeight:700, marginBottom:8 }}>Stand</label>
               <div style={{ display:'flex', gap:8, flexWrap:'wrap' }}>
                 {CONDITIONS.map(c=>(
-                  <button key={c} onClick={()=>setForm({...form,condition:c})} style={{ padding:'8px 16px', borderRadius:99, fontSize:13, fontWeight:600, border:form.condition===c?`2px solid ${PRIMARY}`:'2px solid #e5e5e5', background:form.condition===c?'#E8F5EE':'#fff', color:form.condition===c?PRIMARY:'#555' }}>{c}</button>
+                  <button key={c} onClick={()=>setForm({...form,condition:c})} style={{ padding:'8px 14px', borderRadius:99, fontSize:13, fontWeight:600, border:form.condition===c?`2px solid ${PRIMARY}`:'2px solid #e5e5e5', background:form.condition===c?'#E8F5EE':'#fff', color:form.condition===c?PRIMARY:'#555' }}>{c}</button>
                 ))}
               </div>
             </div>
+
+            {/* ── Billeder ── */}
+            <div>
+              <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:8 }}>
+                <label style={{ fontSize:13, fontWeight:700 }}>Billeder <span style={{ fontWeight:400, color:'#aaa' }}>(op til 6)</span></label>
+                {imgFiles.length < 6 && (
+                  <button type="button" onClick={()=>fileRef.current?.click()}
+                    style={{ fontSize:12, fontWeight:700, color:PRIMARY, background:'#E8F5EE', border:'none', borderRadius:8, padding:'5px 12px', cursor:'pointer' }}>
+                    + Tilføj billede
+                  </button>
+                )}
+              </div>
+              <input ref={fileRef} type="file" accept="image/*" multiple onChange={handleFileSelect} style={{ display:'none' }} />
+
+              {imgPreviews.length === 0 ? (
+                <div onClick={()=>fileRef.current?.click()} style={{ border:'2px dashed #d4d0cb', borderRadius:14, padding:'28px 20px', textAlign:'center', cursor:'pointer', background:'#fafaf8' }}>
+                  <div style={{ fontSize:36, marginBottom:8 }}>📷</div>
+                  <div style={{ fontSize:14, fontWeight:700, color:'#555', marginBottom:4 }}>Klik for at uploade billeder</div>
+                  <div style={{ fontSize:12, color:'#aaa' }}>JPG, PNG eller WEBP · Maks 6 billeder</div>
+                </div>
+              ) : (
+                <div style={{ display:'grid', gridTemplateColumns:'repeat(3,1fr)', gap:8 }}>
+                  {imgPreviews.map((src,i)=>(
+                    <div key={i} style={{ position:'relative', aspectRatio:'1', borderRadius:10, overflow:'hidden' }}>
+                      <img src={src} alt="" style={{ width:'100%', height:'100%', objectFit:'cover' }} />
+                      <button onClick={()=>removeImg(i)} style={{ position:'absolute', top:4, right:4, width:22, height:22, borderRadius:'50%', background:'rgba(0,0,0,0.6)', border:'none', color:'#fff', fontSize:12, cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center', lineHeight:1 }}>✕</button>
+                      {i===0 && <div style={{ position:'absolute', bottom:4, left:4, background:'rgba(0,0,0,0.55)', borderRadius:4, padding:'2px 6px', fontSize:10, color:'#fff', fontWeight:700 }}>Forside</div>}
+                    </div>
+                  ))}
+                  {imgFiles.length < 6 && (
+                    <div onClick={()=>fileRef.current?.click()} style={{ aspectRatio:'1', borderRadius:10, border:'2px dashed #d4d0cb', display:'flex', alignItems:'center', justifyContent:'center', cursor:'pointer', background:'#fafaf8' }}>
+                      <span style={{ fontSize:24, color:'#ccc' }}>+</span>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+
+            {/* ── Foto-tips ── */}
+            <div style={{ background:'#fffcf5', border:'1.5px solid #ffe8a3', borderRadius:14, overflow:'hidden' }}>
+              <button type="button" onClick={()=>setTipsOpen(o=>!o)}
+                style={{ width:'100%', background:'none', border:'none', padding:'12px 16px', display:'flex', alignItems:'center', justifyContent:'space-between', cursor:'pointer' }}>
+                <span style={{ fontSize:13, fontWeight:700, color:'#7a5c00' }}>📸 Tips til gode produktbilleder</span>
+                <span style={{ fontSize:12, color:'#aaa', transition:'transform 0.2s', transform:tipsOpen?'rotate(180deg)':'none' }}>▼</span>
+              </button>
+              {tipsOpen && (
+                <div style={{ padding:'0 16px 16px', display:'flex', flexDirection:'column', gap:10 }}>
+                  {[
+                    ['💡','Godt lys','Tag billeder ved et vindue i dagslys. Undgå direkte sollys der skaber hårde skygger.'],
+                    ['🎯','Ren baggrund','Brug en hvid væg, et lyst gulv eller et stykke hvidt karton som baggrund.'],
+                    ['🔄','Alle vinkler','Tag billeder forfra, bagfra og fra siden — og et nærbillede af eventuelle detaljer.'],
+                    ['⚠️','Vis slitage ærligt','Fotografér ridser, brud og slidte dele. Det skaber tillid og færre misforståelser.'],
+                    ['📏','Vis størrelsen','Læg en genstand som en mønt eller lineal ved siden af for at vise proportioner.'],
+                    ['✨','Rent legetøj','Vask eller tør legetøjet af inden fotografering — det gør en stor forskel.'],
+                  ].map(([icon,title,desc])=>(
+                    <div key={title} style={{ display:'flex', gap:10, alignItems:'flex-start' }}>
+                      <span style={{ fontSize:18, lineHeight:1.4, flexShrink:0 }}>{icon}</span>
+                      <div>
+                        <div style={{ fontSize:13, fontWeight:700, color:'#444', marginBottom:1 }}>{title}</div>
+                        <div style={{ fontSize:12, color:'#777', lineHeight:1.55 }}>{desc}</div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
             <div style={{ display:'flex', gap:10 }}>
               <button onClick={()=>setStep(1)} style={{ flex:1, padding:'13px', borderRadius:12, background:'#f5f4f2', border:'none', fontWeight:700, fontFamily:"'Nunito',sans-serif" }}>← Tilbage</button>
               <Btn variant="primary" color={PRIMARY} radius={22} onClick={handleCreate} disabled={saving} style={{ flex:2, justifyContent:'center', padding:'13px', fontSize:14 }}>
-                {saving ? <><Spinner/>Publicerer…</> : '✓ Publicer opslag'}
+                {saving ? <><Spinner/>{imgFiles.length>0?'Uploader…':'Publicerer…'}</> : '✓ Publicer opslag'}
               </Btn>
             </div>
           </div>
