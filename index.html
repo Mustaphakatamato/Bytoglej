@@ -51,6 +51,8 @@
     }
     .fav-btn { transition: transform 0.15s ease; }
     .fav-btn:hover { transform: scale(1.25); }
+    @keyframes favPop { 0%{transform:scale(1)} 40%{transform:scale(1.45)} 70%{transform:scale(0.9)} 100%{transform:scale(1)} }
+    .fav-pop { animation: favPop 0.35s ease; }
   </style>
 </head>
 <body>
@@ -207,6 +209,13 @@ function Nav({ page, setPage, loggedIn, setLoggedIn }) {
 // ─── LISTING CARD ─────────────────────────────────────────────────────────────
 function ListingCard({ listing, onClick, favs, toggleFav }) {
   const isFav = favs.includes(listing.id);
+  const [popping, setPopping] = useState(false);
+  function handleFav(e) {
+    e.stopPropagation();
+    toggleFav(listing.id);
+    setPopping(true);
+    setTimeout(()=>setPopping(false), 350);
+  }
   return (
     <div className="card" onClick={onClick} style={{ background:'#fff', borderRadius:18, overflow:'hidden', cursor:'pointer', boxShadow:'0 2px 14px rgba(0,0,0,0.07)', position:'relative' }}>
       <div style={{ height:164, background:listing.images?.[0]?'#e8e6e3':listing.color||'#FFD166', display:'flex', alignItems:'center', justifyContent:'center', position:'relative', overflow:'hidden' }}>
@@ -220,8 +229,9 @@ function ListingCard({ listing, onClick, favs, toggleFav }) {
         {listing.condition==='Ny' && !listing.bid_count && (
           <div style={{ position:'absolute', top:10, left:10, background:PRIMARY, borderRadius:99, padding:'3px 10px', fontSize:11, fontWeight:700, color:'#fff' }}>✨ Ny</div>
         )}
-        <button className="fav-btn" onClick={e=>{ e.stopPropagation(); toggleFav(listing.id); }} style={{ position:'absolute', top:10, right:10, background:'rgba(255,255,255,0.95)', border:'none', borderRadius:'50%', width:32, height:32, fontSize:16, display:'flex', alignItems:'center', justifyContent:'center' }}>
-          {isFav?'❤️':'🤍'}
+        <button className={`fav-btn${popping?' fav-pop':''}`} onClick={handleFav}
+          style={{ position:'absolute', top:10, right:10, background:isFav?'#fff0f3':'rgba(255,255,255,0.95)', border:isFav?'1.5px solid #fca5a5':'1.5px solid transparent', borderRadius:'50%', width:34, height:34, fontSize:17, display:'flex', alignItems:'center', justifyContent:'center', boxShadow:isFav?'0 2px 8px rgba(239,68,68,0.25)':'none', transition:'background 0.2s, border 0.2s, box-shadow 0.2s' }}>
+          {isFav ? '❤️' : '🤍'}
         </button>
       </div>
       <div style={{ padding:'14px 16px 18px' }}>
@@ -1020,7 +1030,7 @@ function SignupPage({ setPage, setLoggedIn, showToast }) {
 }
 
 // ─── DASHBOARD ────────────────────────────────────────────────────────────────
-function DashboardPage({ setPage, showToast, allListings, onListingCreated, institution }) {
+function DashboardPage({ setPage, showToast, allListings, onListingCreated, institution, favs, toggleFav, setActiveListing }) {
   const [newOpen,    setNewOpen]    = useState(false);
   const [step,       setStep]       = useState(1);
   const [saving,     setSaving]     = useState(false);
@@ -1078,7 +1088,8 @@ function DashboardPage({ setPage, showToast, allListings, onListingCreated, inst
     onListingCreated();
   }
 
-  const myListings = allListings.slice(0,4);
+  const myListings = allListings.filter(l=>l.institution_name===(institution?.name));
+  const favListings = allListings.filter(l=>favs?.includes(l.id));
 
   return (
     <div style={{ minHeight:'100vh', paddingTop:80, background:'#f8f5f0' }} className="page-enter">
@@ -1101,27 +1112,64 @@ function DashboardPage({ setPage, showToast, allListings, onListingCreated, inst
           ))}
         </div>
 
-        <div style={{ background:'#fff', borderRadius:22, padding:28, boxShadow:'0 2px 12px rgba(0,0,0,0.06)' }}>
-          <h2 style={{ fontFamily:"'Nunito',sans-serif", fontWeight:800, fontSize:20, marginBottom:20 }}>Mine opslag</h2>
-          {myListings.length===0 ? (
-            <div style={{ textAlign:'center', padding:'40px 0', color:'#bbb' }}>
-              <div style={{ fontSize:40, marginBottom:12 }}>📭</div>
-              <p>Ingen opslag endnu. Opret dit første!</p>
-            </div>
-          ) : myListings.map(l=>(
-            <div key={l.id} style={{ display:'flex', alignItems:'center', gap:16, padding:'14px 16px', border:'1.5px solid #f0eeeb', borderRadius:14, marginBottom:10 }}>
-              <div style={{ width:52, height:52, borderRadius:12, background:l.color||'#FFD166', display:'flex', alignItems:'center', justifyContent:'center', fontSize:28, flexShrink:0 }}>{l.emoji||'🧸'}</div>
-              <div style={{ flex:1 }}>
-                <div style={{ fontFamily:"'Nunito',sans-serif", fontWeight:700, fontSize:14 }}>{l.title}</div>
-                <div style={{ fontSize:12, color:'#999', marginTop:2 }}>{l.city} · {l.age_group}</div>
+        <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:24 }}>
+
+          {/* Mine opslag */}
+          <div style={{ background:'#fff', borderRadius:22, padding:28, boxShadow:'0 2px 12px rgba(0,0,0,0.06)' }}>
+            <h2 style={{ fontFamily:"'Nunito',sans-serif", fontWeight:800, fontSize:20, marginBottom:20 }}>Mine opslag</h2>
+            {myListings.length===0 ? (
+              <div style={{ textAlign:'center', padding:'32px 0', color:'#bbb' }}>
+                <div style={{ fontSize:36, marginBottom:10 }}>📭</div>
+                <p style={{ fontSize:14 }}>Ingen opslag endnu. Opret dit første!</p>
               </div>
-              <Badge type={l.type} />
-              <div style={{ fontSize:13, color:PRIMARY, fontWeight:700, fontFamily:"'Nunito',sans-serif" }}>
-                {l.price ? `${l.price} kr.` : l.bid_count ? `${l.bid_count} bud` : '—'}
+            ) : myListings.map(l=>(
+              <div key={l.id} onClick={()=>{ setActiveListing(l); setPage('listing'); }} style={{ display:'flex', alignItems:'center', gap:14, padding:'12px 14px', border:'1.5px solid #f0eeeb', borderRadius:14, marginBottom:10, cursor:'pointer', transition:'border-color 0.15s' }}>
+                <div style={{ width:48, height:48, borderRadius:10, background:l.images?.[0]?'#e8e6e3':l.color||'#FFD166', display:'flex', alignItems:'center', justifyContent:'center', fontSize:24, flexShrink:0, overflow:'hidden' }}>
+                  {l.images?.[0] ? <img src={l.images[0]} style={{ width:'100%', height:'100%', objectFit:'cover' }} alt="" /> : l.emoji||'🧸'}
+                </div>
+                <div style={{ flex:1, minWidth:0 }}>
+                  <div style={{ fontFamily:"'Nunito',sans-serif", fontWeight:700, fontSize:14, whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis' }}>{l.title}</div>
+                  <div style={{ fontSize:12, color:'#999', marginTop:2 }}>{l.city} · {l.age_group}</div>
+                </div>
+                <div style={{ display:'flex', flexDirection:'column', alignItems:'flex-end', gap:4, flexShrink:0 }}>
+                  <Badge type={l.type} />
+                  <div style={{ fontSize:12, color:PRIMARY, fontWeight:700 }}>
+                    {l.price ? `${l.price} kr.` : l.bid_count ? `${l.bid_count} bud` : '—'}
+                  </div>
+                </div>
               </div>
-              <button style={{ background:'#f5f4f2', border:'none', borderRadius:8, padding:'6px 14px', fontSize:12, fontWeight:600 }}>Rediger</button>
+            ))}
+          </div>
+
+          {/* Mine favoritter */}
+          <div style={{ background:'#fff', borderRadius:22, padding:28, boxShadow:'0 2px 12px rgba(0,0,0,0.06)' }}>
+            <div style={{ display:'flex', alignItems:'center', gap:10, marginBottom:20 }}>
+              <h2 style={{ fontFamily:"'Nunito',sans-serif", fontWeight:800, fontSize:20 }}>Mine favoritter</h2>
+              {favListings.length>0 && <div style={{ background:'#fff0f3', border:'1.5px solid #fca5a5', borderRadius:99, padding:'2px 10px', fontSize:12, fontWeight:700, color:'#e11d48' }}>{favListings.length}</div>}
             </div>
-          ))}
+            {favListings.length===0 ? (
+              <div style={{ textAlign:'center', padding:'32px 0', color:'#bbb' }}>
+                <div style={{ fontSize:36, marginBottom:10 }}>🤍</div>
+                <p style={{ fontSize:14 }}>Tryk ❤️ på et opslag for at gemme det her</p>
+                <button onClick={()=>setPage('opslag')} style={{ marginTop:14, background:'none', border:`1.5px solid ${PRIMARY}`, color:PRIMARY, borderRadius:99, padding:'8px 18px', fontSize:13, fontWeight:700, cursor:'pointer' }}>Browse opslag</button>
+              </div>
+            ) : favListings.map(l=>(
+              <div key={l.id} style={{ display:'flex', alignItems:'center', gap:14, padding:'12px 14px', border:'1.5px solid #f0eeeb', borderRadius:14, marginBottom:10, cursor:'pointer', transition:'border-color 0.15s' }}
+                onClick={()=>{ setActiveListing(l); setPage('listing'); }}>
+                <div style={{ width:48, height:48, borderRadius:10, background:l.images?.[0]?'#e8e6e3':l.color||'#FFD166', display:'flex', alignItems:'center', justifyContent:'center', fontSize:24, flexShrink:0, overflow:'hidden' }}>
+                  {l.images?.[0] ? <img src={l.images[0]} style={{ width:'100%', height:'100%', objectFit:'cover' }} alt="" /> : l.emoji||'🧸'}
+                </div>
+                <div style={{ flex:1, minWidth:0 }}>
+                  <div style={{ fontFamily:"'Nunito',sans-serif", fontWeight:700, fontSize:14, whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis' }}>{l.title}</div>
+                  <div style={{ fontSize:12, color:'#999', marginTop:2 }}>{l.institution_name} · {l.city}</div>
+                </div>
+                <div style={{ display:'flex', flexDirection:'column', alignItems:'flex-end', gap:4, flexShrink:0 }}>
+                  <Badge type={l.type} />
+                  <button onClick={e=>{ e.stopPropagation(); toggleFav(l.id); }} style={{ fontSize:14, background:'none', border:'none', cursor:'pointer', padding:0, lineHeight:1 }}>❤️</button>
+                </div>
+              </div>
+            ))}
+          </div>
         </div>
       </div>
 
@@ -1364,7 +1412,7 @@ function App() {
       {page==='listing'   && activeListing && <ListingDetailPage listing={activeListing} setPage={navigate} showToast={showToast} />}
       {page==='login'     && <LoginPage setPage={navigate} setLoggedIn={setLoggedIn} />}
       {page==='signup'    && <SignupPage setPage={navigate} setLoggedIn={setLoggedIn} showToast={showToast} />}
-      {page==='dashboard' && <DashboardPage setPage={navigate} showToast={showToast} allListings={listings} onListingCreated={fetchListings} institution={institution} />}
+      {page==='dashboard' && <DashboardPage setPage={navigate} showToast={showToast} allListings={listings} onListingCreated={fetchListings} institution={institution} favs={favs} toggleFav={toggleFav} setActiveListing={setActiveListing} />}
       {page==='hvordan'   && <HowItWorksPage setPage={navigate} />}
 
       {toast && <Toast msg={toast.msg} type={toast.type} onDone={()=>setToast(null)} />}
