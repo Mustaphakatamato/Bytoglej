@@ -193,7 +193,7 @@ function Nav({ page, setPage, loggedIn, setLoggedIn }) {
         <div style={{ display:'flex', gap:10, alignItems:'center', flexShrink:0 }}>
           {loggedIn ? <>
             <button onClick={()=>setPage('dashboard')} style={{ background:'none', border:'none', fontWeight:600, fontSize:14, color:transparent?'rgba(255,255,255,0.9)':'#555', cursor:'pointer', padding:'8px 12px', borderRadius:8 }}>Min institution</button>
-            <div onClick={()=>setLoggedIn(false)} style={{ width:36, height:36, borderRadius:'50%', background:PRIMARY, display:'flex', alignItems:'center', justifyContent:'center', color:'#fff', fontWeight:800, fontSize:14, cursor:'pointer' }}>M</div>
+            <div onClick={async()=>{ await db.auth.signOut(); setLoggedIn(false); setPage('home'); }} title="Log ud" style={{ width:36, height:36, borderRadius:'50%', background:PRIMARY, display:'flex', alignItems:'center', justifyContent:'center', color:'#fff', fontWeight:800, fontSize:14, cursor:'pointer' }}>M</div>
           </> : <>
             <Btn variant="ghost" onClick={()=>setPage('login')} color={transparent?'rgba(255,255,255,0.9)':PRIMARY} radius={32} style={{ color:transparent?'rgba(255,255,255,0.9)':'#555' }}>Log ind</Btn>
             <Btn variant="primary" onClick={()=>setPage('signup')} color={PRIMARY} radius={22}>Tilmeld institution</Btn>
@@ -677,7 +677,14 @@ function LoginPage({ setPage, setLoggedIn }) {
   const [email, setEmail] = useState('');
   const [pass,  setPass]  = useState('');
   const [loading, setLoading] = useState(false);
-  function handleSubmit(e) { e.preventDefault(); setLoading(true); setTimeout(()=>{ setLoggedIn(true); setPage('dashboard'); }, 1200); }
+  const [error, setError] = useState(null);
+  async function handleSubmit(e) {
+    e.preventDefault(); setLoading(true); setError(null);
+    const { error } = await db.auth.signInWithPassword({ email, password: pass });
+    setLoading(false);
+    if (error) { setError('Forkert e-mail eller kodeord'); return; }
+    setLoggedIn(true); setPage('dashboard');
+  }
   return (
     <div style={{ minHeight:'100vh', display:'flex', alignItems:'center', justifyContent:'center', padding:'80px 24px', background:'linear-gradient(150deg,#fffcf8 0%,#f0f9f4 100%)' }} className="page-enter">
       <div style={{ width:'100%', maxWidth:440 }}>
@@ -695,8 +702,9 @@ function LoginPage({ setPage, setLoggedIn }) {
                 <input type={f.type} value={f.val} onChange={e=>f.set(e.target.value)} placeholder={f.ph} style={{ width:'100%', padding:'12px 14px', borderRadius:12, border:'1.5px solid #e5e5e5', fontSize:14, fontFamily:"'Nunito Sans',sans-serif", outline:'none' }} />
               </div>
             ))}
-            <button type="submit" style={{ background:loading?'#aaa':PRIMARY, color:'#fff', border:'none', borderRadius:22, padding:'14px', fontSize:15, fontWeight:700, transition:'all 0.2s', display:'flex', alignItems:'center', justifyContent:'center', gap:8 }}>
-              {loading ? <><Spinner/>Logger ind…</> : 'Log ind'}
+            {error && <div style={{ background:'#FEF2F2', border:'1.5px solid #fca5a5', borderRadius:10, padding:'12px 16px', fontSize:13, color:'#b91c1c' }}>❌ {error}</div>}
+            <button type="submit" disabled={loading} style={{ background:loading?'#aaa':PRIMARY, color:'#fff', border:'none', borderRadius:22, padding:'14px', fontSize:15, fontWeight:700, transition:'all 0.2s', display:'flex', alignItems:'center', justifyContent:'center', gap:8 }}>
+              {loading ? <><Spinner/>Logger ind…</> : 'Log ind →'}
             </button>
           </form>
           <div style={{ textAlign:'center', marginTop:20, fontSize:13, color:'#888' }}>Ikke tilmeldt? <a onClick={()=>setPage('signup')} style={{ color:PRIMARY, fontWeight:700, cursor:'pointer' }}>Opret institution</a></div>
@@ -714,22 +722,44 @@ function SignupPage({ setPage, setLoggedIn, showToast }) {
   const [cvrData, setCvrData]   = useState(null);
   const [form, setForm]         = useState({ name:'', email:'', pass:'' });
   const [saving, setSaving]     = useState(false);
+  const [authError, setAuthError] = useState(null);
+  const [needsConfirm, setNeedsConfirm] = useState(false);
 
-  function checkCvr() {
+  async function checkCvr() {
     if (cvr.length!==8) return;
     setCvrStatus('checking');
-    setTimeout(()=>{
-      if (cvr==='00000000') { setCvrStatus('err'); }
-      else { setCvrStatus('ok'); setCvrData({ name:'Solsikken Vuggestue & Børnehave', address:'Rosenvej 14, 8000 Aarhus', type:'Vuggestue/Børnehave' }); }
-    }, 1400);
+    try {
+      const res = await fetch(`https://cvrapi.dk/api?search=${cvr}&country=dk`);
+      const data = await res.json();
+      if (!data || data.error) throw new Error('ikke fundet');
+      setCvrStatus('ok');
+      setCvrData({
+        name: data.name,
+        address: `${data.address}, ${data.zipcode} ${data.city}`,
+        city: data.city || 'Danmark',
+        type: data.company_type || 'Institution'
+      });
+    } catch {
+      setCvrStatus('err');
+    }
   }
 
   async function handleDone() {
-    setSaving(true);
-    await db.from('institutions').insert({ cvr, name:cvrData.name, address:cvrData.address, type:cvrData.type, email:form.email, city:'Aarhus' });
+    if (!form.email || form.pass.length < 6) { setAuthError('Udfyld e-mail og mindst 6-tegns kodeord'); return; }
+    setSaving(true); setAuthError(null);
+    const { data, error } = await db.auth.signUp({
+      email: form.email, password: form.pass,
+      options: { data: { full_name: form.name } }
+    });
+    if (error) { setAuthError(error.message); setSaving(false); return; }
+    await db.from('institutions').insert({ cvr, name:cvrData.name, address:cvrData.address, type:cvrData.type, email:form.email, city:cvrData.city||'Danmark' });
     setSaving(false);
-    setLoggedIn(true); setPage('dashboard');
-    showToast('Velkommen til LegetøjsByt! 🎉');
+    if (data.user && !data.session) {
+      setNeedsConfirm(true); setStep(3);
+    } else {
+      setLoggedIn(true); setPage('dashboard');
+      showToast('Velkommen til LegetøjsByt! 🎉');
+    }
   }
 
   const steps = ['CVR-verificering','Opret konto','Færdig!'];
@@ -780,26 +810,36 @@ function SignupPage({ setPage, setLoggedIn, showToast }) {
               <h2 style={{ fontFamily:"'Nunito',sans-serif", fontWeight:900, fontSize:26, marginBottom:8 }}>Opret jeres konto</h2>
               <p style={{ color:'#888', fontSize:14, marginBottom:28 }}>Brug disse oplysninger til at logge ind.</p>
               <div style={{ display:'flex', flexDirection:'column', gap:14 }}>
-                {[{k:'name',label:'Kontaktpersonens navn',ph:'Fornavn Efternavn',type:'text'},{k:'email',label:'E-mail',ph:'navn@institution.dk',type:'email'},{k:'pass',label:'Kodeord',ph:'Mindst 8 tegn',type:'password'}].map(f=>(
+                {[{k:'name',label:'Kontaktpersonens navn',ph:'Fornavn Efternavn',type:'text'},{k:'email',label:'E-mail',ph:'navn@institution.dk',type:'email'},{k:'pass',label:'Kodeord',ph:'Mindst 6 tegn',type:'password'}].map(f=>(
                   <div key={f.k}>
                     <label style={{ display:'block', fontSize:13, fontWeight:700, marginBottom:6 }}>{f.label}</label>
                     <input type={f.type} value={form[f.k]} onChange={e=>setForm({...form,[f.k]:e.target.value})} placeholder={f.ph} style={{ width:'100%', padding:'12px 14px', borderRadius:12, border:'1.5px solid #e5e5e5', fontSize:14, fontFamily:"'Nunito Sans',sans-serif", outline:'none' }} />
                   </div>
                 ))}
-                <Btn variant="primary" color={PRIMARY} radius={22} onClick={()=>setStep(3)} style={{ justifyContent:'center', padding:'14px', fontSize:15 }}>Opret institution →</Btn>
+                {authError && <div style={{ background:'#FEF2F2', border:'1.5px solid #fca5a5', borderRadius:10, padding:'12px 16px', fontSize:13, color:'#b91c1c' }}>❌ {authError}</div>}
+                <Btn variant="primary" color={PRIMARY} radius={22} onClick={handleDone} disabled={saving} style={{ justifyContent:'center', padding:'14px', fontSize:15 }}>{saving?<><Spinner/>Opretter…</>:'Opret institution →'}</Btn>
                 <button onClick={()=>setStep(1)} style={{ background:'none', border:'none', color:'#888', fontSize:13, cursor:'pointer' }}>← Tilbage</button>
               </div>
             </div>
           )}
           {step===3 && (
             <div style={{ textAlign:'center' }}>
-              <div style={{ fontSize:72, marginBottom:16 }}>🎉</div>
-              <h2 style={{ fontFamily:"'Nunito',sans-serif", fontWeight:900, fontSize:28, marginBottom:10 }}>Velkommen til LegetøjsByt!</h2>
-              <p style={{ color:'#888', fontSize:15, lineHeight:1.65, marginBottom:32 }}>Jeres institution er nu oprettet og verificeret.</p>
-              <div style={{ display:'flex', flexDirection:'column', gap:10 }}>
-                <Btn variant="primary" color={PRIMARY} radius={22} onClick={handleDone} disabled={saving} style={{ justifyContent:'center', padding:'14px', fontSize:15 }}>{saving?<><Spinner/>Opretter…</>:'Gå til min institution →'}</Btn>
-                <Btn variant="outline" radius={22} onClick={()=>setPage('opslag')} style={{ justifyContent:'center', padding:'13px', fontSize:14 }}>Browse opslag</Btn>
-              </div>
+              {needsConfirm ? <>
+                <div style={{ fontSize:72, marginBottom:16 }}>📧</div>
+                <h2 style={{ fontFamily:"'Nunito',sans-serif", fontWeight:900, fontSize:26, marginBottom:10 }}>Bekræft din e-mail</h2>
+                <p style={{ color:'#555', fontSize:15, lineHeight:1.65, marginBottom:8 }}>Vi har sendt en bekræftelsesmail til</p>
+                <p style={{ fontWeight:700, fontSize:15, color:PRIMARY, marginBottom:24 }}>{form.email}</p>
+                <p style={{ color:'#888', fontSize:13, lineHeight:1.65, marginBottom:32 }}>Klik på linket i mailen for at aktivere din konto. Tjek evt. spam-mappen.</p>
+                <Btn variant="outline" radius={22} onClick={()=>setPage('login')} style={{ justifyContent:'center', padding:'13px', fontSize:14 }}>Gå til login →</Btn>
+              </> : <>
+                <div style={{ fontSize:72, marginBottom:16 }}>🎉</div>
+                <h2 style={{ fontFamily:"'Nunito',sans-serif", fontWeight:900, fontSize:28, marginBottom:10 }}>Velkommen til LegetøjsByt!</h2>
+                <p style={{ color:'#888', fontSize:15, lineHeight:1.65, marginBottom:32 }}>Jeres institution er nu oprettet og verificeret.</p>
+                <div style={{ display:'flex', flexDirection:'column', gap:10 }}>
+                  <Btn variant="primary" color={PRIMARY} radius={22} onClick={()=>{ setLoggedIn(true); setPage('dashboard'); showToast('Velkommen! 🎉'); }} style={{ justifyContent:'center', padding:'14px', fontSize:15 }}>Gå til min institution →</Btn>
+                  <Btn variant="outline" radius={22} onClick={()=>setPage('opslag')} style={{ justifyContent:'center', padding:'13px', fontSize:14 }}>Browse opslag</Btn>
+                </div>
+              </>}
             </div>
           )}
         </div>
@@ -809,7 +849,7 @@ function SignupPage({ setPage, setLoggedIn, showToast }) {
 }
 
 // ─── DASHBOARD ────────────────────────────────────────────────────────────────
-function DashboardPage({ setPage, showToast, allListings, onListingCreated }) {
+function DashboardPage({ setPage, showToast, allListings, onListingCreated, institution }) {
   const [newOpen,    setNewOpen]    = useState(false);
   const [step,       setStep]       = useState(1);
   const [saving,     setSaving]     = useState(false);
@@ -823,7 +863,7 @@ function DashboardPage({ setPage, showToast, allListings, onListingCreated }) {
       price: form.type==='køb' ? Number(form.price)||null : null,
       age_group: form.age_group, description: form.description,
       condition: form.condition, city: form.city,
-      institution_name: 'Solsikken Vuggestue',
+      institution_name: institution?.name || 'Min Institution',
       emoji: form.emoji, color: form.color,
       bid_count: 0, is_active: true
     });
@@ -842,8 +882,8 @@ function DashboardPage({ setPage, showToast, allListings, onListingCreated }) {
       <div style={{ maxWidth:1140, margin:'0 auto', padding:'36px 24px' }}>
         <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:36 }}>
           <div>
-            <h1 style={{ fontFamily:"'Nunito',sans-serif", fontWeight:900, fontSize:30, letterSpacing:'-0.5px' }}>Min institution</h1>
-            <p style={{ color:'#888', fontSize:14, marginTop:4 }}>Solsikken Vuggestue · CVR: 12345678 · Aarhus</p>
+            <h1 style={{ fontFamily:"'Nunito',sans-serif", fontWeight:900, fontSize:30, letterSpacing:'-0.5px' }}>{institution?.name || 'Min institution'}</h1>
+            <p style={{ color:'#888', fontSize:14, marginTop:4 }}>{institution ? `CVR: ${institution.cvr} · ${institution.city}` : 'Indlæser...'}</p>
           </div>
           <Btn variant="primary" color={PRIMARY} radius={22} onClick={()=>setNewOpen(true)} style={{ fontSize:15, padding:'12px 24px' }}>+ Opret opslag</Btn>
         </div>
@@ -1001,10 +1041,16 @@ function App() {
   const [page,          setPage]          = useState('home');
   const [activeListing, setActiveListing] = useState(null);
   const [loggedIn,      setLoggedIn]      = useState(false);
+  const [institution,   setInstitution]   = useState(null);
   const [toast,         setToast]         = useState(null);
   const [listings,      setListings]      = useState([]);
   const [loading,       setLoading]       = useState(true);
   const [favs,          toggleFav]        = useFavs();
+
+  async function loadInstitution(email) {
+    const { data } = await db.from('institutions').select('*').eq('email', email).maybeSingle();
+    if (data) setInstitution(data);
+  }
 
   async function fetchListings() {
     setLoading(true);
@@ -1017,7 +1063,17 @@ function App() {
     setLoading(false);
   }
 
-  useEffect(() => { fetchListings(); }, []);
+  useEffect(() => {
+    fetchListings();
+    db.auth.getSession().then(({ data: { session } }) => {
+      if (session) { setLoggedIn(true); loadInstitution(session.user.email); }
+    });
+    const { data: { subscription } } = db.auth.onAuthStateChange((_event, session) => {
+      if (session) { setLoggedIn(true); loadInstitution(session.user.email); }
+      else { setLoggedIn(false); setInstitution(null); }
+    });
+    return () => subscription.unsubscribe();
+  }, []);
 
   // Real-time: refresh whenever listings table changes
   useEffect(() => {
@@ -1039,7 +1095,7 @@ function App() {
       {page==='listing'   && activeListing && <ListingDetailPage listing={activeListing} setPage={navigate} showToast={showToast} />}
       {page==='login'     && <LoginPage setPage={navigate} setLoggedIn={setLoggedIn} />}
       {page==='signup'    && <SignupPage setPage={navigate} setLoggedIn={setLoggedIn} showToast={showToast} />}
-      {page==='dashboard' && <DashboardPage setPage={navigate} showToast={showToast} allListings={listings} onListingCreated={fetchListings} />}
+      {page==='dashboard' && <DashboardPage setPage={navigate} showToast={showToast} allListings={listings} onListingCreated={fetchListings} institution={institution} />}
       {page==='hvordan'   && <HowItWorksPage setPage={navigate} />}
 
       {toast && <Toast msg={toast.msg} type={toast.type} onDone={()=>setToast(null)} />}
