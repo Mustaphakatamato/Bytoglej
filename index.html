@@ -211,6 +211,8 @@ function Nav({ page, setPage, loggedIn, setLoggedIn, unreadTotal }) {
 }
 
 // ─── LISTING CARD ─────────────────────────────────────────────────────────────
+const CONDITION_COLORS = { 'Ny':{ bg:'#e6f9f0', color:'#1a7a4a' }, 'Meget god':{ bg:'#e6f9f0', color:'#1a7a4a' }, 'God':{ bg:'#fff8e1', color:'#b45309' }, 'Acceptabel':{ bg:'#fee2e2', color:'#b91c1c' } };
+
 function ListingCard({ listing, onClick, favs, toggleFav }) {
   const isFav = favs.includes(listing.id);
   const [popping, setPopping] = useState(false);
@@ -220,36 +222,37 @@ function ListingCard({ listing, onClick, favs, toggleFav }) {
     setPopping(true);
     setTimeout(()=>setPopping(false), 350);
   }
+  const condStyle = CONDITION_COLORS[listing.condition] || { bg:'#f3f4f6', color:'#555' };
+  const typeColors = { køb:{ bg:'#e6f9f0', color:'#1a7a4a' }, byd:{ bg:'#fef3c7', color:'#92400e' }, byt:{ bg:'#dbeafe', color:'#1e40af' } };
+  const tc = typeColors[listing.type] || { bg:'#f3f4f6', color:'#555' };
+  const typeLabel = { køb:'Køb', byd:'Byd', byt:'Byt' }[listing.type] || listing.type;
   return (
-    <div className="card" onClick={onClick} style={{ background:'#fff', borderRadius:18, overflow:'hidden', cursor:'pointer', boxShadow:'0 2px 14px rgba(0,0,0,0.07)', position:'relative' }}>
-      <div style={{ height:164, background:listing.images?.[0]?'#e8e6e3':listing.color||'#FFD166', display:'flex', alignItems:'center', justifyContent:'center', position:'relative', overflow:'hidden' }}>
+    <div className="card" onClick={onClick} style={{ background:'#fff', borderRadius:16, overflow:'hidden', cursor:'pointer', boxShadow:'0 2px 12px rgba(0,0,0,0.07)', position:'relative', display:'flex', flexDirection:'column' }}>
+      {/* Image */}
+      <div style={{ height:180, background:listing.images?.[0]?'#e8e6e3':listing.color||'#FFD166', display:'flex', alignItems:'center', justifyContent:'center', position:'relative', overflow:'hidden', flexShrink:0 }}>
         {listing.images?.[0]
           ? <img src={listing.images[0]} alt="" style={{ width:'100%', height:'100%', objectFit:'cover', display:'block' }} />
-          : <span style={{ fontSize:62 }}>{listing.emoji||'🧸'}</span>
+          : <span style={{ fontSize:64 }}>{listing.emoji||'🧸'}</span>
         }
-        {listing.bid_count > 0 && (
-          <div style={{ position:'absolute', top:10, left:10, background:'rgba(255,255,255,0.95)', borderRadius:99, padding:'3px 10px', fontSize:11, fontWeight:700, color:ACCENT2 }}>🔥 {listing.bid_count} bud</div>
-        )}
-        {listing.condition==='Ny' && !listing.bid_count && (
-          <div style={{ position:'absolute', top:10, left:10, background:PRIMARY, borderRadius:99, padding:'3px 10px', fontSize:11, fontWeight:700, color:'#fff' }}>✨ Ny</div>
-        )}
         <button className={`fav-btn${popping?' fav-pop':''}`} onClick={handleFav}
-          style={{ position:'absolute', top:10, right:10, background:isFav?'#fff0f3':'rgba(255,255,255,0.95)', border:isFav?'1.5px solid #fca5a5':'1.5px solid transparent', borderRadius:'50%', width:34, height:34, fontSize:17, display:'flex', alignItems:'center', justifyContent:'center', boxShadow:isFav?'0 2px 8px rgba(239,68,68,0.25)':'none', transition:'background 0.2s, border 0.2s, box-shadow 0.2s' }}>
+          style={{ position:'absolute', top:10, right:10, background:isFav?'#fff0f3':'rgba(255,255,255,0.95)', border:'none', borderRadius:'50%', width:32, height:32, fontSize:16, display:'flex', alignItems:'center', justifyContent:'center', boxShadow:'0 2px 8px rgba(0,0,0,0.12)' }}>
           {isFav ? '❤️' : '🤍'}
         </button>
       </div>
-      <div style={{ padding:'14px 16px 18px' }}>
-        <div style={{ display:'flex', alignItems:'center', gap:8, marginBottom:8 }}>
-          <Badge type={listing.type} />
-          <span style={{ fontSize:12, color:'#999', marginLeft:'auto' }}>📍 {listing.city}</span>
+      {/* Body */}
+      <div style={{ padding:'12px 14px 16px', flex:1, display:'flex', flexDirection:'column' }}>
+        {/* Badges row */}
+        <div style={{ display:'flex', gap:6, marginBottom:8, flexWrap:'wrap' }}>
+          <span style={{ background:tc.bg, color:tc.color, borderRadius:99, padding:'2px 10px', fontSize:11, fontWeight:700 }}>{typeLabel}</span>
+          {listing.condition && <span style={{ background:condStyle.bg, color:condStyle.color, borderRadius:99, padding:'2px 10px', fontSize:11, fontWeight:700 }}>{listing.condition}</span>}
         </div>
-        <div style={{ fontFamily:"'Nunito',sans-serif", fontWeight:700, fontSize:15, marginBottom:4, lineHeight:1.3 }}>{listing.title}</div>
-        <div style={{ fontSize:12, color:'#999', marginBottom:12 }}>{listing.institution_name}</div>
-        <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between' }}>
-          <span style={{ background:'#f5f4f2', borderRadius:6, padding:'2px 8px', fontSize:11, color:'#666', fontWeight:600 }}>👶 {listing.age_group}</span>
+        <div style={{ fontFamily:"'Nunito',sans-serif", fontWeight:800, fontSize:15, marginBottom:4, lineHeight:1.3 }}>{listing.title}</div>
+        {listing.description && <div style={{ fontSize:12, color:'#777', lineHeight:1.5, marginBottom:8, display:'-webkit-box', WebkitLineClamp:2, WebkitBoxOrient:'vertical', overflow:'hidden' }}>{listing.description}</div>}
+        <div style={{ marginTop:'auto' }}>
           {listing.price
-            ? <span style={{ fontFamily:"'Nunito',sans-serif", fontWeight:800, fontSize:16, color:PRIMARY }}>{listing.price} kr.</span>
-            : <span style={{ fontSize:12, color:'#bbb' }}>Ingen fast pris</span>}
+            ? <div style={{ fontFamily:"'Nunito',sans-serif", fontWeight:900, fontSize:17, color:PRIMARY, marginBottom:4 }}>{listing.price} kr.</div>
+            : <div style={{ fontSize:13, color:ACCENT2, fontWeight:700, marginBottom:4 }}>Byttes kun</div>}
+          <div style={{ fontSize:11, color:'#aaa' }}>{listing.institution_name}{listing.city ? `, ${listing.city}` : ''}</div>
         </div>
       </div>
     </div>
@@ -257,54 +260,44 @@ function ListingCard({ listing, onClick, favs, toggleFav }) {
 }
 
 // ─── HOME ─────────────────────────────────────────────────────────────────────
-function HeroSection({ setPage, listings }) {
-  const preview = listings.slice(0,3);
-  const [search, setSearch] = useState('');
+function HeroSection({ setPage }) {
   return (
-    <section style={{ minHeight:'100vh', display:'flex', alignItems:'center', background:'linear-gradient(145deg,#0c4d2e 0%,#1a7a4a 45%,#2A7D4F 75%,#3d9a62 100%)', padding:'100px 24px 60px', position:'relative', overflow:'hidden' }}>
-      <div style={{ position:'absolute', top:-120, right:-120, width:620, height:620, borderRadius:'50%', background:'rgba(255,255,255,0.04)', pointerEvents:'none' }} />
-      <div style={{ position:'absolute', bottom:-160, left:-80, width:480, height:480, borderRadius:'50%', background:'rgba(255,255,255,0.03)', pointerEvents:'none' }} />
+    <section style={{ background:'linear-gradient(135deg,#a8d5c2 0%,#7bbfaa 60%,#5eab94 100%)', padding:'120px 24px 80px', overflow:'hidden', position:'relative' }}>
+      <div style={{ maxWidth:1140, margin:'0 auto', display:'grid', gridTemplateColumns:'1fr 1fr', gap:64, alignItems:'center' }}>
+        {/* Left */}
+        <div className="page-enter">
+          <h1 style={{ fontFamily:"'Nunito',sans-serif", fontWeight:900, fontSize:'clamp(36px,5vw,60px)', lineHeight:1.1, letterSpacing:'-1.5px', marginBottom:20, color:'#1a3a2e' }}>
+            Byt, køb og sælg<br/>legetøj<br/><span style={{ color:'#2d6a4f' }}>nemt mellem<br/>institutioner</span>
+          </h1>
+          <p style={{ fontSize:16, color:'#2d5045', lineHeight:1.7, marginBottom:36, maxWidth:440 }}>
+            Den første markedsplads hvor børnehaver, skoler og SFO'er kan handle legetøj og udstyr bæredygtigt. Spar penge, hjælp miljøet og giv legetøj nyt liv.
+          </p>
+          <div style={{ display:'flex', gap:14, flexWrap:'wrap' }}>
+            <Btn variant="primary" color="#2d6a4f" radius={22} onClick={()=>setPage('signup')} style={{ padding:'14px 28px', fontSize:15, boxShadow:'0 4px 18px rgba(45,106,79,0.35)' }}>🚀 Kom i gang nu</Btn>
+            <button onClick={()=>setPage('hvordan')} style={{ background:'rgba(255,255,255,0.35)', border:'1.5px solid rgba(255,255,255,0.6)', borderRadius:22, padding:'14px 24px', fontSize:15, fontWeight:700, color:'#1a3a2e', cursor:'pointer', display:'flex', alignItems:'center', gap:8, backdropFilter:'blur(8px)', fontFamily:"'Nunito Sans',sans-serif" }}>▷ Se hvordan det virker</button>
+          </div>
+        </div>
 
-      <div style={{ maxWidth:1140, margin:'0 auto', width:'100%' }}>
-        <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:60, alignItems:'center' }}>
-          <div className="page-enter">
-            <div style={{ display:'inline-flex', alignItems:'center', gap:8, background:'rgba(255,255,255,0.14)', borderRadius:99, padding:'6px 16px', marginBottom:28, fontSize:13, fontWeight:700, color:'rgba(255,255,255,0.9)', backdropFilter:'blur(10px)', border:'1px solid rgba(255,255,255,0.18)' }}>
-              <span style={{ width:8, height:8, borderRadius:'50%', background:'#7effc5', display:'inline-block', boxShadow:'0 0 8px #7effc5' }} />
-              CVR-verificerede institutioner
-            </div>
-            <h1 style={{ fontFamily:"'Nunito',sans-serif", fontWeight:900, fontSize:'clamp(40px,5.5vw,68px)', lineHeight:1.05, letterSpacing:'-2px', marginBottom:20, color:'#fff' }}>
-              Giv legetøjet<br/>nyt liv ♻️
-            </h1>
-            <p style={{ fontSize:18, color:'rgba(255,255,255,0.78)', lineHeight:1.65, marginBottom:36, maxWidth:460 }}>
-              Markedspladsen hvor danske institutioner køber, bytter og byder på brugt legetøj
-            </p>
-            <form onSubmit={e=>{ e.preventDefault(); setPage('opslag'); }}>
-              <div style={{ background:'#fff', borderRadius:22, boxShadow:'0 10px 44px rgba(0,0,0,0.22)', padding:8, marginBottom:18 }}>
-                <div style={{ display:'flex', gap:8 }}>
-                  <input value={search} onChange={e=>setSearch(e.target.value)} placeholder="🔍  Søg efter LEGO, cykel, køkken..." style={{ flex:1, border:'none', outline:'none', fontSize:15, padding:'10px 16px', background:'transparent', fontFamily:"'Nunito Sans',sans-serif" }} />
-                  <button type="submit" style={{ background:PRIMARY, color:'#fff', border:'none', borderRadius:16, padding:'10px 26px', fontSize:15, fontWeight:700, fontFamily:"'Nunito',sans-serif" }}>Søg</button>
-                </div>
-              </div>
-            </form>
-            <div style={{ display:'flex', gap:8, flexWrap:'wrap' }}>
-              {[['🏷️ Køb','køb'],['📊 Byd','byd'],['🔄 Byt','byt']].map(([label]) => (
-                <button key={label} onClick={()=>setPage('opslag')} style={{ padding:'8px 18px', borderRadius:99, border:'1.5px solid rgba(255,255,255,0.28)', background:'rgba(255,255,255,0.1)', color:'rgba(255,255,255,0.92)', fontSize:13, fontWeight:700, backdropFilter:'blur(8px)', transition:'all 0.15s' }}>{label}</button>
-              ))}
+        {/* Right: photo + badges */}
+        <div style={{ position:'relative' }}>
+          <div style={{ borderRadius:24, overflow:'hidden', boxShadow:'0 24px 64px rgba(0,0,0,0.18)', aspectRatio:'4/3' }}>
+            <img src="https://images.unsplash.com/photo-1513475382585-d06e58bcb0e0?w=680&auto=format&fit=crop&q=80" alt="Legetøj og kreative aktiviteter" style={{ width:'100%', height:'100%', objectFit:'cover', display:'block' }} />
+          </div>
+          {/* Badge top-left */}
+          <div style={{ position:'absolute', top:-14, left:-14, background:'#fff', borderRadius:14, padding:'10px 16px', boxShadow:'0 8px 28px rgba(0,0,0,0.12)', display:'flex', alignItems:'center', gap:8 }}>
+            <span style={{ fontSize:20 }}>🛡️</span>
+            <div>
+              <div style={{ fontWeight:700, fontSize:12, color:PRIMARY }}>Verificerede</div>
+              <div style={{ fontSize:11, color:'#888' }}>institutioner</div>
             </div>
           </div>
-
-          {/* Floating cards */}
-          <div style={{ position:'relative', height:420 }}>
-            {(preview.length > 0 ? preview : [{id:'a',emoji:'🧸',color:'#FFD166',title:'Bamse-samling',institution_name:'Solen Vuggestue',type:'byt'},{id:'b',emoji:'🧱',color:'#A78BFA',title:'LEGO Duplo kasse',institution_name:'Regnbuen Børnehave',type:'køb'},{id:'c',emoji:'🚲',color:'#06D6A0',title:'Balancecykler × 4',institution_name:'Parkskolen SFO',type:'byd'}]).map((item,i) => (
-              <div key={item.id} onClick={()=>setPage('opslag')} style={{ position:'absolute', top: i===0?0 : i===1?130 : 260, left: i===1?32:0, right: i===1?0:32, background:'#fff', borderRadius:20, padding:'16px 20px', cursor:'pointer', boxShadow:'0 14px 44px rgba(0,0,0,0.16)', display:'flex', alignItems:'center', gap:14, animation:`${i%2===0?'float':'float2'} ${3.5+i*0.8}s ease-in-out infinite` }}>
-                <div style={{ width:52, height:52, borderRadius:14, background:item.color||'#FFD166', display:'flex', alignItems:'center', justifyContent:'center', fontSize:28, flexShrink:0 }}>{item.emoji||'🧸'}</div>
-                <div style={{ flex:1, minWidth:0 }}>
-                  <div style={{ fontFamily:"'Nunito',sans-serif", fontWeight:700, fontSize:14, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{item.title}</div>
-                  <div style={{ fontSize:12, color:'#999', marginTop:2 }}>{item.institution_name}</div>
-                </div>
-                <Badge type={item.type} />
-              </div>
-            ))}
+          {/* Badge bottom-right */}
+          <div style={{ position:'absolute', bottom:-14, right:-14, background:'#fff', borderRadius:14, padding:'10px 16px', boxShadow:'0 8px 28px rgba(0,0,0,0.12)', display:'flex', alignItems:'center', gap:8 }}>
+            <span style={{ fontSize:20 }}>♻️</span>
+            <div>
+              <div style={{ fontWeight:700, fontSize:12, color:ACCENT }}>100% bæredygtig</div>
+              <div style={{ fontSize:11, color:'#888' }}>genbrug</div>
+            </div>
           </div>
         </div>
       </div>
@@ -312,107 +305,127 @@ function HeroSection({ setPage, listings }) {
   );
 }
 
-function StatsBar({ count }) {
+function HowSection({ setPage }) {
+  const steps = [
+    { icon:'👤', n:'1', title:'Tilmeld din institution', desc:'Opret en verificeret profil for din børnehave, skole eller SFO med CVR-nummer' },
+    { icon:'📷', n:'2', title:'Upload legetøj', desc:'Tag billeder af legetøj I ikke bruger og opret annoncer med pris eller bytteønsker' },
+    { icon:'🤝', n:'3', title:'Køb, byt eller byd', desc:'Find perfekt legetøj til jeres børn og gennemfør sikre handler mellem institutioner' },
+  ];
   return (
-    <section style={{ background:'#fff', padding:'32px 24px', borderBottom:'1px solid #f0eeeb' }}>
-      <div style={{ maxWidth:1140, margin:'0 auto', display:'grid', gridTemplateColumns:'repeat(4,1fr)', gap:24, textAlign:'center' }}>
-        {[{n:'1.200+',label:'Institutioner',icon:'🏫'},{n:count||'…',label:'Aktive opslag',icon:'📦'},{n:'12.000+',label:'Handler gennemført',icon:'🤝'},{n:'98 ton',label:'Sparet legetøj',icon:'♻️'}].map((s,i) => (
-          <div key={i} style={{ animation:`slideUp 0.45s ease ${i*0.08}s both` }}>
-            <div style={{ fontSize:26, marginBottom:4 }}>{s.icon}</div>
-            <div style={{ fontFamily:"'Nunito',sans-serif", fontWeight:900, fontSize:30, color:PRIMARY, lineHeight:1 }}>{s.n}</div>
-            <div style={{ fontSize:13, color:'#888', marginTop:4, fontWeight:600 }}>{s.label}</div>
-          </div>
-        ))}
+    <section style={{ padding:'80px 24px', background:'#fff' }}>
+      <div style={{ maxWidth:1140, margin:'0 auto' }}>
+        <div style={{ textAlign:'center', marginBottom:56 }}>
+          <h2 style={{ fontFamily:"'Nunito',sans-serif", fontWeight:900, fontSize:'clamp(24px,3.5vw,38px)', letterSpacing:'-0.5px', marginBottom:10 }}>Sådan fungerer Legetøjsbyt.dk</h2>
+          <p style={{ color:'#888', fontSize:16 }}>En simpel og sikker måde for institutioner at dele ressourcer på</p>
+        </div>
+        <div style={{ display:'grid', gridTemplateColumns:'repeat(3,1fr)', gap:40, textAlign:'center' }}>
+          {steps.map((s,i) => (
+            <div key={i} style={{ animation:`slideUp 0.45s ease ${i*0.1}s both` }}>
+              <div style={{ width:60, height:60, borderRadius:'50%', background:'#e8f5ee', display:'flex', alignItems:'center', justifyContent:'center', fontSize:26, margin:'0 auto 16px' }}>{s.icon}</div>
+              <h3 style={{ fontFamily:"'Nunito',sans-serif", fontWeight:800, fontSize:17, marginBottom:8 }}>{s.n}. {s.title}</h3>
+              <p style={{ color:PRIMARY, fontSize:13, lineHeight:1.65, maxWidth:240, margin:'0 auto' }}>{s.desc}</p>
+            </div>
+          ))}
+        </div>
       </div>
     </section>
   );
 }
 
 function ListingsPreview({ listings, loading, setPage, setActiveListing, favs, toggleFav }) {
+  const [search, setSearch] = useState('');
   const [filter, setFilter] = useState('alle');
-  const shown = filter==='alle' ? listings.slice(0,6) : listings.filter(l=>l.type===filter).slice(0,6);
+  const dSearch = useDebounce(search, 180);
+  const shown = useMemo(() => {
+    let r = listings;
+    if (filter !== 'alle') r = r.filter(l => l.type === filter);
+    if (dSearch) r = r.filter(l => l.title.toLowerCase().includes(dSearch.toLowerCase()) || (l.institution_name||'').toLowerCase().includes(dSearch.toLowerCase()));
+    return r.slice(0, 4);
+  }, [listings, filter, dSearch]);
+
   return (
-    <section style={{ padding:'80px 24px', background:'#fffcf8' }}>
+    <section style={{ padding:'80px 24px', background:'#f5f6f7' }}>
       <div style={{ maxWidth:1140, margin:'0 auto' }}>
-        <div style={{ display:'flex', alignItems:'flex-end', justifyContent:'space-between', marginBottom:36, flexWrap:'wrap', gap:16 }}>
+        {/* Header */}
+        <div style={{ display:'flex', alignItems:'flex-end', justifyContent:'space-between', marginBottom:8, flexWrap:'wrap', gap:12 }}>
           <div>
-            <h2 style={{ fontFamily:"'Nunito',sans-serif", fontWeight:800, fontSize:'clamp(24px,3vw,38px)', letterSpacing:'-0.5px' }}>Nyeste opslag</h2>
-            <p style={{ color:'#888', marginTop:6, fontSize:15 }}>Fra verificerede institutioner over hele Danmark</p>
+            <h2 style={{ fontFamily:"'Nunito',sans-serif", fontWeight:900, fontSize:'clamp(24px,3vw,36px)', letterSpacing:'-0.5px', marginBottom:4 }}>Markedsplads</h2>
+            <p style={{ color:'#888', fontSize:14 }}>Udforsk tusindvis af legetøj fra verificerede institutioner</p>
           </div>
-          <div style={{ display:'flex', gap:8 }}>
-            {['alle','køb','byd','byt'].map(f => (
-              <button key={f} onClick={()=>setFilter(f)} style={{ padding:'7px 18px', borderRadius:99, border:filter===f?'none':'1.5px solid #ddd', background:filter===f?PRIMARY:'#fff', color:filter===f?'#fff':'#555', fontSize:13, fontWeight:700, fontFamily:"'Nunito',sans-serif", transition:'all 0.15s', textTransform:'capitalize' }}>{f}</button>
-            ))}
-          </div>
+          <Btn variant="primary" color={PRIMARY} radius={22} onClick={()=>setPage('opslag')} style={{ padding:'11px 22px', fontSize:14, whiteSpace:'nowrap' }}>Se alle annoncer</Btn>
         </div>
-        <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fill,minmax(260px,1fr))', gap:20 }}>
-          {loading ? [1,2,3,4,5,6].map(i=><SkeletonCard key={i}/>) : shown.map(l=>(
+
+        {/* Search + filters */}
+        <div style={{ background:'#fff', borderRadius:16, padding:'14px 20px', display:'flex', gap:12, marginBottom:28, boxShadow:'0 1px 8px rgba(0,0,0,0.06)', flexWrap:'wrap', alignItems:'center' }}>
+          <input value={search} onChange={e=>setSearch(e.target.value)} placeholder="Søg efter legetøj, kategori eller institution..." style={{ flex:1, minWidth:200, border:'none', outline:'none', fontSize:14, fontFamily:"'Nunito Sans',sans-serif", color:'#333' }} />
+          <select value={filter} onChange={e=>setFilter(e.target.value)} style={{ border:'1px solid #e5e5e5', borderRadius:10, padding:'8px 14px', fontSize:13, fontFamily:"'Nunito Sans',sans-serif", color:'#555', outline:'none', background:'#fff' }}>
+            <option value="alle">Alle kategorier</option>
+            <option value="køb">Køb</option>
+            <option value="byd">Byd</option>
+            <option value="byt">Byt</option>
+          </select>
+          <select style={{ border:'1px solid #e5e5e5', borderRadius:10, padding:'8px 14px', fontSize:13, fontFamily:"'Nunito Sans',sans-serif", color:'#555', outline:'none', background:'#fff' }}>
+            <option>Afstand</option>
+          </select>
+        </div>
+
+        {/* Cards */}
+        <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fill,minmax(250px,1fr))', gap:20 }}>
+          {loading ? [1,2,3,4].map(i=><SkeletonCard key={i}/>) : shown.map(l=>(
             <ListingCard key={l.id} listing={l} favs={favs} toggleFav={toggleFav} onClick={()=>{ setActiveListing(l); setPage('listing'); }} />
           ))}
         </div>
-        <div style={{ textAlign:'center', marginTop:40 }}>
-          <Btn variant="outline" onClick={()=>setPage('opslag')} radius={22} style={{ padding:'13px 36px', fontSize:15 }}>Se alle {listings.length} opslag →</Btn>
+
+        <div style={{ textAlign:'center', marginTop:36 }}>
+          <Btn variant="primary" color={PRIMARY} radius={99} onClick={()=>setPage('opslag')} style={{ padding:'13px 36px', fontSize:15 }}>Se alle {listings.length} annoncer</Btn>
         </div>
       </div>
     </section>
   );
 }
 
-function HowSection() {
-  const steps = [
-    { n:'01', icon:'🏢', title:'Registrér din institution', desc:'Angiv jeres CVR-nummer. Vi verificerer automatisk at I er en godkendt institution.' },
-    { n:'02', icon:'📸', title:'Opret et opslag', desc:'Beskriv legetøjet og vælg om det skal købes, byttes eller budes på. Det tager 2 minutter.' },
-    { n:'03', icon:'🚚', title:'Aftal og afhendt', desc:'Institutioner nær jer kontakter jer. Aftal afhentning direkte via platformen.' },
+function MissionSection({ setPage }) {
+  const points = [
+    { icon:'🛡️', color:'#e8f5ee', title:'Sikker handel', desc:'Kun verificerede institutioner med CVR-nummer' },
+    { icon:'💛', color:'#fff9e6', title:'Spar penge', desc:'Få kvalitetslegetøj til en brøkdel af nyprisen' },
+    { icon:'♻️', color:'#e8f5ee', title:'Bæredygtighed', desc:'Fremm genbrug og hjælp miljøet' },
+    { icon:'🚚', color:'#fff3e8', title:'Transport service', desc:'Valgfri levering direkte til jeres institution' },
   ];
   return (
-    <section style={{ padding:'80px 24px', background:'#f8f5f0' }}>
-      <div style={{ maxWidth:1140, margin:'0 auto' }}>
-        <div style={{ textAlign:'center', marginBottom:56 }}>
-          <h2 style={{ fontFamily:"'Nunito',sans-serif", fontWeight:800, fontSize:'clamp(28px,4vw,44px)', letterSpacing:'-0.5px' }}>Sådan virker det</h2>
-          <p style={{ color:'#888', marginTop:12, fontSize:17 }}>Kom i gang på under 5 minutter</p>
-        </div>
-        <div style={{ display:'grid', gridTemplateColumns:'repeat(3,1fr)', gap:32 }}>
-          {steps.map((s,i) => (
-            <div key={i} style={{ background:'#fff', borderRadius:22, padding:32, boxShadow:'0 2px 16px rgba(0,0,0,0.06)', position:'relative', overflow:'hidden', animation:`slideUp 0.5s ease ${i*0.14}s both` }}>
-              <div style={{ position:'absolute', top:-10, right:14, fontFamily:"'Nunito',sans-serif", fontWeight:900, fontSize:84, color:'#f5f4f2', lineHeight:1, userSelect:'none' }}>{s.n}</div>
-              <div style={{ width:56, height:56, borderRadius:16, background:'#f0f9f4', display:'flex', alignItems:'center', justifyContent:'center', fontSize:28, marginBottom:20 }}>{s.icon}</div>
-              <h3 style={{ fontFamily:"'Nunito',sans-serif", fontWeight:800, fontSize:18, marginBottom:10 }}>{s.title}</h3>
-              <p style={{ color:'#777', lineHeight:1.65, fontSize:14 }}>{s.desc}</p>
-            </div>
-          ))}
-        </div>
-      </div>
-    </section>
-  );
-}
-
-function TrustSection({ setPage }) {
-  return (
-    <section style={{ padding:'80px 24px', background:`linear-gradient(135deg,${PRIMARY} 0%,#1a5c38 100%)` }}>
-      <div style={{ maxWidth:1140, margin:'0 auto', display:'grid', gridTemplateColumns:'1fr 1fr', gap:60, alignItems:'center' }}>
+    <section style={{ padding:'80px 24px', background:'#fff' }}>
+      <div style={{ maxWidth:1140, margin:'0 auto', display:'grid', gridTemplateColumns:'1fr 1fr', gap:64, alignItems:'center' }}>
+        {/* Left */}
         <div>
-          <h2 style={{ fontFamily:"'Nunito',sans-serif", fontWeight:900, fontSize:'clamp(26px,3.5vw,42px)', color:'#fff', letterSpacing:'-0.5px', marginBottom:16 }}>Kun for certificerede institutioner</h2>
-          <p style={{ color:'rgba(255,255,255,0.8)', fontSize:17, lineHeight:1.65, marginBottom:32 }}>Vi verificerer automatisk alle institutioner via CVR-registeret. Ingen privatpersoner. Ingen usikre handler.</p>
-          {[['🔍','Automatisk CVR-opslag','Vi tjekker branchekode og aktiv status'],['🏫','Godkendte institutioner',"Vuggestuer, børnehaver, skoler, SFO'er"],['🔒','Sikker datahåndtering','GDPR-compliant og sikker drift']].map(([icon,title,desc],i) => (
-            <div key={i} style={{ display:'flex', gap:14, alignItems:'flex-start', background:'rgba(255,255,255,0.1)', borderRadius:14, padding:'13px 16px', marginBottom:10, backdropFilter:'blur(8px)' }}>
-              <span style={{ fontSize:22 }}>{icon}</span>
-              <div>
-                <div style={{ color:'#fff', fontWeight:700, fontSize:14, marginBottom:3 }}>{title}</div>
-                <div style={{ color:'rgba(255,255,255,0.7)', fontSize:13 }}>{desc}</div>
+          <h2 style={{ fontFamily:"'Nunito',sans-serif", fontWeight:900, fontSize:'clamp(26px,3.5vw,42px)', letterSpacing:'-0.5px', marginBottom:14 }}>Vores mission</h2>
+          <p style={{ color:'#555', fontSize:15, lineHeight:1.75, marginBottom:32 }}>Vi tror på en fremtid hvor legetøj får flere liv. Legetøjsbyt.dk forbinder danske institutioner i et bæredygtigt fællesskab, hvor ressourcer deles og miljøet passes på.</p>
+          <div style={{ display:'flex', flexDirection:'column', gap:16 }}>
+            {points.map((p,i) => (
+              <div key={i} style={{ display:'flex', gap:14, alignItems:'flex-start' }}>
+                <div style={{ width:36, height:36, borderRadius:10, background:p.color, display:'flex', alignItems:'center', justifyContent:'center', fontSize:18, flexShrink:0 }}>{p.icon}</div>
+                <div>
+                  <div style={{ fontWeight:700, fontSize:14, marginBottom:2 }}>{p.title}</div>
+                  <div style={{ fontSize:13, color:'#888' }}>{p.desc}</div>
+                </div>
               </div>
-            </div>
-          ))}
+            ))}
+          </div>
         </div>
-        <div style={{ background:'#fff', borderRadius:24, padding:36, boxShadow:'0 20px 60px rgba(0,0,0,0.2)' }}>
-          <h3 style={{ fontFamily:"'Nunito',sans-serif", fontWeight:800, fontSize:22, marginBottom:6 }}>Tilmeld jer i dag</h3>
-          <p style={{ color:'#888', fontSize:14, marginBottom:24 }}>Gratis at oprette profil. Ingen binding.</p>
-          {[{label:'CVR-nummer',placeholder:'12345678',type:'text'},{label:'Din e-mail',placeholder:'navn@institution.dk',type:'email'},{label:'Kodeord',placeholder:'••••••••',type:'password'}].map((f,i) => (
-            <div key={i} style={{ marginBottom:14 }}>
-              <label style={{ display:'block', fontSize:13, fontWeight:700, marginBottom:6 }}>{f.label}</label>
-              <input type={f.type} placeholder={f.placeholder} readOnly style={{ width:'100%', padding:'12px 14px', borderRadius:12, border:'1.5px solid #e5e5e5', fontSize:14, fontFamily:"'Nunito Sans',sans-serif", background:'#fafafa' }} />
-            </div>
-          ))}
-          <Btn variant="primary" color={PRIMARY} radius={22} onClick={()=>setPage('signup')} style={{ justifyContent:'center', padding:'14px', fontSize:15, width:'100%' }}>Opret institution gratis →</Btn>
+
+        {/* Right: photo + floating stats */}
+        <div style={{ position:'relative' }}>
+          <div style={{ borderRadius:24, overflow:'hidden', boxShadow:'0 16px 48px rgba(0,0,0,0.12)', aspectRatio:'4/3' }}>
+            <img src="https://images.unsplash.com/photo-1580582932707-520aed937b7b?w=680&auto=format&fit=crop&q=80" alt="Klasseværelse" style={{ width:'100%', height:'100%', objectFit:'cover', display:'block' }} />
+          </div>
+          {/* Stat top-right */}
+          <div style={{ position:'absolute', top:-16, right:-16, background:'#fff', borderRadius:16, padding:'14px 20px', boxShadow:'0 8px 28px rgba(0,0,0,0.12)', textAlign:'center' }}>
+            <div style={{ fontFamily:"'Nunito',sans-serif", fontWeight:900, fontSize:28, color:ACCENT2 }}>156</div>
+            <div style={{ fontSize:12, color:'#888' }}>institutioner tilmeldt</div>
+          </div>
+          {/* Stat bottom-left */}
+          <div style={{ position:'absolute', bottom:-16, left:-16, background:'#fff', borderRadius:16, padding:'14px 20px', boxShadow:'0 8px 28px rgba(0,0,0,0.12)', textAlign:'center' }}>
+            <div style={{ fontFamily:"'Nunito',sans-serif", fontWeight:900, fontSize:28, color:PRIMARY }}>2.847</div>
+            <div style={{ fontSize:12, color:'#888' }}>handler gennemført</div>
+          </div>
         </div>
       </div>
     </section>
@@ -452,11 +465,10 @@ function Footer({ setPage }) {
 function HomePage({ setPage, setActiveListing, listings, loading, favs, toggleFav }) {
   return (
     <>
-      <HeroSection setPage={setPage} listings={listings} />
-      <StatsBar count={listings.length} />
+      <HeroSection setPage={setPage} />
+      <HowSection setPage={setPage} />
       <ListingsPreview listings={listings} loading={loading} setPage={setPage} setActiveListing={setActiveListing} favs={favs} toggleFav={toggleFav} />
-      <HowSection />
-      <TrustSection setPage={setPage} />
+      <MissionSection setPage={setPage} />
       <Footer setPage={setPage} />
     </>
   );
