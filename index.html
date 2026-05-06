@@ -167,7 +167,7 @@ function Toast({ msg, type='success', onDone }) {
 }
 
 // ─── NAV ─────────────────────────────────────────────────────────────────────
-function Nav({ page, setPage, loggedIn, setLoggedIn }) {
+function Nav({ page, setPage, loggedIn, setLoggedIn, unreadTotal }) {
   const [scrolled, setScrolled] = useState(false);
   useEffect(() => {
     const fn = () => setScrolled(window.scrollY > 20);
@@ -195,6 +195,10 @@ function Nav({ page, setPage, loggedIn, setLoggedIn }) {
         <div style={{ display:'flex', gap:10, alignItems:'center', flexShrink:0 }}>
           {loggedIn ? <>
             <button onClick={()=>setPage('dashboard')} style={{ background:'none', border:'none', fontWeight:600, fontSize:14, color:transparent?'rgba(255,255,255,0.9)':'#555', cursor:'pointer', padding:'8px 12px', borderRadius:8 }}>Min institution</button>
+            <button onClick={()=>setPage('beskeder')} title="Beskeder" style={{ background:'none', border:'none', padding:'6px 8px', borderRadius:8, cursor:'pointer', position:'relative', display:'flex', alignItems:'center', justifyContent:'center', fontSize:20 }}>
+              💬
+              {unreadTotal > 0 && <span style={{ position:'absolute', top:2, right:2, background:'#EF476F', color:'#fff', borderRadius:99, fontSize:10, fontWeight:700, minWidth:16, height:16, display:'flex', alignItems:'center', justifyContent:'center', padding:'0 4px', lineHeight:1 }}>{unreadTotal > 9 ? '9+' : unreadTotal}</span>}
+            </button>
             <div onClick={async()=>{ await db.auth.signOut(); setLoggedIn(false); setPage('home'); }} title="Log ud" style={{ width:36, height:36, borderRadius:'50%', background:PRIMARY, display:'flex', alignItems:'center', justifyContent:'center', color:'#fff', fontWeight:800, fontSize:14, cursor:'pointer' }}>M</div>
           </> : <>
             <Btn variant="ghost" onClick={()=>setPage('login')} color={transparent?'rgba(255,255,255,0.9)':PRIMARY} radius={32} style={{ color:transparent?'rgba(255,255,255,0.9)':'#555' }}>Log ind</Btn>
@@ -567,13 +571,12 @@ function ImageGallery({ images, color, emoji }) {
 }
 
 // ─── LISTING DETAIL ───────────────────────────────────────────────────────────
-function ListingDetailPage({ listing, setPage, showToast }) {
+function ListingDetailPage({ listing, setPage, showToast, onStartConv }) {
   const [buyModal,  setBuyModal]  = useState(false);
   const [bidModal,  setBidModal]  = useState(false);
   const [swapModal, setSwapModal] = useState(false);
   const [bidAmount, setBidAmount] = useState('');
   const [swapOffer, setSwapOffer] = useState('');
-  const [msgText,   setMsgText]   = useState('');
   const [bidCount,  setBidCount]  = useState(listing.bid_count||0);
   const [saving,    setSaving]    = useState(false);
 
@@ -601,15 +604,6 @@ function ListingDetailPage({ listing, setPage, showToast }) {
     setSaving(false); setSwapModal(false);
     showToast('Bytteforslag sendt!');
   }
-  async function handleMsg(e) {
-    e.preventDefault();
-    if (!msgText.trim()) return;
-    setSaving(true);
-    await db.from('messages').insert({ listing_id:listing.id, sender_name:'Anonym Institution', message:msgText });
-    setSaving(false); setMsgText('');
-    showToast('Besked sendt!');
-  }
-
   return (
     <div style={{ minHeight:'100vh', paddingTop:80, background:'#fffcf8' }} className="page-enter">
       <div style={{ maxWidth:1140, margin:'0 auto', padding:'24px 24px 0' }}>
@@ -629,13 +623,11 @@ function ListingDetailPage({ listing, setPage, showToast }) {
             <p style={{ color:'#888', fontSize:14, marginBottom:20 }}>Opslået af <strong style={{ color:'#333' }}>{listing.institution_name}</strong></p>
             <p style={{ color:'#555', lineHeight:1.75, fontSize:15, marginBottom:32 }}>{listing.description}</p>
             <div style={{ background:'#fff', borderRadius:20, padding:24, boxShadow:'0 2px 12px rgba(0,0,0,0.06)' }}>
-              <h3 style={{ fontFamily:"'Nunito',sans-serif", fontWeight:800, fontSize:18, marginBottom:16 }}>Send besked til institutionen</h3>
-              <form onSubmit={handleMsg}>
-                <textarea value={msgText} onChange={e=>setMsgText(e.target.value)} placeholder="Hej, vi er interesserede i …" rows={3} style={{ width:'100%', padding:'12px 14px', borderRadius:12, border:'1.5px solid #e5e5e5', fontSize:14, resize:'vertical', fontFamily:"'Nunito Sans',sans-serif", marginBottom:12, outline:'none' }} />
-                <Btn variant="primary" color={PRIMARY} radius={22} type="submit" disabled={saving||!msgText.trim()} style={{ padding:'11px 24px' }}>
-                  {saving ? <><Spinner/>Sender…</> : 'Send besked'}
-                </Btn>
-              </form>
+              <h3 style={{ fontFamily:"'Nunito',sans-serif", fontWeight:800, fontSize:18, marginBottom:8 }}>Kontakt institutionen</h3>
+              <p style={{ fontSize:13, color:'#888', marginBottom:16, lineHeight:1.55 }}>Send en besked direkte til {listing.institution_name} for at aftale nærmere, byde en pris eller foreslå et bytte.</p>
+              <Btn variant="primary" color={PRIMARY} radius={22} onClick={()=>onStartConv && onStartConv(listing)} style={{ padding:'12px 24px', width:'100%', justifyContent:'center', fontSize:15 }}>
+                💬 Åbn besked
+              </Btn>
             </div>
           </div>
 
@@ -1489,6 +1481,267 @@ function DashboardPage({ setPage, showToast, allListings, onListingCreated, inst
 }
 
 // ─── HOW IT WORKS PAGE ────────────────────────────────────────────────────────
+// ─── HELPERS ──────────────────────────────────────────────────────────────────
+function relTime(ts) {
+  if (!ts) return '';
+  const diff = Date.now() - new Date(ts).getTime();
+  const m = Math.floor(diff/60000);
+  if (m < 1) return 'nu';
+  if (m < 60) return `${m} min`;
+  const h = Math.floor(m/60);
+  if (h < 24) return `${h} t`;
+  const d = Math.floor(h/24);
+  if (d < 7) return `${d} d`;
+  return new Date(ts).toLocaleDateString('da-DK',{day:'numeric',month:'short'});
+}
+
+// ─── MESSAGES PAGE ────────────────────────────────────────────────────────────
+function MessagesPage({ setPage, selectedConvId, setSelectedConvId }) {
+  const [userId,    setUserId]    = useState(null);
+  const [convs,     setConvs]     = useState([]);
+  const [active,    setActive]    = useState(null);
+  const [messages,  setMessages]  = useState([]);
+  const [newMsg,    setNewMsg]    = useState('');
+  const [search,    setSearch]    = useState('');
+  const [loading,   setLoading]   = useState(true);
+  const [msgLoad,   setMsgLoad]   = useState(false);
+  const [sending,   setSending]   = useState(false);
+  const bottomRef = React.useRef(null);
+  const inputRef  = React.useRef(null);
+
+  // Boot
+  useEffect(() => {
+    db.auth.getUser().then(({ data: { user } }) => {
+      if (!user) { setLoading(false); return; }
+      setUserId(user.id);
+      loadConvs(user.id);
+    });
+  }, []);
+
+  // Pre-select conversation passed from listing page
+  useEffect(() => {
+    if (!selectedConvId || !convs.length) return;
+    const c = convs.find(x => x.id === selectedConvId);
+    if (c) openConv(c);
+  }, [selectedConvId, convs]);
+
+  // Real-time: refresh conv list on any conversation update
+  useEffect(() => {
+    if (!userId) return;
+    const ch = db.channel('convs-rt').on('postgres_changes', { event:'UPDATE', schema:'public', table:'conversations' }, () => loadConvs(userId)).subscribe();
+    return () => db.removeChannel(ch);
+  }, [userId]);
+
+  async function loadConvs(uid) {
+    setLoading(true);
+    const { data } = await db.from('conversations').select('*')
+      .or(`initiator_id.eq.${uid},owner_id.eq.${uid}`)
+      .order('last_message_at', { ascending: false });
+    if (data) setConvs(data);
+    setLoading(false);
+  }
+
+  async function openConv(conv) {
+    setActive(conv);
+    setSelectedConvId(conv.id);
+    setMsgLoad(true);
+    const { data } = await db.from('chat_messages').select('*').eq('conversation_id', conv.id).order('created_at', { ascending: true });
+    if (data) setMessages(data);
+    setMsgLoad(false);
+    setTimeout(() => bottomRef.current?.scrollIntoView({ behavior:'smooth' }), 60);
+    inputRef.current?.focus();
+    // Reset unread for current user
+    const isInit = conv.initiator_id === userId;
+    if ((isInit && conv.initiator_unread > 0) || (!isInit && conv.owner_unread > 0)) {
+      const patch = isInit ? { initiator_unread: 0 } : { owner_unread: 0 };
+      await db.from('conversations').update(patch).eq('id', conv.id);
+      setConvs(cs => cs.map(c => c.id === conv.id ? { ...c, ...patch } : c));
+    }
+  }
+
+  // Real-time messages for active conversation
+  useEffect(() => {
+    if (!active) return;
+    const ch = db.channel(`msgs-${active.id}`)
+      .on('postgres_changes', { event:'INSERT', schema:'public', table:'chat_messages', filter:`conversation_id=eq.${active.id}` },
+        ({ new: m }) => {
+          setMessages(prev => [...prev, m]);
+          setTimeout(() => bottomRef.current?.scrollIntoView({ behavior:'smooth' }), 60);
+        })
+      .subscribe();
+    return () => db.removeChannel(ch);
+  }, [active?.id]);
+
+  async function send() {
+    const content = newMsg.trim();
+    if (!content || !active || !userId) return;
+    setSending(true);
+    setNewMsg('');
+    const senderName = active.initiator_id === userId ? active.initiator_name : active.owner_name;
+    await db.from('chat_messages').insert({ conversation_id: active.id, sender_id: userId, sender_name: senderName, content });
+    // Increment unread for other party, update last message
+    const isInit = active.initiator_id === userId;
+    const unreadPatch = isInit ? { owner_unread: (active.owner_unread||0)+1 } : { initiator_unread: (active.initiator_unread||0)+1 };
+    const updated = { last_message: content, last_message_at: new Date().toISOString(), ...unreadPatch };
+    await db.from('conversations').update(updated).eq('id', active.id);
+    setActive(a => ({ ...a, ...updated }));
+    setConvs(cs => cs.map(c => c.id === active.id ? { ...c, ...updated } : c).sort((a,b) => new Date(b.last_message_at)-new Date(a.last_message_at)));
+    setSending(false);
+  }
+
+  function onKey(e) { if (e.key==='Enter' && !e.shiftKey) { e.preventDefault(); send(); } }
+
+  const myUnread = c => c.initiator_id === userId ? (c.initiator_unread||0) : (c.owner_unread||0);
+  const otherName = c => c.initiator_id === userId ? c.owner_name : c.initiator_name;
+  const filtered = convs.filter(c => otherName(c).toLowerCase().includes(search.toLowerCase()) || c.listing_title.toLowerCase().includes(search.toLowerCase()));
+  const totalUnread = convs.reduce((s,c) => s + myUnread(c), 0);
+
+  if (!userId) return (
+    <div style={{ minHeight:'100vh', display:'flex', alignItems:'center', justifyContent:'center', paddingTop:80 }} className="page-enter">
+      <div style={{ textAlign:'center' }}>
+        <div style={{ fontSize:56, marginBottom:16 }}>💬</div>
+        <h2 style={{ fontFamily:"'Nunito',sans-serif", fontWeight:900, fontSize:24, marginBottom:8 }}>Log ind for at se dine beskeder</h2>
+        <Btn variant="primary" color={PRIMARY} radius={22} onClick={()=>setPage('login')} style={{ marginTop:16, padding:'13px 32px', fontSize:15 }}>Log ind</Btn>
+      </div>
+    </div>
+  );
+
+  return (
+    <div style={{ height:'100vh', display:'flex', flexDirection:'column', paddingTop:68, background:'#f8f5f0' }} className="page-enter">
+      <div style={{ flex:1, display:'flex', overflow:'hidden', maxWidth:1200, width:'100%', margin:'0 auto', padding:'16px 16px 0' }}>
+
+        {/* ── Conversation list ── */}
+        <div style={{ width:320, flexShrink:0, display:'flex', flexDirection:'column', background:'#fff', borderRadius:'18px 18px 0 0', boxShadow:'0 2px 16px rgba(0,0,0,0.07)', marginRight:12, overflow:'hidden' }}>
+          <div style={{ padding:'20px 18px 12px' }}>
+            <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:14 }}>
+              <h2 style={{ fontFamily:"'Nunito',sans-serif", fontWeight:900, fontSize:20 }}>Beskeder</h2>
+              {totalUnread > 0 && <div style={{ background:'#e11d48', color:'#fff', borderRadius:99, padding:'2px 9px', fontSize:12, fontWeight:800 }}>{totalUnread}</div>}
+            </div>
+            <div style={{ position:'relative' }}>
+              <span style={{ position:'absolute', left:12, top:'50%', transform:'translateY(-50%)', fontSize:14, color:'#bbb' }}>🔍</span>
+              <input value={search} onChange={e=>setSearch(e.target.value)} placeholder="Søg samtaler…" style={{ width:'100%', padding:'9px 12px 9px 34px', borderRadius:10, border:'1.5px solid #eee', fontSize:13, outline:'none', background:'#fafaf8' }} />
+            </div>
+          </div>
+          <div style={{ flex:1, overflowY:'auto' }}>
+            {loading ? <div style={{ padding:24, textAlign:'center', color:'#bbb', fontSize:13 }}>Indlæser…</div>
+            : filtered.length === 0 ? (
+              <div style={{ padding:40, textAlign:'center', color:'#bbb' }}>
+                <div style={{ fontSize:40, marginBottom:10 }}>💬</div>
+                <p style={{ fontSize:13 }}>Ingen samtaler endnu</p>
+                <button onClick={()=>setPage('opslag')} style={{ marginTop:12, background:'none', border:`1.5px solid ${PRIMARY}`, color:PRIMARY, borderRadius:99, padding:'7px 16px', fontSize:12, fontWeight:700, cursor:'pointer' }}>Find opslag</button>
+              </div>
+            ) : filtered.map(c => {
+              const unread = myUnread(c);
+              const isActive = active?.id === c.id;
+              return (
+                <div key={c.id} onClick={()=>openConv(c)} style={{ display:'flex', gap:12, padding:'13px 16px', cursor:'pointer', background:isActive?'#f0faf5':'#fff', borderLeft:isActive?`3px solid ${PRIMARY}`:'3px solid transparent', transition:'background 0.15s' }}>
+                  <div style={{ width:46, height:46, borderRadius:12, background:c.listing_image?'#e8e6e3':c.listing_color||'#FFD166', display:'flex', alignItems:'center', justifyContent:'center', fontSize:22, flexShrink:0, overflow:'hidden', position:'relative' }}>
+                    {c.listing_image ? <img src={c.listing_image} style={{ width:'100%', height:'100%', objectFit:'cover' }} alt="" /> : c.listing_emoji||'🧸'}
+                    {unread>0 && <div style={{ position:'absolute', top:-4, right:-4, width:18, height:18, background:'#e11d48', borderRadius:'50%', border:'2px solid #fff', display:'flex', alignItems:'center', justifyContent:'center', fontSize:9, fontWeight:800, color:'#fff' }}>{unread>9?'9+':unread}</div>}
+                  </div>
+                  <div style={{ flex:1, minWidth:0 }}>
+                    <div style={{ display:'flex', justifyContent:'space-between', alignItems:'baseline', marginBottom:3 }}>
+                      <div style={{ fontFamily:"'Nunito',sans-serif", fontWeight:unread>0?800:600, fontSize:13, whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis', maxWidth:140 }}>{otherName(c)}</div>
+                      <div style={{ fontSize:11, color:'#bbb', flexShrink:0, marginLeft:6 }}>{relTime(c.last_message_at)}</div>
+                    </div>
+                    <div style={{ fontSize:12, color:'#888', fontWeight:600, whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis', marginBottom:2 }}>📦 {c.listing_title}</div>
+                    <div style={{ fontSize:12, color:unread>0?'#333':'#aaa', fontWeight:unread>0?600:400, whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis' }}>{c.last_message || 'Samtale startet'}</div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+
+        {/* ── Chat window ── */}
+        <div style={{ flex:1, display:'flex', flexDirection:'column', background:'#fff', borderRadius:'18px 18px 0 0', boxShadow:'0 2px 16px rgba(0,0,0,0.07)', overflow:'hidden' }}>
+          {!active ? (
+            <div style={{ flex:1, display:'flex', alignItems:'center', justifyContent:'center', flexDirection:'column', color:'#ccc' }}>
+              <div style={{ fontSize:56, marginBottom:16 }}>💬</div>
+              <div style={{ fontFamily:"'Nunito',sans-serif", fontWeight:700, fontSize:18, color:'#bbb' }}>Vælg en samtale</div>
+              <div style={{ fontSize:13, marginTop:6, color:'#ddd' }}>eller start en ny fra et opslag</div>
+            </div>
+          ) : (
+            <>
+              {/* Product reference card */}
+              <div style={{ padding:'14px 20px', borderBottom:'1.5px solid #f0eeeb', display:'flex', alignItems:'center', gap:14, background:'#fafaf8' }}>
+                <div style={{ width:48, height:48, borderRadius:12, background:active.listing_image?'#e8e6e3':active.listing_color||'#FFD166', display:'flex', alignItems:'center', justifyContent:'center', fontSize:24, flexShrink:0, overflow:'hidden' }}>
+                  {active.listing_image ? <img src={active.listing_image} style={{ width:'100%', height:'100%', objectFit:'cover' }} alt="" /> : active.listing_emoji||'🧸'}
+                </div>
+                <div style={{ flex:1, minWidth:0 }}>
+                  <div style={{ fontSize:12, color:'#aaa', fontWeight:600, marginBottom:2 }}>Samtale om</div>
+                  <div style={{ fontFamily:"'Nunito',sans-serif", fontWeight:800, fontSize:15, whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis' }}>{active.listing_title}</div>
+                  <div style={{ fontSize:12, color:'#888', marginTop:1 }}>med <strong>{otherName(active)}</strong></div>
+                </div>
+                <button onClick={()=>{ const l = { id:active.listing_id }; setPage('listing'); }} style={{ fontSize:12, fontWeight:700, color:PRIMARY, background:'#E8F5EE', border:'none', borderRadius:8, padding:'6px 12px', cursor:'pointer', whiteSpace:'nowrap' }}>Se opslag →</button>
+              </div>
+
+              {/* Messages */}
+              <div style={{ flex:1, overflowY:'auto', padding:'20px 24px', display:'flex', flexDirection:'column', gap:6 }}>
+                {msgLoad ? <div style={{ textAlign:'center', color:'#bbb', paddingTop:40 }}>Indlæser…</div>
+                : messages.length === 0 ? (
+                  <div style={{ textAlign:'center', color:'#bbb', paddingTop:60 }}>
+                    <div style={{ fontSize:40, marginBottom:10 }}>👋</div>
+                    <p style={{ fontSize:14 }}>Send den første besked for at starte samtalen</p>
+                  </div>
+                ) : (() => {
+                  let lastDate = null;
+                  return messages.map((m, i) => {
+                    const mine = m.sender_id === userId;
+                    const d = new Date(m.created_at);
+                    const dateStr = d.toLocaleDateString('da-DK',{weekday:'long',day:'numeric',month:'long'});
+                    const showDate = dateStr !== lastDate;
+                    lastDate = dateStr;
+                    const prevMine = i>0 && messages[i-1].sender_id === userId;
+                    const grouped = mine === prevMine && !showDate;
+                    return (
+                      <React.Fragment key={m.id}>
+                        {showDate && <div style={{ textAlign:'center', margin:'12px 0 4px', fontSize:11, fontWeight:600, color:'#bbb', letterSpacing:0.5 }}>{dateStr}</div>}
+                        <div style={{ display:'flex', justifyContent:mine?'flex-end':'flex-start', marginTop:grouped?2:10 }}>
+                          {!mine && !grouped && <div style={{ width:30, height:30, borderRadius:'50%', background:'#f0eeeb', display:'flex', alignItems:'center', justifyContent:'center', fontSize:13, fontWeight:700, color:'#888', flexShrink:0, marginRight:8, alignSelf:'flex-end' }}>{m.sender_name.charAt(0).toUpperCase()}</div>}
+                          {!mine && grouped && <div style={{ width:30, marginRight:8, flexShrink:0 }} />}
+                          <div style={{ maxWidth:'68%' }}>
+                            {!mine && !grouped && <div style={{ fontSize:11, fontWeight:700, color:'#aaa', marginBottom:3, marginLeft:2 }}>{m.sender_name}</div>}
+                            <div style={{ background:mine?PRIMARY:'#f0f2f5', color:mine?'#fff':'#1c1a17', borderRadius:mine?'18px 18px 4px 18px':'18px 18px 18px 4px', padding:'10px 14px', fontSize:14, lineHeight:1.5, wordBreak:'break-word', boxShadow:'0 1px 3px rgba(0,0,0,0.07)' }}>
+                              {m.content}
+                            </div>
+                            <div style={{ fontSize:10, color:'#bbb', marginTop:3, textAlign:mine?'right':'left', marginLeft:mine?0:2 }}>
+                              {d.toLocaleTimeString('da-DK',{hour:'2-digit',minute:'2-digit'})}
+                            </div>
+                          </div>
+                        </div>
+                      </React.Fragment>
+                    );
+                  });
+                })()}
+                <div ref={bottomRef} />
+              </div>
+
+              {/* Input */}
+              <div style={{ padding:'12px 16px', borderTop:'1.5px solid #f0eeeb', display:'flex', gap:10, alignItems:'flex-end', background:'#fff' }}>
+                <textarea
+                  ref={inputRef}
+                  value={newMsg}
+                  onChange={e=>setNewMsg(e.target.value)}
+                  onKeyDown={onKey}
+                  placeholder="Skriv en besked… (Enter for at sende)"
+                  rows={1}
+                  style={{ flex:1, padding:'11px 14px', borderRadius:14, border:'1.5px solid #e5e5e5', fontSize:14, resize:'none', fontFamily:"'Nunito Sans',sans-serif", outline:'none', lineHeight:1.5, maxHeight:120, overflowY:'auto' }}
+                  onInput={e=>{ e.target.style.height='auto'; e.target.style.height=Math.min(e.target.scrollHeight,120)+'px'; }}
+                />
+                <button onClick={send} disabled={!newMsg.trim()||sending}
+                  style={{ width:44, height:44, borderRadius:14, background:newMsg.trim()?PRIMARY:'#e5e5e5', border:'none', display:'flex', alignItems:'center', justifyContent:'center', cursor:newMsg.trim()?'pointer':'default', transition:'background 0.2s', flexShrink:0 }}>
+                  {sending ? <Spinner /> : <span style={{ fontSize:18, color:'#fff' }}>↑</span>}
+                </button>
+              </div>
+            </>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function HowItWorksPage({ setPage }) {
   return (
     <div style={{ minHeight:'100vh', paddingTop:80, background:'#fffcf8' }} className="page-enter">
@@ -1522,18 +1775,30 @@ function HowItWorksPage({ setPage }) {
 
 // ─── APP ──────────────────────────────────────────────────────────────────────
 function App() {
-  const [page,          setPage]          = useState('home');
-  const [activeListing, setActiveListing] = useState(null);
-  const [loggedIn,      setLoggedIn]      = useState(false);
-  const [institution,   setInstitution]   = useState(null);
-  const [toast,         setToast]         = useState(null);
-  const [listings,      setListings]      = useState([]);
-  const [loading,       setLoading]       = useState(true);
-  const [favs,          toggleFav]        = useFavs();
+  const [page,           setPage]           = useState('home');
+  const [activeListing,  setActiveListing]  = useState(null);
+  const [loggedIn,       setLoggedIn]       = useState(false);
+  const [institution,    setInstitution]    = useState(null);
+  const [toast,          setToast]          = useState(null);
+  const [listings,       setListings]       = useState([]);
+  const [loading,        setLoading]        = useState(true);
+  const [favs,           toggleFav]         = useFavs();
+  const [selectedConvId, setSelectedConvId] = useState(null);
+  const [unreadTotal,    setUnreadTotal]    = useState(0);
 
   async function loadInstitution(email) {
     const { data } = await db.from('institutions').select('*').eq('email', email).maybeSingle();
     if (data) setInstitution(data);
+  }
+
+  async function fetchUnread(userId) {
+    const { data } = await db.from('conversations')
+      .select('initiator_id,initiator_unread,owner_id,owner_unread')
+      .or(`initiator_id.eq.${userId},owner_id.eq.${userId}`);
+    if (!data) return;
+    const total = data.reduce((sum, c) =>
+      sum + (c.initiator_id === userId ? (c.initiator_unread||0) : (c.owner_unread||0)), 0);
+    setUnreadTotal(total);
   }
 
   async function fetchListings() {
@@ -1550,37 +1815,70 @@ function App() {
   useEffect(() => {
     fetchListings();
     db.auth.getSession().then(({ data: { session } }) => {
-      if (session) { setLoggedIn(true); loadInstitution(session.user.email); }
+      if (session) { setLoggedIn(true); loadInstitution(session.user.email); fetchUnread(session.user.id); }
     });
     const { data: { subscription } } = db.auth.onAuthStateChange((_event, session) => {
-      if (session) { setLoggedIn(true); loadInstitution(session.user.email); }
-      else { setLoggedIn(false); setInstitution(null); }
+      if (session) { setLoggedIn(true); loadInstitution(session.user.email); fetchUnread(session.user.id); }
+      else { setLoggedIn(false); setInstitution(null); setUnreadTotal(0); }
     });
     return () => subscription.unsubscribe();
   }, []);
 
-  // Real-time: refresh whenever listings table changes
+  // Real-time: refresh listings and unread count on changes
   useEffect(() => {
-    const channel = db.channel('rt-listings')
+    const ch1 = db.channel('rt-listings')
       .on('postgres_changes', { event:'*', schema:'public', table:'listings' }, fetchListings)
       .subscribe();
-    return () => db.removeChannel(channel);
+    const ch2 = db.channel('rt-convs-app')
+      .on('postgres_changes', { event:'*', schema:'public', table:'conversations' }, async () => {
+        const { data:{ user } } = await db.auth.getUser();
+        if (user) fetchUnread(user.id);
+      })
+      .subscribe();
+    return () => { db.removeChannel(ch1); db.removeChannel(ch2); };
   }, []);
+
+  async function startConversation(listing) {
+    const { data:{ user } } = await db.auth.getUser();
+    if (!user) { navigate('login'); return; }
+    if (listing.user_id === user.id) {
+      showToast('Dette er dit eget opslag.', 'info');
+      return;
+    }
+    const { data: inst } = await db.from('institutions').select('name').eq('email', user.email).maybeSingle();
+    const userName = inst?.name || user.email;
+    const { data: existing } = await db.from('conversations')
+      .select('id').eq('listing_id', listing.id).eq('initiator_id', user.id).maybeSingle();
+    if (existing) { setSelectedConvId(existing.id); navigate('beskeder'); return; }
+    const { data: conv } = await db.from('conversations').insert({
+      listing_id:    listing.id,
+      listing_title: listing.title,
+      listing_emoji: listing.emoji,
+      listing_color: listing.color,
+      listing_image: listing.images?.[0] || null,
+      initiator_id:  user.id,
+      initiator_name: userName,
+      owner_id:      listing.user_id,
+      owner_name:    listing.institution_name,
+    }).select().single();
+    if (conv) { setSelectedConvId(conv.id); navigate('beskeder'); }
+  }
 
   function showToast(msg, type='success') { setToast({ msg, type }); }
   function navigate(p) { setPage(p); window.scrollTo({ top:0, behavior:'smooth' }); }
 
   return (
     <div>
-      <Nav page={page} setPage={navigate} loggedIn={loggedIn} setLoggedIn={setLoggedIn} />
+      <Nav page={page} setPage={navigate} loggedIn={loggedIn} setLoggedIn={setLoggedIn} unreadTotal={unreadTotal} />
 
       {page==='home'      && <HomePage setPage={navigate} setActiveListing={setActiveListing} listings={listings} loading={loading} favs={favs} toggleFav={toggleFav} />}
       {page==='opslag'    && <OpslagPage listings={listings} loading={loading} setPage={navigate} setActiveListing={setActiveListing} favs={favs} toggleFav={toggleFav} />}
-      {page==='listing'   && activeListing && <ListingDetailPage listing={activeListing} setPage={navigate} showToast={showToast} />}
+      {page==='listing'   && activeListing && <ListingDetailPage listing={activeListing} setPage={navigate} showToast={showToast} onStartConv={startConversation} />}
       {page==='login'     && <LoginPage setPage={navigate} setLoggedIn={setLoggedIn} />}
       {page==='signup'    && <SignupPage setPage={navigate} setLoggedIn={setLoggedIn} showToast={showToast} />}
       {page==='dashboard' && <DashboardPage setPage={navigate} showToast={showToast} allListings={listings} onListingCreated={fetchListings} institution={institution} favs={favs} toggleFav={toggleFav} setActiveListing={setActiveListing} />}
       {page==='hvordan'   && <HowItWorksPage setPage={navigate} />}
+      {page==='beskeder'  && <MessagesPage setPage={navigate} selectedConvId={selectedConvId} setSelectedConvId={setSelectedConvId} />}
 
       {toast && <Toast msg={toast.msg} type={toast.type} onDone={()=>setToast(null)} />}
     </div>
