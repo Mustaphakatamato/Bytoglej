@@ -187,7 +187,7 @@ function Nav({ page, setPage, loggedIn, setLoggedIn, unreadTotal }) {
         </div>
 
         <div style={{ display:'flex', gap:4, flex:1, justifyContent:'center' }}>
-          {[['opslag','🔍 Opslag'],['hvordan','Sådan virker det']].map(([p,label]) => (
+          {[['opslag','Markedsplads'],['hvordan','Sådan virker det'],['om-os','Om os'],['kontakt','Kontakt']].map(([p,label]) => (
             <button key={p} onClick={()=>setPage(p)} style={{ background:'none', border:'none', padding:'8px 16px', fontSize:14, fontWeight:600, color:page===p?PRIMARY:transparent?'rgba(255,255,255,0.85)':'#555', borderRadius:8, borderBottom:page===p?`2px solid ${PRIMARY}`:'2px solid transparent', transition:'all 0.15s' }}>{label}</button>
           ))}
         </div>
@@ -431,7 +431,7 @@ function Footer({ setPage }) {
             </div>
             <p style={{ fontSize:14, lineHeight:1.65, maxWidth:260 }}>Danmarks markedsplads for brugt institutionslegetøj. CVR-verificeret og bæredygtigt.</p>
           </div>
-          {[{title:'Platform',links:[['opslag','Opslag'],['hvordan','Sådan virker det']]},{title:'Support',links:[['home','Hjælpecenter'],['home','Kontakt os'],['home','GDPR']]},{title:'Om os',links:[['home','Om LegetøjsByt'],['home','Presse'],['home','Karriere']]}].map((col,i) => (
+          {[{title:'Platform',links:[['opslag','Markedsplads'],['hvordan','Sådan virker det']]},{title:'Support',links:[['kontakt','Kontakt os'],['kontakt','FAQ']]},{title:'Om os',links:[['om-os','Om LegetøjsByt'],['om-os','Vores værdier']]}].map((col,i) => (
             <div key={i}>
               <div style={{ color:'#fff', fontWeight:700, fontSize:14, marginBottom:14 }}>{col.title}</div>
               <div style={{ display:'flex', flexDirection:'column', gap:8 }}>
@@ -607,7 +607,7 @@ function ListingDetailPage({ listing, setPage, showToast, onStartConv }) {
   return (
     <div style={{ minHeight:'100vh', paddingTop:80, background:'#fffcf8' }} className="page-enter">
       <div style={{ maxWidth:1140, margin:'0 auto', padding:'24px 24px 0' }}>
-        <button onClick={()=>setPage('opslag')} style={{ background:'none', border:'none', fontSize:14, fontWeight:600, color:'#666', cursor:'pointer', display:'flex', alignItems:'center', gap:6, padding:'8px 0', fontFamily:"'Nunito Sans',sans-serif" }}>← Tilbage til opslag</button>
+        <button onClick={()=>setPage('opslag')} style={{ background:'none', border:'none', fontSize:14, fontWeight:600, color:'#666', cursor:'pointer', display:'flex', alignItems:'center', gap:6, padding:'8px 0', fontFamily:"'Nunito Sans',sans-serif" }}>← Tilbage til markedsplads</button>
       </div>
       <div style={{ maxWidth:1140, margin:'0 auto', padding:'20px 24px' }}>
         <div style={{ display:'grid', gridTemplateColumns:'1fr 380px', gap:40, alignItems:'start' }}>
@@ -1743,31 +1743,255 @@ function MessagesPage({ setPage, selectedConvId, setSelectedConvId }) {
 }
 
 function HowItWorksPage({ setPage }) {
+  const steps = [
+    { n:1, icon:'👤', bg:'#7C3AED', title:'Tilmeld din institution', desc:'Start med at oprette en profil for din institution. Du skal bruge CVR-nummer og kontaktoplysninger. Vi verificerer alle institutioner for at sikre en tryg handelsplatform.', checks:['CVR-verificering','Institutionens kontaktoplysninger','Ansvarlig kontaktperson','Godkendelse inden for 1-2 hverdage'] },
+    { n:2, icon:'📷', bg:'#F59E0B', title:'Opret annoncer', desc:'Upload billeder og beskrivelser af det legetøj I ønsker at sælge eller bytte. Jo mere detaljeret beskrivelse, jo bedre.', checks:['Tydelige billeder fra flere vinkler','Beskrivelse af stand og alder','Pris eller bytteønske','Kategorisering for nem søgning'] },
+    { n:3, icon:'🔍', bg:'#3B82F6', title:'Find og søg', desc:'Søg efter det legetøj I har brug for. Brug filtre til at finde præcis det I søger baseret på kategori, afstand og pris.', checks:['Avancerede søgefiltre','Søgning på afstand','Kategori og prisfiltre','Gem favoritter til senere'] },
+    { n:4, icon:'🤝', bg:'#7C3AED', title:'Gennemfør handlen', desc:'Vælg mellem at købe, afgive bud eller foreslå et bytte. Vi tilbyder også transportservice hvis I ikke kan mødes.', checks:['Køb direkte til fastpris','Afgiv bud og forhandl pris','Foreslå bytte med egne annoncer','Valgfri transportservice'] },
+  ];
+  const tradeTypes = [
+    { icon:'💰', title:'Køb', color:'#2A7D4F', desc:'Køb direkte til den angivne pris', ex:'Du ser et legetøj til 450 kr og køber det med det samme' },
+    { icon:'🤝', title:'Byd', color:'#F59E0B', desc:'Afgiv et bud lavere end udbudsprisen', ex:'Du byder 350 kr på et legetøj til 450 kr og afventer svar' },
+    { icon:'🔄', title:'Byt', color:'#3B82F6', desc:'Tilbyd et af dine egne produkter i bytte', ex:'Du tilbyder dit puslespil i bytte for deres byggeklodser' },
+  ];
+  const features = [
+    { icon:'🛡️', title:'Sikker platform', desc:'Alle institutioner verificeres med CVR-nummer' },
+    { icon:'💬', title:'Direkte kommunikation', desc:'Kommuniker direkte med andre institutioner' },
+    { icon:'🚚', title:'Transport service', desc:'Valgfri levering mellem institutioner' },
+    { icon:'⭐', title:'Bedømmelser', desc:'Bedøm og blive bedømt for at bygge tillid' },
+  ];
   return (
-    <div style={{ minHeight:'100vh', paddingTop:80, background:'#fffcf8' }} className="page-enter">
-      <div style={{ maxWidth:900, margin:'0 auto', padding:'60px 24px' }}>
-        <div style={{ textAlign:'center', marginBottom:60 }}>
-          <h1 style={{ fontFamily:"'Nunito',sans-serif", fontWeight:900, fontSize:42, letterSpacing:'-1px', marginBottom:12 }}>Sådan virker LegetøjsByt</h1>
-          <p style={{ color:'#888', fontSize:18, lineHeight:1.65, maxWidth:560, margin:'0 auto' }}>En tryg markedsplads kun for verificerede institutioner</p>
+    <div style={{ minHeight:'100vh', paddingTop:80, background:'#f8f9fa' }} className="page-enter">
+      <div style={{ maxWidth:860, margin:'0 auto', padding:'48px 24px 80px' }}>
+
+        {/* Header */}
+        <div style={{ textAlign:'center', marginBottom:52 }}>
+          <h1 style={{ fontFamily:"'Nunito',sans-serif", fontWeight:900, fontSize:38, letterSpacing:'-0.5px', marginBottom:10 }}>Hvordan virker det?</h1>
+          <p style={{ color:'#888', fontSize:16 }}>En simpel guide til at komme i gang med Legetøjsbyt.dk</p>
         </div>
-        {[
-          {n:'01',icon:'🏢',color:'#E8F5EE',title:'Registrér jeres institution',desc:'Angiv jeres CVR-nummer — vi slår det automatisk op i Erhvervsstyrelsens register og bekræfter at I er en godkendt institution. Det tager under 30 sekunder.'},
-          {n:'02',icon:'📸',color:'#E8F0FB',title:'Opret et opslag',desc:'Beskriv legetøjet, vælg emoji og farve, og angiv om det skal sælges til fast pris, byder på auktion eller byttes. Opslaget er synligt for alle verificerede institutioner.'},
-          {n:'03',icon:'🤝',color:'#FEF0E3',title:'Kom i kontakt',desc:'Interesserede institutioner sender jer en besked, afgiver et bud eller foreslår et bytte — alt gemmes direkte i databasen.'},
-          {n:'04',icon:'🚚',color:'#E8F5EE',title:'Aftal afhentning',desc:'Aftaling sker direkte via vores beskedsystem. I vælger selv om I vil afhente eller sende med pakkepost.'},
-        ].map((s,i)=>(
-          <div key={i} style={{ display:'flex', gap:28, marginBottom:20, alignItems:'flex-start', background:'#fff', borderRadius:20, padding:28, boxShadow:'0 2px 16px rgba(0,0,0,0.06)', animation:`slideUp 0.4s ease ${i*0.1}s both` }}>
-            <div style={{ width:64, height:64, borderRadius:16, background:s.color, display:'flex', alignItems:'center', justifyContent:'center', fontSize:32, flexShrink:0 }}>{s.icon}</div>
-            <div>
-              <div style={{ fontSize:11, fontWeight:800, color:'#ccc', letterSpacing:2, marginBottom:6 }}>TRIN {s.n}</div>
-              <h3 style={{ fontFamily:"'Nunito',sans-serif", fontWeight:800, fontSize:20, marginBottom:8 }}>{s.title}</h3>
-              <p style={{ color:'#666', lineHeight:1.75, fontSize:15 }}>{s.desc}</p>
+
+        {/* Steps */}
+        {steps.map((s,i) => (
+          <div key={i} style={{ display:'flex', gap:24, marginBottom:28, alignItems:'flex-start' }}>
+            <div style={{ width:56, height:56, borderRadius:'50%', background:s.bg, display:'flex', alignItems:'center', justifyContent:'center', fontSize:26, flexShrink:0, color:'#fff' }}>{s.icon}</div>
+            <div style={{ flex:1 }}>
+              <div style={{ display:'flex', alignItems:'center', gap:10, marginBottom:6 }}>
+                <span style={{ background:s.bg, color:'#fff', borderRadius:99, fontSize:11, fontWeight:800, padding:'3px 10px' }}>Trin {s.n}</span>
+                <h3 style={{ fontFamily:"'Nunito',sans-serif", fontWeight:800, fontSize:19, margin:0 }}>{s.title}</h3>
+              </div>
+              <p style={{ color:'#555', fontSize:14, lineHeight:1.65, marginBottom:12 }}>{s.desc}</p>
+              <div style={{ background:'#fff', border:'1px solid #e8e8e8', borderRadius:12, padding:'14px 18px' }}>
+                <div style={{ fontWeight:700, fontSize:13, marginBottom:8 }}>Dette skal du have klar:</div>
+                {s.checks.map((c,j) => (
+                  <div key={j} style={{ display:'flex', alignItems:'center', gap:8, fontSize:13, color:'#2A7D4F', marginBottom:j<s.checks.length-1?6:0 }}>
+                    <span style={{ fontSize:14 }}>✅</span> {c}
+                  </div>
+                ))}
+              </div>
             </div>
           </div>
         ))}
-        <div style={{ textAlign:'center', marginTop:48 }}>
-          <Btn variant="primary" color={PRIMARY} radius={22} onClick={()=>setPage('signup')} style={{ fontSize:16, padding:'15px 40px' }}>Tilmeld institution gratis →</Btn>
+
+        {/* Trade types */}
+        <h2 style={{ fontFamily:"'Nunito',sans-serif", fontWeight:800, fontSize:26, textAlign:'center', margin:'52px 0 24px' }}>Tre måder at handle på</h2>
+        <div style={{ display:'grid', gridTemplateColumns:'repeat(3,1fr)', gap:16, marginBottom:52 }}>
+          {tradeTypes.map((t,i) => (
+            <div key={i} style={{ background:'#fff', borderRadius:16, padding:'24px 20px', textAlign:'center', boxShadow:'0 1px 8px rgba(0,0,0,0.06)' }}>
+              <div style={{ fontSize:36, marginBottom:10 }}>{t.icon}</div>
+              <div style={{ fontFamily:"'Nunito',sans-serif", fontWeight:800, fontSize:18, marginBottom:6 }}>{t.title}</div>
+              <div style={{ fontSize:13, color:'#555', marginBottom:12, lineHeight:1.55 }}>{t.desc}</div>
+              <div style={{ fontSize:12, color:'#888', fontStyle:'italic', lineHeight:1.5 }}><strong>Eksempel:</strong> {t.ex}</div>
+            </div>
+          ))}
         </div>
+
+        {/* Extra features */}
+        <h2 style={{ fontFamily:"'Nunito',sans-serif", fontWeight:800, fontSize:26, textAlign:'center', marginBottom:20 }}>Yderligere funktioner</h2>
+        <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:14, marginBottom:52 }}>
+          {features.map((f,i) => (
+            <div key={i} style={{ background:'#fff', borderRadius:14, padding:'18px 20px', display:'flex', gap:14, alignItems:'flex-start', boxShadow:'0 1px 6px rgba(0,0,0,0.05)' }}>
+              <div style={{ fontSize:24, flexShrink:0 }}>{f.icon}</div>
+              <div>
+                <div style={{ fontWeight:700, fontSize:14, marginBottom:4 }}>{f.title}</div>
+                <div style={{ fontSize:13, color:'#666' }}>{f.desc}</div>
+              </div>
+            </div>
+          ))}
+        </div>
+
+        {/* Verification */}
+        <div style={{ background:'#fff', borderRadius:20, padding:32, boxShadow:'0 1px 8px rgba(0,0,0,0.06)', marginBottom:52, textAlign:'center' }}>
+          <h2 style={{ fontFamily:"'Nunito',sans-serif", fontWeight:800, fontSize:24, marginBottom:6 }}>Verificeringsproces</h2>
+          <div style={{ fontSize:48, margin:'16px 0 6px' }}>🛡️</div>
+          <h3 style={{ fontFamily:"'Nunito',sans-serif", fontWeight:800, fontSize:18, color:PRIMARY, marginBottom:6 }}>Kun verificerede institutioner</h3>
+          <p style={{ fontSize:14, color:'#888', marginBottom:28 }}>Vi sikrer tryghed ved at verificere alle institutioner før de får adgang</p>
+          <div style={{ display:'grid', gridTemplateColumns:'repeat(3,1fr)', gap:20 }}>
+            {[['1','CVR-tjek','Vi tjekker at CVR-nummeret er gyldigt og aktivt'],['2','Kontaktverificering','Vi kontakter institutionen for at bekræfte legitimitet'],['3','Godkendelse','Efter godkendelse får I fuld adgang til platformen']].map(([n,title,desc],i)=>(
+              <div key={i}>
+                <div style={{ width:36, height:36, borderRadius:'50%', background:PRIMARY, color:'#fff', fontWeight:800, fontSize:16, display:'flex', alignItems:'center', justifyContent:'center', margin:'0 auto 10px' }}>{n}</div>
+                <div style={{ fontWeight:700, fontSize:14, marginBottom:4 }}>{title}</div>
+                <div style={{ fontSize:12, color:'#888', lineHeight:1.5 }}>{desc}</div>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* Tips */}
+        <h2 style={{ fontFamily:"'Nunito',sans-serif", fontWeight:800, fontSize:26, textAlign:'center', marginBottom:20 }}>Tips til succesfuld handel</h2>
+        <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:16, marginBottom:52 }}>
+          {[{title:'Gode annoncer',tips:['Tag tydelige billeder i godt lys','Beskriv stand og eventuelle skader ærligt','Angiv aldersgruppe og antal dele','Sæt en rimelig pris baseret på stand']},{title:'Sikker handel',tips:['Kommuniker altid gennem platformen','Mød på offentlige steder eller brug transport','Tjek produktet før betaling','Giv feedback efter handlen']}].map((col,i)=>(
+            <div key={i} style={{ background:'#fff', borderRadius:14, padding:'20px 22px', boxShadow:'0 1px 6px rgba(0,0,0,0.05)' }}>
+              <div style={{ fontWeight:700, fontSize:14, marginBottom:12 }}>{col.title}</div>
+              {col.tips.map((t,j)=>(
+                <div key={j} style={{ display:'flex', gap:8, fontSize:13, color:'#2A7D4F', marginBottom:j<col.tips.length-1?8:0 }}>✅ {t}</div>
+              ))}
+            </div>
+          ))}
+        </div>
+
+        {/* CTA */}
+        <div style={{ background:'#fff', borderRadius:20, padding:'36px 32px', textAlign:'center', boxShadow:'0 1px 8px rgba(0,0,0,0.06)' }}>
+          <h2 style={{ fontFamily:"'Nunito',sans-serif", fontWeight:900, fontSize:26, marginBottom:8 }}>Klar til at komme i gang?</h2>
+          <p style={{ color:'#888', fontSize:14, marginBottom:24 }}>Tilmeld din institution i dag og bliv en del af det bæredygtige fællesskab</p>
+          <div style={{ display:'flex', gap:12, justifyContent:'center', flexWrap:'wrap' }}>
+            <Btn variant="primary" color={PRIMARY} radius={22} onClick={()=>setPage('signup')} style={{ padding:'13px 28px', fontSize:15 }}>👤 Tilmeld institution</Btn>
+            <Btn variant="outline" radius={22} onClick={()=>setPage('opslag')} style={{ padding:'13px 28px', fontSize:15 }}>Se markedspladsen →</Btn>
+          </div>
+        </div>
+
+      </div>
+    </div>
+  );
+}
+
+// ─── OM OS ────────────────────────────────────────────────────────────────────
+function OmOsPage({ setPage }) {
+  const values = [
+    { icon:'🛡️', title:'Tillid', desc:'Kun verificerede institutioner med CVR-nummer' },
+    { icon:'✓', title:'Gennemsigtighed', desc:'Åbne beskrivelser og fair prissætning' },
+    { icon:'🌿', title:'Bæredygtighed', desc:'Fremme genbrug og cirkulær økonomi' },
+    { icon:'👥', title:'Fællesskab', desc:'Skabe forbindelser mellem institutioner' },
+  ];
+  return (
+    <div style={{ minHeight:'100vh', paddingTop:80, background:'#f8f9fa' }} className="page-enter">
+      <div style={{ maxWidth:860, margin:'0 auto', padding:'48px 24px 80px' }}>
+
+        <div style={{ textAlign:'center', marginBottom:52 }}>
+          <h1 style={{ fontFamily:"'Nunito',sans-serif", fontWeight:900, fontSize:38, letterSpacing:'-0.5px', marginBottom:10 }}>Om LegetøjsByt</h1>
+          <p style={{ color:'#888', fontSize:16, maxWidth:520, margin:'0 auto' }}>Vi hjælper danske institutioner med at genbruge legetøj — bæredygtigt, sikkert og nemt.</p>
+        </div>
+
+        {/* Vores værdier */}
+        <div style={{ background:'#fff', borderRadius:20, padding:32, boxShadow:'0 1px 8px rgba(0,0,0,0.06)', marginBottom:28 }}>
+          <h2 style={{ fontFamily:"'Nunito',sans-serif", fontWeight:800, fontSize:22, marginBottom:24 }}>Vores værdier</h2>
+          <div style={{ display:'flex', flexDirection:'column', gap:20 }}>
+            {values.map((v,i) => (
+              <div key={i} style={{ display:'flex', gap:16, alignItems:'flex-start' }}>
+                <div style={{ width:36, height:36, borderRadius:10, background:'#f0f9f4', display:'flex', alignItems:'center', justifyContent:'center', fontSize:18, flexShrink:0, color:PRIMARY }}>{v.icon}</div>
+                <div>
+                  <div style={{ fontWeight:700, fontSize:15, marginBottom:3 }}>{v.title}</div>
+                  <div style={{ fontSize:13, color:'#2A7D4F' }}>{v.desc}</div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* Hvem kan bruge platformen */}
+        <div style={{ background:'#fff', borderRadius:20, padding:32, boxShadow:'0 1px 8px rgba(0,0,0,0.06)', marginBottom:28 }}>
+          <h2 style={{ fontFamily:"'Nunito',sans-serif", fontWeight:800, fontSize:22, marginBottom:8 }}>Hvem kan bruge platformen?</h2>
+          <div style={{ background:'#fffcf8', border:'1px solid #f0ece6', borderRadius:14, padding:'20px 24px' }}>
+            <p style={{ fontSize:13, color:ACCENT, fontWeight:600, marginBottom:14 }}>Legetøjsbyt.dk er designet specifikt til danske institutioner:</p>
+            <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:'8px 32px' }}>
+              {['Vuggestuer','Børnehaver','Folkeskoler','SFO\'er','Fritidsklubber','Private institutioner'].map((t,i)=>(
+                <div key={i} style={{ display:'flex', gap:8, alignItems:'center', fontSize:13, color:'#444' }}>
+                  <span style={{ color:PRIMARY, fontSize:14 }}>✓</span> {t}
+                </div>
+              ))}
+            </div>
+            <p style={{ fontSize:12, color:'#888', marginTop:14, fontStyle:'italic' }}>Alle institutioner skal verificeres med CVR-nummer for at sikre troværdighed og sikkerhed.</p>
+          </div>
+        </div>
+
+        {/* Vores impact */}
+        <div style={{ background:'#fff', borderRadius:20, padding:32, boxShadow:'0 1px 8px rgba(0,0,0,0.06)', marginBottom:28 }}>
+          <h2 style={{ fontFamily:"'Nunito',sans-serif", fontWeight:800, fontSize:22, marginBottom:24 }}>Vores impact</h2>
+          <div style={{ display:'grid', gridTemplateColumns:'repeat(3,1fr)', gap:16 }}>
+            {[{n:'2.847',label:'Handler gennemført',color:'#2A7D4F'},{n:'156',label:'Institutioner tilmeldt',color:'#3B82C4'},{n:'12,5',label:'Ton CO₂ sparet',color:'#F4831F'}].map((s,i)=>(
+              <div key={i} style={{ background:'#f8f9fa', borderRadius:14, padding:'20px', textAlign:'center' }}>
+                <div style={{ fontFamily:"'Nunito',sans-serif", fontWeight:900, fontSize:32, color:s.color }}>{s.n}</div>
+                <div style={{ fontSize:13, color:'#888', marginTop:4 }}>{s.label}</div>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* Fremtiden */}
+        <div style={{ background:'#fff', borderRadius:20, padding:32, boxShadow:'0 1px 8px rgba(0,0,0,0.06)' }}>
+          <h2 style={{ fontFamily:"'Nunito',sans-serif", fontWeight:800, fontSize:22, marginBottom:16 }}>Fremtiden</h2>
+          <p style={{ fontSize:14, color:'#555', lineHeight:1.75, marginBottom:12 }}>Vi arbejder konstant på at forbedre platformen og tilføje nye funktioner der gør det endnu nemmere for institutioner at handle bæredygtigt.</p>
+          <p style={{ fontSize:14, color:'#555', lineHeight:1.75, marginBottom:20 }}>Vores mål er at blive den foretrukne platform for alle danske institutioner og at inspirere til lignende initiativer i resten af Norden.</p>
+          <div style={{ display:'flex', gap:8, flexWrap:'wrap' }}>
+            {['Miljøvenlig','Fællesskab','Innovation'].map((tag,i)=>(
+              <span key={i} style={{ background:['#E8F5EE','#E8F0FB','#FEF0E3'][i], color:[PRIMARY,ACCENT2,ACCENT][i], borderRadius:99, padding:'5px 14px', fontSize:12, fontWeight:700 }}>{tag}</span>
+            ))}
+          </div>
+        </div>
+
+      </div>
+    </div>
+  );
+}
+
+// ─── KONTAKT ──────────────────────────────────────────────────────────────────
+function KontaktPage() {
+  const [open, setOpen] = useState(null);
+  const faqs = [
+    { q:'Hvem kan tilmelde sig LegetøjsByt?', a:'Alle CVR-registrerede institutioner i Danmark kan tilmelde sig. Det inkluderer vuggestuer, børnehaver, SFO\'er, folkeskoler, fritidsklubber og andre godkendte institutioner.' },
+    { q:'Hvad koster det at bruge platformen?', a:'LegetøjsByt er gratis at bruge. Vi tager ingen kommission eller gebyrer for handler. Målet er at fremme bæredygtig genbrug i institutionssektoren.' },
+    { q:'Hvordan verificeres min institution?', a:'Når du angiver dit CVR-nummer, slår vi det automatisk op i Erhvervsstyrelsens register. Vi bekræfter at jeres institution er aktiv og godkendt. Processen tager typisk 1-2 hverdage.' },
+    { q:'Kan jeg sælge privat legetøj på platformen?', a:'Nej — LegetøjsByt er udelukkende for institutioner. Alt legetøj der handles på platformen skal tilhøre den pågældende institution og bruges i institutionsmæssig sammenhæng.' },
+    { q:'Hvad sker der hvis et produkt ikke er som beskrevet?', a:'Vi opfordrer altid til at inspicere produktet inden betaling. Har I en tvist, kan I kontakte os via support, og vi vil hjælpe med mægling mellem institutionerne.' },
+    { q:'Tilbyder I transport eller levering?', a:'Vi samarbejder med transportpartnere der kan levere legetøj mellem institutioner. Vælg "Valgfri transportservice" under en handel for at se priser og muligheder i jeres område.' },
+    { q:'Hvordan sletter jeg min institutions konto?', a:'Kontakt os på support@legetoejsbyt.dk, så sørger vi for at slette alle jeres data i overensstemmelse med GDPR. Handler og beskeder anonymiseres og opbevares i op til 30 dage herefter.' },
+  ];
+  return (
+    <div style={{ minHeight:'100vh', paddingTop:80, background:'#f8f9fa' }} className="page-enter">
+      <div style={{ maxWidth:760, margin:'0 auto', padding:'48px 24px 80px' }}>
+
+        <div style={{ textAlign:'center', marginBottom:48 }}>
+          <h1 style={{ fontFamily:"'Nunito',sans-serif", fontWeight:900, fontSize:38, letterSpacing:'-0.5px', marginBottom:10 }}>Kontakt os</h1>
+          <p style={{ color:'#888', fontSize:16 }}>Vi er her for at hjælpe — skriv til os eller find svaret nedenfor</p>
+        </div>
+
+        {/* Contact options */}
+        <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:16, marginBottom:48 }}>
+          {[{icon:'✉️',title:'E-mail',val:'support@legetoejsbyt.dk',sub:'Svar inden for 1-2 hverdage'},{icon:'💬',title:'Chat',val:'Åbn beskeder på platformen',sub:'Tilgængelig for registrerede institutioner'}].map((c,i)=>(
+            <div key={i} style={{ background:'#fff', borderRadius:16, padding:'24px', textAlign:'center', boxShadow:'0 1px 8px rgba(0,0,0,0.06)' }}>
+              <div style={{ fontSize:36, marginBottom:10 }}>{c.icon}</div>
+              <div style={{ fontWeight:700, fontSize:15, marginBottom:4 }}>{c.title}</div>
+              <div style={{ fontSize:13, color:PRIMARY, fontWeight:600, marginBottom:4 }}>{c.val}</div>
+              <div style={{ fontSize:12, color:'#999' }}>{c.sub}</div>
+            </div>
+          ))}
+        </div>
+
+        {/* FAQ */}
+        <h2 style={{ fontFamily:"'Nunito',sans-serif", fontWeight:800, fontSize:24, marginBottom:20 }}>Ofte stillede spørgsmål</h2>
+        <div style={{ display:'flex', flexDirection:'column', gap:10 }}>
+          {faqs.map((f,i) => (
+            <div key={i} style={{ background:'#fff', borderRadius:14, overflow:'hidden', boxShadow:'0 1px 6px rgba(0,0,0,0.05)' }}>
+              <button onClick={()=>setOpen(open===i?null:i)} style={{ width:'100%', background:'none', border:'none', padding:'18px 22px', display:'flex', justifyContent:'space-between', alignItems:'center', cursor:'pointer', textAlign:'left', gap:12 }}>
+                <span style={{ fontWeight:700, fontSize:14, color:'#1c1a17' }}>{f.q}</span>
+                <span style={{ fontSize:20, color:'#aaa', flexShrink:0, transition:'transform 0.2s', transform:open===i?'rotate(45deg)':'rotate(0deg)' }}>+</span>
+              </button>
+              {open===i && (
+                <div style={{ padding:'0 22px 18px', fontSize:14, color:'#555', lineHeight:1.75, borderTop:'1px solid #f0f0f0', paddingTop:14 }}>{f.a}</div>
+              )}
+            </div>
+          ))}
+        </div>
+
       </div>
     </div>
   );
@@ -1878,6 +2102,8 @@ function App() {
       {page==='signup'    && <SignupPage setPage={navigate} setLoggedIn={setLoggedIn} showToast={showToast} />}
       {page==='dashboard' && <DashboardPage setPage={navigate} showToast={showToast} allListings={listings} onListingCreated={fetchListings} institution={institution} favs={favs} toggleFav={toggleFav} setActiveListing={setActiveListing} />}
       {page==='hvordan'   && <HowItWorksPage setPage={navigate} />}
+      {page==='om-os'     && <OmOsPage setPage={navigate} />}
+      {page==='kontakt'   && <KontaktPage />}
       {page==='beskeder'  && <MessagesPage setPage={navigate} selectedConvId={selectedConvId} setSelectedConvId={setSelectedConvId} />}
 
       {toast && <Toast msg={toast.msg} type={toast.type} onDone={()=>setToast(null)} />}
