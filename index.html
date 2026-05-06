@@ -1042,6 +1042,10 @@ function DashboardPage({ setPage, showToast, allListings, onListingCreated, inst
   const [instLoading, setInstLoading] = useState(true);
   const [authUserId,  setAuthUserId]  = useState(null);
   const [form, setForm] = useState({ title:'', type:'køb', price:'', age_group:'3-6 år', description:'', condition:'God', city:'København', emoji:'🧸', color:'#FFD166' });
+  const [editListing, setEditListing] = useState(null);
+  const [editForm,    setEditForm]    = useState(null);
+  const [editSaving,  setEditSaving]  = useState(false);
+  const [confirmDelete, setConfirmDelete] = useState(null);
   const fileRef = React.useRef(null);
 
   // Single effect: load auth user + institution + listings — fully self-contained
@@ -1082,6 +1086,38 @@ function DashboardPage({ setPage, showToast, allListings, onListingCreated, inst
     } else { return; }
     const { data } = await q;
     if (data) setMyListings(data);
+  }
+
+  function openEdit(l) {
+    setEditForm({ title:l.title, type:l.type, price:l.price||'', age_group:l.age_group, description:l.description||'', condition:l.condition||'God', city:l.city, emoji:l.emoji||'🧸', color:l.color||'#FFD166' });
+    setEditListing(l);
+  }
+
+  async function handleUpdate() {
+    if (!editForm.title.trim()) return;
+    setEditSaving(true);
+    const { error } = await db.from('listings').update({
+      title: editForm.title, type: editForm.type,
+      price: editForm.type==='køb' ? Number(editForm.price)||null : null,
+      age_group: editForm.age_group, description: editForm.description,
+      condition: editForm.condition, city: editForm.city,
+      emoji: editForm.emoji, color: editForm.color,
+    }).eq('id', editListing.id);
+    setEditSaving(false);
+    if (error) { showToast('Noget gik galt', 'error'); return; }
+    setEditListing(null); setEditForm(null);
+    showToast('Opslag opdateret ✓');
+    fetchMyListings(authUserId, institution?.name);
+    onListingCreated();
+  }
+
+  async function handleDelete(id) {
+    const { error } = await db.from('listings').update({ is_active: false }).eq('id', id);
+    setConfirmDelete(null);
+    if (error) { showToast('Noget gik galt', 'error'); return; }
+    showToast('Opslag slettet');
+    fetchMyListings(authUserId, institution?.name);
+    onListingCreated();
   }
 
   function handleFileSelect(e) {
@@ -1179,20 +1215,30 @@ function DashboardPage({ setPage, showToast, allListings, onListingCreated, inst
                 <p style={{ fontSize:14 }}>Ingen opslag endnu. Opret dit første!</p>
               </div>
             ) : myListings.map(l=>(
-              <div key={l.id} onClick={()=>{ setActiveListing(l); setPage('listing'); }} style={{ display:'flex', alignItems:'center', gap:14, padding:'12px 14px', border:'1.5px solid #f0eeeb', borderRadius:14, marginBottom:10, cursor:'pointer', transition:'border-color 0.15s' }}>
-                <div style={{ width:48, height:48, borderRadius:10, background:l.images?.[0]?'#e8e6e3':l.color||'#FFD166', display:'flex', alignItems:'center', justifyContent:'center', fontSize:24, flexShrink:0, overflow:'hidden' }}>
-                  {l.images?.[0] ? <img src={l.images[0]} style={{ width:'100%', height:'100%', objectFit:'cover' }} alt="" /> : l.emoji||'🧸'}
-                </div>
-                <div style={{ flex:1, minWidth:0 }}>
-                  <div style={{ fontFamily:"'Nunito',sans-serif", fontWeight:700, fontSize:14, whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis' }}>{l.title}</div>
-                  <div style={{ fontSize:12, color:'#999', marginTop:2 }}>{l.city} · {l.age_group}</div>
-                </div>
-                <div style={{ display:'flex', flexDirection:'column', alignItems:'flex-end', gap:4, flexShrink:0 }}>
+              <div key={l.id} style={{ border:'1.5px solid #f0eeeb', borderRadius:14, marginBottom:10, overflow:'hidden' }}>
+                <div onClick={()=>{ setActiveListing(l); setPage('listing'); }} style={{ display:'flex', alignItems:'center', gap:14, padding:'12px 14px', cursor:'pointer' }}>
+                  <div style={{ width:48, height:48, borderRadius:10, background:l.images?.[0]?'#e8e6e3':l.color||'#FFD166', display:'flex', alignItems:'center', justifyContent:'center', fontSize:24, flexShrink:0, overflow:'hidden' }}>
+                    {l.images?.[0] ? <img src={l.images[0]} style={{ width:'100%', height:'100%', objectFit:'cover' }} alt="" /> : l.emoji||'🧸'}
+                  </div>
+                  <div style={{ flex:1, minWidth:0 }}>
+                    <div style={{ fontFamily:"'Nunito',sans-serif", fontWeight:700, fontSize:14, whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis' }}>{l.title}</div>
+                    <div style={{ fontSize:12, color:'#999', marginTop:2 }}>{l.city} · {l.age_group}</div>
+                  </div>
                   <Badge type={l.type} />
-                  <div style={{ fontSize:12, color:PRIMARY, fontWeight:700 }}>
-                    {l.price ? `${l.price} kr.` : l.bid_count ? `${l.bid_count} bud` : '—'}
+                  <div style={{ display:'flex', gap:6, flexShrink:0 }} onClick={e=>e.stopPropagation()}>
+                    <button onClick={()=>openEdit(l)} style={{ background:'#f0f9f4', border:'none', borderRadius:8, padding:'6px 12px', fontSize:12, fontWeight:700, color:PRIMARY, cursor:'pointer' }}>Rediger</button>
+                    <button onClick={()=>setConfirmDelete(l.id)} style={{ background:'#fff0f0', border:'none', borderRadius:8, padding:'6px 12px', fontSize:12, fontWeight:700, color:'#e11d48', cursor:'pointer' }}>Slet</button>
                   </div>
                 </div>
+                {confirmDelete===l.id && (
+                  <div style={{ background:'#fff5f5', borderTop:'1.5px solid #fecaca', padding:'10px 14px', display:'flex', alignItems:'center', justifyContent:'space-between' }}>
+                    <span style={{ fontSize:13, color:'#b91c1c', fontWeight:600 }}>Slet dette opslag permanent?</span>
+                    <div style={{ display:'flex', gap:8 }}>
+                      <button onClick={()=>setConfirmDelete(null)} style={{ background:'#fff', border:'1.5px solid #e5e5e5', borderRadius:8, padding:'6px 14px', fontSize:12, fontWeight:600, cursor:'pointer' }}>Annuller</button>
+                      <button onClick={()=>handleDelete(l.id)} style={{ background:'#e11d48', border:'none', borderRadius:8, padding:'6px 14px', fontSize:12, fontWeight:700, color:'#fff', cursor:'pointer' }}>Ja, slet</button>
+                    </div>
+                  </div>
+                )}
               </div>
             ))}
           </div>
@@ -1228,6 +1274,71 @@ function DashboardPage({ setPage, showToast, allListings, onListingCreated, inst
           </div>
         </div>
       </div>
+
+      <Modal open={!!editListing} onClose={()=>{setEditListing(null);setEditForm(null);}} title="Rediger opslag">
+        {editForm && (
+          <div style={{ display:'flex', flexDirection:'column', gap:14 }}>
+            <div>
+              <label style={{ display:'block', fontSize:13, fontWeight:700, marginBottom:6 }}>Titel *</label>
+              <input value={editForm.title} onChange={e=>setEditForm({...editForm,title:e.target.value})} style={{ width:'100%', padding:'11px 14px', borderRadius:10, border:'1.5px solid #e5e5e5', fontSize:14, outline:'none' }} />
+            </div>
+            <div>
+              <label style={{ display:'block', fontSize:13, fontWeight:700, marginBottom:8 }}>Handelsform</label>
+              <div style={{ display:'flex', gap:8 }}>
+                {['køb','byd','byt'].map(t=>(
+                  <button key={t} onClick={()=>setEditForm({...editForm,type:t})} style={{ flex:1, padding:'10px', borderRadius:10, background:editForm.type===t?TYPE_CFG[t].bg:'#f5f4f2', color:editForm.type===t?TYPE_CFG[t].color:'#888', fontFamily:"'Nunito',sans-serif", fontWeight:700, fontSize:13, border:editForm.type===t?`2px solid ${TYPE_CFG[t].color}`:'2px solid transparent' }}>{TYPE_CFG[t].icon} {TYPE_CFG[t].label}</button>
+                ))}
+              </div>
+            </div>
+            {editForm.type==='køb' && (
+              <div>
+                <label style={{ display:'block', fontSize:13, fontWeight:700, marginBottom:6 }}>Pris (kr.)</label>
+                <input type="number" value={editForm.price} onChange={e=>setEditForm({...editForm,price:e.target.value})} placeholder="Fx 250" style={{ width:'100%', padding:'11px 14px', borderRadius:10, border:'1.5px solid #e5e5e5', fontSize:14, outline:'none' }} />
+              </div>
+            )}
+            <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:10 }}>
+              <div>
+                <label style={{ display:'block', fontSize:13, fontWeight:700, marginBottom:6 }}>Aldersgruppe</label>
+                <select value={editForm.age_group} onChange={e=>setEditForm({...editForm,age_group:e.target.value})} style={{ width:'100%', padding:'11px 14px', borderRadius:10, border:'1.5px solid #e5e5e5', fontSize:14, outline:'none', background:'#fff' }}>
+                  {AGE_GROUPS.map(a=><option key={a}>{a}</option>)}
+                </select>
+              </div>
+              <div>
+                <label style={{ display:'block', fontSize:13, fontWeight:700, marginBottom:6 }}>By</label>
+                <select value={editForm.city} onChange={e=>setEditForm({...editForm,city:e.target.value})} style={{ width:'100%', padding:'11px 14px', borderRadius:10, border:'1.5px solid #e5e5e5', fontSize:14, outline:'none', background:'#fff' }}>
+                  {CITIES.filter(c=>c!=='alle').map(c=><option key={c}>{c}</option>)}
+                </select>
+              </div>
+            </div>
+            <div>
+              <label style={{ display:'block', fontSize:13, fontWeight:700, marginBottom:6 }}>Beskrivelse</label>
+              <textarea value={editForm.description} onChange={e=>setEditForm({...editForm,description:e.target.value})} rows={3} style={{ width:'100%', padding:'11px 14px', borderRadius:10, border:'1.5px solid #e5e5e5', fontSize:14, resize:'none', fontFamily:"'Nunito Sans',sans-serif", outline:'none' }} />
+            </div>
+            <div>
+              <label style={{ display:'block', fontSize:13, fontWeight:700, marginBottom:8 }}>Stand</label>
+              <div style={{ display:'flex', gap:8, flexWrap:'wrap' }}>
+                {CONDITIONS.map(c=>(
+                  <button key={c} onClick={()=>setEditForm({...editForm,condition:c})} style={{ padding:'8px 14px', borderRadius:99, fontSize:13, fontWeight:600, border:editForm.condition===c?`2px solid ${PRIMARY}`:'2px solid #e5e5e5', background:editForm.condition===c?'#E8F5EE':'#fff', color:editForm.condition===c?PRIMARY:'#555' }}>{c}</button>
+                ))}
+              </div>
+            </div>
+            <div>
+              <label style={{ display:'block', fontSize:13, fontWeight:700, marginBottom:8 }}>Emoji</label>
+              <div style={{ display:'flex', gap:6, flexWrap:'wrap' }}>
+                {EMOJIS.map(e=>(
+                  <button key={e} onClick={()=>setEditForm({...editForm,emoji:e})} style={{ width:38, height:38, borderRadius:10, fontSize:20, border:editForm.emoji===e?`2px solid ${PRIMARY}`:'2px solid #f0eeeb', background:editForm.emoji===e?'#E8F5EE':'#fff' }}>{e}</button>
+                ))}
+              </div>
+            </div>
+            <div style={{ display:'flex', gap:10, marginTop:4 }}>
+              <button onClick={()=>{setEditListing(null);setEditForm(null);}} style={{ flex:1, padding:'13px', borderRadius:12, background:'#f5f4f2', border:'none', fontWeight:700, fontFamily:"'Nunito',sans-serif" }}>Annuller</button>
+              <Btn variant="primary" color={PRIMARY} radius={22} onClick={handleUpdate} disabled={editSaving} style={{ flex:2, justifyContent:'center', padding:'13px', fontSize:14 }}>
+                {editSaving ? <><Spinner/>Gemmer…</> : '✓ Gem ændringer'}
+              </Btn>
+            </div>
+          </div>
+        )}
+      </Modal>
 
       <Modal open={newOpen} onClose={()=>{setNewOpen(false);resetModal();}} title={`Nyt opslag — trin ${step}/2`}>
         {step===1 && (
