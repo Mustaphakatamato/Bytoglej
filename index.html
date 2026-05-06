@@ -216,24 +216,37 @@ const CONDITION_COLORS = { 'Ny':{ bg:'#e6f9f0', color:'#1a7a4a' }, 'Meget god':{
 function ListingCard({ listing, onClick, favs, toggleFav }) {
   const isFav = favs.includes(listing.id);
   const [popping, setPopping] = useState(false);
+  const [imgIdx, setImgIdx] = useState(0);
+  const imgs = listing.images?.length ? listing.images : [];
   function handleFav(e) {
     e.stopPropagation();
     toggleFav(listing.id);
     setPopping(true);
     setTimeout(()=>setPopping(false), 350);
   }
+  function prevImg(e) { e.stopPropagation(); setImgIdx(i => (i - 1 + imgs.length) % imgs.length); }
+  function nextImg(e) { e.stopPropagation(); setImgIdx(i => (i + 1) % imgs.length); }
   const condStyle = CONDITION_COLORS[listing.condition] || { bg:'#f3f4f6', color:'#555' };
   const typeColors = { køb:{ bg:'#e6f9f0', color:'#1a7a4a' }, byd:{ bg:'#fef3c7', color:'#92400e' }, byt:{ bg:'#dbeafe', color:'#1e40af' } };
   const tc = typeColors[listing.type] || { bg:'#f3f4f6', color:'#555' };
   const typeLabel = { køb:'Køb', byd:'Byd', byt:'Byt' }[listing.type] || listing.type;
   return (
     <div className="card" onClick={onClick} style={{ background:'#fff', borderRadius:16, overflow:'hidden', cursor:'pointer', boxShadow:'0 2px 12px rgba(0,0,0,0.07)', position:'relative', display:'flex', flexDirection:'column' }}>
-      {/* Image */}
-      <div style={{ height:180, background:listing.images?.[0]?'#e8e6e3':listing.color||'#FFD166', display:'flex', alignItems:'center', justifyContent:'center', position:'relative', overflow:'hidden', flexShrink:0 }}>
-        {listing.images?.[0]
-          ? <img src={listing.images[0]} alt="" style={{ width:'100%', height:'100%', objectFit:'cover', display:'block' }} />
+      {/* Image with carousel */}
+      <div style={{ height:180, background:imgs.length?'#e8e6e3':listing.color||'#FFD166', display:'flex', alignItems:'center', justifyContent:'center', position:'relative', overflow:'hidden', flexShrink:0 }}>
+        {imgs.length
+          ? <img src={imgs[imgIdx]} alt="" style={{ width:'100%', height:'100%', objectFit:'cover', display:'block', transition:'opacity 0.2s' }} />
           : <span style={{ fontSize:64 }}>{listing.emoji||'🧸'}</span>
         }
+        {/* Prev/Next arrows — only when multiple images */}
+        {imgs.length > 1 && <>
+          <button onClick={prevImg} style={{ position:'absolute', left:8, top:'50%', transform:'translateY(-50%)', background:'rgba(0,0,0,0.45)', border:'none', borderRadius:'50%', width:28, height:28, color:'#fff', fontSize:14, cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center', lineHeight:1 }}>‹</button>
+          <button onClick={nextImg} style={{ position:'absolute', right:44, top:'50%', transform:'translateY(-50%)', background:'rgba(0,0,0,0.45)', border:'none', borderRadius:'50%', width:28, height:28, color:'#fff', fontSize:14, cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center', lineHeight:1 }}>›</button>
+          {/* Dots */}
+          <div style={{ position:'absolute', bottom:6, left:'50%', transform:'translateX(-50%)', display:'flex', gap:4 }}>
+            {imgs.map((_,i) => <div key={i} style={{ width:i===imgIdx?14:6, height:6, borderRadius:99, background:i===imgIdx?'#fff':'rgba(255,255,255,0.5)', transition:'all 0.2s' }} />)}
+          </div>
+        </>}
         <button className={`fav-btn${popping?' fav-pop':''}`} onClick={handleFav}
           style={{ position:'absolute', top:10, right:10, background:isFav?'#fff0f3':'rgba(255,255,255,0.95)', border:'none', borderRadius:'50%', width:32, height:32, fontSize:16, display:'flex', alignItems:'center', justifyContent:'center', boxShadow:'0 2px 8px rgba(0,0,0,0.12)' }}>
           {isFav ? '❤️' : '🤍'}
@@ -1099,6 +1112,10 @@ function DashboardPage({ setPage, showToast, allListings, onListingCreated, inst
 
   async function handleUpdate() {
     if (!editForm.title.trim()) return;
+    if (editForm.type === 'køb' && !String(editForm.price).trim()) {
+      showToast('Angiv en pris for køb-opslag', 'error');
+      return;
+    }
     setEditSaving(true);
     const { error } = await db.from('listings').update({
       title: editForm.title, type: editForm.type,
@@ -1145,6 +1162,10 @@ function DashboardPage({ setPage, showToast, allListings, onListingCreated, inst
 
   async function handleCreate() {
     if (!form.title.trim()) return;
+    if (form.type === 'køb' && !String(form.price).trim()) {
+      showToast('Angiv en pris for køb-opslag', 'error');
+      return;
+    }
     setSaving(true);
     // Always get fresh auth user so user_id is guaranteed
     const { data: { user } } = await db.auth.getUser();
@@ -1361,8 +1382,9 @@ function DashboardPage({ setPage, showToast, allListings, onListingCreated, inst
             </div>
             {form.type==='køb' && (
               <div>
-                <label style={{ display:'block', fontSize:13, fontWeight:700, marginBottom:6 }}>Pris (kr.)</label>
-                <input type="number" value={form.price} onChange={e=>setForm({...form,price:e.target.value})} placeholder="Fx 250" style={{ width:'100%', padding:'11px 14px', borderRadius:10, border:'1.5px solid #e5e5e5', fontSize:14, outline:'none' }} />
+                <label style={{ display:'block', fontSize:13, fontWeight:700, marginBottom:6 }}>Pris (kr.) <span style={{ color:'#e53e3e' }}>*</span></label>
+                <input type="number" value={form.price} onChange={e=>setForm({...form,price:e.target.value})} placeholder="Fx 250" min="1" style={{ width:'100%', padding:'11px 14px', borderRadius:10, border:`1.5px solid ${!form.price?'#fca5a5':'#e5e5e5'}`, fontSize:14, outline:'none' }} />
+                {!form.price && <p style={{ fontSize:12, color:'#e53e3e', marginTop:4 }}>Pris er påkrævet ved køb-opslag</p>}
               </div>
             )}
             <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:10 }}>
@@ -1395,7 +1417,7 @@ function DashboardPage({ setPage, showToast, allListings, onListingCreated, inst
                 ))}
               </div>
             </div>
-            <Btn variant="primary" color={PRIMARY} radius={22} onClick={()=>form.title.trim()&&setStep(2)} disabled={!form.title.trim()} style={{ justifyContent:'center', padding:'13px', fontSize:14 }}>Næste →</Btn>
+            <Btn variant="primary" color={PRIMARY} radius={22} onClick={()=>{ const ok = form.title.trim() && (form.type!=='køb'||form.price); if(ok) setStep(2); }} disabled={!form.title.trim()||(form.type==='køb'&&!form.price)} style={{ justifyContent:'center', padding:'13px', fontSize:14 }}>Næste →</Btn>
           </div>
         )}
         {step===2 && (
