@@ -491,27 +491,89 @@ function HomePage({ setPage, setActiveListing, listings, loading, favs, toggleFa
   );
 }
 
+// Haversine distance in km
+function haversine(lat1, lon1, lat2, lon2) {
+  const R = 6371, dLat = (lat2-lat1)*Math.PI/180, dLon = (lon2-lon1)*Math.PI/180;
+  const a = Math.sin(dLat/2)**2 + Math.cos(lat1*Math.PI/180)*Math.cos(lat2*Math.PI/180)*Math.sin(dLon/2)**2;
+  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+}
+
+// Cache geocoding results
+const geoCache = {};
+async function geocodeCity(city) {
+  if (geoCache[city]) return geoCache[city];
+  try {
+    const r = await fetch(`https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(city+', Danmark')}&format=json&limit=1`, { headers:{ 'Accept-Language':'da' } });
+    const d = await r.json();
+    if (d[0]) { geoCache[city] = { lat: parseFloat(d[0].lat), lon: parseFloat(d[0].lon) }; return geoCache[city]; }
+  } catch {}
+  return null;
+}
+
 // ─── OPSLAG PAGE ──────────────────────────────────────────────────────────────
 function OpslagPage({ listings, loading, setPage, setActiveListing, favs, toggleFav }) {
   const [filter, setFilter] = useState('alle');
   const [search, setSearch] = useState('');
   const [city, setCity]     = useState('alle');
   const [sort, setSort]     = useState('newest');
+  const [maxDist, setMaxDist] = useState('alle');
+  const [userCoords, setUserCoords] = useState(null);
+  const [geoLoading, setGeoLoading] = useState(false);
+  const [listingCoords, setListingCoords] = useState({});
   const dSearch = useDebounce(search, 180);
+
+  // Load user's location from their institution
+  useEffect(() => {
+    db.auth.getUser().then(async ({ data:{ user } }) => {
+      if (!user) return;
+      const { data: inst } = await db.from('institutions').select('city,zipcode').eq('email', user.email).maybeSingle();
+      if (!inst) return;
+      const q = inst.zipcode ? `${inst.zipcode} ${inst.city}, Danmark` : `${inst.city}, Danmark`;
+      setGeoLoading(true);
+      const coords = await geocodeCity(q);
+      if (coords) setUserCoords(coords);
+      setGeoLoading(false);
+    });
+  }, []);
+
+  // Geocode all unique listing cities when distance filter is active
+  useEffect(() => {
+    if (maxDist === 'alle') return;
+    const cities = [...new Set(listings.map(l => l.city).filter(Boolean))];
+    cities.forEach(async c => {
+      if (listingCoords[c]) return;
+      const coords = await geocodeCity(c + ', Danmark');
+      if (coords) setListingCoords(prev => ({ ...prev, [c]: coords }));
+    });
+  }, [maxDist, listings]);
 
   const filtered = useMemo(() => {
     let r = listings.filter(l => {
       const matchType   = filter==='alle' || l.type===filter;
       const matchCity   = city==='alle'   || l.city===city;
       const matchSearch = !dSearch || l.title.toLowerCase().includes(dSearch.toLowerCase()) || (l.institution_name||'').toLowerCase().includes(dSearch.toLowerCase());
-      return matchType && matchCity && matchSearch;
+      let matchDist = true;
+      if (maxDist !== 'alle' && userCoords && l.city) {
+        const coords = listingCoords[l.city];
+        if (coords) matchDist = haversine(userCoords.lat, userCoords.lon, coords.lat, coords.lon) <= Number(maxDist);
+        else matchDist = true; // include until geocoded
+      }
+      return matchType && matchCity && matchSearch && matchDist;
     });
     if (sort==='newest')     r = [...r].sort((a,b)=>new Date(b.created_at)-new Date(a.created_at));
     if (sort==='price-asc')  r = [...r].sort((a,b)=>(a.price||0)-(b.price||0));
     if (sort==='price-desc') r = [...r].sort((a,b)=>(b.price||0)-(a.price||0));
     if (sort==='bids')       r = [...r].sort((a,b)=>(b.bid_count||0)-(a.bid_count||0));
+    if (maxDist !== 'alle' && userCoords) {
+      r = [...r].sort((a,b) => {
+        const ca = listingCoords[a.city], cb = listingCoords[b.city];
+        const da = ca ? haversine(userCoords.lat, userCoords.lon, ca.lat, ca.lon) : 9999;
+        const db2 = cb ? haversine(userCoords.lat, userCoords.lon, cb.lat, cb.lon) : 9999;
+        return da - db2;
+      });
+    }
     return r;
-  }, [listings, filter, city, dSearch, sort]);
+  }, [listings, filter, city, dSearch, sort, maxDist, userCoords, listingCoords]);
 
   return (
     <div style={{ minHeight:'100vh', paddingTop:68, background:'#fffcf8' }}>
@@ -536,6 +598,18 @@ function OpslagPage({ listings, loading, setPage, setActiveListing, favs, toggle
             <option value="price-desc">Pris: høj → lav</option>
             <option value="bids">Flest bud</option>
           </select>
+          <div style={{ position:'relative' }}>
+            <select value={maxDist} onChange={e=>setMaxDist(e.target.value)} style={{ padding:'10px 36px 10px 14px', borderRadius:12, border:`1.5px solid ${maxDist!=='alle'?PRIMARY:'#eceae6'}`, fontSize:14, background:maxDist!=='alle'?'#e8f5ee':'#f5f4f2', fontFamily:"'Nunito Sans',sans-serif", outline:'none', color:maxDist!=='alle'?PRIMARY:'#555', fontWeight:maxDist!=='alle'?700:400, appearance:'none', cursor:'pointer' }}>
+              <option value="alle">📍 Afstand</option>
+              <option value="5">Inden for 5 km</option>
+              <option value="10">Inden for 10 km</option>
+              <option value="25">Inden for 25 km</option>
+              <option value="50">Inden for 50 km</option>
+              <option value="100">Inden for 100 km</option>
+            </select>
+            {geoLoading && <span style={{ position:'absolute', right:10, top:'50%', transform:'translateY(-50%)', fontSize:12 }}>⏳</span>}
+            {!userCoords && maxDist!=='alle' && <div style={{ position:'absolute', top:'110%', left:0, background:'#fff', border:'1.5px solid #fca5a5', borderRadius:10, padding:'8px 12px', fontSize:12, color:'#b91c1c', whiteSpace:'nowrap', zIndex:10, boxShadow:'0 4px 12px rgba(0,0,0,0.1)' }}>Log ind for at bruge afstandsfilter</div>}
+          </div>
         </div>
       </div>
 
@@ -569,13 +643,15 @@ function OpslagPage({ listings, loading, setPage, setActiveListing, favs, toggle
 // ─── IMAGE GALLERY ────────────────────────────────────────────────────────────
 function ImageGallery({ images, color, emoji }) {
   const [active, setActive] = useState(0);
+  const [lightbox, setLightbox] = useState(false);
   if (!images || images.length === 0) {
     return <div style={{ height:380, background:color||'#FFD166', borderRadius:24, display:'flex', alignItems:'center', justifyContent:'center', marginBottom:28, fontSize:120 }}>{emoji||'🧸'}</div>;
   }
   return (
     <div style={{ marginBottom:28 }}>
       <div style={{ position:'relative', height:380, borderRadius:24, overflow:'hidden', background:'#f0eeeb' }}>
-        <img src={images[active]} alt="" style={{ width:'100%', height:'100%', objectFit:'cover', display:'block' }} />
+        <img src={images[active]} alt="" onClick={()=>setLightbox(true)} style={{ width:'100%', height:'100%', objectFit:'cover', display:'block', cursor:'zoom-in' }} />
+        <div style={{ position:'absolute', bottom:12, right:12, background:'rgba(0,0,0,0.48)', color:'#fff', borderRadius:8, padding:'4px 10px', fontSize:11, fontWeight:600, pointerEvents:'none' }}>🔍 Klik for fuld visning</div>
         {images.length > 1 && <>
           <button onClick={()=>setActive(i=>(i-1+images.length)%images.length)}
             style={{ position:'absolute', left:12, top:'50%', transform:'translateY(-50%)', width:40, height:40, borderRadius:'50%', background:'rgba(255,255,255,0.92)', border:'none', fontSize:18, cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center', boxShadow:'0 2px 8px rgba(0,0,0,0.15)' }}>‹</button>
@@ -595,19 +671,54 @@ function ImageGallery({ images, color, emoji }) {
           ))}
         </div>
       )}
+      {/* Lightbox */}
+      {lightbox && (
+        <div onClick={()=>setLightbox(false)} style={{ position:'fixed', inset:0, background:'rgba(0,0,0,0.93)', zIndex:9999, display:'flex', alignItems:'center', justifyContent:'center', cursor:'zoom-out' }}>
+          <img src={images[active]} alt="" onClick={e=>e.stopPropagation()} style={{ maxWidth:'92vw', maxHeight:'88vh', objectFit:'contain', borderRadius:10, boxShadow:'0 8px 48px rgba(0,0,0,0.5)' }} />
+          {images.length > 1 && <>
+            <button onClick={e=>{e.stopPropagation();setActive(i=>(i-1+images.length)%images.length);}} style={{ position:'absolute', left:20, top:'50%', transform:'translateY(-50%)', background:'rgba(255,255,255,0.15)', border:'none', color:'#fff', borderRadius:'50%', width:52, height:52, fontSize:28, cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center' }}>‹</button>
+            <button onClick={e=>{e.stopPropagation();setActive(i=>(i+1)%images.length);}} style={{ position:'absolute', right:20, top:'50%', transform:'translateY(-50%)', background:'rgba(255,255,255,0.15)', border:'none', color:'#fff', borderRadius:'50%', width:52, height:52, fontSize:28, cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center' }}>›</button>
+          </>}
+          <button onClick={()=>setLightbox(false)} style={{ position:'absolute', top:20, right:20, background:'rgba(255,255,255,0.15)', border:'none', color:'#fff', borderRadius:'50%', width:44, height:44, fontSize:20, cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center' }}>✕</button>
+          <div style={{ position:'absolute', bottom:20, color:'rgba(255,255,255,0.6)', fontSize:13 }}>{active+1} / {images.length}</div>
+        </div>
+      )}
     </div>
   );
 }
 
 // ─── LISTING DETAIL ───────────────────────────────────────────────────────────
-function ListingDetailPage({ listing, setPage, showToast, onStartConv }) {
+function ListingDetailPage({ listing, setPage, showToast, onStartConv, favs, toggleFav }) {
   const [buyModal,  setBuyModal]  = useState(false);
   const [bidModal,  setBidModal]  = useState(false);
   const [swapModal, setSwapModal] = useState(false);
   const [bidAmount, setBidAmount] = useState('');
   const [swapOffer, setSwapOffer] = useState('');
+  const [selectedSwapId, setSelectedSwapId] = useState(null);
   const [bidCount,  setBidCount]  = useState(listing.bid_count||0);
   const [saving,    setSaving]    = useState(false);
+  const [currentUserId, setCurrentUserId] = useState(null);
+  const [ownListings, setOwnListings] = useState([]);
+  const [isFav, setIsFav] = useState(favs?.includes(listing.id) || false);
+
+  useEffect(() => {
+    db.auth.getUser().then(({ data:{ user } }) => {
+      if (!user) return;
+      setCurrentUserId(user.id);
+      db.from('listings').select('id,title,emoji,color,images').eq('user_id', user.id).eq('is_active', true).neq('id', listing.id)
+        .then(({ data }) => { if (data) setOwnListings(data); });
+    });
+  }, []);
+
+  // Sync fav state when favs prop changes
+  useEffect(() => { setIsFav(favs?.includes(listing.id) || false); }, [favs, listing.id]);
+
+  function handleToggleFav() {
+    toggleFav?.(listing.id);
+    setIsFav(v => !v);
+  }
+
+  const isOwn = currentUserId && listing.user_id && currentUserId === listing.user_id;
 
   async function handleBuy() {
     setSaving(true);
@@ -627,10 +738,12 @@ function ListingDetailPage({ listing, setPage, showToast, onStartConv }) {
     showToast(`Bud på ${bidAmount} kr. afsendt! 🎉`);
   }
   async function handleSwap() {
-    if (!swapOffer.trim()) return;
+    const chosen = ownListings.find(l => l.id === selectedSwapId);
+    if (!chosen && !swapOffer.trim()) return;
     setSaving(true);
-    await db.from('messages').insert({ listing_id:listing.id, sender_name:'Anonym Institution', message:`Bytteforslag: ${swapOffer}` });
-    setSaving(false); setSwapModal(false);
+    const offerText = chosen ? `Bytteforslag: ${chosen.title}` : `Bytteforslag: ${swapOffer}`;
+    await db.from('messages').insert({ listing_id:listing.id, sender_name:'Anonym Institution', message:offerText });
+    setSaving(false); setSwapModal(false); setSelectedSwapId(null); setSwapOffer('');
     showToast('Bytteforslag sendt!');
   }
   return (
@@ -651,13 +764,22 @@ function ListingDetailPage({ listing, setPage, showToast, onStartConv }) {
             <h1 style={{ fontFamily:"'Nunito',sans-serif", fontWeight:900, fontSize:30, letterSpacing:'-0.5px', marginBottom:8 }}>{listing.title}</h1>
             <p style={{ color:'#888', fontSize:14, marginBottom:20 }}>Opslået af <strong style={{ color:'#333' }}>{listing.institution_name}</strong></p>
             <p style={{ color:'#555', lineHeight:1.75, fontSize:15, marginBottom:32 }}>{listing.description}</p>
-            <div style={{ background:'#fff', borderRadius:20, padding:24, boxShadow:'0 2px 12px rgba(0,0,0,0.06)' }}>
-              <h3 style={{ fontFamily:"'Nunito',sans-serif", fontWeight:800, fontSize:18, marginBottom:8 }}>Kontakt institutionen</h3>
-              <p style={{ fontSize:13, color:'#888', marginBottom:16, lineHeight:1.55 }}>Send en besked direkte til {listing.institution_name} for at aftale nærmere, byde en pris eller foreslå et bytte.</p>
-              <Btn variant="primary" color={PRIMARY} radius={22} onClick={()=>onStartConv && onStartConv(listing)} style={{ padding:'12px 24px', width:'100%', justifyContent:'center', fontSize:15 }}>
-                💬 Åbn besked
-              </Btn>
-            </div>
+            {!isOwn && (
+              <div style={{ background:'#fff', borderRadius:20, padding:24, boxShadow:'0 2px 12px rgba(0,0,0,0.06)' }}>
+                <h3 style={{ fontFamily:"'Nunito',sans-serif", fontWeight:800, fontSize:18, marginBottom:8 }}>Kontakt institutionen</h3>
+                <p style={{ fontSize:13, color:'#888', marginBottom:16, lineHeight:1.55 }}>Send en besked direkte til {listing.institution_name} for at aftale nærmere, byde en pris eller foreslå et bytte.</p>
+                <Btn variant="primary" color={PRIMARY} radius={22} onClick={()=>onStartConv && onStartConv(listing)} style={{ padding:'12px 24px', width:'100%', justifyContent:'center', fontSize:15 }}>
+                  💬 Åbn besked
+                </Btn>
+              </div>
+            )}
+            {isOwn && (
+              <div style={{ background:'#f0f9f4', borderRadius:20, padding:20, border:`1.5px solid #c6e8d4`, textAlign:'center' }}>
+                <div style={{ fontSize:24, marginBottom:6 }}>✏️</div>
+                <div style={{ fontWeight:700, fontSize:14, color:PRIMARY, marginBottom:4 }}>Dit eget opslag</div>
+                <div style={{ fontSize:13, color:'#5a9a74' }}>Rediger det fra din dashboard</div>
+              </div>
+            )}
           </div>
 
           <div style={{ position:'sticky', top:96 }}>
@@ -665,10 +787,12 @@ function ListingDetailPage({ listing, setPage, showToast, onStartConv }) {
               {listing.price && <div style={{ fontFamily:"'Nunito',sans-serif", fontWeight:900, fontSize:36, color:PRIMARY, marginBottom:8 }}>{listing.price} kr.</div>}
               {bidCount > 0 && <div style={{ color:'#888', fontSize:13, marginBottom:16 }}><strong style={{ color:ACCENT2 }}>{bidCount} bud</strong> afgivet</div>}
               <div style={{ display:'flex', flexDirection:'column', gap:10 }}>
-                {listing.type==='køb' && <Btn variant="primary" color={PRIMARY} radius={22} onClick={()=>setBuyModal(true)} style={{ justifyContent:'center', padding:'14px', fontSize:15 }}>🏷️ Køb nu — {listing.price} kr.</Btn>}
-                {listing.type==='byd' && <Btn variant="primary" color={ACCENT2} radius={22} onClick={()=>setBidModal(true)} style={{ justifyContent:'center', padding:'14px', fontSize:15 }}>📊 Afgiv bud</Btn>}
-                {listing.type==='byt' && <Btn variant="primary" color={ACCENT} radius={22} onClick={()=>setSwapModal(true)} style={{ justifyContent:'center', padding:'14px', fontSize:15 }}>🔄 Foreslå bytte</Btn>}
-                <Btn variant="outline" radius={22} style={{ justifyContent:'center', padding:'13px', fontSize:14 }}>♡ Gem opslag</Btn>
+                {!isOwn && listing.type==='køb' && <Btn variant="primary" color={PRIMARY} radius={22} onClick={()=>setBuyModal(true)} style={{ justifyContent:'center', padding:'14px', fontSize:15 }}>🏷️ Køb nu — {listing.price} kr.</Btn>}
+                {!isOwn && listing.type==='byd' && <Btn variant="primary" color={ACCENT2} radius={22} onClick={()=>setBidModal(true)} style={{ justifyContent:'center', padding:'14px', fontSize:15 }}>📊 Afgiv bud</Btn>}
+                {!isOwn && listing.type==='byt' && <Btn variant="primary" color={ACCENT} radius={22} onClick={()=>setSwapModal(true)} style={{ justifyContent:'center', padding:'14px', fontSize:15 }}>🔄 Foreslå bytte</Btn>}
+                <button onClick={handleToggleFav} style={{ width:'100%', padding:'13px', borderRadius:22, border:`1.5px solid ${isFav?'#fca5a5':'#e5e5e5'}`, background:isFav?'#fff0f3':'#fff', color:isFav?'#e11d48':'#555', fontSize:14, fontWeight:700, cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center', gap:6, transition:'all 0.2s' }}>
+                  {isFav ? '❤️ Gemt' : '🤍 Gem opslag'}
+                </button>
               </div>
               <div style={{ borderTop:'1px solid #f0f0f0', marginTop:20, paddingTop:16, display:'flex', flexDirection:'column', gap:10 }}>
                 {[['🏢','Institution',listing.institution_name],['📍','By',listing.city],['👶','Aldersgruppe',listing.age_group],['⭐','Stand',listing.condition]].map(([icon,label,val],i) => (
@@ -721,18 +845,39 @@ function ListingDetailPage({ listing, setPage, showToast, onStartConv }) {
         </div>
       </Modal>
 
-      <Modal open={swapModal} onClose={()=>setSwapModal(false)} title="Foreslå bytte">
+      <Modal open={swapModal} onClose={()=>{ setSwapModal(false); setSelectedSwapId(null); setSwapOffer(''); }} title="Foreslå bytte">
         <div style={{ display:'flex', flexDirection:'column', gap:16 }}>
           <div style={{ background:'#FEF0E3', borderRadius:12, padding:16 }}>
             <div style={{ fontSize:13, color:'#c05a0a', fontWeight:600, marginBottom:4 }}>De tilbyder:</div>
             <div style={{ fontFamily:"'Nunito',sans-serif", fontWeight:700, fontSize:16 }}>{listing.title}</div>
           </div>
           <div>
-            <label style={{ display:'block', fontSize:13, fontWeight:700, marginBottom:8 }}>I tilbyder til gengæld:</label>
-            <textarea value={swapOffer} onChange={e=>setSwapOffer(e.target.value)} placeholder="Beskriv hvad I tilbyder i bytte…" rows={4} style={{ width:'100%', padding:'12px 14px', borderRadius:12, border:'1.5px solid #e5e5e5', fontSize:14, resize:'none', fontFamily:"'Nunito Sans',sans-serif", outline:'none' }} />
+            <label style={{ display:'block', fontSize:13, fontWeight:700, marginBottom:10 }}>Vælg hvad I tilbyder i bytte:</label>
+            {ownListings.length > 0 ? (
+              <div style={{ display:'flex', flexDirection:'column', gap:8, maxHeight:220, overflowY:'auto' }}>
+                {ownListings.map(l => (
+                  <div key={l.id} onClick={()=>setSelectedSwapId(l.id===selectedSwapId?null:l.id)}
+                    style={{ display:'flex', alignItems:'center', gap:12, padding:'10px 14px', borderRadius:12, border:`2px solid ${selectedSwapId===l.id?ACCENT:'#e5e5e5'}`, background:selectedSwapId===l.id?'#FEF0E3':'#fff', cursor:'pointer', transition:'all 0.15s' }}>
+                    <div style={{ width:40, height:40, borderRadius:10, background:l.images?.[0]?'#e8e6e3':l.color||'#FFD166', display:'flex', alignItems:'center', justifyContent:'center', overflow:'hidden', flexShrink:0 }}>
+                      {l.images?.[0] ? <img src={l.images[0]} style={{ width:'100%', height:'100%', objectFit:'cover' }} alt="" /> : l.emoji||'🧸'}
+                    </div>
+                    <span style={{ fontWeight:600, fontSize:14 }}>{l.title}</span>
+                    {selectedSwapId===l.id && <span style={{ marginLeft:'auto', color:ACCENT, fontSize:18 }}>✓</span>}
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div style={{ background:'#f8f7f5', borderRadius:10, padding:'12px 14px', fontSize:13, color:'#999', marginBottom:4 }}>Du har ingen aktive opslag at tilbyde — skriv det manuelt nedenfor.</div>
+            )}
           </div>
-          <Btn variant="primary" color={ACCENT} radius={22} onClick={handleSwap} disabled={saving||!swapOffer.trim()} style={{ justifyContent:'center', padding:'14px', fontSize:15 }}>{saving?<><Spinner/>Sender…</>:'Send bytteforslag'}</Btn>
-          <Btn variant="ghost" onClick={()=>setSwapModal(false)} style={{ justifyContent:'center' }}>Annuller</Btn>
+          <div>
+            <label style={{ display:'block', fontSize:13, fontWeight:600, marginBottom:6, color:'#888' }}>
+              {ownListings.length > 0 ? 'Eller skriv en fri beskrivelse:' : 'Beskriv hvad I tilbyder:'}
+            </label>
+            <textarea value={swapOffer} onChange={e=>setSwapOffer(e.target.value)} placeholder="Fx: Vi tilbyder vores cykeltrailer i god stand…" rows={3} style={{ width:'100%', padding:'11px 14px', borderRadius:12, border:'1.5px solid #e5e5e5', fontSize:14, resize:'none', fontFamily:"'Nunito Sans',sans-serif", outline:'none' }} />
+          </div>
+          <Btn variant="primary" color={ACCENT} radius={22} onClick={handleSwap} disabled={saving||(!selectedSwapId&&!swapOffer.trim())} style={{ justifyContent:'center', padding:'14px', fontSize:15 }}>{saving?<><Spinner/>Sender…</>:'Send bytteforslag'}</Btn>
+          <Btn variant="ghost" onClick={()=>{ setSwapModal(false); setSelectedSwapId(null); setSwapOffer(''); }} style={{ justifyContent:'center' }}>Annuller</Btn>
         </div>
       </Modal>
     </div>
@@ -1051,7 +1196,7 @@ function SignupPage({ setPage, setLoggedIn, showToast }) {
 }
 
 // ─── DASHBOARD ────────────────────────────────────────────────────────────────
-function DashboardPage({ setPage, showToast, allListings, onListingCreated, institution: instProp, onInstitutionChange, favs, toggleFav, setActiveListing }) {
+function DashboardPage({ setPage, showToast, allListings, onListingCreated, institution: instProp, onInstitutionChange, favs, toggleFav, setActiveListing, unreadTotal }) {
   const [newOpen,    setNewOpen]    = useState(false);
   const [step,       setStep]       = useState(1);
   const [saving,     setSaving]     = useState(false);
@@ -1069,6 +1214,7 @@ function DashboardPage({ setPage, showToast, allListings, onListingCreated, inst
   const [confirmDelete, setConfirmDelete] = useState(null);
   const fileRef = React.useRef(null);
   const logoRef = React.useRef(null);
+  const listingsRef = React.useRef(null);
   const [logoUploading, setLogoUploading] = useState(false);
 
   // Single effect: load auth user + institution + listings — fully self-contained
@@ -1262,11 +1408,19 @@ function DashboardPage({ setPage, showToast, allListings, onListingCreated, inst
         </div>
 
         <div style={{ display:'grid', gridTemplateColumns:'repeat(4,1fr)', gap:16, marginBottom:32 }}>
-          {[{icon:'📦',n:myListings.length,label:'Aktive opslag'},{icon:'🤝',n:7,label:'Handler'},{icon:'💬',n:2,label:'Beskeder'},{icon:'⭐',n:'4.8',label:'Rating'}].map((s,i)=>(
-            <div key={i} style={{ background:'#fff', borderRadius:20, padding:'20px 24px', boxShadow:'0 2px 12px rgba(0,0,0,0.06)', animation:`slideUp 0.4s ease ${i*0.08}s both` }}>
+          {[
+            {icon:'📦', n:myListings.length, label:'Aktive opslag', onClick:()=>listingsRef.current?.scrollIntoView({behavior:'smooth',block:'start'}), clickable:true},
+            {icon:'🤝', n:7, label:'Handler', onClick:null, clickable:false},
+            {icon:'💬', n:unreadTotal||0, label:'Ulæste beskeder', onClick:()=>setPage('beskeder'), clickable:true},
+            {icon:'⭐', n:'4.8', label:'Rating', onClick:null, clickable:false},
+          ].map((s,i)=>(
+            <div key={i} onClick={s.onClick||undefined} style={{ background:'#fff', borderRadius:20, padding:'20px 24px', boxShadow:'0 2px 12px rgba(0,0,0,0.06)', animation:`slideUp 0.4s ease ${i*0.08}s both`, cursor:s.clickable?'pointer':'default', transition:'transform 0.15s, box-shadow 0.15s', position:'relative' }}
+              onMouseEnter={e=>{ if(s.clickable){ e.currentTarget.style.transform='translateY(-2px)'; e.currentTarget.style.boxShadow='0 6px 20px rgba(0,0,0,0.10)'; }}}
+              onMouseLeave={e=>{ e.currentTarget.style.transform=''; e.currentTarget.style.boxShadow='0 2px 12px rgba(0,0,0,0.06)'; }}>
               <div style={{ fontSize:24, marginBottom:6 }}>{s.icon}</div>
-              <div style={{ fontFamily:"'Nunito',sans-serif", fontWeight:900, fontSize:28, lineHeight:1 }}>{s.n}</div>
+              <div style={{ fontFamily:"'Nunito',sans-serif", fontWeight:900, fontSize:28, lineHeight:1, color:s.n>0&&s.label.includes('Ulæste')?'#EF476F':'#1c1a17' }}>{s.n}</div>
               <div style={{ fontSize:13, color:'#888', marginTop:4 }}>{s.label}</div>
+              {s.clickable && <div style={{ position:'absolute', top:14, right:14, fontSize:14, color:'#ccc' }}>→</div>}
             </div>
           ))}
         </div>
@@ -1274,7 +1428,7 @@ function DashboardPage({ setPage, showToast, allListings, onListingCreated, inst
         <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:24 }}>
 
           {/* Mine opslag */}
-          <div style={{ background:'#fff', borderRadius:22, padding:28, boxShadow:'0 2px 12px rgba(0,0,0,0.06)' }}>
+          <div ref={listingsRef} style={{ background:'#fff', borderRadius:22, padding:28, boxShadow:'0 2px 12px rgba(0,0,0,0.06)' }}>
             <h2 style={{ fontFamily:"'Nunito',sans-serif", fontWeight:800, fontSize:20, marginBottom:20 }}>Mine opslag</h2>
             {myListings.length===0 ? (
               <div style={{ textAlign:'center', padding:'32px 0', color:'#bbb' }}>
@@ -1582,6 +1736,8 @@ function MessagesPage({ setPage, selectedConvId, setSelectedConvId }) {
   const [loading,   setLoading]   = useState(true);
   const [msgLoad,   setMsgLoad]   = useState(false);
   const [sending,   setSending]   = useState(false);
+  const [emojiOpen, setEmojiOpen] = useState(false);
+  const EMOJI_LIST = ['😊','😄','😂','🥰','😍','👍','👏','🙌','❤️','🎉','✅','🤔','😅','🙏','🚀','💪','🌟','😮','🤝','📦','♻️','👶','🏫','🧸','🎠','⚽'];
   const bottomRef = React.useRef(null);
   const inputRef  = React.useRef(null);
 
@@ -1794,21 +1950,32 @@ function MessagesPage({ setPage, selectedConvId, setSelectedConvId }) {
               </div>
 
               {/* Input */}
-              <div style={{ padding:'12px 16px', borderTop:'1.5px solid #f0eeeb', display:'flex', gap:10, alignItems:'flex-end', background:'#fff' }}>
-                <textarea
-                  ref={inputRef}
-                  value={newMsg}
-                  onChange={e=>setNewMsg(e.target.value)}
-                  onKeyDown={onKey}
-                  placeholder="Skriv en besked… (Enter for at sende)"
-                  rows={1}
-                  style={{ flex:1, padding:'11px 14px', borderRadius:14, border:'1.5px solid #e5e5e5', fontSize:14, resize:'none', fontFamily:"'Nunito Sans',sans-serif", outline:'none', lineHeight:1.5, maxHeight:120, overflowY:'auto' }}
-                  onInput={e=>{ e.target.style.height='auto'; e.target.style.height=Math.min(e.target.scrollHeight,120)+'px'; }}
-                />
-                <button onClick={send} disabled={!newMsg.trim()||sending}
-                  style={{ width:44, height:44, borderRadius:14, background:newMsg.trim()?PRIMARY:'#e5e5e5', border:'none', display:'flex', alignItems:'center', justifyContent:'center', cursor:newMsg.trim()?'pointer':'default', transition:'background 0.2s', flexShrink:0 }}>
-                  {sending ? <Spinner /> : <span style={{ fontSize:18, color:'#fff' }}>↑</span>}
-                </button>
+              <div style={{ borderTop:'1.5px solid #f0eeeb', background:'#fff', position:'relative' }}>
+                {emojiOpen && (
+                  <div style={{ position:'absolute', bottom:'100%', left:0, right:0, background:'#fff', borderTop:'1.5px solid #f0eeeb', padding:'10px 12px', display:'flex', flexWrap:'wrap', gap:4 }}>
+                    {EMOJI_LIST.map(em => (
+                      <button key={em} onClick={()=>{ setNewMsg(m=>m+em); setEmojiOpen(false); inputRef.current?.focus(); }}
+                        style={{ background:'none', border:'none', fontSize:22, cursor:'pointer', padding:'4px', borderRadius:8, lineHeight:1 }}>{em}</button>
+                    ))}
+                  </div>
+                )}
+                <div style={{ padding:'12px 16px', display:'flex', gap:8, alignItems:'flex-end' }}>
+                  <button onClick={()=>setEmojiOpen(v=>!v)} style={{ background:'none', border:'none', fontSize:22, cursor:'pointer', padding:'8px', borderRadius:10, flexShrink:0, color:'#aaa', lineHeight:1, height:44, display:'flex', alignItems:'center' }}>😊</button>
+                  <textarea
+                    ref={inputRef}
+                    value={newMsg}
+                    onChange={e=>setNewMsg(e.target.value)}
+                    onKeyDown={onKey}
+                    placeholder="Skriv en besked… (Enter for at sende)"
+                    rows={1}
+                    style={{ flex:1, padding:'11px 14px', borderRadius:14, border:'1.5px solid #e5e5e5', fontSize:14, resize:'none', fontFamily:"'Nunito Sans',sans-serif", outline:'none', lineHeight:1.5, maxHeight:120, overflowY:'auto' }}
+                    onInput={e=>{ e.target.style.height='auto'; e.target.style.height=Math.min(e.target.scrollHeight,120)+'px'; }}
+                  />
+                  <button onClick={send} disabled={!newMsg.trim()||sending}
+                    style={{ width:44, height:44, borderRadius:14, background:newMsg.trim()?PRIMARY:'#e5e5e5', border:'none', display:'flex', alignItems:'center', justifyContent:'center', cursor:newMsg.trim()?'pointer':'default', transition:'background 0.2s', flexShrink:0 }}>
+                    {sending ? <Spinner /> : <span style={{ fontSize:18, color:'#fff' }}>↑</span>}
+                  </button>
+                </div>
               </div>
             </>
           )}
@@ -2173,10 +2340,10 @@ function App() {
 
       {page==='home'      && <HomePage setPage={navigate} setActiveListing={setActiveListing} listings={listings} loading={loading} favs={favs} toggleFav={toggleFav} />}
       {page==='opslag'    && <OpslagPage listings={listings} loading={loading} setPage={navigate} setActiveListing={setActiveListing} favs={favs} toggleFav={toggleFav} />}
-      {page==='listing'   && activeListing && <ListingDetailPage listing={activeListing} setPage={navigate} showToast={showToast} onStartConv={startConversation} />}
+      {page==='listing'   && activeListing && <ListingDetailPage listing={activeListing} setPage={navigate} showToast={showToast} onStartConv={startConversation} favs={favs} toggleFav={toggleFav} />}
       {page==='login'     && <LoginPage setPage={navigate} setLoggedIn={setLoggedIn} />}
       {page==='signup'    && <SignupPage setPage={navigate} setLoggedIn={setLoggedIn} showToast={showToast} />}
-      {page==='dashboard' && <DashboardPage setPage={navigate} showToast={showToast} allListings={listings} onListingCreated={fetchListings} institution={institution} onInstitutionChange={setInstitution} favs={favs} toggleFav={toggleFav} setActiveListing={setActiveListing} />}
+      {page==='dashboard' && <DashboardPage setPage={navigate} showToast={showToast} allListings={listings} onListingCreated={fetchListings} institution={institution} onInstitutionChange={setInstitution} favs={favs} toggleFav={toggleFav} setActiveListing={setActiveListing} unreadTotal={unreadTotal} />}
       {page==='hvordan'   && <HowItWorksPage setPage={navigate} />}
       {page==='om-os'     && <OmOsPage setPage={navigate} />}
       {page==='kontakt'   && <KontaktPage />}
