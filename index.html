@@ -167,7 +167,7 @@ function Toast({ msg, type='success', onDone }) {
 }
 
 // ─── NAV ─────────────────────────────────────────────────────────────────────
-function Nav({ page, setPage, loggedIn, setLoggedIn, unreadTotal }) {
+function Nav({ page, setPage, loggedIn, setLoggedIn, unreadTotal, institution }) {
   const [scrolled, setScrolled] = useState(false);
   useEffect(() => {
     const fn = () => setScrolled(window.scrollY > 20);
@@ -199,7 +199,11 @@ function Nav({ page, setPage, loggedIn, setLoggedIn, unreadTotal }) {
               💬 Beskeder
               {unreadTotal > 0 && <span style={{ background:'#EF476F', color:'#fff', borderRadius:99, fontSize:11, fontWeight:700, minWidth:18, height:18, display:'flex', alignItems:'center', justifyContent:'center', padding:'0 5px', lineHeight:1 }}>{unreadTotal > 9 ? '9+' : unreadTotal}</span>}
             </button>
-            <div onClick={async()=>{ await db.auth.signOut(); setLoggedIn(false); setPage('home'); }} title="Log ud" style={{ width:36, height:36, borderRadius:'50%', background:PRIMARY, display:'flex', alignItems:'center', justifyContent:'center', color:'#fff', fontWeight:800, fontSize:14, cursor:'pointer' }}>M</div>
+            <div onClick={async()=>{ await db.auth.signOut(); setLoggedIn(false); setPage('home'); }} title="Log ud" style={{ width:38, height:38, borderRadius:'50%', background:PRIMARY, display:'flex', alignItems:'center', justifyContent:'center', color:'#fff', fontWeight:800, fontSize:14, cursor:'pointer', overflow:'hidden', flexShrink:0, border:`2px solid ${PRIMARY}` }}>
+              {institution?.logo_url
+                ? <img src={institution.logo_url} alt="logo" style={{ width:'100%', height:'100%', objectFit:'cover' }} />
+                : <span>{institution?.name?.charAt(0)?.toUpperCase() || 'M'}</span>}
+            </div>
           </> : <>
             <Btn variant="ghost" onClick={()=>setPage('login')} color={transparent?'rgba(255,255,255,0.9)':PRIMARY} radius={32} style={{ color:transparent?'rgba(255,255,255,0.9)':'#555' }}>Log ind</Btn>
             <Btn variant="primary" onClick={()=>setPage('signup')} color={PRIMARY} radius={22}>Tilmeld institution</Btn>
@@ -1047,7 +1051,7 @@ function SignupPage({ setPage, setLoggedIn, showToast }) {
 }
 
 // ─── DASHBOARD ────────────────────────────────────────────────────────────────
-function DashboardPage({ setPage, showToast, allListings, onListingCreated, institution: instProp, favs, toggleFav, setActiveListing }) {
+function DashboardPage({ setPage, showToast, allListings, onListingCreated, institution: instProp, onInstitutionChange, favs, toggleFav, setActiveListing }) {
   const [newOpen,    setNewOpen]    = useState(false);
   const [step,       setStep]       = useState(1);
   const [saving,     setSaving]     = useState(false);
@@ -1064,6 +1068,8 @@ function DashboardPage({ setPage, showToast, allListings, onListingCreated, inst
   const [editSaving,  setEditSaving]  = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(null);
   const fileRef = React.useRef(null);
+  const logoRef = React.useRef(null);
+  const [logoUploading, setLogoUploading] = useState(false);
 
   // Single effect: load auth user + institution + listings — fully self-contained
   useEffect(() => {
@@ -1202,19 +1208,55 @@ function DashboardPage({ setPage, showToast, allListings, onListingCreated, inst
     fetchMyListings(user?.id || authUserId, inst?.name || institution?.name);
   }
 
+  async function handleLogoUpload(e) {
+    const file = e.target.files?.[0];
+    if (!file || !authUserId || !institution) return;
+    const validTypes = ['image/jpeg','image/png','image/webp','image/gif'];
+    if (!validTypes.includes(file.type)) { showToast('Kun JPG, PNG eller WEBP tilladt', 'error'); return; }
+    setLogoUploading(true);
+    const ext = file.name.split('.').pop().toLowerCase();
+    const path = `institution-logos/${authUserId}.${ext}`;
+    const { error: upErr } = await db.storage.from('listing-images').upload(path, file, { upsert: true });
+    if (upErr) { showToast('Upload fejlede', 'error'); setLogoUploading(false); return; }
+    const { data: { publicUrl } } = db.storage.from('listing-images').getPublicUrl(path);
+    const { error: dbErr } = await db.from('institutions').update({ logo_url: publicUrl }).eq('email', institution.email);
+    if (!dbErr) {
+      const updated = { ...institution, logo_url: publicUrl };
+      setInstitution(updated);
+      onInstitutionChange?.(updated);
+      showToast('Logo opdateret ✓');
+    } else {
+      showToast('Kunne ikke gemme logo', 'error');
+    }
+    setLogoUploading(false);
+    e.target.value = '';
+  }
+
   const favListings = allListings.filter(l=>favs?.includes(l.id));
 
   return (
     <div style={{ minHeight:'100vh', paddingTop:80, background:'#f8f5f0' }} className="page-enter">
       <div style={{ maxWidth:1140, margin:'0 auto', padding:'36px 24px' }}>
         <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:36 }}>
-          <div>
-            <h1 style={{ fontFamily:"'Nunito',sans-serif", fontWeight:900, fontSize:30, letterSpacing:'-0.5px' }}>
-              {institution?.name || (instLoading ? 'Indlæser…' : 'Min institution')}
-            </h1>
-            <p style={{ color:'#888', fontSize:14, marginTop:4 }}>
-              {institution ? `CVR: ${institution.cvr} · ${institution.city}` : instLoading ? '…' : 'Institution ikke fundet'}
-            </p>
+          <div style={{ display:'flex', alignItems:'center', gap:20 }}>
+            {/* Logo avatar — click to upload */}
+            <div onClick={()=>logoRef.current?.click()} title="Klik for at skifte logo" style={{ width:72, height:72, borderRadius:18, background:PRIMARY, display:'flex', alignItems:'center', justifyContent:'center', cursor:'pointer', overflow:'hidden', flexShrink:0, border:'3px solid #fff', boxShadow:'0 4px 16px rgba(0,0,0,0.12)', position:'relative' }}>
+              {logoUploading
+                ? <Spinner />
+                : institution?.logo_url
+                  ? <img src={institution.logo_url} alt="logo" style={{ width:'100%', height:'100%', objectFit:'cover' }} />
+                  : <span style={{ color:'#fff', fontFamily:"'Nunito',sans-serif", fontWeight:900, fontSize:28 }}>{institution?.name?.charAt(0)?.toUpperCase() || '?'}</span>}
+              <div style={{ position:'absolute', bottom:0, left:0, right:0, background:'rgba(0,0,0,0.45)', color:'#fff', fontSize:10, fontWeight:700, textAlign:'center', padding:'3px 0', letterSpacing:0.5 }}>SKIFT</div>
+            </div>
+            <input ref={logoRef} type="file" accept="image/*" style={{ display:'none' }} onChange={handleLogoUpload} />
+            <div>
+              <h1 style={{ fontFamily:"'Nunito',sans-serif", fontWeight:900, fontSize:30, letterSpacing:'-0.5px' }}>
+                {institution?.name || (instLoading ? 'Indlæser…' : 'Min institution')}
+              </h1>
+              <p style={{ color:'#888', fontSize:14, marginTop:4 }}>
+                {institution ? `CVR: ${institution.cvr} · ${institution.city}` : instLoading ? '…' : 'Institution ikke fundet'}
+              </p>
+            </div>
           </div>
           <Btn variant="primary" color={PRIMARY} radius={22} onClick={()=>setNewOpen(true)} style={{ fontSize:15, padding:'12px 24px' }}>+ Opret opslag</Btn>
         </div>
@@ -2127,14 +2169,14 @@ function App() {
 
   return (
     <div>
-      <Nav page={page} setPage={navigate} loggedIn={loggedIn} setLoggedIn={setLoggedIn} unreadTotal={unreadTotal} />
+      <Nav page={page} setPage={navigate} loggedIn={loggedIn} setLoggedIn={setLoggedIn} unreadTotal={unreadTotal} institution={institution} />
 
       {page==='home'      && <HomePage setPage={navigate} setActiveListing={setActiveListing} listings={listings} loading={loading} favs={favs} toggleFav={toggleFav} />}
       {page==='opslag'    && <OpslagPage listings={listings} loading={loading} setPage={navigate} setActiveListing={setActiveListing} favs={favs} toggleFav={toggleFav} />}
       {page==='listing'   && activeListing && <ListingDetailPage listing={activeListing} setPage={navigate} showToast={showToast} onStartConv={startConversation} />}
       {page==='login'     && <LoginPage setPage={navigate} setLoggedIn={setLoggedIn} />}
       {page==='signup'    && <SignupPage setPage={navigate} setLoggedIn={setLoggedIn} showToast={showToast} />}
-      {page==='dashboard' && <DashboardPage setPage={navigate} showToast={showToast} allListings={listings} onListingCreated={fetchListings} institution={institution} favs={favs} toggleFav={toggleFav} setActiveListing={setActiveListing} />}
+      {page==='dashboard' && <DashboardPage setPage={navigate} showToast={showToast} allListings={listings} onListingCreated={fetchListings} institution={institution} onInstitutionChange={setInstitution} favs={favs} toggleFav={toggleFav} setActiveListing={setActiveListing} />}
       {page==='hvordan'   && <HowItWorksPage setPage={navigate} />}
       {page==='om-os'     && <OmOsPage setPage={navigate} />}
       {page==='kontakt'   && <KontaktPage />}
