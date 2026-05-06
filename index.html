@@ -1030,15 +1030,56 @@ function SignupPage({ setPage, setLoggedIn, showToast }) {
 }
 
 // ─── DASHBOARD ────────────────────────────────────────────────────────────────
-function DashboardPage({ setPage, showToast, allListings, onListingCreated, institution, favs, toggleFav, setActiveListing }) {
+function DashboardPage({ setPage, showToast, allListings, onListingCreated, institution: instProp, favs, toggleFav, setActiveListing }) {
   const [newOpen,    setNewOpen]    = useState(false);
   const [step,       setStep]       = useState(1);
   const [saving,     setSaving]     = useState(false);
   const [imgFiles,   setImgFiles]   = useState([]);
   const [imgPreviews,setImgPreviews]= useState([]);
   const [tipsOpen,   setTipsOpen]   = useState(false);
+  const [myListings, setMyListings] = useState([]);
+  const [institution, setInstitution] = useState(instProp || null);
+  const [instLoading, setInstLoading] = useState(!instProp);
   const [form, setForm] = useState({ title:'', type:'køb', price:'', age_group:'3-6 år', description:'', condition:'God', city:'København', emoji:'🧸', color:'#FFD166' });
   const fileRef = React.useRef(null);
+
+  // Load institution directly from auth — reliable even when App prop arrives late
+  useEffect(() => {
+    let cancelled = false;
+    async function load() {
+      setInstLoading(true);
+      const { data: { user } } = await db.auth.getUser();
+      if (!user || cancelled) return;
+      const { data: inst } = await db.from('institutions').select('*').eq('email', user.email).maybeSingle();
+      if (cancelled) return;
+      if (inst) setInstitution(inst);
+      setInstLoading(false);
+    }
+    // If prop already set use it, but also verify in background
+    if (instProp) setInstitution(instProp);
+    load();
+    return () => { cancelled = true; };
+  }, [instProp]);
+
+  // Load this institution's listings whenever institution is known
+  useEffect(() => {
+    if (!institution?.name) return;
+    db.from('listings').select('*')
+      .eq('institution_name', institution.name)
+      .eq('is_active', true)
+      .order('created_at', { ascending: false })
+      .then(({ data }) => { if (data) setMyListings(data); });
+  }, [institution?.name, allListings]);
+
+  async function loadMyListings() {
+    const name = institution?.name;
+    if (!name) return;
+    const { data } = await db.from('listings').select('*')
+      .eq('institution_name', name)
+      .eq('is_active', true)
+      .order('created_at', { ascending: false });
+    if (data) setMyListings(data);
+  }
 
   function handleFileSelect(e) {
     const files = Array.from(e.target.files);
@@ -1061,13 +1102,22 @@ function DashboardPage({ setPage, showToast, allListings, onListingCreated, inst
 
   async function handleCreate() {
     if (!form.title.trim()) return;
+    // Ensure institution is resolved before saving
+    let inst = institution;
+    if (!inst) {
+      const { data: { user } } = await db.auth.getUser();
+      if (user) {
+        const { data } = await db.from('institutions').select('*').eq('email', user.email).maybeSingle();
+        if (data) { inst = data; setInstitution(data); }
+      }
+    }
     setSaving(true);
     const { data: listing, error } = await db.from('listings').insert({
       title: form.title, type: form.type,
       price: form.type==='køb' ? Number(form.price)||null : null,
       age_group: form.age_group, description: form.description,
       condition: form.condition, city: form.city,
-      institution_name: institution?.name || 'Min Institution',
+      institution_name: inst?.name || 'Ukendt institution',
       emoji: form.emoji, color: form.color,
       images: [], bid_count: 0, is_active: true
     }).select().single();
@@ -1086,33 +1136,22 @@ function DashboardPage({ setPage, showToast, allListings, onListingCreated, inst
     setNewOpen(false); resetModal();
     showToast('Opslag publiceret! 🎉');
     onListingCreated();
-    // Genindlæs egne opslag direkte så dashboardet opdateres med det samme
-    if (institution?.name) {
-      const { data } = await db.from('listings').select('*').eq('institution_name', institution.name).eq('is_active', true).order('created_at', { ascending: false });
-      if (data) setMyListings(data);
-    }
+    loadMyListings();
   }
 
-  const [myListings, setMyListings] = useState([]);
   const favListings = allListings.filter(l=>favs?.includes(l.id));
-
-  useEffect(() => {
-    if (!institution?.name) return;
-    db.from('listings')
-      .select('*')
-      .eq('institution_name', institution.name)
-      .eq('is_active', true)
-      .order('created_at', { ascending: false })
-      .then(({ data }) => { if (data) setMyListings(data); });
-  }, [institution?.name, allListings]);
 
   return (
     <div style={{ minHeight:'100vh', paddingTop:80, background:'#f8f5f0' }} className="page-enter">
       <div style={{ maxWidth:1140, margin:'0 auto', padding:'36px 24px' }}>
         <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:36 }}>
           <div>
-            <h1 style={{ fontFamily:"'Nunito',sans-serif", fontWeight:900, fontSize:30, letterSpacing:'-0.5px' }}>{institution?.name || 'Min institution'}</h1>
-            <p style={{ color:'#888', fontSize:14, marginTop:4 }}>{institution ? `CVR: ${institution.cvr} · ${institution.city}` : 'Indlæser...'}</p>
+            <h1 style={{ fontFamily:"'Nunito',sans-serif", fontWeight:900, fontSize:30, letterSpacing:'-0.5px' }}>
+              {institution?.name || (instLoading ? 'Indlæser…' : 'Min institution')}
+            </h1>
+            <p style={{ color:'#888', fontSize:14, marginTop:4 }}>
+              {institution ? `CVR: ${institution.cvr} · ${institution.city}` : instLoading ? '…' : 'Institution ikke fundet'}
+            </p>
           </div>
           <Btn variant="primary" color={PRIMARY} radius={22} onClick={()=>setNewOpen(true)} style={{ fontSize:15, padding:'12px 24px' }}>+ Opret opslag</Btn>
         </div>
