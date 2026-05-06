@@ -1039,45 +1039,48 @@ function DashboardPage({ setPage, showToast, allListings, onListingCreated, inst
   const [tipsOpen,   setTipsOpen]   = useState(false);
   const [myListings, setMyListings] = useState([]);
   const [institution, setInstitution] = useState(instProp || null);
-  const [instLoading, setInstLoading] = useState(!instProp);
+  const [instLoading, setInstLoading] = useState(true);
+  const [authUserId,  setAuthUserId]  = useState(null);
   const [form, setForm] = useState({ title:'', type:'køb', price:'', age_group:'3-6 år', description:'', condition:'God', city:'København', emoji:'🧸', color:'#FFD166' });
   const fileRef = React.useRef(null);
 
-  // Load institution directly from auth — reliable even when App prop arrives late
+  // Single effect: load auth user + institution + listings — fully self-contained
   useEffect(() => {
     let cancelled = false;
-    async function load() {
+    async function boot() {
       setInstLoading(true);
       const { data: { user } } = await db.auth.getUser();
-      if (!user || cancelled) return;
-      const { data: inst } = await db.from('institutions').select('*').eq('email', user.email).maybeSingle();
-      if (cancelled) return;
-      if (inst) setInstitution(inst);
-      setInstLoading(false);
+      if (!user || cancelled) { setInstLoading(false); return; }
+      setAuthUserId(user.id);
+
+      // Load institution
+      const { data: inst } = await db.from('institutions')
+        .select('*').eq('email', user.email).maybeSingle();
+      if (!cancelled && inst) setInstitution(inst);
+
+      // Load MY listings: filter by user_id (new) OR institution_name (legacy)
+      await fetchMyListings(user.id, inst?.name);
+      if (!cancelled) setInstLoading(false);
     }
-    // If prop already set use it, but also verify in background
-    if (instProp) setInstitution(instProp);
-    load();
+    boot();
     return () => { cancelled = true; };
-  }, [instProp]);
+  }, []);
 
-  // Load this institution's listings whenever institution is known
+  // Re-fetch when allListings changes (new listing created by someone else / realtime)
   useEffect(() => {
-    if (!institution?.name) return;
-    db.from('listings').select('*')
-      .eq('institution_name', institution.name)
-      .eq('is_active', true)
-      .order('created_at', { ascending: false })
-      .then(({ data }) => { if (data) setMyListings(data); });
-  }, [institution?.name, allListings]);
+    if (authUserId) fetchMyListings(authUserId, institution?.name);
+  }, [allListings]);
 
-  async function loadMyListings() {
-    const name = institution?.name;
-    if (!name) return;
-    const { data } = await db.from('listings').select('*')
-      .eq('institution_name', name)
-      .eq('is_active', true)
-      .order('created_at', { ascending: false });
+  async function fetchMyListings(userId, instName) {
+    let q = db.from('listings').select('*').eq('is_active', true).order('created_at', { ascending: false });
+    if (userId && instName) {
+      q = q.or(`user_id.eq.${userId},institution_name.eq.${instName}`);
+    } else if (userId) {
+      q = q.eq('user_id', userId);
+    } else if (instName) {
+      q = q.eq('institution_name', instName);
+    } else { return; }
+    const { data } = await q;
     if (data) setMyListings(data);
   }
 
@@ -1102,22 +1105,21 @@ function DashboardPage({ setPage, showToast, allListings, onListingCreated, inst
 
   async function handleCreate() {
     if (!form.title.trim()) return;
-    // Ensure institution is resolved before saving
-    let inst = institution;
-    if (!inst) {
-      const { data: { user } } = await db.auth.getUser();
-      if (user) {
-        const { data } = await db.from('institutions').select('*').eq('email', user.email).maybeSingle();
-        if (data) { inst = data; setInstitution(data); }
-      }
-    }
     setSaving(true);
+    // Always get fresh auth user so user_id is guaranteed
+    const { data: { user } } = await db.auth.getUser();
+    let inst = institution;
+    if (!inst && user) {
+      const { data } = await db.from('institutions').select('*').eq('email', user.email).maybeSingle();
+      if (data) { inst = data; setInstitution(data); }
+    }
     const { data: listing, error } = await db.from('listings').insert({
       title: form.title, type: form.type,
       price: form.type==='køb' ? Number(form.price)||null : null,
       age_group: form.age_group, description: form.description,
       condition: form.condition, city: form.city,
-      institution_name: inst?.name || 'Ukendt institution',
+      institution_name: inst?.name || 'Min institution',
+      user_id: user?.id || null,
       emoji: form.emoji, color: form.color,
       images: [], bid_count: 0, is_active: true
     }).select().single();
@@ -1136,7 +1138,7 @@ function DashboardPage({ setPage, showToast, allListings, onListingCreated, inst
     setNewOpen(false); resetModal();
     showToast('Opslag publiceret! 🎉');
     onListingCreated();
-    loadMyListings();
+    fetchMyListings(user?.id || authUserId, inst?.name || institution?.name);
   }
 
   const favListings = allListings.filter(l=>favs?.includes(l.id));
