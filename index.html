@@ -195,9 +195,9 @@ function Nav({ page, setPage, loggedIn, setLoggedIn, unreadTotal }) {
         <div style={{ display:'flex', gap:10, alignItems:'center', flexShrink:0 }}>
           {loggedIn ? <>
             <button onClick={()=>setPage('dashboard')} style={{ background:'none', border:'none', fontWeight:600, fontSize:14, color:transparent?'rgba(255,255,255,0.9)':'#555', cursor:'pointer', padding:'8px 12px', borderRadius:8 }}>Min institution</button>
-            <button onClick={()=>setPage('beskeder')} title="Beskeder" style={{ background:'none', border:'none', padding:'6px 8px', borderRadius:8, cursor:'pointer', position:'relative', display:'flex', alignItems:'center', justifyContent:'center', fontSize:20 }}>
-              💬
-              {unreadTotal > 0 && <span style={{ position:'absolute', top:2, right:2, background:'#EF476F', color:'#fff', borderRadius:99, fontSize:10, fontWeight:700, minWidth:16, height:16, display:'flex', alignItems:'center', justifyContent:'center', padding:'0 4px', lineHeight:1 }}>{unreadTotal > 9 ? '9+' : unreadTotal}</span>}
+            <button onClick={()=>setPage('beskeder')} style={{ background:'none', border:'none', fontWeight:600, fontSize:14, color:transparent?'rgba(255,255,255,0.9)':'#555', cursor:'pointer', padding:'8px 12px', borderRadius:8, position:'relative', display:'flex', alignItems:'center', gap:6 }}>
+              💬 Beskeder
+              {unreadTotal > 0 && <span style={{ background:'#EF476F', color:'#fff', borderRadius:99, fontSize:11, fontWeight:700, minWidth:18, height:18, display:'flex', alignItems:'center', justifyContent:'center', padding:'0 5px', lineHeight:1 }}>{unreadTotal > 9 ? '9+' : unreadTotal}</span>}
             </button>
             <div onClick={async()=>{ await db.auth.signOut(); setLoggedIn(false); setPage('home'); }} title="Log ud" style={{ width:36, height:36, borderRadius:'50%', background:PRIMARY, display:'flex', alignItems:'center', justifyContent:'center', color:'#fff', fontWeight:800, fontSize:14, cursor:'pointer' }}>M</div>
           </> : <>
