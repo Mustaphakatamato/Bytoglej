@@ -30,6 +30,9 @@ create table if not exists listing_shares (
   created_at timestamptz default now()
 );
 alter table listing_shares enable row level security;
+drop policy if exists "shares_select" on listing_shares;
+drop policy if exists "shares_insert" on listing_shares;
+drop policy if exists "shares_update" on listing_shares;
 create policy "shares_select" on listing_shares for select using (true);
 create policy "shares_insert" on listing_shares for insert with check (true);
 create policy "shares_update" on listing_shares for update using (true);
@@ -44,6 +47,9 @@ create table if not exists institution_members (
   unique(institution_id, email)
 );
 alter table institution_members enable row level security;
+drop policy if exists "members_select" on institution_members;
+drop policy if exists "members_insert" on institution_members;
+drop policy if exists "members_delete" on institution_members;
 create policy "members_select" on institution_members for select using (true);
 create policy "members_insert" on institution_members for insert with check (true);
 create policy "members_delete" on institution_members for delete using (true);
