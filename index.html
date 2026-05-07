@@ -791,7 +791,7 @@ function ImageGallery({ images, color, emoji }) {
 }
 
 // ─── LISTING DETAIL ───────────────────────────────────────────────────────────
-function ListingDetailPage({ listing, setPage, showToast, onStartConv, favs, toggleFav }) {
+function ListingDetailPage({ listing, setPage, showToast, onStartConv, favs, toggleFav, setSelectedConvId }) {
   const [buyModal,  setBuyModal]  = useState(false);
   const [bidModal,  setBidModal]  = useState(false);
   const [swapModal, setSwapModal] = useState(false);
@@ -831,12 +831,53 @@ function ListingDetailPage({ listing, setPage, showToast, onStartConv, favs, tog
   }
   async function handleBid() {
     if (!bidAmount) return;
+    if (!currentUserId) { showToast('Log ind for at byde', 'error'); return; }
     setSaving(true);
-    const newCount = bidCount+1;
+    const newCount = bidCount + 1;
     await Promise.all([
-      db.from('bids').insert({ listing_id:listing.id, bidder_name:'Anonym Institution', amount:Number(bidAmount) }),
-      db.from('listings').update({ bid_count:newCount }).eq('id',listing.id)
+      db.from('bids').insert({ listing_id: listing.id, bidder_name: 'Anonym Institution', amount: Number(bidAmount) }),
+      db.from('listings').update({ bid_count: newCount }).eq('id', listing.id)
     ]);
+    // Create or find conversation, then insert bid message
+    try {
+      const { data: { user } } = await db.auth.getUser();
+      const { data: inst } = await db.from('institutions').select('name').eq('email', user.email).maybeSingle();
+      const userName = inst?.name || user.email;
+      let convId = null;
+      let ownerUnread = 0;
+      const { data: existing } = await db.from('conversations')
+        .select('id,owner_unread').eq('listing_id', listing.id).eq('initiator_id', currentUserId).maybeSingle();
+      if (existing) {
+        convId = existing.id;
+        ownerUnread = existing.owner_unread || 0;
+      } else {
+        const { data: conv } = await db.from('conversations').insert({
+          listing_id: listing.id, listing_title: listing.title,
+          listing_emoji: listing.emoji, listing_color: listing.color,
+          listing_image: listing.images?.[0] || null,
+          initiator_id: currentUserId, initiator_name: userName,
+          owner_id: listing.user_id, owner_name: listing.institution_name,
+        }).select().single();
+        convId = conv?.id;
+      }
+      if (convId) {
+        const bidMsg = `Bud: ${bidAmount} kr.`;
+        await db.from('chat_messages').insert({
+          conversation_id: convId, sender_id: currentUserId, sender_name: userName,
+          content: bidMsg, message_type: 'bid',
+          bid_amount: Number(bidAmount), bid_status: 'pending',
+        });
+        await db.from('conversations').update({
+          last_message: bidMsg, last_message_at: new Date().toISOString(),
+          owner_unread: ownerUnread + 1,
+        }).eq('id', convId);
+        setSaving(false); setBidCount(newCount); setBidModal(false);
+        showToast(`Bud på ${bidAmount} kr. afsendt! 🎉`);
+        if (setSelectedConvId) setSelectedConvId(convId);
+        setPage('beskeder');
+        return;
+      }
+    } catch {}
     setSaving(false); setBidCount(newCount); setBidModal(false);
     showToast(`Bud på ${bidAmount} kr. afsendt! 🎉`);
   }
@@ -1323,6 +1364,27 @@ function DashboardPage({ setPage, showToast, allListings, onListingCreated, inst
   const listingsRef = React.useRef(null);
   const [logoUploading, setLogoUploading] = useState(false);
 
+  // Feature #5: Edit profile
+  const [editProfileOpen, setEditProfileOpen] = useState(false);
+  const [editProfileForm, setEditProfileForm] = useState(null);
+  const [editProfileSaving, setEditProfileSaving] = useState(false);
+
+  // Feature #2: Transaction history
+  const [tradesOpen, setTradesOpen] = useState(false);
+  const [trades, setTrades] = useState([]);
+  const [tradesLoading, setTradesLoading] = useState(false);
+
+  // Feature #15: Incoming requests
+  const [incomingConvs, setIncomingConvs] = useState([]);
+
+  // Feature #19: Members management
+  const [membersOpen, setMembersOpen] = useState(false);
+  const [members, setMembers] = useState([]);
+  const [memberEmail, setMemberEmail] = useState('');
+  const [memberSaving, setMemberSaving] = useState(false);
+
+  const isAdmin = !institution?._memberRole;
+
   // Single effect: load auth user + institution + listings — fully self-contained
   useEffect(() => {
     let cancelled = false;
@@ -1332,13 +1394,25 @@ function DashboardPage({ setPage, showToast, allListings, onListingCreated, inst
       if (!user || cancelled) { setInstLoading(false); return; }
       setAuthUserId(user.id);
 
-      // Load institution
-      const { data: inst } = await db.from('institutions')
-        .select('*').eq('email', user.email).maybeSingle();
+      // Load institution (admin or member)
+      let inst = null;
+      const { data: adminInst } = await db.from('institutions').select('*').eq('email', user.email).maybeSingle();
+      if (adminInst) { inst = adminInst; }
+      else {
+        const { data: mem } = await db.from('institution_members').select('role,institutions(*)').eq('email', user.email).maybeSingle();
+        if (mem?.institutions) inst = { ...mem.institutions, _memberRole: mem.role };
+      }
       if (!cancelled && inst) setInstitution(inst);
 
-      // Load MY listings: filter by user_id (new) OR institution_name (legacy)
+      // Load MY listings
       await fetchMyListings(user.id, inst?.name);
+
+      // Feature #15: incoming conversations (where user is owner)
+      const { data: incoming } = await db.from('conversations')
+        .select('*').eq('owner_id', user.id)
+        .order('last_message_at', { ascending: false });
+      if (!cancelled && incoming) setIncomingConvs(incoming);
+
       if (!cancelled) setInstLoading(false);
     }
     boot();
@@ -1484,6 +1558,94 @@ function DashboardPage({ setPage, showToast, allListings, onListingCreated, inst
     e.target.value = '';
   }
 
+  // Feature #5: Edit profile handlers
+  function openEditProfile() {
+    if (!institution) return;
+    setEditProfileForm({
+      institution_type: institution.institution_type || '',
+      ownership_type: institution.ownership_type || '',
+      address: institution.address || '',
+      zipcode: institution.zipcode || '',
+      city: institution.city || '',
+      children_count: institution.children_count || '',
+      phone: institution.phone || '',
+      website: institution.website || '',
+      leader_name: institution.leader_name || '',
+      leader_phone: institution.leader_phone || '',
+      leader_email: institution.leader_email || '',
+      contact_name: institution.contact_name || '',
+    });
+    setEditProfileOpen(true);
+  }
+  async function handleSaveProfile() {
+    if (!institution || !editProfileForm) return;
+    setEditProfileSaving(true);
+    const { error } = await db.from('institutions').update({
+      institution_type: editProfileForm.institution_type,
+      ownership_type: editProfileForm.ownership_type,
+      address: editProfileForm.address,
+      zipcode: editProfileForm.zipcode,
+      city: editProfileForm.city,
+      children_count: Number(editProfileForm.children_count) || null,
+      phone: editProfileForm.phone || null,
+      website: editProfileForm.website || null,
+      leader_name: editProfileForm.leader_name,
+      leader_phone: editProfileForm.leader_phone,
+      leader_email: editProfileForm.leader_email,
+      contact_name: editProfileForm.contact_name,
+    }).eq('email', institution.email);
+    setEditProfileSaving(false);
+    if (error) { showToast('Noget gik galt', 'error'); return; }
+    const updated = { ...institution, ...editProfileForm, children_count: Number(editProfileForm.children_count) || null };
+    setInstitution(updated);
+    onInstitutionChange?.(updated);
+    setEditProfileOpen(false);
+    showToast('Profil opdateret ✓');
+  }
+
+  // Feature #2: Transaction history
+  async function fetchTrades() {
+    if (!authUserId) return;
+    setTradesLoading(true);
+    const { data: convs } = await db.from('conversations')
+      .select('id,listing_title,initiator_name,owner_name,initiator_id,owner_id')
+      .or(`initiator_id.eq.${authUserId},owner_id.eq.${authUserId}`);
+    if (!convs?.length) { setTradesLoading(false); return; }
+    const { data: bidMsgs } = await db.from('chat_messages')
+      .select('*').in('conversation_id', convs.map(c=>c.id))
+      .eq('message_type','bid').eq('bid_status','accepted')
+      .order('created_at', { ascending: false });
+    if (bidMsgs) {
+      setTrades(bidMsgs.map(msg => ({ ...msg, conv: convs.find(c=>c.id===msg.conversation_id) })));
+    }
+    setTradesLoading(false);
+  }
+
+  // Feature #19: Members handlers
+  async function fetchMembers() {
+    if (!institution?.id) return;
+    const { data } = await db.from('institution_members').select('*').eq('institution_id', institution.id).order('created_at');
+    if (data) setMembers(data);
+  }
+  async function addMember() {
+    if (!memberEmail.trim() || !institution?.id) return;
+    setMemberSaving(true);
+    const { error } = await db.from('institution_members').insert({ institution_id: institution.id, email: memberEmail.trim().toLowerCase(), role: 'member' });
+    setMemberSaving(false);
+    if (error) {
+      showToast(error.code==='23505' ? 'Brugeren er allerede tilføjet' : 'Noget gik galt', 'error');
+      return;
+    }
+    setMemberEmail('');
+    fetchMembers();
+    showToast('Bruger tilføjet ✓');
+  }
+  async function removeMember(id) {
+    await db.from('institution_members').delete().eq('id', id);
+    setMembers(ms => ms.filter(m => m.id !== id));
+    showToast('Bruger fjernet');
+  }
+
   const favListings = allListings.filter(l=>favs?.includes(l.id));
   const ww = useWindowWidth();
   const isMobile = ww < 768;
@@ -1507,20 +1669,25 @@ function DashboardPage({ setPage, showToast, allListings, onListingCreated, inst
               <h1 style={{ fontFamily:"'Nunito',sans-serif", fontWeight:900, fontSize:isMobile?22:30, letterSpacing:'-0.5px' }}>
                 {institution?.name || (instLoading ? 'Indlæser…' : 'Min institution')}
               </h1>
-              <p style={{ color:'#888', fontSize:14, marginTop:4 }}>
-                {institution ? `CVR: ${institution.cvr} · ${institution.city}` : instLoading ? '…' : 'Institution ikke fundet'}
+              <p style={{ color:'#888', fontSize:14, marginTop:4, display:'flex', alignItems:'center', gap:8, flexWrap:'wrap' }}>
+                <span>{institution ? `CVR: ${institution.cvr} · ${institution.city}` : instLoading ? '…' : 'Institution ikke fundet'}</span>
+                {institution && isAdmin && <button onClick={openEditProfile} style={{ background:'none', border:'none', color:PRIMARY, fontSize:13, fontWeight:700, cursor:'pointer', padding:0, display:'flex', alignItems:'center', gap:4 }}>✏️ Rediger profil</button>}
+                {institution?._memberRole && <span style={{ background:'#e8f0fb', color:ACCENT2, borderRadius:99, padding:'2px 10px', fontSize:11, fontWeight:700 }}>Medarbejder</span>}
               </p>
             </div>
           </div>
-          <Btn variant="primary" color={PRIMARY} radius={22} onClick={()=>setNewOpen(true)} style={{ fontSize:isMobile?14:15, padding:isMobile?'10px 18px':'12px 24px' }}>+ Opret opslag</Btn>
+          <div style={{ display:'flex', gap:10, flexWrap:'wrap' }}>
+            {isAdmin && <Btn variant="outline" radius={22} onClick={()=>{ setMembersOpen(true); fetchMembers(); }} style={{ fontSize:isMobile?12:13, padding:isMobile?'8px 14px':'10px 18px' }}>👥 Brugere</Btn>}
+            <Btn variant="primary" color={PRIMARY} radius={22} onClick={()=>setNewOpen(true)} style={{ fontSize:isMobile?14:15, padding:isMobile?'10px 18px':'12px 24px' }}>+ Opret opslag</Btn>
+          </div>
         </div>
 
         <div style={{ display:'grid', gridTemplateColumns:isMobile?'repeat(2,1fr)':'repeat(4,1fr)', gap:isMobile?12:16, marginBottom:isMobile?24:32 }}>
           {[
             {icon:'📦', n:myListings.length, label:'Aktive opslag', onClick:()=>listingsRef.current?.scrollIntoView({behavior:'smooth',block:'start'}), clickable:true},
-            {icon:'🤝', n:7, label:'Handler', onClick:null, clickable:false},
+            {icon:'🤝', n:trades.length||0, label:'Handler', onClick:()=>{ setTradesOpen(true); fetchTrades(); }, clickable:true},
             {icon:'💬', n:unreadTotal||0, label:'Ulæste beskeder', onClick:()=>setPage('beskeder'), clickable:true},
-            {icon:'⭐', n:'4.8', label:'Rating', onClick:null, clickable:false},
+            {icon:'📬', n:incomingConvs.filter(c=>c.owner_unread>0).length||0, label:'Indkommende', onClick:()=>{ const el=document.getElementById('incoming-section'); if(el) el.scrollIntoView({behavior:'smooth'}); }, clickable:true},
           ].map((s,i)=>(
             <div key={i} onClick={s.onClick||undefined} style={{ background:'#fff', borderRadius:20, padding:'20px 24px', boxShadow:'0 2px 12px rgba(0,0,0,0.06)', animation:`slideUp 0.4s ease ${i*0.08}s both`, cursor:s.clickable?'pointer':'default', transition:'transform 0.15s, box-shadow 0.15s', position:'relative' }}
               onMouseEnter={e=>{ if(s.clickable){ e.currentTarget.style.transform='translateY(-2px)'; e.currentTarget.style.boxShadow='0 6px 20px rgba(0,0,0,0.10)'; }}}
@@ -1602,6 +1769,43 @@ function DashboardPage({ setPage, showToast, allListings, onListingCreated, inst
             ))}
           </div>
         </div>
+
+        {/* Feature #15: Incoming requests section */}
+        <div id="incoming-section" style={{ background:'#fff', borderRadius:22, padding:28, boxShadow:'0 2px 12px rgba(0,0,0,0.06)', marginTop:isMobile?16:24 }}>
+          <div style={{ display:'flex', alignItems:'center', gap:10, marginBottom:20 }}>
+            <h2 style={{ fontFamily:"'Nunito',sans-serif", fontWeight:800, fontSize:20 }}>Indkommende anmodninger</h2>
+            {incomingConvs.filter(c=>c.owner_unread>0).length > 0 && <div style={{ background:'#EF476F', color:'#fff', borderRadius:99, padding:'2px 10px', fontSize:12, fontWeight:800 }}>{incomingConvs.filter(c=>c.owner_unread>0).length} ny</div>}
+          </div>
+          {incomingConvs.length === 0 ? (
+            <div style={{ textAlign:'center', padding:'32px 0', color:'#bbb' }}>
+              <div style={{ fontSize:36, marginBottom:10 }}>📬</div>
+              <p style={{ fontSize:14 }}>Ingen indkommende anmodninger på dine opslag endnu</p>
+            </div>
+          ) : (
+            <div style={{ display:'flex', flexDirection:'column', gap:10 }}>
+              {incomingConvs.slice(0,10).map(c => (
+                <div key={c.id} onClick={()=>setPage('beskeder')} style={{ display:'flex', alignItems:'center', gap:14, padding:'12px 16px', border:`1.5px solid ${c.owner_unread>0?'#c6e8d4':'#f0eeeb'}`, borderRadius:14, cursor:'pointer', background:c.owner_unread>0?'#f0faf5':'#fff', transition:'all 0.15s' }}>
+                  <div style={{ width:44, height:44, borderRadius:12, background:c.listing_image?'#e8e6e3':c.listing_color||'#FFD166', display:'flex', alignItems:'center', justifyContent:'center', fontSize:22, flexShrink:0, overflow:'hidden', position:'relative' }}>
+                    {c.listing_image ? <img src={c.listing_image} style={{ width:'100%', height:'100%', objectFit:'cover' }} alt="" /> : c.listing_emoji||'🧸'}
+                    {c.owner_unread>0 && <div style={{ position:'absolute', top:-4, right:-4, width:16, height:16, background:'#EF476F', borderRadius:'50%', border:'2px solid #fff', display:'flex', alignItems:'center', justifyContent:'center', fontSize:8, fontWeight:800, color:'#fff' }}>{c.owner_unread>9?'9+':c.owner_unread}</div>}
+                  </div>
+                  <div style={{ flex:1, minWidth:0 }}>
+                    <div style={{ fontFamily:"'Nunito',sans-serif", fontWeight:c.owner_unread>0?700:600, fontSize:14, whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis' }}>
+                      {c.initiator_name}
+                    </div>
+                    <div style={{ fontSize:12, color:'#888', marginTop:2, whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis' }}>📦 {c.listing_title}</div>
+                    <div style={{ fontSize:12, color:c.owner_unread>0?'#333':'#aaa', fontWeight:c.owner_unread>0?600:400, whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis' }}>{c.last_message || 'Samtale startet'}</div>
+                  </div>
+                  <div style={{ display:'flex', flexDirection:'column', alignItems:'flex-end', gap:4, flexShrink:0 }}>
+                    <div style={{ fontSize:11, color:'#bbb' }}>{relTime(c.last_message_at)}</div>
+                    <div style={{ fontSize:11, color:PRIMARY, fontWeight:700 }}>→</div>
+                  </div>
+                </div>
+              ))}
+              {incomingConvs.length > 10 && <button onClick={()=>setPage('beskeder')} style={{ background:'none', border:`1.5px solid ${PRIMARY}`, color:PRIMARY, borderRadius:99, padding:'8px 18px', fontSize:13, fontWeight:700, cursor:'pointer', alignSelf:'center', marginTop:4 }}>Se alle {incomingConvs.length} →</button>}
+            </div>
+          )}
+        </div>
       </div>
 
       <Modal open={!!editListing} onClose={()=>{setEditListing(null);setEditForm(null);}} title="Rediger opslag">
@@ -1667,6 +1871,123 @@ function DashboardPage({ setPage, showToast, allListings, onListingCreated, inst
             </div>
           </div>
         )}
+      </Modal>
+
+      {/* Feature #5: Edit Profile Modal */}
+      <Modal open={editProfileOpen} onClose={()=>setEditProfileOpen(false)} title="Rediger institutionsprofil">
+        {editProfileForm && (
+          <div style={{ display:'flex', flexDirection:'column', gap:14 }}>
+            <div style={{ background:'#f0f9f4', border:'1.5px solid #c6e8d4', borderRadius:12, padding:'12px 16px' }}>
+              <div style={{ fontSize:12, color:'#5a9a74', fontWeight:700, marginBottom:4 }}>Fra CVR-registret (kan ikke ændres)</div>
+              <div style={{ fontWeight:800, fontSize:15 }}>{institution?.name}</div>
+              <div style={{ fontSize:13, color:'#888' }}>CVR: {institution?.cvr}</div>
+            </div>
+            <div style={{ display:'grid', gridTemplateColumns:'1fr 110px', gap:10 }}>
+              <div>
+                <label style={{ display:'block', fontSize:12, fontWeight:700, marginBottom:5 }}>Adresse</label>
+                <input value={editProfileForm.address} onChange={e=>setEditProfileForm(f=>({...f,address:e.target.value}))} style={{ width:'100%', padding:'10px 12px', borderRadius:10, border:'1.5px solid #e5e5e5', fontSize:14, outline:'none' }} />
+              </div>
+              <div>
+                <label style={{ display:'block', fontSize:12, fontWeight:700, marginBottom:5 }}>Postnr.</label>
+                <input value={editProfileForm.zipcode} onChange={e=>setEditProfileForm(f=>({...f,zipcode:e.target.value}))} style={{ width:'100%', padding:'10px 12px', borderRadius:10, border:'1.5px solid #e5e5e5', fontSize:14, outline:'none' }} />
+              </div>
+            </div>
+            <div>
+              <label style={{ display:'block', fontSize:12, fontWeight:700, marginBottom:5 }}>By</label>
+              <input value={editProfileForm.city} onChange={e=>setEditProfileForm(f=>({...f,city:e.target.value}))} style={{ width:'100%', padding:'10px 12px', borderRadius:10, border:'1.5px solid #e5e5e5', fontSize:14, outline:'none' }} />
+            </div>
+            <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:10 }}>
+              <div>
+                <label style={{ display:'block', fontSize:12, fontWeight:700, marginBottom:5 }}>Telefon</label>
+                <input value={editProfileForm.phone} onChange={e=>setEditProfileForm(f=>({...f,phone:e.target.value}))} placeholder="+45 12 34 56 78" style={{ width:'100%', padding:'10px 12px', borderRadius:10, border:'1.5px solid #e5e5e5', fontSize:14, outline:'none' }} />
+              </div>
+              <div>
+                <label style={{ display:'block', fontSize:12, fontWeight:700, marginBottom:5 }}>Antal børn</label>
+                <input type="number" value={editProfileForm.children_count} onChange={e=>setEditProfileForm(f=>({...f,children_count:e.target.value}))} placeholder="Fx 60" style={{ width:'100%', padding:'10px 12px', borderRadius:10, border:'1.5px solid #e5e5e5', fontSize:14, outline:'none' }} />
+              </div>
+            </div>
+            <div>
+              <label style={{ display:'block', fontSize:12, fontWeight:700, marginBottom:5 }}>Hjemmeside</label>
+              <input value={editProfileForm.website} onChange={e=>setEditProfileForm(f=>({...f,website:e.target.value}))} placeholder="https://min-institution.dk" style={{ width:'100%', padding:'10px 12px', borderRadius:10, border:'1.5px solid #e5e5e5', fontSize:14, outline:'none' }} />
+            </div>
+            <div style={{ borderTop:'1px solid #f0eeeb', paddingTop:14 }}>
+              <div style={{ fontSize:12, fontWeight:700, color:'#888', marginBottom:10 }}>Institutionsleder</div>
+              <div style={{ display:'flex', flexDirection:'column', gap:10 }}>
+                <input value={editProfileForm.leader_name} onChange={e=>setEditProfileForm(f=>({...f,leader_name:e.target.value}))} placeholder="Fulde navn" style={{ width:'100%', padding:'10px 12px', borderRadius:10, border:'1.5px solid #e5e5e5', fontSize:14, outline:'none' }} />
+                <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:10 }}>
+                  <input value={editProfileForm.leader_phone} onChange={e=>setEditProfileForm(f=>({...f,leader_phone:e.target.value}))} placeholder="Telefon" style={{ width:'100%', padding:'10px 12px', borderRadius:10, border:'1.5px solid #e5e5e5', fontSize:14, outline:'none' }} />
+                  <input value={editProfileForm.leader_email} onChange={e=>setEditProfileForm(f=>({...f,leader_email:e.target.value}))} placeholder="E-mail" style={{ width:'100%', padding:'10px 12px', borderRadius:10, border:'1.5px solid #e5e5e5', fontSize:14, outline:'none' }} />
+                </div>
+              </div>
+            </div>
+            <div style={{ display:'flex', gap:10 }}>
+              <button onClick={()=>setEditProfileOpen(false)} style={{ flex:1, padding:'12px', borderRadius:12, background:'#f5f4f2', border:'none', fontWeight:700, cursor:'pointer' }}>Annuller</button>
+              <Btn variant="primary" color={PRIMARY} radius={22} onClick={handleSaveProfile} disabled={editProfileSaving} style={{ flex:2, justifyContent:'center', padding:'12px', fontSize:14 }}>
+                {editProfileSaving ? <><Spinner/>Gemmer…</> : '✓ Gem profil'}
+              </Btn>
+            </div>
+          </div>
+        )}
+      </Modal>
+
+      {/* Feature #2: Trades History Modal */}
+      <Modal open={tradesOpen} onClose={()=>setTradesOpen(false)} title="Historik over handler">
+        <div>
+          {tradesLoading ? (
+            <div style={{ textAlign:'center', padding:'32px 0', color:'#bbb' }}>Indlæser…</div>
+          ) : trades.length === 0 ? (
+            <div style={{ textAlign:'center', padding:'32px 0', color:'#bbb' }}>
+              <div style={{ fontSize:40, marginBottom:10 }}>🤝</div>
+              <p style={{ fontSize:14 }}>Ingen gennemførte handler endnu</p>
+              <p style={{ fontSize:12, color:'#ccc', marginTop:6 }}>Handler optræder her når et bud accepteres</p>
+            </div>
+          ) : trades.map(t => (
+            <div key={t.id} style={{ border:'1.5px solid #f0eeeb', borderRadius:14, padding:'14px 16px', marginBottom:10 }}>
+              <div style={{ display:'flex', justifyContent:'space-between', alignItems:'flex-start', marginBottom:6 }}>
+                <div style={{ fontFamily:"'Nunito',sans-serif", fontWeight:700, fontSize:14 }}>{t.conv?.listing_title || 'Ukendt opslag'}</div>
+                <div style={{ fontFamily:"'Nunito',sans-serif", fontWeight:900, fontSize:18, color:PRIMARY }}>{t.bid_amount} kr.</div>
+              </div>
+              <div style={{ fontSize:12, color:'#888', display:'flex', gap:12, flexWrap:'wrap' }}>
+                <span>🏢 {t.conv?.initiator_id === authUserId ? t.conv?.owner_name : t.conv?.initiator_name}</span>
+                <span>📅 {new Date(t.created_at).toLocaleDateString('da-DK',{day:'numeric',month:'long',year:'numeric'})}</span>
+              </div>
+              <div style={{ marginTop:8 }}>
+                <span style={{ background:'#e8f5ee', color:PRIMARY, borderRadius:99, padding:'3px 10px', fontSize:11, fontWeight:700 }}>✅ Accepteret</span>
+              </div>
+            </div>
+          ))}
+        </div>
+      </Modal>
+
+      {/* Feature #19: Members Modal */}
+      <Modal open={membersOpen} onClose={()=>setMembersOpen(false)} title="Brugere under institutionen">
+        <div style={{ display:'flex', flexDirection:'column', gap:14 }}>
+          <div style={{ background:'#f8f7f5', borderRadius:12, padding:'12px 14px', fontSize:13, color:'#666' }}>
+            ℹ️ Tilføj medarbejdere der skal kunne uploade og favorisere opslag. De logger ind med deres egen e-mail.
+          </div>
+          <div style={{ display:'flex', gap:8 }}>
+            <input value={memberEmail} onChange={e=>setMemberEmail(e.target.value)} placeholder="medarbejder@institution.dk" type="email"
+              onKeyDown={e=>e.key==='Enter'&&addMember()}
+              style={{ flex:1, padding:'11px 14px', borderRadius:10, border:'1.5px solid #e5e5e5', fontSize:14, outline:'none' }} />
+            <Btn variant="primary" color={PRIMARY} radius={12} onClick={addMember} disabled={memberSaving||!memberEmail.trim()} style={{ padding:'11px 18px', fontSize:13 }}>
+              {memberSaving ? <Spinner /> : '+ Tilføj'}
+            </Btn>
+          </div>
+          {members.length === 0 ? (
+            <div style={{ textAlign:'center', padding:'20px 0', color:'#bbb', fontSize:13 }}>Ingen medarbejdere tilføjet endnu</div>
+          ) : members.map(m => (
+            <div key={m.id} style={{ display:'flex', alignItems:'center', gap:12, padding:'10px 14px', border:'1.5px solid #f0eeeb', borderRadius:12 }}>
+              <div style={{ width:36, height:36, borderRadius:'50%', background:'#e8f0fb', display:'flex', alignItems:'center', justifyContent:'center', fontSize:16, fontWeight:700, color:ACCENT2, flexShrink:0 }}>
+                {m.email.charAt(0).toUpperCase()}
+              </div>
+              <div style={{ flex:1, minWidth:0 }}>
+                <div style={{ fontSize:14, fontWeight:600, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{m.email}</div>
+                <div style={{ fontSize:11, color:'#aaa', marginTop:1 }}>Medarbejder · Tilføjet {new Date(m.created_at).toLocaleDateString('da-DK')}</div>
+              </div>
+              <button onClick={()=>removeMember(m.id)} style={{ background:'#fff0f0', border:'none', borderRadius:8, padding:'6px 12px', fontSize:12, fontWeight:700, color:'#e11d48', cursor:'pointer' }}>Fjern</button>
+            </div>
+          ))}
+        </div>
       </Modal>
 
       <Modal open={newOpen} onClose={()=>{setNewOpen(false);resetModal();}} title={`Nyt opslag — trin ${step}/2`}>
@@ -1835,23 +2156,27 @@ function relTime(ts) {
 
 // ─── MESSAGES PAGE ────────────────────────────────────────────────────────────
 function MessagesPage({ setPage, selectedConvId, setSelectedConvId }) {
-  const [userId,    setUserId]    = useState(null);
-  const [convs,     setConvs]     = useState([]);
-  const [active,    setActive]    = useState(null);
-  const [messages,  setMessages]  = useState([]);
-  const [newMsg,    setNewMsg]    = useState('');
-  const [search,    setSearch]    = useState('');
-  const [loading,   setLoading]   = useState(true);
-  const [msgLoad,   setMsgLoad]   = useState(false);
-  const [sending,   setSending]   = useState(false);
-  const [emojiOpen, setEmojiOpen] = useState(false);
+  const [userId,      setUserId]      = useState(null);
+  const [convs,       setConvs]       = useState([]);
+  const [active,      setActive]      = useState(null);
+  const [messages,    setMessages]    = useState([]);
+  const [newMsg,      setNewMsg]      = useState('');
+  const [search,      setSearch]      = useState('');
+  const [loading,     setLoading]     = useState(true);
+  const [msgLoad,     setMsgLoad]     = useState(false);
+  const [sending,     setSending]     = useState(false);
+  const [emojiOpen,   setEmojiOpen]   = useState(false);
+  const [showArchived,setShowArchived]= useState(false);
+  const [rejectingBid,setRejectingBid]= useState(null);
+  const [rejectNote,  setRejectNote]  = useState('');
+  const [counterBidMsg,setCounterBidMsg] = useState(null);
+  const [counterAmount,setCounterAmount] = useState('');
   const ww = useWindowWidth();
   const isMobile = ww < 768;
   const EMOJI_LIST = ['😊','😄','😂','🥰','😍','👍','👏','🙌','❤️','🎉','✅','🤔','😅','🙏','🚀','💪','🌟','😮','🤝','📦','♻️','👶','🏫','🧸','🎠','⚽'];
   const bottomRef = React.useRef(null);
   const inputRef  = React.useRef(null);
 
-  // Boot
   useEffect(() => {
     db.auth.getUser().then(({ data: { user } }) => {
       if (!user) { setLoading(false); return; }
@@ -1860,17 +2185,15 @@ function MessagesPage({ setPage, selectedConvId, setSelectedConvId }) {
     });
   }, []);
 
-  // Pre-select conversation passed from listing page
   useEffect(() => {
     if (!selectedConvId || !convs.length) return;
     const c = convs.find(x => x.id === selectedConvId);
     if (c) openConv(c);
   }, [selectedConvId, convs]);
 
-  // Real-time: refresh conv list on any conversation update
   useEffect(() => {
     if (!userId) return;
-    const ch = db.channel('convs-rt').on('postgres_changes', { event:'UPDATE', schema:'public', table:'conversations' }, () => loadConvs(userId)).subscribe();
+    const ch = db.channel('convs-rt').on('postgres_changes', { event:'*', schema:'public', table:'conversations' }, () => loadConvs(userId)).subscribe();
     return () => db.removeChannel(ch);
   }, [userId]);
 
@@ -1892,7 +2215,6 @@ function MessagesPage({ setPage, selectedConvId, setSelectedConvId }) {
     setMsgLoad(false);
     setTimeout(() => bottomRef.current?.scrollIntoView({ behavior:'smooth' }), 60);
     inputRef.current?.focus();
-    // Reset unread for current user
     const isInit = conv.initiator_id === userId;
     if ((isInit && conv.initiator_unread > 0) || (!isInit && conv.owner_unread > 0)) {
       const patch = isInit ? { initiator_unread: 0 } : { owner_unread: 0 };
@@ -1901,7 +2223,6 @@ function MessagesPage({ setPage, selectedConvId, setSelectedConvId }) {
     }
   }
 
-  // Real-time messages for active conversation
   useEffect(() => {
     if (!active) return;
     const ch = db.channel(`msgs-${active.id}`)
@@ -1910,6 +2231,8 @@ function MessagesPage({ setPage, selectedConvId, setSelectedConvId }) {
           setMessages(prev => [...prev, m]);
           setTimeout(() => bottomRef.current?.scrollIntoView({ behavior:'smooth' }), 60);
         })
+      .on('postgres_changes', { event:'UPDATE', schema:'public', table:'chat_messages', filter:`conversation_id=eq.${active.id}` },
+        ({ new: m }) => { setMessages(prev => prev.map(x => x.id === m.id ? m : x)); })
       .subscribe();
     return () => db.removeChannel(ch);
   }, [active?.id]);
@@ -1921,7 +2244,6 @@ function MessagesPage({ setPage, selectedConvId, setSelectedConvId }) {
     setNewMsg('');
     const senderName = active.initiator_id === userId ? active.initiator_name : active.owner_name;
     await db.from('chat_messages').insert({ conversation_id: active.id, sender_id: userId, sender_name: senderName, content });
-    // Increment unread for other party, update last message
     const isInit = active.initiator_id === userId;
     const unreadPatch = isInit ? { owner_unread: (active.owner_unread||0)+1 } : { initiator_unread: (active.initiator_unread||0)+1 };
     const updated = { last_message: content, last_message_at: new Date().toISOString(), ...unreadPatch };
@@ -1931,12 +2253,64 @@ function MessagesPage({ setPage, selectedConvId, setSelectedConvId }) {
     setSending(false);
   }
 
+  async function archiveConv(conv, e) {
+    e.stopPropagation();
+    const isInit = conv.initiator_id === userId;
+    const field = isInit ? 'archived_by_initiator' : 'archived_by_owner';
+    const newVal = !(isInit ? (conv.archived_by_initiator||false) : (conv.archived_by_owner||false));
+    await db.from('conversations').update({ [field]: newVal }).eq('id', conv.id);
+    setConvs(cs => cs.map(c => c.id === conv.id ? { ...c, [field]: newVal } : c));
+    if (active?.id === conv.id) setActive(null);
+  }
+
+  async function handleAcceptBid(msg) {
+    await db.from('chat_messages').update({ bid_status: 'accepted' }).eq('id', msg.id);
+    const confirmMsg = `Bud på ${msg.bid_amount} kr. accepteret! 🎉`;
+    const senderName = active.owner_id === userId ? active.owner_name : active.initiator_name;
+    await db.from('chat_messages').insert({ conversation_id: active.id, sender_id: userId, sender_name: senderName, content: confirmMsg });
+    const upd = { last_message: confirmMsg, last_message_at: new Date().toISOString(), initiator_unread: (active.initiator_unread||0)+1 };
+    await db.from('conversations').update(upd).eq('id', active.id);
+    setActive(a => ({ ...a, ...upd }));
+  }
+
+  async function handleRejectBid() {
+    const msg = rejectingBid;
+    await db.from('chat_messages').update({ bid_status: 'rejected', bid_note: rejectNote }).eq('id', msg.id);
+    const senderName = active.owner_id === userId ? active.owner_name : active.initiator_name;
+    const rejectMsg = `Bud afvist${rejectNote ? ': ' + rejectNote : ''}`;
+    await db.from('chat_messages').insert({ conversation_id: active.id, sender_id: userId, sender_name: senderName, content: rejectMsg });
+    const upd = { last_message: rejectMsg, last_message_at: new Date().toISOString(), initiator_unread: (active.initiator_unread||0)+1 };
+    await db.from('conversations').update(upd).eq('id', active.id);
+    setActive(a => ({ ...a, ...upd }));
+    setRejectingBid(null); setRejectNote('');
+  }
+
+  async function handleCounterBid() {
+    const amount = Number(counterAmount);
+    if (!amount) return;
+    const msg = counterBidMsg;
+    await db.from('chat_messages').update({ bid_status: 'countered' }).eq('id', msg.id);
+    const senderName = active.owner_id === userId ? active.owner_name : active.initiator_name;
+    const counterContent = `Modbud: ${amount} kr.`;
+    await db.from('chat_messages').insert({
+      conversation_id: active.id, sender_id: userId, sender_name: senderName,
+      content: counterContent, message_type: 'bid', bid_amount: amount, bid_status: 'pending',
+    });
+    const upd = { last_message: counterContent, last_message_at: new Date().toISOString(), initiator_unread: (active.initiator_unread||0)+1 };
+    await db.from('conversations').update(upd).eq('id', active.id);
+    setActive(a => ({ ...a, ...upd }));
+    setCounterBidMsg(null); setCounterAmount('');
+  }
+
   function onKey(e) { if (e.key==='Enter' && !e.shiftKey) { e.preventDefault(); send(); } }
 
   const myUnread = c => c.initiator_id === userId ? (c.initiator_unread||0) : (c.owner_unread||0);
   const otherName = c => c.initiator_id === userId ? c.owner_name : c.initiator_name;
-  const filtered = convs.filter(c => otherName(c).toLowerCase().includes(search.toLowerCase()) || c.listing_title.toLowerCase().includes(search.toLowerCase()));
-  const totalUnread = convs.reduce((s,c) => s + myUnread(c), 0);
+  const isArchived = c => c.initiator_id === userId ? (c.archived_by_initiator||false) : (c.archived_by_owner||false);
+  const filtered = convs
+    .filter(c => showArchived ? isArchived(c) : !isArchived(c))
+    .filter(c => otherName(c).toLowerCase().includes(search.toLowerCase()) || c.listing_title.toLowerCase().includes(search.toLowerCase()));
+  const totalUnread = convs.filter(c => !isArchived(c)).reduce((s,c) => s + myUnread(c), 0);
 
   if (!userId) return (
     <div style={{ minHeight:'100vh', display:'flex', alignItems:'center', justifyContent:'center', paddingTop:80 }} className="page-enter">
@@ -1948,7 +2322,6 @@ function MessagesPage({ setPage, selectedConvId, setSelectedConvId }) {
     </div>
   );
 
-  // On mobile: show list panel or chat panel, not both
   const showList = !isMobile || !active;
   const showChat = !isMobile || !!active;
 
@@ -1959,9 +2332,13 @@ function MessagesPage({ setPage, selectedConvId, setSelectedConvId }) {
         {/* ── Conversation list ── */}
         {showList && <div style={{ width:isMobile?'100%':320, flexShrink:0, display:'flex', flexDirection:'column', background:'#fff', borderRadius:isMobile?0:'18px 18px 0 0', boxShadow:'0 2px 16px rgba(0,0,0,0.07)', marginRight:isMobile?0:12, overflow:'hidden' }}>
           <div style={{ padding:'20px 18px 12px' }}>
-            <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:14 }}>
+            <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:10 }}>
               <h2 style={{ fontFamily:"'Nunito',sans-serif", fontWeight:900, fontSize:20 }}>Beskeder</h2>
-              {totalUnread > 0 && <div style={{ background:'#e11d48', color:'#fff', borderRadius:99, padding:'2px 9px', fontSize:12, fontWeight:800 }}>{totalUnread}</div>}
+              {totalUnread > 0 && !showArchived && <div style={{ background:'#e11d48', color:'#fff', borderRadius:99, padding:'2px 9px', fontSize:12, fontWeight:800 }}>{totalUnread}</div>}
+            </div>
+            <div style={{ display:'flex', gap:6, marginBottom:10 }}>
+              <button onClick={()=>setShowArchived(false)} style={{ flex:1, padding:'6px 0', borderRadius:8, border:'none', background:!showArchived?PRIMARY:'#f0eeeb', color:!showArchived?'#fff':'#888', fontSize:12, fontWeight:700, cursor:'pointer' }}>Aktive</button>
+              <button onClick={()=>setShowArchived(true)} style={{ flex:1, padding:'6px 0', borderRadius:8, border:'none', background:showArchived?PRIMARY:'#f0eeeb', color:showArchived?'#fff':'#888', fontSize:12, fontWeight:700, cursor:'pointer' }}>Arkiveret</button>
             </div>
             <div style={{ position:'relative' }}>
               <span style={{ position:'absolute', left:12, top:'50%', transform:'translateY(-50%)', fontSize:14, color:'#bbb' }}>🔍</span>
@@ -1972,27 +2349,32 @@ function MessagesPage({ setPage, selectedConvId, setSelectedConvId }) {
             {loading ? <div style={{ padding:24, textAlign:'center', color:'#bbb', fontSize:13 }}>Indlæser…</div>
             : filtered.length === 0 ? (
               <div style={{ padding:40, textAlign:'center', color:'#bbb' }}>
-                <div style={{ fontSize:40, marginBottom:10 }}>💬</div>
-                <p style={{ fontSize:13 }}>Ingen samtaler endnu</p>
-                <button onClick={()=>setPage('opslag')} style={{ marginTop:12, background:'none', border:`1.5px solid ${PRIMARY}`, color:PRIMARY, borderRadius:99, padding:'7px 16px', fontSize:12, fontWeight:700, cursor:'pointer' }}>Find opslag</button>
+                <div style={{ fontSize:40, marginBottom:10 }}>{showArchived ? '📭' : '💬'}</div>
+                <p style={{ fontSize:13 }}>{showArchived ? 'Ingen arkiverede samtaler' : 'Ingen samtaler endnu'}</p>
+                {!showArchived && <button onClick={()=>setPage('opslag')} style={{ marginTop:12, background:'none', border:`1.5px solid ${PRIMARY}`, color:PRIMARY, borderRadius:99, padding:'7px 16px', fontSize:12, fontWeight:700, cursor:'pointer' }}>Find opslag</button>}
               </div>
             ) : filtered.map(c => {
               const unread = myUnread(c);
-              const isActive = active?.id === c.id;
+              const isAct = active?.id === c.id;
+              const archived = isArchived(c);
               return (
-                <div key={c.id} onClick={()=>openConv(c)} style={{ display:'flex', gap:12, padding:'13px 16px', cursor:'pointer', background:isActive?'#f0faf5':'#fff', borderLeft:isActive?`3px solid ${PRIMARY}`:'3px solid transparent', transition:'background 0.15s' }}>
+                <div key={c.id} style={{ display:'flex', gap:12, padding:'13px 16px', cursor:'pointer', background:isAct?'#f0faf5':'#fff', borderLeft:isAct?`3px solid ${PRIMARY}`:'3px solid transparent', transition:'background 0.15s', position:'relative' }}
+                  onClick={()=>openConv(c)}>
                   <div style={{ width:46, height:46, borderRadius:12, background:c.listing_image?'#e8e6e3':c.listing_color||'#FFD166', display:'flex', alignItems:'center', justifyContent:'center', fontSize:22, flexShrink:0, overflow:'hidden', position:'relative' }}>
                     {c.listing_image ? <img src={c.listing_image} style={{ width:'100%', height:'100%', objectFit:'cover' }} alt="" /> : c.listing_emoji||'🧸'}
-                    {unread>0 && <div style={{ position:'absolute', top:-4, right:-4, width:18, height:18, background:'#e11d48', borderRadius:'50%', border:'2px solid #fff', display:'flex', alignItems:'center', justifyContent:'center', fontSize:9, fontWeight:800, color:'#fff' }}>{unread>9?'9+':unread}</div>}
+                    {unread>0 && !archived && <div style={{ position:'absolute', top:-4, right:-4, width:18, height:18, background:'#e11d48', borderRadius:'50%', border:'2px solid #fff', display:'flex', alignItems:'center', justifyContent:'center', fontSize:9, fontWeight:800, color:'#fff' }}>{unread>9?'9+':unread}</div>}
                   </div>
                   <div style={{ flex:1, minWidth:0 }}>
                     <div style={{ display:'flex', justifyContent:'space-between', alignItems:'baseline', marginBottom:3 }}>
-                      <div style={{ fontFamily:"'Nunito',sans-serif", fontWeight:unread>0?800:600, fontSize:13, whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis', maxWidth:140 }}>{otherName(c)}</div>
-                      <div style={{ fontSize:11, color:'#bbb', flexShrink:0, marginLeft:6 }}>{relTime(c.last_message_at)}</div>
+                      <div style={{ fontFamily:"'Nunito',sans-serif", fontWeight:unread>0?800:600, fontSize:13, whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis', maxWidth:110 }}>{otherName(c)}</div>
+                      <div style={{ fontSize:11, color:'#bbb', flexShrink:0, marginLeft:4 }}>{relTime(c.last_message_at)}</div>
                     </div>
                     <div style={{ fontSize:12, color:'#888', fontWeight:600, whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis', marginBottom:2 }}>📦 {c.listing_title}</div>
                     <div style={{ fontSize:12, color:unread>0?'#333':'#aaa', fontWeight:unread>0?600:400, whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis' }}>{c.last_message || 'Samtale startet'}</div>
                   </div>
+                  <button onClick={e=>archiveConv(c,e)} title={archived?'Fjern fra arkiv':'Arkiver'} style={{ background:'none', border:'none', fontSize:16, cursor:'pointer', padding:'4px', color:'#ccc', flexShrink:0, alignSelf:'center' }}>
+                    {archived ? '📤' : '📥'}
+                  </button>
                 </div>
               );
             })}
@@ -2009,7 +2391,6 @@ function MessagesPage({ setPage, selectedConvId, setSelectedConvId }) {
             </div>
           ) : (
             <>
-              {/* Product reference card — with back button on mobile */}
               <div style={{ padding:'12px 16px', borderBottom:'1.5px solid #f0eeeb', display:'flex', alignItems:'center', gap:12, background:'#fafaf8' }}>
                 {isMobile && (
                   <button onClick={()=>setActive(null)} style={{ background:'none', border:'none', fontSize:22, color:'#555', cursor:'pointer', padding:'4px 6px 4px 0', lineHeight:1, flexShrink:0 }}>←</button>
@@ -2022,7 +2403,7 @@ function MessagesPage({ setPage, selectedConvId, setSelectedConvId }) {
                   <div style={{ fontFamily:"'Nunito',sans-serif", fontWeight:800, fontSize:15, whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis' }}>{active.listing_title}</div>
                   <div style={{ fontSize:12, color:'#888', marginTop:1 }}>med <strong>{otherName(active)}</strong></div>
                 </div>
-                <button onClick={()=>{ const l = { id:active.listing_id }; setPage('listing'); }} style={{ fontSize:12, fontWeight:700, color:PRIMARY, background:'#E8F5EE', border:'none', borderRadius:8, padding:'6px 12px', cursor:'pointer', whiteSpace:'nowrap' }}>Se opslag →</button>
+                <button onClick={()=>setPage('listing')} style={{ fontSize:12, fontWeight:700, color:PRIMARY, background:'#E8F5EE', border:'none', borderRadius:8, padding:'6px 12px', cursor:'pointer', whiteSpace:'nowrap' }}>Se opslag →</button>
               </div>
 
               {/* Messages */}
@@ -2034,6 +2415,7 @@ function MessagesPage({ setPage, selectedConvId, setSelectedConvId }) {
                     <p style={{ fontSize:14 }}>Send den første besked for at starte samtalen</p>
                   </div>
                 ) : (() => {
+                  const isOwnerInConv = active.owner_id === userId;
                   let lastDate = null;
                   return messages.map((m, i) => {
                     const mine = m.sender_id === userId;
@@ -2042,23 +2424,52 @@ function MessagesPage({ setPage, selectedConvId, setSelectedConvId }) {
                     const showDate = dateStr !== lastDate;
                     lastDate = dateStr;
                     const prevMine = i>0 && messages[i-1].sender_id === userId;
-                    const grouped = mine === prevMine && !showDate;
+                    const grouped = mine === prevMine && !showDate && m.message_type !== 'bid' && messages[i-1]?.message_type !== 'bid';
+                    const isBid = m.message_type === 'bid';
                     return (
                       <React.Fragment key={m.id}>
                         {showDate && <div style={{ textAlign:'center', margin:'12px 0 4px', fontSize:11, fontWeight:600, color:'#bbb', letterSpacing:0.5 }}>{dateStr}</div>}
-                        <div style={{ display:'flex', justifyContent:mine?'flex-end':'flex-start', marginTop:grouped?2:10 }}>
-                          {!mine && !grouped && <div style={{ width:30, height:30, borderRadius:'50%', background:'#f0eeeb', display:'flex', alignItems:'center', justifyContent:'center', fontSize:13, fontWeight:700, color:'#888', flexShrink:0, marginRight:8, alignSelf:'flex-end' }}>{m.sender_name.charAt(0).toUpperCase()}</div>}
-                          {!mine && grouped && <div style={{ width:30, marginRight:8, flexShrink:0 }} />}
-                          <div style={{ maxWidth:'68%' }}>
-                            {!mine && !grouped && <div style={{ fontSize:11, fontWeight:700, color:'#aaa', marginBottom:3, marginLeft:2 }}>{m.sender_name}</div>}
-                            <div style={{ background:mine?PRIMARY:'#f0f2f5', color:mine?'#fff':'#1c1a17', borderRadius:mine?'18px 18px 4px 18px':'18px 18px 18px 4px', padding:'10px 14px', fontSize:14, lineHeight:1.5, wordBreak:'break-word', boxShadow:'0 1px 3px rgba(0,0,0,0.07)' }}>
-                              {m.content}
-                            </div>
-                            <div style={{ fontSize:10, color:'#bbb', marginTop:3, textAlign:mine?'right':'left', marginLeft:mine?0:2 }}>
-                              {d.toLocaleTimeString('da-DK',{hour:'2-digit',minute:'2-digit'})}
+                        {isBid ? (
+                          <div style={{ display:'flex', justifyContent:mine?'flex-end':'flex-start', marginTop:10 }}>
+                            {!mine && <div style={{ width:30, height:30, borderRadius:'50%', background:'#f0eeeb', display:'flex', alignItems:'center', justifyContent:'center', fontSize:13, fontWeight:700, color:'#888', flexShrink:0, marginRight:8, alignSelf:'flex-end' }}>{m.sender_name.charAt(0).toUpperCase()}</div>}
+                            <div style={{ maxWidth:'78%' }}>
+                              {!mine && <div style={{ fontSize:11, fontWeight:700, color:'#aaa', marginBottom:3, marginLeft:2 }}>{m.sender_name}</div>}
+                              <div style={{ background:mine?'#e8f0fb':'#f0f2f5', border:`1.5px solid ${mine?ACCENT2:'#e0ddd8'}`, borderRadius:16, padding:'14px 16px' }}>
+                                <div style={{ display:'flex', alignItems:'center', gap:8, marginBottom:8 }}>
+                                  <span style={{ fontSize:20 }}>📊</span>
+                                  <span style={{ fontFamily:"'Nunito',sans-serif", fontWeight:800, fontSize:17, color:ACCENT2 }}>{m.bid_amount} kr.</span>
+                                  <span style={{ fontSize:12, color:'#888', fontWeight:600 }}>bud</span>
+                                </div>
+                                {m.bid_status === 'pending' && isOwnerInConv && !mine && (
+                                  <div style={{ display:'flex', gap:8, flexWrap:'wrap' }}>
+                                    <button onClick={()=>handleAcceptBid(m)} style={{ padding:'7px 14px', borderRadius:10, background:'#e8f5ee', border:`1.5px solid ${PRIMARY}`, color:PRIMARY, fontSize:12, fontWeight:700, cursor:'pointer' }}>✅ Accepter</button>
+                                    <button onClick={()=>{ setRejectingBid(m); setRejectNote(''); }} style={{ padding:'7px 14px', borderRadius:10, background:'#fff0f0', border:'1.5px solid #fca5a5', color:'#e11d48', fontSize:12, fontWeight:700, cursor:'pointer' }}>❌ Afvis</button>
+                                    <button onClick={()=>{ setCounterBidMsg(m); setCounterAmount(''); }} style={{ padding:'7px 14px', borderRadius:10, background:'#fff8e1', border:'1.5px solid #ffe08a', color:'#b45309', fontSize:12, fontWeight:700, cursor:'pointer' }}>🔄 Modbud</button>
+                                  </div>
+                                )}
+                                {m.bid_status === 'pending' && (!isOwnerInConv || mine) && (
+                                  <div style={{ fontSize:12, color:'#888', fontWeight:600 }}>⏳ Afventer svar</div>
+                                )}
+                                {m.bid_status === 'accepted' && <div style={{ fontSize:12, color:PRIMARY, fontWeight:700 }}>✅ Accepteret</div>}
+                                {m.bid_status === 'rejected' && <div style={{ fontSize:12, color:'#e11d48', fontWeight:700 }}>❌ Afvist{m.bid_note ? `: ${m.bid_note}` : ''}</div>}
+                                {m.bid_status === 'countered' && <div style={{ fontSize:12, color:'#b45309', fontWeight:700 }}>🔄 Modbud sendt</div>}
+                              </div>
+                              <div style={{ fontSize:10, color:'#bbb', marginTop:3, textAlign:mine?'right':'left' }}>{d.toLocaleTimeString('da-DK',{hour:'2-digit',minute:'2-digit'})}</div>
                             </div>
                           </div>
-                        </div>
+                        ) : (
+                          <div style={{ display:'flex', justifyContent:mine?'flex-end':'flex-start', marginTop:grouped?2:10 }}>
+                            {!mine && !grouped && <div style={{ width:30, height:30, borderRadius:'50%', background:'#f0eeeb', display:'flex', alignItems:'center', justifyContent:'center', fontSize:13, fontWeight:700, color:'#888', flexShrink:0, marginRight:8, alignSelf:'flex-end' }}>{m.sender_name.charAt(0).toUpperCase()}</div>}
+                            {!mine && grouped && <div style={{ width:30, marginRight:8, flexShrink:0 }} />}
+                            <div style={{ maxWidth:'68%' }}>
+                              {!mine && !grouped && <div style={{ fontSize:11, fontWeight:700, color:'#aaa', marginBottom:3, marginLeft:2 }}>{m.sender_name}</div>}
+                              <div style={{ background:mine?PRIMARY:'#f0f2f5', color:mine?'#fff':'#1c1a17', borderRadius:mine?'18px 18px 4px 18px':'18px 18px 18px 4px', padding:'10px 14px', fontSize:14, lineHeight:1.5, wordBreak:'break-word', boxShadow:'0 1px 3px rgba(0,0,0,0.07)' }}>
+                                {m.content}
+                              </div>
+                              <div style={{ fontSize:10, color:'#bbb', marginTop:3, textAlign:mine?'right':'left', marginLeft:mine?0:2 }}>{d.toLocaleTimeString('da-DK',{hour:'2-digit',minute:'2-digit'})}</div>
+                            </div>
+                          </div>
+                        )}
                       </React.Fragment>
                     );
                   });
@@ -2066,25 +2477,44 @@ function MessagesPage({ setPage, selectedConvId, setSelectedConvId }) {
                 <div ref={bottomRef} />
               </div>
 
+              {/* Reject dialog overlay */}
+              {rejectingBid && (
+                <div style={{ borderTop:'2px solid #fecaca', background:'#fff5f5', padding:'14px 16px' }}>
+                  <div style={{ fontSize:13, fontWeight:700, color:'#b91c1c', marginBottom:8 }}>❌ Afvis bud på {rejectingBid.bid_amount} kr.</div>
+                  <textarea value={rejectNote} onChange={e=>setRejectNote(e.target.value)} placeholder="Evt. kommentar (valgfri)" rows={2} style={{ width:'100%', padding:'9px 12px', borderRadius:10, border:'1.5px solid #fca5a5', fontSize:13, resize:'none', fontFamily:"'Nunito Sans',sans-serif", outline:'none', marginBottom:8 }} />
+                  <div style={{ display:'flex', gap:8 }}>
+                    <button onClick={()=>setRejectingBid(null)} style={{ flex:1, padding:'8px', borderRadius:10, background:'#f5f4f2', border:'none', fontWeight:700, fontSize:13, cursor:'pointer' }}>Annuller</button>
+                    <button onClick={handleRejectBid} style={{ flex:1, padding:'8px', borderRadius:10, background:'#e11d48', border:'none', color:'#fff', fontWeight:700, fontSize:13, cursor:'pointer' }}>Bekræft afvisning</button>
+                  </div>
+                </div>
+              )}
+
+              {/* Counter bid dialog */}
+              {counterBidMsg && (
+                <div style={{ borderTop:'2px solid #ffe08a', background:'#fffbef', padding:'14px 16px' }}>
+                  <div style={{ fontSize:13, fontWeight:700, color:'#7a5c00', marginBottom:8 }}>🔄 Send modbud (originalt bud: {counterBidMsg.bid_amount} kr.)</div>
+                  <div style={{ display:'flex', gap:8 }}>
+                    <input type="number" value={counterAmount} onChange={e=>setCounterAmount(e.target.value)} placeholder="Dit modbud (kr.)" style={{ flex:1, padding:'9px 12px', borderRadius:10, border:'1.5px solid #ffe08a', fontSize:14, fontWeight:700, outline:'none' }} />
+                    <button onClick={()=>setCounterBidMsg(null)} style={{ padding:'8px 14px', borderRadius:10, background:'#f5f4f2', border:'none', fontWeight:700, fontSize:13, cursor:'pointer' }}>✕</button>
+                    <button onClick={handleCounterBid} disabled={!counterAmount} style={{ padding:'8px 16px', borderRadius:10, background:counterAmount?ACCENT:'#e5e5e5', border:'none', color:'#fff', fontWeight:700, fontSize:13, cursor:counterAmount?'pointer':'default' }}>Send</button>
+                  </div>
+                </div>
+              )}
+
               {/* Input */}
               <div style={{ borderTop:'1.5px solid #f0eeeb', background:'#fff', position:'relative' }}>
                 {emojiOpen && (
                   <div style={{ position:'absolute', bottom:'100%', left:0, right:0, background:'#fff', borderTop:'1.5px solid #f0eeeb', padding:'10px 12px', display:'flex', flexWrap:'wrap', gap:4 }}>
                     {EMOJI_LIST.map(em => (
-                      <button key={em} onClick={()=>{ setNewMsg(m=>m+em); setEmojiOpen(false); inputRef.current?.focus(); }}
+                      <button key={em} onClick={()=>{ setNewMsg(msg=>msg+em); setEmojiOpen(false); inputRef.current?.focus(); }}
                         style={{ background:'none', border:'none', fontSize:22, cursor:'pointer', padding:'4px', borderRadius:8, lineHeight:1 }}>{em}</button>
                     ))}
                   </div>
                 )}
                 <div style={{ padding:'12px 16px', display:'flex', gap:8, alignItems:'flex-end' }}>
                   <button onClick={()=>setEmojiOpen(v=>!v)} style={{ background:'none', border:'none', fontSize:22, cursor:'pointer', padding:'8px', borderRadius:10, flexShrink:0, color:'#aaa', lineHeight:1, height:44, display:'flex', alignItems:'center' }}>😊</button>
-                  <textarea
-                    ref={inputRef}
-                    value={newMsg}
-                    onChange={e=>setNewMsg(e.target.value)}
-                    onKeyDown={onKey}
-                    placeholder="Skriv en besked… (Enter for at sende)"
-                    rows={1}
+                  <textarea ref={inputRef} value={newMsg} onChange={e=>setNewMsg(e.target.value)} onKeyDown={onKey}
+                    placeholder="Skriv en besked… (Enter for at sende)" rows={1}
                     style={{ flex:1, padding:'11px 14px', borderRadius:14, border:'1.5px solid #e5e5e5', fontSize:14, resize:'none', fontFamily:"'Nunito Sans',sans-serif", outline:'none', lineHeight:1.5, maxHeight:120, overflowY:'auto' }}
                     onInput={e=>{ e.target.style.height='auto'; e.target.style.height=Math.min(e.target.scrollHeight,120)+'px'; }}
                   />
@@ -2378,7 +2808,10 @@ function App() {
 
   async function loadInstitution(email) {
     const { data } = await db.from('institutions').select('*').eq('email', email).maybeSingle();
-    if (data) setInstitution(data);
+    if (data) { setInstitution(data); return; }
+    // Check if member of an institution
+    const { data: mem } = await db.from('institution_members').select('role,institutions(*)').eq('email', email).maybeSingle();
+    if (mem?.institutions) setInstitution({ ...mem.institutions, _memberRole: mem.role });
   }
 
   async function fetchUnread(userId) {
@@ -2463,7 +2896,7 @@ function App() {
 
       {page==='home'      && <HomePage setPage={navigate} setActiveListing={setActiveListing} listings={listings} loading={loading} favs={favs} toggleFav={toggleFav} />}
       {page==='opslag'    && <OpslagPage listings={listings} loading={loading} setPage={navigate} setActiveListing={setActiveListing} favs={favs} toggleFav={toggleFav} />}
-      {page==='listing'   && activeListing && <ListingDetailPage listing={activeListing} setPage={navigate} showToast={showToast} onStartConv={startConversation} favs={favs} toggleFav={toggleFav} />}
+      {page==='listing'   && activeListing && <ListingDetailPage listing={activeListing} setPage={navigate} showToast={showToast} onStartConv={startConversation} favs={favs} toggleFav={toggleFav} setSelectedConvId={setSelectedConvId} />}
       {page==='login'     && <LoginPage setPage={navigate} setLoggedIn={setLoggedIn} />}
       {page==='signup'    && <SignupPage setPage={navigate} setLoggedIn={setLoggedIn} showToast={showToast} />}
       {page==='dashboard' && <DashboardPage setPage={navigate} showToast={showToast} allListings={listings} onListingCreated={fetchListings} institution={institution} onInstitutionChange={setInstitution} favs={favs} toggleFav={toggleFav} setActiveListing={setActiveListing} unreadTotal={unreadTotal} />}
