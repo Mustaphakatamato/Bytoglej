@@ -801,15 +801,39 @@ function ListingDetailPage({ listing, setPage, showToast, onStartConv, favs, tog
   const [bidCount,  setBidCount]  = useState(listing.bid_count||0);
   const [saving,    setSaving]    = useState(false);
   const [currentUserId, setCurrentUserId] = useState(null);
+  const [currentUserEmail, setCurrentUserEmail] = useState(null);
   const [ownListings, setOwnListings] = useState([]);
   const [isFav, setIsFav] = useState(favs?.includes(listing.id) || false);
+  const [shareModal, setShareModal] = useState(false);
+  const [teamMembers, setTeamMembers] = useState([]);
+  const [selectedEmails, setSelectedEmails] = useState([]);
+  const [shareNote, setShareNote] = useState('');
+  const [shareSending, setShareSending] = useState(false);
+  const [myInstName, setMyInstName] = useState(null);
 
   useEffect(() => {
-    db.auth.getUser().then(({ data:{ user } }) => {
+    db.auth.getUser().then(async ({ data:{ user } }) => {
       if (!user) return;
       setCurrentUserId(user.id);
+      setCurrentUserEmail(user.email);
       db.from('listings').select('id,title,emoji,color,images').eq('user_id', user.id).eq('is_active', true).neq('id', listing.id)
         .then(({ data }) => { if (data) setOwnListings(data); });
+      // Load institution members for sharing
+      const { data: inst } = await db.from('institutions').select('id,name,email').eq('email', user.email).maybeSingle();
+      if (inst) {
+        setMyInstName(inst.name);
+        const { data: mems } = await db.from('institution_members').select('*').eq('institution_id', inst.id);
+        if (mems?.length) setTeamMembers(mems);
+      } else {
+        const { data: mem } = await db.from('institution_members').select('role,institutions(id,name,email)').eq('email', user.email).maybeSingle();
+        if (mem?.institutions) {
+          setMyInstName(mem.institutions.name);
+          const { data: mems } = await db.from('institution_members').select('*').eq('institution_id', mem.institutions.id);
+          // Also include admin as recipient
+          const adminEntry = { id: 'admin', email: mem.institutions.email, role: 'admin' };
+          setTeamMembers([adminEntry, ...(mems||[])]);
+        }
+      }
     });
   }, []);
 
@@ -819,6 +843,31 @@ function ListingDetailPage({ listing, setPage, showToast, onStartConv, favs, tog
   function handleToggleFav() {
     toggleFav?.(listing.id);
     setIsFav(v => !v);
+  }
+
+  async function handleShare() {
+    if (!selectedEmails.length || !currentUserId) return;
+    setShareSending(true);
+    await Promise.all(selectedEmails.map(email =>
+      db.from('listing_shares').insert({
+        listing_id: listing.id,
+        listing_title: listing.title,
+        listing_image: listing.images?.[0] || null,
+        listing_type: listing.type,
+        listing_price: listing.price || null,
+        listing_emoji: listing.emoji,
+        listing_color: listing.color,
+        listing_institution_name: listing.institution_name,
+        listing_city: listing.city,
+        from_user_id: currentUserId,
+        from_name: myInstName || 'Ukendt',
+        to_email: email,
+        note: shareNote.trim() || null,
+      })
+    ));
+    setShareSending(false);
+    setShareModal(false); setSelectedEmails([]); setShareNote('');
+    showToast(`Opslag delt med ${selectedEmails.length} medarbejder${selectedEmails.length > 1 ? 'e' : ''}! 📤`);
   }
 
   const isOwn = currentUserId && listing.user_id && currentUserId === listing.user_id;
@@ -940,6 +989,11 @@ function ListingDetailPage({ listing, setPage, showToast, onStartConv, favs, tog
                 <button onClick={handleToggleFav} style={{ width:'100%', padding:'13px', borderRadius:22, border:`1.5px solid ${isFav?'#fca5a5':'#e5e5e5'}`, background:isFav?'#fff0f3':'#fff', color:isFav?'#e11d48':'#555', fontSize:14, fontWeight:700, cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center', gap:6, transition:'all 0.2s' }}>
                   {isFav ? '❤️ Gemt' : '🤍 Gem opslag'}
                 </button>
+                {currentUserId && teamMembers.filter(m => m.email !== currentUserEmail).length > 0 && (
+                  <button onClick={()=>setShareModal(true)} style={{ width:'100%', padding:'13px', borderRadius:22, border:'1.5px solid #e5e5e5', background:'#fff', color:'#555', fontSize:14, fontWeight:700, cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center', gap:6 }}>
+                    📤 Del med medarbejder
+                  </button>
+                )}
               </div>
               <div style={{ borderTop:'1px solid #f0f0f0', marginTop:20, paddingTop:16, display:'flex', flexDirection:'column', gap:10 }}>
                 {[['🏢','Institution',listing.institution_name],['📍','By',listing.city],['👶','Aldersgruppe',listing.age_group],['⭐','Stand',listing.condition]].map(([icon,label,val],i) => (
@@ -1025,6 +1079,51 @@ function ListingDetailPage({ listing, setPage, showToast, onStartConv, favs, tog
           </div>
           <Btn variant="primary" color={ACCENT} radius={22} onClick={handleSwap} disabled={saving||(!selectedSwapId&&!swapOffer.trim())} style={{ justifyContent:'center', padding:'14px', fontSize:15 }}>{saving?<><Spinner/>Sender…</>:'Send bytteforslag'}</Btn>
           <Btn variant="ghost" onClick={()=>{ setSwapModal(false); setSelectedSwapId(null); setSwapOffer(''); }} style={{ justifyContent:'center' }}>Annuller</Btn>
+        </div>
+      </Modal>
+
+      <Modal open={shareModal} onClose={()=>{ setShareModal(false); setSelectedEmails([]); setShareNote(''); }} title="Del med medarbejder">
+        <div style={{ display:'flex', flexDirection:'column', gap:14 }}>
+          <div style={{ background:'#f8f7f5', borderRadius:12, padding:14, display:'flex', gap:12, alignItems:'center' }}>
+            <div style={{ width:44, height:44, borderRadius:10, background:listing.images?.[0]?'#e8e6e3':listing.color||'#FFD166', display:'flex', alignItems:'center', justifyContent:'center', fontSize:24, flexShrink:0, overflow:'hidden' }}>
+              {listing.images?.[0] ? <img src={listing.images[0]} style={{ width:'100%', height:'100%', objectFit:'cover' }} alt="" /> : listing.emoji||'🧸'}
+            </div>
+            <div>
+              <div style={{ fontWeight:700, fontSize:14 }}>{listing.title}</div>
+              <div style={{ fontSize:12, color:'#888', marginTop:2 }}>{listing.institution_name} · {listing.city}</div>
+            </div>
+          </div>
+          <div>
+            <label style={{ display:'block', fontSize:12, fontWeight:700, marginBottom:8, color:'#555' }}>Vælg medarbejdere</label>
+            <div style={{ display:'flex', flexDirection:'column', gap:6, maxHeight:200, overflowY:'auto' }}>
+              {teamMembers.filter(m => m.email !== currentUserEmail).map(m => {
+                const sel = selectedEmails.includes(m.email);
+                return (
+                  <div key={m.id} onClick={()=>setSelectedEmails(es => sel ? es.filter(e=>e!==m.email) : [...es, m.email])}
+                    style={{ display:'flex', alignItems:'center', gap:12, padding:'10px 14px', borderRadius:12, border:`2px solid ${sel?PRIMARY:'#e5e5e5'}`, background:sel?'#e8f5ee':'#fff', cursor:'pointer', transition:'all 0.15s' }}>
+                    <div style={{ width:34, height:34, borderRadius:'50%', background:'#e8f0fb', display:'flex', alignItems:'center', justifyContent:'center', fontSize:14, fontWeight:800, color:ACCENT2, flexShrink:0 }}>
+                      {m.email.charAt(0).toUpperCase()}
+                    </div>
+                    <div style={{ flex:1, minWidth:0 }}>
+                      <div style={{ fontSize:13, fontWeight:600, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{m.email}</div>
+                      {m.role === 'admin' && <div style={{ fontSize:11, color:'#aaa' }}>Admin</div>}
+                    </div>
+                    {sel && <span style={{ color:PRIMARY, fontSize:18, flexShrink:0 }}>✓</span>}
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+          <div>
+            <label style={{ display:'block', fontSize:12, fontWeight:700, marginBottom:6, color:'#555' }}>Tilføj besked <span style={{ fontWeight:400, color:'#aaa' }}>(valgfri)</span></label>
+            <textarea value={shareNote} onChange={e=>setShareNote(e.target.value)} placeholder="Fx: Hvad synes I om dette?" rows={2} style={{ width:'100%', padding:'10px 12px', borderRadius:10, border:'1.5px solid #e5e5e5', fontSize:14, resize:'none', fontFamily:"'Nunito Sans',sans-serif", outline:'none' }} />
+          </div>
+          <div style={{ display:'flex', gap:10 }}>
+            <button onClick={()=>{ setShareModal(false); setSelectedEmails([]); setShareNote(''); }} style={{ flex:1, padding:'12px', borderRadius:12, background:'#f5f4f2', border:'none', fontWeight:700, cursor:'pointer', fontFamily:"'Nunito',sans-serif" }}>Annuller</button>
+            <Btn variant="primary" color={PRIMARY} radius={22} onClick={handleShare} disabled={shareSending||!selectedEmails.length} style={{ flex:2, justifyContent:'center', padding:'12px', fontSize:14 }}>
+              {shareSending ? <><Spinner/>Sender…</> : `📤 Del${selectedEmails.length ? ` med ${selectedEmails.length}` : ''}`}
+            </Btn>
+          </div>
         </div>
       </Modal>
     </div>
@@ -2155,8 +2254,9 @@ function relTime(ts) {
 }
 
 // ─── MESSAGES PAGE ────────────────────────────────────────────────────────────
-function MessagesPage({ setPage, selectedConvId, setSelectedConvId }) {
+function MessagesPage({ setPage, selectedConvId, setSelectedConvId, setActiveListing }) {
   const [userId,      setUserId]      = useState(null);
+  const [userEmail,   setUserEmail]   = useState(null);
   const [convs,       setConvs]       = useState([]);
   const [active,      setActive]      = useState(null);
   const [messages,    setMessages]    = useState([]);
@@ -2171,6 +2271,8 @@ function MessagesPage({ setPage, selectedConvId, setSelectedConvId }) {
   const [rejectNote,  setRejectNote]  = useState('');
   const [counterBidMsg,setCounterBidMsg] = useState(null);
   const [counterAmount,setCounterAmount] = useState('');
+  const [shares,      setShares]      = useState([]);
+  const [activeShare, setActiveShare] = useState(null);
   const ww = useWindowWidth();
   const isMobile = ww < 768;
   const EMOJI_LIST = ['😊','😄','😂','🥰','😍','👍','👏','🙌','❤️','🎉','✅','🤔','😅','🙏','🚀','💪','🌟','😮','🤝','📦','♻️','👶','🏫','🧸','🎠','⚽'];
@@ -2181,9 +2283,27 @@ function MessagesPage({ setPage, selectedConvId, setSelectedConvId }) {
     db.auth.getUser().then(({ data: { user } }) => {
       if (!user) { setLoading(false); return; }
       setUserId(user.id);
+      setUserEmail(user.email);
       loadConvs(user.id);
+      loadShares(user.email);
     });
   }, []);
+
+  async function loadShares(email) {
+    const { data } = await db.from('listing_shares').select('*').eq('to_email', email).order('created_at', { ascending: false });
+    if (data) setShares(data);
+  }
+
+  async function markShareRead(share) {
+    if (share.read) return;
+    await db.from('listing_shares').update({ read: true }).eq('id', share.id);
+    setShares(ss => ss.map(s => s.id === share.id ? { ...s, read: true } : s));
+  }
+
+  async function openSharedListing(share) {
+    const { data } = await db.from('listings').select('*').eq('id', share.listing_id).maybeSingle();
+    if (data && setActiveListing) { setActiveListing(data); setPage('listing'); }
+  }
 
   useEffect(() => {
     if (!selectedConvId || !convs.length) return;
@@ -2196,6 +2316,15 @@ function MessagesPage({ setPage, selectedConvId, setSelectedConvId }) {
     const ch = db.channel('convs-rt').on('postgres_changes', { event:'*', schema:'public', table:'conversations' }, () => loadConvs(userId)).subscribe();
     return () => db.removeChannel(ch);
   }, [userId]);
+
+  useEffect(() => {
+    if (!userEmail) return;
+    const ch = db.channel('shares-rt')
+      .on('postgres_changes', { event:'INSERT', schema:'public', table:'listing_shares', filter:`to_email=eq.${userEmail}` },
+        ({ new: s }) => setShares(prev => [s, ...prev]))
+      .subscribe();
+    return () => db.removeChannel(ch);
+  }, [userEmail]);
 
   async function loadConvs(uid) {
     setLoading(true);
@@ -2322,8 +2451,9 @@ function MessagesPage({ setPage, selectedConvId, setSelectedConvId }) {
     </div>
   );
 
-  const showList = !isMobile || !active;
-  const showChat = !isMobile || !!active;
+  const unreadShares = shares.filter(s => !s.read).length;
+  const showList = !isMobile || (!active && !activeShare);
+  const showChat = !isMobile || !!active || !!activeShare;
 
   return (
     <div style={{ height:'100vh', display:'flex', flexDirection:'column', paddingTop:68, background:'#f8f5f0' }} className="page-enter">
@@ -2346,6 +2476,31 @@ function MessagesPage({ setPage, selectedConvId, setSelectedConvId }) {
             </div>
           </div>
           <div style={{ flex:1, overflowY:'auto' }}>
+            {/* Delte opslag section */}
+            {shares.length > 0 && (
+              <div style={{ borderBottom:'2px solid #f0eeeb' }}>
+                <div style={{ padding:'10px 16px 6px', display:'flex', alignItems:'center', gap:8 }}>
+                  <span style={{ fontSize:11, fontWeight:700, color:'#aaa', textTransform:'uppercase', letterSpacing:0.5 }}>Delte opslag</span>
+                  {unreadShares > 0 && <span style={{ background:'#EF476F', color:'#fff', borderRadius:99, padding:'1px 7px', fontSize:10, fontWeight:800 }}>{unreadShares}</span>}
+                </div>
+                {shares.slice(0,5).map(s => {
+                  const isAct = activeShare?.id === s.id;
+                  return (
+                    <div key={s.id} onClick={()=>{ setActiveShare(s); setActive(null); markShareRead(s); }}
+                      style={{ display:'flex', gap:10, padding:'10px 16px', cursor:'pointer', background:isAct?'#f0faf5':'#fff', borderLeft:isAct?`3px solid ${PRIMARY}`:'3px solid transparent', opacity:s.read&&!isAct?0.65:1, transition:'all 0.15s' }}>
+                      <div style={{ width:40, height:40, borderRadius:10, background:s.listing_image?'#e8e6e3':s.listing_color||'#FFD166', display:'flex', alignItems:'center', justifyContent:'center', fontSize:20, flexShrink:0, overflow:'hidden' }}>
+                        {s.listing_image ? <img src={s.listing_image} style={{ width:'100%', height:'100%', objectFit:'cover' }} alt="" /> : s.listing_emoji||'🧸'}
+                      </div>
+                      <div style={{ flex:1, minWidth:0 }}>
+                        <div style={{ fontFamily:"'Nunito',sans-serif", fontWeight:s.read?600:800, fontSize:13, whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis' }}>{s.listing_title}</div>
+                        <div style={{ fontSize:11, color:'#aaa', marginTop:2 }}>📤 Fra {s.from_name} · {relTime(s.created_at)}</div>
+                      </div>
+                      {!s.read && <div style={{ width:8, height:8, borderRadius:'50%', background:'#EF476F', flexShrink:0, alignSelf:'center' }} />}
+                    </div>
+                  );
+                })}
+              </div>
+            )}
             {loading ? <div style={{ padding:24, textAlign:'center', color:'#bbb', fontSize:13 }}>Indlæser…</div>
             : filtered.length === 0 ? (
               <div style={{ padding:40, textAlign:'center', color:'#bbb' }}>
@@ -2383,12 +2538,48 @@ function MessagesPage({ setPage, selectedConvId, setSelectedConvId }) {
 
         {/* ── Chat window ── */}
         {showChat && <div style={{ flex:1, display:'flex', flexDirection:'column', background:'#fff', borderRadius:isMobile?0:'18px 18px 0 0', boxShadow:'0 2px 16px rgba(0,0,0,0.07)', overflow:'hidden' }}>
-          {!active ? (
+          {!active && !activeShare ? (
             <div style={{ flex:1, display:'flex', alignItems:'center', justifyContent:'center', flexDirection:'column', color:'#ccc' }}>
               <div style={{ fontSize:56, marginBottom:16 }}>💬</div>
               <div style={{ fontFamily:"'Nunito',sans-serif", fontWeight:700, fontSize:18, color:'#bbb' }}>Vælg en samtale</div>
               <div style={{ fontSize:13, marginTop:6, color:'#ddd' }}>eller start en ny fra et opslag</div>
             </div>
+          ) : activeShare && !active ? (
+            <>
+              <div style={{ padding:'12px 16px', borderBottom:'1.5px solid #f0eeeb', display:'flex', alignItems:'center', gap:12, background:'#fafaf8' }}>
+                {isMobile && <button onClick={()=>setActiveShare(null)} style={{ background:'none', border:'none', fontSize:22, color:'#555', cursor:'pointer', padding:'4px 6px 4px 0', lineHeight:1, flexShrink:0 }}>←</button>}
+                <div style={{ fontSize:22 }}>📤</div>
+                <div style={{ flex:1 }}>
+                  <div style={{ fontFamily:"'Nunito',sans-serif", fontWeight:800, fontSize:15 }}>Delt opslag</div>
+                  <div style={{ fontSize:12, color:'#888' }}>Fra {activeShare.from_name}</div>
+                </div>
+              </div>
+              <div style={{ flex:1, overflowY:'auto', padding:'24px 20px', display:'flex', flexDirection:'column', alignItems:'center', gap:14 }}>
+                <div style={{ width:'100%', maxWidth:380 }}>
+                  <div style={{ background:'#fff', borderRadius:20, overflow:'hidden', boxShadow:'0 4px 20px rgba(0,0,0,0.10)' }}>
+                    <div style={{ height:200, background:activeShare.listing_image?'#e8e6e3':activeShare.listing_color||'#FFD166', display:'flex', alignItems:'center', justifyContent:'center', fontSize:80, overflow:'hidden' }}>
+                      {activeShare.listing_image ? <img src={activeShare.listing_image} style={{ width:'100%', height:'100%', objectFit:'cover' }} alt="" /> : activeShare.listing_emoji||'🧸'}
+                    </div>
+                    <div style={{ padding:'16px 20px 20px' }}>
+                      <div style={{ marginBottom:10 }}><Badge type={activeShare.listing_type} /></div>
+                      <div style={{ fontFamily:"'Nunito',sans-serif", fontWeight:900, fontSize:20, marginBottom:4 }}>{activeShare.listing_title}</div>
+                      <div style={{ fontSize:13, color:'#888', marginBottom:8 }}>{activeShare.listing_institution_name}{activeShare.listing_city ? ` · ${activeShare.listing_city}` : ''}</div>
+                      {activeShare.listing_price && <div style={{ fontFamily:"'Nunito',sans-serif", fontWeight:900, fontSize:26, color:PRIMARY }}>{activeShare.listing_price} kr.</div>}
+                    </div>
+                  </div>
+                  {activeShare.note && (
+                    <div style={{ background:'#f0faf5', border:`1.5px solid #c6e8d4`, borderRadius:14, padding:'12px 16px', marginTop:12 }}>
+                      <div style={{ fontSize:12, color:PRIMARY, fontWeight:700, marginBottom:4 }}>💬 Besked fra {activeShare.from_name}</div>
+                      <div style={{ fontSize:14, color:'#333', lineHeight:1.55 }}>{activeShare.note}</div>
+                    </div>
+                  )}
+                  <div style={{ fontSize:11, color:'#bbb', textAlign:'center', marginTop:10 }}>Delt {relTime(activeShare.created_at)}</div>
+                  <Btn variant="primary" color={PRIMARY} radius={22} onClick={()=>openSharedListing(activeShare)} style={{ justifyContent:'center', width:'100%', marginTop:14, padding:'13px', fontSize:15 }}>
+                    Se opslag →
+                  </Btn>
+                </div>
+              </div>
+            </>
           ) : (
             <>
               <div style={{ padding:'12px 16px', borderBottom:'1.5px solid #f0eeeb', display:'flex', alignItems:'center', gap:12, background:'#fafaf8' }}>
@@ -2903,7 +3094,7 @@ function App() {
       {page==='hvordan'   && <HowItWorksPage setPage={navigate} />}
       {page==='om-os'     && <OmOsPage setPage={navigate} />}
       {page==='kontakt'   && <KontaktPage />}
-      {page==='beskeder'  && <MessagesPage setPage={navigate} selectedConvId={selectedConvId} setSelectedConvId={setSelectedConvId} />}
+      {page==='beskeder'  && <MessagesPage setPage={navigate} selectedConvId={selectedConvId} setSelectedConvId={setSelectedConvId} setActiveListing={setActiveListing} />}
 
       {toast && <Toast msg={toast.msg} type={toast.type} onDone={()=>setToast(null)} />}
     </div>
