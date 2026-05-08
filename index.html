@@ -1142,8 +1142,36 @@ function ListingDetailPage({ listing, setPage, showToast, onStartConv, favs, tog
     const chosen = ownListings.find(l => l.id === selectedSwapId);
     if (!chosen && !swapOffer.trim()) return;
     setSaving(true);
-    const offerText = chosen ? `Bytteforslag: ${chosen.title}` : `Bytteforslag: ${swapOffer}`;
-    await db.from('messages').insert({ listing_id:listing.id, sender_name:'Anonym Institution', message:offerText });
+    const offerText = chosen ? `Bytteforslag: "${chosen.title}"` : `Bytteforslag: ${swapOffer}`;
+    try {
+      const { data:{ user } } = await db.auth.getUser();
+      if (user) {
+        const { data: inst } = await db.from('institutions').select('name').eq('email', user.email).maybeSingle();
+        const userName = inst?.name || user.email;
+        const { data: existing } = await db.from('conversations')
+          .select('id,owner_unread').eq('listing_id', listing.id).eq('initiator_id', user.id).maybeSingle();
+        let convId = existing?.id;
+        if (!convId) {
+          const { data: conv } = await db.from('conversations').insert({
+            listing_id: listing.id, listing_title: listing.title,
+            listing_emoji: listing.emoji, listing_color: listing.color,
+            listing_image: listing.images?.[0] || null,
+            initiator_id: user.id, initiator_name: userName,
+            owner_id: listing.user_id, owner_name: listing.institution_name,
+          }).select().single();
+          convId = conv?.id;
+        }
+        if (convId) {
+          await db.from('chat_messages').insert({ conversation_id: convId, sender_id: user.id, sender_name: userName, content: offerText });
+          await db.from('conversations').update({ last_message: offerText, last_message_at: new Date().toISOString(), owner_unread: (existing?.owner_unread||0)+1 }).eq('id', convId);
+          setSaving(false); setSwapModal(false); setSelectedSwapId(null); setSwapOffer('');
+          showToast('Bytteforslag sendt!');
+          if (setSelectedConvId) setSelectedConvId(convId);
+          setPage('beskeder');
+          return;
+        }
+      }
+    } catch {}
     setSaving(false); setSwapModal(false); setSelectedSwapId(null); setSwapOffer('');
     showToast('Bytteforslag sendt!');
   }
@@ -2924,7 +2952,10 @@ function MessagesPage({ setPage, selectedConvId, setSelectedConvId, setActiveLis
                       <div style={{ fontFamily:"'Nunito',sans-serif", fontWeight:unread>0?800:600, fontSize:13, whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis', maxWidth:110 }}>{otherName(c)}</div>
                       <div style={{ fontSize:11, color:'#bbb', flexShrink:0, marginLeft:4 }}>{relTime(c.last_message_at)}</div>
                     </div>
-                    <div style={{ fontSize:12, color:'#888', fontWeight:600, whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis', marginBottom:2 }}>📦 {c.listing_title}</div>
+                    <div style={{ fontSize:12, color:'#888', fontWeight:600, whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis', marginBottom:2 }}>
+                      📦 {c.listing_title}
+                      {c.initiator_id === userId && <span style={{ marginLeft:6, background:'#f0f9f4', color:'#2d6a4f', borderRadius:99, padding:'1px 6px', fontSize:10, fontWeight:700 }}>Sendt</span>}
+                    </div>
                     <div style={{ fontSize:12, color:unread>0?'#333':'#aaa', fontWeight:unread>0?600:400, whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis' }}>{c.last_message || 'Samtale startet'}</div>
                   </div>
                   <button onClick={e=>archiveConv(c,e)} title={archived?'Fjern fra arkiv':'Arkiver'} style={{ background:'none', border:'none', fontSize:16, cursor:'pointer', padding:'4px', color:'#ccc', flexShrink:0, alignSelf:'center' }}>
