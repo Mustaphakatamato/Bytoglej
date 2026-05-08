@@ -2277,7 +2277,8 @@ function DashboardPage({ setPage, showToast, allListings, onListingCreated, inst
           <div style={{ display:'flex', flexDirection:'column', gap:16 }}>
             <div>
               <label style={{ display:'block', fontSize:13, fontWeight:700, marginBottom:6 }}>Beskrivelse</label>
-              <textarea value={form.description} onChange={e=>setForm({...form,description:e.target.value})} placeholder="Beskriv legetøjets stand, hvad der medfølger, mål osv." rows={3} style={{ width:'100%', padding:'11px 14px', borderRadius:10, border:'1.5px solid #e5e5e5', fontSize:14, resize:'none', fontFamily:"'Nunito Sans',sans-serif", outline:'none' }} />
+              <textarea value={form.description} onChange={e=>setForm({...form,description:e.target.value})} placeholder="Beskriv legetøjets stand, hvad der medfølger, mål osv." rows={3} style={{ width:'100%', padding:'11px 14px', borderRadius:10, border:`1.5px solid ${!form.description.trim()?'#fca5a5':'#e5e5e5'}`, fontSize:14, resize:'none', fontFamily:"'Nunito Sans',sans-serif", outline:'none' }} />
+              {!form.description.trim() && <p style={{ fontSize:12, color:'#e53e3e', marginTop:4 }}>Beskrivelse er påkrævet</p>}
               {aiSuggestion && !form.description && (
                 <div style={{ marginTop:8, background:'#f0faf5', border:'1.5px solid #a8d5be', borderRadius:10, padding:'10px 14px', display:'flex', gap:10, alignItems:'flex-start' }}>
                   <span style={{ fontSize:18, flexShrink:0 }}>🤖</span>
@@ -2383,12 +2384,25 @@ function DashboardPage({ setPage, showToast, allListings, onListingCreated, inst
               )}
             </div>
 
-            <div style={{ display:'flex', gap:10 }}>
-              <button onClick={()=>setStep(1)} style={{ flex:1, padding:'13px', borderRadius:12, background:'#f5f4f2', border:'none', fontWeight:700, fontFamily:"'Nunito',sans-serif" }}>← Tilbage</button>
-              <Btn variant="primary" color={PRIMARY} radius={22} onClick={handleCreate} disabled={saving} style={{ flex:2, justifyContent:'center', padding:'13px', fontSize:14 }}>
-                {saving ? <><Spinner/>{imgFiles.length>0?'Uploader…':'Publicerer…'}</> : '✓ Publicer opslag'}
-              </Btn>
-            </div>
+            {(() => {
+              const missingDesc = !form.description.trim();
+              const missingImg  = imgFiles.length === 0;
+              const missing = [missingDesc && 'beskrivelse', missingImg && 'mindst ét billede'].filter(Boolean);
+              return (<>
+                {missing.length > 0 && (
+                  <div style={{ background:'#fff7ed', border:'1.5px solid #fed7aa', borderRadius:10, padding:'10px 14px', fontSize:13, color:'#92400e', display:'flex', gap:8, alignItems:'center' }}>
+                    <span>⚠️</span>
+                    <span>Mangler: <strong>{missing.join(' og ')}</strong></span>
+                  </div>
+                )}
+                <div style={{ display:'flex', gap:10 }}>
+                  <button onClick={()=>setStep(1)} style={{ flex:1, padding:'13px', borderRadius:12, background:'#f5f4f2', border:'none', fontWeight:700, fontFamily:"'Nunito',sans-serif" }}>← Tilbage</button>
+                  <Btn variant="primary" color={PRIMARY} radius={22} onClick={handleCreate} disabled={saving || missingDesc || missingImg} style={{ flex:2, justifyContent:'center', padding:'13px', fontSize:14 }}>
+                    {saving ? <><Spinner/>{imgFiles.length>0?'Uploader…':'Publicerer…'}</> : '✓ Publicer opslag'}
+                  </Btn>
+                </div>
+              </>);
+            })()}
           </div>
         )}
       </Modal>
