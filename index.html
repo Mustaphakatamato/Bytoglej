@@ -1285,9 +1285,9 @@ function SignupPage({ setPage, setLoggedIn, showToast }) {
       const data = await res.json();
       if (!data || data.error) throw new Error('ikke fundet');
       setCvrStatus('ok');
-      const cd = { name:data.name, address:data.address||'', zipcode:data.zipcode||'', city:data.city||'', type:data.company_type||'Institution' };
+      const cd = { name:data.name, address:data.address||'', zipcode:data.zipcode||'', city:data.city||'', type:data.company_type||'Institution', phone:data.phone||'', website:data.website||'' };
       setCvrData(cd);
-      setForm(f=>({...f, address:cd.address, zipcode:cd.zipcode, city:cd.city}));
+      setForm(f=>({...f, address:cd.address, zipcode:cd.zipcode, city:cd.city, inst_phone:cd.phone, website:cd.website}));
     } catch { setCvrStatus('err'); }
   }
 
@@ -1397,6 +1397,8 @@ function SignupPage({ setPage, setLoggedIn, showToast }) {
                         <div style={{fontFamily:"'Nunito',sans-serif",fontWeight:800,fontSize:14,color:'#1a5c38',marginBottom:6}}>Fundet i CVR-registret</div>
                         <div style={{fontWeight:700,fontSize:15}}>{cvrData.name}</div>
                         <div style={{fontSize:13,color:'#555',marginTop:3}}>{cvrData.address}, {cvrData.zipcode} {cvrData.city}</div>
+                        {cvrData.phone && <div style={{fontSize:13,color:'#555',marginTop:2}}>📞 {cvrData.phone}</div>}
+                        {cvrData.website && <div style={{fontSize:13,color:'#555',marginTop:2}}>🌐 {cvrData.website}</div>}
                       </div>
                     </div>
                   </div>
