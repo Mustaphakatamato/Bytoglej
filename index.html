@@ -13,6 +13,8 @@
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@4.15.0/dist/tf.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/coco-ssd@2.2.3/dist/coco-ssd.min.js"></script>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
     html { scroll-behavior: smooth; }
@@ -628,14 +630,114 @@ function haversine(lat1, lon1, lat2, lon2) {
 
 // Cache geocoding results
 const geoCache = {};
+const NOM_HEADERS = { 'User-Agent': 'LegetojsByt/1.0 (kontakt@legetojsbyt.dk)', 'Accept-Language': 'da' };
 async function geocodeCity(city) {
   if (geoCache[city]) return geoCache[city];
   try {
-    const r = await fetch(`https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(city+', Danmark')}&format=json&limit=1`, { headers:{ 'Accept-Language':'da' } });
+    const r = await fetch(`https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(city+', Danmark')}&format=json&limit=1&countrycodes=dk`, { headers: NOM_HEADERS });
     const d = await r.json();
     if (d[0]) { geoCache[city] = { lat: parseFloat(d[0].lat), lon: parseFloat(d[0].lon) }; return geoCache[city]; }
   } catch {}
   return null;
+}
+async function geocodeAddress(address, zipcode, city) {
+  const q = [address, zipcode, city, 'Danmark'].filter(Boolean).join(', ');
+  const key = q;
+  if (geoCache[key]) return geoCache[key];
+  try {
+    const r = await fetch(`https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(q)}&format=json&limit=1&countrycodes=dk`, { headers: NOM_HEADERS });
+    const d = await r.json();
+    if (d[0]) { geoCache[key] = { lat: parseFloat(d[0].lat), lon: parseFloat(d[0].lon) }; return geoCache[key]; }
+  } catch {}
+  return null;
+}
+
+// ─── MAP VIEW ─────────────────────────────────────────────────────────────────
+function hashOffset(str, salt) {
+  let h = salt * 2654435761;
+  for (let i = 0; i < str.length; i++) { h = Math.imul(h ^ str.charCodeAt(i), 2654435761); }
+  return ((h >>> 0) % 10000 - 5000) / 500000; // ±0.01 degrees
+}
+
+function MapView({ listings, listingCoords, userCoords, onListingClick, isMobile }) {
+  const containerRef = React.useRef(null);
+  const mapRef = React.useRef(null);
+  const markersLayerRef = React.useRef(null);
+  const cbRef = React.useRef({});
+
+  React.useEffect(() => {
+    if (!containerRef.current || !window.L) return;
+    const center = userCoords ? [userCoords.lat, userCoords.lon] : [56.0, 10.0];
+    const map = window.L.map(containerRef.current, { zoomControl: true }).setView(center, userCoords ? 11 : 7);
+    window.L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      attribution: '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
+      maxZoom: 19,
+    }).addTo(map);
+    markersLayerRef.current = window.L.layerGroup().addTo(map);
+    mapRef.current = map;
+    return () => { map.remove(); mapRef.current = null; markersLayerRef.current = null; };
+  }, []);
+
+  React.useEffect(() => {
+    const layer = markersLayerRef.current;
+    if (!layer || !window.L) return;
+    layer.clearLayers();
+    cbRef.current = {};
+
+    listings.forEach((l, idx) => {
+      const coords = listingCoords[l.city];
+      if (!coords) return;
+      const lat = coords.lat + hashOffset(l.id || String(idx), 1);
+      const lon = coords.lon + hashOffset(l.id || String(idx), 2);
+      cbRef.current[idx] = l;
+
+      const imgHtml = l.images?.[0]
+        ? `<img src="${l.images[0]}" style="width:100%;height:72px;object-fit:cover;border-radius:8px;display:block;margin-bottom:7px;">`
+        : `<div style="width:100%;height:72px;background:${l.color||'#FFD166'};border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:30px;margin-bottom:7px;">${l.emoji||'🧸'}</div>`;
+      const typeColor = l.type==='køb'?'#EF476F':l.type==='byd'?'#06B6D4':'#2d6a4f';
+      const typeLabel = l.type==='køb'?'Til køb':l.type==='byd'?'Giv et bud':'Til bytte';
+      const priceHtml = l.type==='køb'&&l.price ? `<span style="font-weight:800;color:#1c1a17;">${l.price} kr.</span>` : '';
+
+      const popup = window.L.popup({ maxWidth: 210, className: 'ltb-popup' }).setContent(
+        `<div style="width:195px;font-family:'Nunito Sans',sans-serif;">
+          ${imgHtml}
+          <div style="font-weight:700;font-size:13px;line-height:1.35;margin-bottom:3px;">${l.title}</div>
+          <div style="font-size:11px;color:#888;margin-bottom:6px;">${l.institution_name||''} · ${l.city||''}</div>
+          <div style="display:flex;align-items:center;justify-content:space-between;gap:6px;">
+            <div style="display:flex;align-items:center;gap:5px;">
+              <span style="background:${typeColor};color:#fff;border-radius:99px;padding:2px 8px;font-size:10px;font-weight:700;">${typeLabel}</span>
+              ${priceHtml}
+            </div>
+            <button data-ltb-idx="${idx}" style="background:#2d6a4f;color:#fff;border:none;border-radius:8px;padding:5px 10px;font-size:11px;font-weight:700;cursor:pointer;white-space:nowrap;">Åbn →</button>
+          </div>
+        </div>`
+      );
+      const marker = window.L.marker([lat, lon]);
+      marker.bindPopup(popup);
+      layer.addLayer(marker);
+    });
+
+    if (userCoords) {
+      const circle = window.L.circleMarker([userCoords.lat, userCoords.lon], {
+        radius: 9, color: '#1d4ed8', fillColor: '#3b82f6', fillOpacity: 0.9, weight: 2.5
+      });
+      circle.bindPopup('<div style="font-family:sans-serif;font-weight:700;font-size:13px;">📍 Din institution</div>');
+      layer.addLayer(circle);
+    }
+  }, [listings, listingCoords, userCoords]);
+
+  React.useEffect(() => {
+    function handleClick(e) {
+      const btn = e.target.closest('[data-ltb-idx]');
+      if (!btn) return;
+      const l = cbRef.current[btn.dataset.ltbIdx];
+      if (l) onListingClick(l);
+    }
+    document.addEventListener('click', handleClick);
+    return () => document.removeEventListener('click', handleClick);
+  }, [onListingClick]);
+
+  return <div ref={containerRef} style={{ height: isMobile ? 420 : 580, borderRadius: 16, overflow: 'hidden', border: '1.5px solid #e5e4e0' }} />;
 }
 
 // ─── OPSLAG PAGE ──────────────────────────────────────────────────────────────
@@ -649,35 +751,44 @@ function OpslagPage({ listings, loading, setPage, setActiveListing, favs, toggle
   const [maxDist, setMaxDist] = useState('alle');
   const [activeTags, setActiveTags] = useState([]);
   const [tagDropOpen, setTagDropOpen] = useState(false);
+  const [viewMode, setViewMode] = useState('list'); // 'list' | 'map'
   const [userCoords, setUserCoords] = useState(null);
+  const [userHasCoords, setUserHasCoords] = useState(null); // null=unknown, true/false
   const [geoLoading, setGeoLoading] = useState(false);
   const [listingCoords, setListingCoords] = useState({});
   const dSearch = useDebounce(search, 180);
 
-  // Load user's location from their institution
+  // Load user's location — prefer stored lat/lon, fall back to geocoding city
   useEffect(() => {
     db.auth.getUser().then(async ({ data:{ user } }) => {
-      if (!user) return;
-      const { data: inst } = await db.from('institutions').select('city,zipcode').eq('email', user.email).maybeSingle();
-      if (!inst) return;
-      const q = inst.zipcode ? `${inst.zipcode} ${inst.city}, Danmark` : `${inst.city}, Danmark`;
+      if (!user) { setUserHasCoords(false); return; }
+      const { data: inst } = await db.from('institutions').select('city,zipcode,latitude,longitude').eq('email', user.email).maybeSingle();
+      if (!inst) { setUserHasCoords(false); return; }
+      if (inst.latitude && inst.longitude) {
+        setUserCoords({ lat: inst.latitude, lon: inst.longitude });
+        setUserHasCoords(true);
+        return;
+      }
+      // Fall back to geocoding city
+      setUserHasCoords(false);
       setGeoLoading(true);
+      const q = inst.zipcode ? `${inst.zipcode} ${inst.city}, Danmark` : `${inst.city}, Danmark`;
       const coords = await geocodeCity(q);
       if (coords) setUserCoords(coords);
       setGeoLoading(false);
     });
   }, []);
 
-  // Geocode all unique listing cities when distance filter is active
+  // Geocode all unique listing cities when distance filter is active or map view is on
   useEffect(() => {
-    if (maxDist === 'alle') return;
+    if (maxDist === 'alle' && viewMode !== 'map') return;
     const cities = [...new Set(listings.map(l => l.city).filter(Boolean))];
     cities.forEach(async c => {
       if (listingCoords[c]) return;
       const coords = await geocodeCity(c + ', Danmark');
       if (coords) setListingCoords(prev => ({ ...prev, [c]: coords }));
     });
-  }, [maxDist, listings]);
+  }, [maxDist, viewMode, listings]);
 
   const filtered = useMemo(() => {
     let r = listings.filter(l => {
@@ -708,16 +819,27 @@ function OpslagPage({ listings, loading, setPage, setActiveListing, favs, toggle
     return r;
   }, [listings, filter, city, dSearch, sort, maxDist, userCoords, listingCoords, activeTags]);
 
+  const handleListingClick = React.useCallback(l => { setActiveListing(l); setPage('listing'); }, [setActiveListing, setPage]);
+
   return (
     <div style={{ minHeight:'100vh', paddingTop:68, background:'#fffcf8' }}>
       <div style={{ position:'sticky', top:68, zIndex:400, background:'rgba(255,252,248,0.97)', borderBottom:'1px solid #f0eeeb', backdropFilter:'blur(14px)', padding:isMobile?'10px 12px':'14px 24px' }}>
         <div style={{ maxWidth:1140, margin:'0 auto', display:'flex', flexDirection:'column', gap:8 }}>
-          {/* Row 1: search */}
+          {/* Row 1: search + view toggle */}
           <div style={{ display:'flex', gap:8 }}>
             <div style={{ flex:1, background:'#f5f4f2', borderRadius:12, display:'flex', alignItems:'center', padding:'10px 14px', gap:10, border:'1.5px solid #eceae6' }}>
               <span style={{ color:'#bbb', fontSize:16 }}>🔍</span>
               <input value={search} onChange={e=>setSearch(e.target.value)} placeholder="Søg i opslag..." style={{ border:'none', background:'transparent', outline:'none', fontSize:14, fontFamily:"'Nunito Sans',sans-serif", flex:1, minWidth:0 }} />
               {search && <button onClick={()=>setSearch('')} style={{ border:'none', background:'none', color:'#bbb', fontSize:15 }}>✕</button>}
+            </div>
+            {/* List / Map toggle */}
+            <div style={{ display:'flex', borderRadius:12, overflow:'hidden', border:'1.5px solid #e5e4e0', flexShrink:0 }}>
+              {[['list','☰','Liste'],['map','🗺','Kort']].map(([mode, icon, label]) => (
+                <button key={mode} onClick={()=>setViewMode(mode)}
+                  style={{ padding:isMobile?'8px 12px':'9px 16px', border:'none', background:viewMode===mode?PRIMARY:'#f5f4f2', color:viewMode===mode?'#fff':'#666', fontWeight:700, fontSize:13, cursor:'pointer', display:'flex', alignItems:'center', gap:5, transition:'all 0.15s', whiteSpace:'nowrap' }}>
+                  {icon}{!isMobile && ' '+label}
+                </button>
+              ))}
             </div>
           </div>
           {/* Row 2: filters */}
@@ -730,60 +852,86 @@ function OpslagPage({ listings, loading, setPage, setActiveListing, favs, toggle
             <select value={city} onChange={e=>setCity(e.target.value)} style={{ padding:'8px 12px', borderRadius:12, border:'1.5px solid #eceae6', fontSize:13, background:'#f5f4f2', fontFamily:"'Nunito Sans',sans-serif", outline:'none' }}>
               {CITIES.map(c=><option key={c} value={c}>{c==='alle'?'Alle byer':c}</option>)}
             </select>
-            <select value={sort} onChange={e=>setSort(e.target.value)} style={{ padding:'8px 12px', borderRadius:12, border:'1.5px solid #eceae6', fontSize:13, background:'#f5f4f2', fontFamily:"'Nunito Sans',sans-serif", outline:'none' }}>
-              <option value="newest">Nyeste først</option>
-              <option value="price-asc">Pris: lav → høj</option>
-              <option value="price-desc">Pris: høj → lav</option>
-              <option value="bids">Flest bud</option>
-            </select>
-          <div style={{ position:'relative' }}>
-            <select value={maxDist} onChange={e=>setMaxDist(e.target.value)} style={{ padding:'10px 36px 10px 14px', borderRadius:12, border:`1.5px solid ${maxDist!=='alle'?PRIMARY:'#eceae6'}`, fontSize:14, background:maxDist!=='alle'?'#e8f5ee':'#f5f4f2', fontFamily:"'Nunito Sans',sans-serif", outline:'none', color:maxDist!=='alle'?PRIMARY:'#555', fontWeight:maxDist!=='alle'?700:400, appearance:'none', cursor:'pointer' }}>
-              <option value="alle">📍 Afstand</option>
-              <option value="5">Inden for 5 km</option>
-              <option value="10">Inden for 10 km</option>
-              <option value="25">Inden for 25 km</option>
-              <option value="50">Inden for 50 km</option>
-              <option value="100">Inden for 100 km</option>
-            </select>
-            {geoLoading && <span style={{ position:'absolute', right:10, top:'50%', transform:'translateY(-50%)', fontSize:12 }}>⏳</span>}
-            {!userCoords && maxDist!=='alle' && <div style={{ position:'absolute', top:'110%', left:0, background:'#fff', border:'1.5px solid #fca5a5', borderRadius:10, padding:'8px 12px', fontSize:12, color:'#b91c1c', whiteSpace:'nowrap', zIndex:10, boxShadow:'0 4px 12px rgba(0,0,0,0.1)' }}>Log ind for at bruge afstandsfilter</div>}
-          </div>
-          {/* Row 3: multi-select tag dropdown */}
-          <div style={{ position:'relative' }}>
-            <button onClick={()=>setTagDropOpen(o=>!o)}
-              style={{ padding:'8px 14px', borderRadius:12, border:`1.5px solid ${activeTags.length?'#2563eb':'#eceae6'}`, background:activeTags.length?'#eff6ff':'#f5f4f2', fontSize:13, fontWeight:activeTags.length?700:400, color:activeTags.length?'#2563eb':'#555', cursor:'pointer', display:'flex', alignItems:'center', gap:6, whiteSpace:'nowrap' }}>
-              🏷️ Kategorier
-              {activeTags.length > 0 && <span style={{ background:'#2563eb', color:'#fff', borderRadius:99, padding:'1px 7px', fontSize:11, fontWeight:700 }}>{activeTags.length}</span>}
-              <span style={{ fontSize:10, color:'#aaa' }}>{tagDropOpen ? '▲' : '▼'}</span>
-            </button>
-            {tagDropOpen && (
-              <div style={{ position:'absolute', top:'calc(100% + 6px)', left:0, zIndex:500, background:'#fff', border:'1.5px solid #e5e5e5', borderRadius:14, boxShadow:'0 8px 28px rgba(0,0,0,0.12)', padding:12, minWidth:280 }}>
-                <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:10 }}>
-                  <span style={{ fontSize:12, fontWeight:700, color:'#555' }}>Vælg kategorier</span>
-                  {activeTags.length > 0 && <button onClick={()=>setActiveTags([])} style={{ fontSize:11, fontWeight:700, color:'#2563eb', background:'none', border:'none', cursor:'pointer' }}>Ryd alle</button>}
-                </div>
-                <div style={{ display:'flex', flexWrap:'wrap', gap:6 }}>
-                  {LISTING_TAGS.map(t => {
-                    const sel = activeTags.includes(t);
-                    return (
-                      <button key={t} onClick={()=>setActiveTags(prev => sel ? prev.filter(x=>x!==t) : [...prev, t])}
-                        style={{ padding:'5px 12px', borderRadius:99, fontSize:12, fontWeight:700, border:sel?'2px solid #2563eb':'1.5px solid #ddd', background:sel?'#eff6ff':'#f9f9f9', color:sel?'#2563eb':'#666', cursor:'pointer', transition:'all 0.12s' }}>
-                        {sel ? '✓ ' : ''}{t}
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
+            {viewMode === 'list' && (
+              <select value={sort} onChange={e=>setSort(e.target.value)} style={{ padding:'8px 12px', borderRadius:12, border:'1.5px solid #eceae6', fontSize:13, background:'#f5f4f2', fontFamily:"'Nunito Sans',sans-serif", outline:'none' }}>
+                <option value="newest">Nyeste først</option>
+                <option value="price-asc">Pris: lav → høj</option>
+                <option value="price-desc">Pris: høj → lav</option>
+                <option value="bids">Flest bud</option>
+              </select>
             )}
+            <div style={{ position:'relative' }}>
+              <select value={maxDist} onChange={e=>setMaxDist(e.target.value)} style={{ padding:'10px 36px 10px 14px', borderRadius:12, border:`1.5px solid ${maxDist!=='alle'?PRIMARY:'#eceae6'}`, fontSize:14, background:maxDist!=='alle'?'#e8f5ee':'#f5f4f2', fontFamily:"'Nunito Sans',sans-serif", outline:'none', color:maxDist!=='alle'?PRIMARY:'#555', fontWeight:maxDist!=='alle'?700:400, appearance:'none', cursor:'pointer' }}>
+                <option value="alle">📍 Afstand</option>
+                <option value="5">Inden for 5 km</option>
+                <option value="10">Inden for 10 km</option>
+                <option value="25">Inden for 25 km</option>
+                <option value="50">Inden for 50 km</option>
+                <option value="100">Inden for 100 km</option>
+              </select>
+              {geoLoading && <span style={{ position:'absolute', right:10, top:'50%', transform:'translateY(-50%)', fontSize:12 }}>⏳</span>}
+              {!userCoords && maxDist!=='alle' && <div style={{ position:'absolute', top:'110%', left:0, background:'#fff', border:'1.5px solid #fca5a5', borderRadius:10, padding:'8px 12px', fontSize:12, color:'#b91c1c', whiteSpace:'nowrap', zIndex:10, boxShadow:'0 4px 12px rgba(0,0,0,0.1)' }}>Log ind for at bruge afstandsfilter</div>}
+            </div>
+            {/* Multi-select tag dropdown */}
+            <div style={{ position:'relative' }}>
+              <button onClick={()=>setTagDropOpen(o=>!o)}
+                style={{ padding:'8px 14px', borderRadius:12, border:`1.5px solid ${activeTags.length?'#2563eb':'#eceae6'}`, background:activeTags.length?'#eff6ff':'#f5f4f2', fontSize:13, fontWeight:activeTags.length?700:400, color:activeTags.length?'#2563eb':'#555', cursor:'pointer', display:'flex', alignItems:'center', gap:6, whiteSpace:'nowrap' }}>
+                🏷️ Kategorier
+                {activeTags.length > 0 && <span style={{ background:'#2563eb', color:'#fff', borderRadius:99, padding:'1px 7px', fontSize:11, fontWeight:700 }}>{activeTags.length}</span>}
+                <span style={{ fontSize:10, color:'#aaa' }}>{tagDropOpen ? '▲' : '▼'}</span>
+              </button>
+              {tagDropOpen && (
+                <div style={{ position:'absolute', top:'calc(100% + 6px)', left:0, zIndex:500, background:'#fff', border:'1.5px solid #e5e5e5', borderRadius:14, boxShadow:'0 8px 28px rgba(0,0,0,0.12)', padding:12, minWidth:280 }}>
+                  <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:10 }}>
+                    <span style={{ fontSize:12, fontWeight:700, color:'#555' }}>Vælg kategorier</span>
+                    {activeTags.length > 0 && <button onClick={()=>setActiveTags([])} style={{ fontSize:11, fontWeight:700, color:'#2563eb', background:'none', border:'none', cursor:'pointer' }}>Ryd alle</button>}
+                  </div>
+                  <div style={{ display:'flex', flexWrap:'wrap', gap:6 }}>
+                    {LISTING_TAGS.map(t => {
+                      const sel = activeTags.includes(t);
+                      return (
+                        <button key={t} onClick={()=>setActiveTags(prev => sel ? prev.filter(x=>x!==t) : [...prev, t])}
+                          style={{ padding:'5px 12px', borderRadius:99, fontSize:12, fontWeight:700, border:sel?'2px solid #2563eb':'1.5px solid #ddd', background:sel?'#eff6ff':'#f9f9f9', color:sel?'#2563eb':'#666', cursor:'pointer', transition:'all 0.12s' }}>
+                          {sel ? '✓ ' : ''}{t}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+            </div>
           </div>
         </div>
       </div>
 
       <div style={{ maxWidth:1140, margin:'0 auto', padding:isMobile?'16px 12px':'28px 24px' }}>
-        <p style={{ color:'#999', fontSize:14, marginBottom:22 }}>
-          {loading ? 'Henter opslag…' : `${filtered.length} opslag fundet`}{dSearch && ` for "${dSearch}"`}
-        </p>
-        {loading ? (
+        {/* Banner: institution has no stored coordinates */}
+        {userHasCoords === false && (
+          <div style={{ background:'#fffbeb', border:'1.5px solid #fcd34d', borderRadius:14, padding:'12px 16px', marginBottom:18, display:'flex', alignItems:'center', gap:12, flexWrap:'wrap' }}>
+            <span style={{ fontSize:20 }}>📍</span>
+            <span style={{ fontSize:13, color:'#92400e', flex:1 }}>
+              Din institution mangler præcise koordinater — <strong>afstandsfilter og kortvisning</strong> baseres på by-center indtil din adresse er geokodet.
+              Opdater din adresse i <button onClick={()=>setPage('dashboard')} style={{ background:'none', border:'none', color:'#b45309', fontWeight:700, fontSize:13, cursor:'pointer', textDecoration:'underline', padding:0 }}>institutionsprofilen</button> for at fixe det.
+            </span>
+          </div>
+        )}
+
+        <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:18, flexWrap:'wrap', gap:8 }}>
+          <p style={{ color:'#999', fontSize:14, margin:0 }}>
+            {loading ? 'Henter opslag…' : `${filtered.length} opslag`}{dSearch && ` for "${dSearch}"`}
+            {viewMode === 'map' && !loading && <span style={{ marginLeft:8, fontSize:12, color:'#bbb' }}>— pins baseret på by</span>}
+          </p>
+        </div>
+
+        {viewMode === 'map' ? (
+          <MapView
+            listings={filtered}
+            listingCoords={listingCoords}
+            userCoords={userCoords}
+            onListingClick={handleListingClick}
+            isMobile={isMobile}
+          />
+        ) : loading ? (
           <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fill,minmax(260px,1fr))', gap:20 }}>
             {[1,2,3,4,5,6].map(i=><SkeletonCard key={i}/>)}
           </div>
@@ -797,7 +945,7 @@ function OpslagPage({ listings, loading, setPage, setActiveListing, favs, toggle
         ) : (
           <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fill,minmax(260px,1fr))', gap:20 }}>
             {filtered.map(l=>(
-              <ListingCard key={l.id} listing={l} favs={favs} toggleFav={toggleFav} onClick={()=>{ setActiveListing(l); setPage('listing'); }} />
+              <ListingCard key={l.id} listing={l} favs={favs} toggleFav={toggleFav} onClick={()=>handleListingClick(l)} />
             ))}
           </div>
         )}
@@ -1344,6 +1492,10 @@ function SignupPage({ setPage, setLoggedIn, showToast }) {
       leader_name: form.leader_name, leader_phone: form.leader_phone, leader_email: form.leader_email,
       contact_name: form.contact_name, email: form.email
     });
+    // Geocode address in background (non-blocking)
+    geocodeAddress(form.address, form.zipcode, form.city).then(coords => {
+      if (coords) db.from('institutions').update({ latitude: coords.lat, longitude: coords.lon }).eq('email', form.email);
+    });
     setSaving(false);
     if (data.user && !data.session) { setNeedsConfirm(true); setStep(5); }
     else { setLoggedIn(true); setPage('dashboard'); showToast('Velkommen til LegetøjsByt! 🎉'); }
@@ -1847,6 +1999,13 @@ function DashboardPage({ setPage, showToast, allListings, onListingCreated, inst
     }).eq('email', institution.email);
     setEditProfileSaving(false);
     if (error) { showToast('Noget gik galt', 'error'); return; }
+    // Re-geocode if address changed
+    const addrChanged = editProfileForm.address !== institution.address || editProfileForm.zipcode !== institution.zipcode || editProfileForm.city !== institution.city;
+    if (addrChanged) {
+      geocodeAddress(editProfileForm.address, editProfileForm.zipcode, editProfileForm.city).then(coords => {
+        if (coords) db.from('institutions').update({ latitude: coords.lat, longitude: coords.lon }).eq('email', institution.email);
+      });
+    }
     const updated = { ...institution, ...editProfileForm, children_count: Number(editProfileForm.children_count) || null };
     setInstitution(updated);
     onInstitutionChange?.(updated);
