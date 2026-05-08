@@ -2315,8 +2315,6 @@ function DashboardPage({ setPage, showToast, allListings, onListingCreated, inst
 
               {aiAnalyzing ? (
                 <ScanningLoader />
-              ) : null}
-              {aiAnalyzing ? null
               ) : imgPreviews.length === 0 ? (
                 <div onClick={()=>fileRef.current?.click()} style={{ border:'2px dashed #d4d0cb', borderRadius:14, padding:'28px 20px', textAlign:'center', cursor:'pointer', background:'#fafaf8' }}>
                   <div style={{ fontSize:36, marginBottom:8 }}>📷</div>
