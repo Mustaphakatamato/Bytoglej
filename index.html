@@ -1951,6 +1951,46 @@ function DashboardPage({ setPage, showToast, allListings, onListingCreated, inst
           ))}
         </div>
 
+        {/* Institution profile card */}
+        {institution && (
+          <div style={{ background:'#fff', borderRadius:22, padding:isMobile?20:28, boxShadow:'0 2px 12px rgba(0,0,0,0.06)', marginBottom:isMobile?16:24 }}>
+            <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:20, flexWrap:'wrap', gap:10 }}>
+              <h2 style={{ fontFamily:"'Nunito',sans-serif", fontWeight:800, fontSize:20, margin:0 }}>Institutionsprofil</h2>
+              {isAdmin && <Btn variant="outline" radius={22} onClick={openEditProfile} style={{ fontSize:13, padding:'8px 18px', gap:6 }}>✏️ Rediger oplysninger</Btn>}
+            </div>
+            <div style={{ display:'grid', gridTemplateColumns:isMobile?'1fr':'1fr 1fr', gap:isMobile?12:20 }}>
+              <div style={{ display:'flex', flexDirection:'column', gap:12 }}>
+                <div style={{ background:'#f8f7f5', borderRadius:14, padding:'14px 16px' }}>
+                  <div style={{ fontSize:11, fontWeight:700, color:'#aaa', textTransform:'uppercase', letterSpacing:0.8, marginBottom:8 }}>Institutionsoplysninger</div>
+                  <InfoRow icon="🏫" label="Type" value={institution.institution_type || '—'} />
+                  <InfoRow icon="🏛️" label="Driftsform" value={institution.ownership_type || '—'} />
+                  <InfoRow icon="👶" label="Antal børn" value={institution.children_count ? `${institution.children_count} indskrevne` : '—'} />
+                </div>
+                <div style={{ background:'#f8f7f5', borderRadius:14, padding:'14px 16px' }}>
+                  <div style={{ fontSize:11, fontWeight:700, color:'#aaa', textTransform:'uppercase', letterSpacing:0.8, marginBottom:8 }}>Kontakt</div>
+                  <InfoRow icon="📍" label="Adresse" value={institution.address ? `${institution.address}, ${institution.zipcode} ${institution.city}` : '—'} />
+                  <InfoRow icon="📞" label="Telefon" value={institution.phone || '—'} />
+                  <InfoRow icon="🌐" label="Hjemmeside" value={institution.website || '—'} link={institution.website} />
+                </div>
+              </div>
+              <div style={{ display:'flex', flexDirection:'column', gap:12 }}>
+                <div style={{ background:'#f8f7f5', borderRadius:14, padding:'14px 16px' }}>
+                  <div style={{ fontSize:11, fontWeight:700, color:'#aaa', textTransform:'uppercase', letterSpacing:0.8, marginBottom:8 }}>Institutionsleder</div>
+                  <InfoRow icon="👤" label="Navn" value={institution.leader_name || '—'} />
+                  <InfoRow icon="📞" label="Telefon" value={institution.leader_phone || '—'} />
+                  <InfoRow icon="✉️" label="E-mail" value={institution.leader_email || '—'} />
+                </div>
+                <div style={{ background:'#f8f7f5', borderRadius:14, padding:'14px 16px' }}>
+                  <div style={{ fontSize:11, fontWeight:700, color:'#aaa', textTransform:'uppercase', letterSpacing:0.8, marginBottom:8 }}>Kontaktperson (LegetøjsByt)</div>
+                  <InfoRow icon="👤" label="Navn" value={institution.contact_name || '—'} />
+                  <InfoRow icon="✉️" label="E-mail" value={institution.email || '—'} />
+                  <InfoRow icon="🔑" label="CVR" value={institution.cvr || '—'} />
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
         <div style={{ display:'grid', gridTemplateColumns:isMobile?'1fr':'1fr 1fr', gap:isMobile?16:24 }}>
 
           {/* Mine opslag */}
@@ -2020,46 +2060,6 @@ function DashboardPage({ setPage, showToast, allListings, onListingCreated, inst
             ))}
           </div>
         </div>
-
-        {/* Institution profile card */}
-        {institution && (
-          <div style={{ background:'#fff', borderRadius:22, padding:isMobile?20:28, boxShadow:'0 2px 12px rgba(0,0,0,0.06)', marginTop:isMobile?16:24 }}>
-            <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:20, flexWrap:'wrap', gap:10 }}>
-              <h2 style={{ fontFamily:"'Nunito',sans-serif", fontWeight:800, fontSize:20, margin:0 }}>Institutionsprofil</h2>
-              {isAdmin && <Btn variant="outline" radius={22} onClick={openEditProfile} style={{ fontSize:13, padding:'8px 18px', gap:6 }}>✏️ Rediger oplysninger</Btn>}
-            </div>
-            <div style={{ display:'grid', gridTemplateColumns:isMobile?'1fr':'1fr 1fr', gap:isMobile?12:20 }}>
-              <div style={{ display:'flex', flexDirection:'column', gap:12 }}>
-                <div style={{ background:'#f8f7f5', borderRadius:14, padding:'14px 16px' }}>
-                  <div style={{ fontSize:11, fontWeight:700, color:'#aaa', textTransform:'uppercase', letterSpacing:0.8, marginBottom:8 }}>Institutionsoplysninger</div>
-                  <InfoRow icon="🏫" label="Type" value={institution.institution_type || '—'} />
-                  <InfoRow icon="🏛️" label="Driftsform" value={institution.ownership_type || '—'} />
-                  <InfoRow icon="👶" label="Antal børn" value={institution.children_count ? `${institution.children_count} indskrevne` : '—'} />
-                </div>
-                <div style={{ background:'#f8f7f5', borderRadius:14, padding:'14px 16px' }}>
-                  <div style={{ fontSize:11, fontWeight:700, color:'#aaa', textTransform:'uppercase', letterSpacing:0.8, marginBottom:8 }}>Kontakt</div>
-                  <InfoRow icon="📍" label="Adresse" value={institution.address ? `${institution.address}, ${institution.zipcode} ${institution.city}` : '—'} />
-                  <InfoRow icon="📞" label="Telefon" value={institution.phone || '—'} />
-                  <InfoRow icon="🌐" label="Hjemmeside" value={institution.website || '—'} link={institution.website} />
-                </div>
-              </div>
-              <div style={{ display:'flex', flexDirection:'column', gap:12 }}>
-                <div style={{ background:'#f8f7f5', borderRadius:14, padding:'14px 16px' }}>
-                  <div style={{ fontSize:11, fontWeight:700, color:'#aaa', textTransform:'uppercase', letterSpacing:0.8, marginBottom:8 }}>Institutionsleder</div>
-                  <InfoRow icon="👤" label="Navn" value={institution.leader_name || '—'} />
-                  <InfoRow icon="📞" label="Telefon" value={institution.leader_phone || '—'} />
-                  <InfoRow icon="✉️" label="E-mail" value={institution.leader_email || '—'} />
-                </div>
-                <div style={{ background:'#f8f7f5', borderRadius:14, padding:'14px 16px' }}>
-                  <div style={{ fontSize:11, fontWeight:700, color:'#aaa', textTransform:'uppercase', letterSpacing:0.8, marginBottom:8 }}>Kontaktperson (LegetøjsByt)</div>
-                  <InfoRow icon="👤" label="Navn" value={institution.contact_name || '—'} />
-                  <InfoRow icon="✉️" label="E-mail" value={institution.email || '—'} />
-                  <InfoRow icon="🔑" label="CVR" value={institution.cvr || '—'} />
-                </div>
-              </div>
-            </div>
-          </div>
-        )}
 
         {/* Feature #15: Incoming requests section */}
         <div id="incoming-section" style={{ background:'#fff', borderRadius:22, padding:28, boxShadow:'0 2px 12px rgba(0,0,0,0.06)', marginTop:isMobile?16:24 }}>
