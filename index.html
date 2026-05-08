@@ -1627,7 +1627,7 @@ function SignupPage({ setPage, setLoggedIn, showToast }) {
     });
     // Geocode address in background (non-blocking)
     geocodeAddress(form.address, form.zipcode, form.city).then(coords => {
-      if (coords) db.from('institutions').update({ latitude: coords.lat, longitude: coords.lon }).eq('email', form.email);
+      if (coords) db.from('institutions').update({ latitude: coords.lat, longitude: coords.lon }).eq('email', form.email.toLowerCase());
     });
     setSaving(false);
     if (data.user && !data.session) { setNeedsConfirm(true); setStep(5); }
