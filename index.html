@@ -2771,7 +2771,9 @@ function MessagesPage({ setPage, selectedConvId, setSelectedConvId, setActiveLis
     if (!content || !active || !userId) return;
     setSending(true);
     setNewMsg('');
-    const senderName = active.initiator_id === userId ? active.initiator_name : active.owner_name;
+    const senderName = ctxIsAdmin && adminInstName
+      ? adminInstName
+      : (active.initiator_id === userId ? active.initiator_name : active.owner_name);
     await db.from('chat_messages').insert({ conversation_id: active.id, sender_id: userId, sender_name: senderName, content });
     const isInit = active.initiator_id === userId;
     const unreadPatch = isInit ? { owner_unread: (active.owner_unread||0)+1 } : { initiator_unread: (active.initiator_unread||0)+1 };
@@ -2803,7 +2805,7 @@ function MessagesPage({ setPage, selectedConvId, setSelectedConvId, setActiveLis
   async function handleAcceptBid(msg) {
     await db.from('chat_messages').update({ bid_status: 'accepted' }).eq('id', msg.id);
     const confirmMsg = `Bud på ${msg.bid_amount} kr. accepteret! 🎉`;
-    const senderName = active.owner_id === userId ? active.owner_name : active.initiator_name;
+    const senderName = ctxIsAdmin && adminInstName ? adminInstName : (active.owner_id === userId ? active.owner_name : active.initiator_name);
     await db.from('chat_messages').insert({ conversation_id: active.id, sender_id: userId, sender_name: senderName, content: confirmMsg });
     const upd = { last_message: confirmMsg, last_message_at: new Date().toISOString(), initiator_unread: (active.initiator_unread||0)+1 };
     await db.from('conversations').update(upd).eq('id', active.id);
@@ -2813,7 +2815,7 @@ function MessagesPage({ setPage, selectedConvId, setSelectedConvId, setActiveLis
   async function handleRejectBid() {
     const msg = rejectingBid;
     await db.from('chat_messages').update({ bid_status: 'rejected', bid_note: rejectNote }).eq('id', msg.id);
-    const senderName = active.owner_id === userId ? active.owner_name : active.initiator_name;
+    const senderName = ctxIsAdmin && adminInstName ? adminInstName : (active.owner_id === userId ? active.owner_name : active.initiator_name);
     const rejectMsg = `Bud afvist${rejectNote ? ': ' + rejectNote : ''}`;
     await db.from('chat_messages').insert({ conversation_id: active.id, sender_id: userId, sender_name: senderName, content: rejectMsg });
     const upd = { last_message: rejectMsg, last_message_at: new Date().toISOString(), initiator_unread: (active.initiator_unread||0)+1 };
@@ -2827,7 +2829,7 @@ function MessagesPage({ setPage, selectedConvId, setSelectedConvId, setActiveLis
     if (!amount) return;
     const msg = counterBidMsg;
     await db.from('chat_messages').update({ bid_status: 'countered' }).eq('id', msg.id);
-    const senderName = active.owner_id === userId ? active.owner_name : active.initiator_name;
+    const senderName = ctxIsAdmin && adminInstName ? adminInstName : (active.owner_id === userId ? active.owner_name : active.initiator_name);
     const counterContent = `Modbud: ${amount} kr.`;
     await db.from('chat_messages').insert({
       conversation_id: active.id, sender_id: userId, sender_name: senderName,
@@ -3020,12 +3022,14 @@ function MessagesPage({ setPage, selectedConvId, setSelectedConvId, setActiveLis
                   const isOwnerInConv = active.owner_id === userId;
                   let lastDate = null;
                   return messages.map((m, i) => {
-                    const mine = m.sender_id === userId;
+                    const mine = ctxIsAdmin && adminInstName
+                      ? m.sender_name === adminInstName
+                      : m.sender_id === userId;
                     const d = new Date(m.created_at);
                     const dateStr = d.toLocaleDateString('da-DK',{weekday:'long',day:'numeric',month:'long'});
                     const showDate = dateStr !== lastDate;
                     lastDate = dateStr;
-                    const prevMine = i>0 && messages[i-1].sender_id === userId;
+                    const prevMine = i>0 && (ctxIsAdmin && adminInstName ? messages[i-1].sender_name === adminInstName : messages[i-1].sender_id === userId);
                     const grouped = mine === prevMine && !showDate && m.message_type !== 'bid' && messages[i-1]?.message_type !== 'bid' && m.message_type !== 'swap' && messages[i-1]?.message_type !== 'swap';
                     const isBid = m.message_type === 'bid';
                     const isSwap = m.message_type === 'swap';
