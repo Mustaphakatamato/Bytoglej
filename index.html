@@ -2022,11 +2022,11 @@ function DashboardPage({ setPage, showToast, allListings, onListingCreated, inst
         </div>
 
         {/* Institution profile card */}
-        {isAdmin && institution && (
+        {institution && (
           <div style={{ background:'#fff', borderRadius:22, padding:isMobile?20:28, boxShadow:'0 2px 12px rgba(0,0,0,0.06)', marginTop:isMobile?16:24 }}>
             <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:20, flexWrap:'wrap', gap:10 }}>
               <h2 style={{ fontFamily:"'Nunito',sans-serif", fontWeight:800, fontSize:20, margin:0 }}>Institutionsprofil</h2>
-              <Btn variant="outline" radius={22} onClick={openEditProfile} style={{ fontSize:13, padding:'8px 18px', gap:6 }}>✏️ Rediger oplysninger</Btn>
+              {isAdmin && <Btn variant="outline" radius={22} onClick={openEditProfile} style={{ fontSize:13, padding:'8px 18px', gap:6 }}>✏️ Rediger oplysninger</Btn>}
             </div>
             <div style={{ display:'grid', gridTemplateColumns:isMobile?'1fr':'1fr 1fr', gap:isMobile?12:20 }}>
               <div style={{ display:'flex', flexDirection:'column', gap:12 }}>
