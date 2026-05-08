@@ -1680,9 +1680,9 @@ function SignupPage({ setPage, setLoggedIn, showToast }) {
     if (cvr.length!==8 && cvr.length!==10) return;
     setCvrStatus('checking');
     try {
-      // P-nummer (10 cifre) bruger ?pno= parameteren; CVR (8 cifre) bruger ?search=
+      // P-nummer (10 cifre) bruger ?produ= parameteren; CVR (8 cifre) bruger ?search=
       const url = cvr.length===10
-        ? `https://cvrapi.dk/api?pno=${cvr}&country=dk`
+        ? `https://cvrapi.dk/api?produ=${cvr}&country=dk`
         : `https://cvrapi.dk/api?search=${cvr}&country=dk`;
       const res = await fetch(url);
       const data = await res.json();
