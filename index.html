@@ -304,6 +304,7 @@ function ListingCard({ listing, onClick, favs, toggleFav }) {
   const isFav = favs.includes(listing.id);
   const [popping, setPopping] = useState(false);
   const [imgIdx, setImgIdx] = useState(0);
+  const [localFavCount, setLocalFavCount] = useState(listing.fav_count || 0);
   const imgs = listing.images?.length ? listing.images : [];
   function handleFav(e) {
     e.stopPropagation();
@@ -311,7 +312,8 @@ function ListingCard({ listing, onClick, favs, toggleFav }) {
     toggleFav(listing.id);
     setPopping(true);
     setTimeout(()=>setPopping(false), 350);
-    const newCount = Math.max(0, (listing.fav_count || 0) + (adding ? 1 : -1));
+    const newCount = Math.max(0, localFavCount + (adding ? 1 : -1));
+    setLocalFavCount(newCount);
     db.from('listings').update({ fav_count: newCount }).eq('id', listing.id);
   }
   function prevImg(e) { e.stopPropagation(); setImgIdx(i => (i - 1 + imgs.length) % imgs.length); }
@@ -357,7 +359,7 @@ function ListingCard({ listing, onClick, favs, toggleFav }) {
             : <div style={{ fontSize:13, color:ACCENT2, fontWeight:700, marginBottom:4 }}>Byttes kun</div>}
           <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between' }}>
             <div style={{ fontSize:11, color:'#aaa' }}>{listing.institution_name}{listing.city ? `, ${listing.city}` : ''}</div>
-            {listing.fav_count > 0 && <div style={{ fontSize:11, color:'#e57373', fontWeight:700 }}>♥ {listing.fav_count}</div>}
+            {localFavCount > 0 && <div style={{ fontSize:11, color:'#e57373', fontWeight:700 }}>♥ {localFavCount}</div>}
           </div>
           {listing.tags?.length > 0 && (
             <div style={{ display:'flex', gap:4, flexWrap:'wrap', marginTop:6 }}>
@@ -850,6 +852,7 @@ function ListingDetailPage({ listing, setPage, showToast, onStartConv, favs, tog
   const [currentUserEmail, setCurrentUserEmail] = useState(null);
   const [ownListings, setOwnListings] = useState([]);
   const [isFav, setIsFav] = useState(favs?.includes(listing.id) || false);
+  const [localFavCount, setLocalFavCount] = useState(listing.fav_count || 0);
   const [shareModal, setShareModal] = useState(false);
   const [teamMembers, setTeamMembers] = useState([]);
   const [selectedEmails, setSelectedEmails] = useState([]);
@@ -890,7 +893,8 @@ function ListingDetailPage({ listing, setPage, showToast, onStartConv, favs, tog
     const adding = !isFav;
     toggleFav?.(listing.id);
     setIsFav(v => !v);
-    const newCount = Math.max(0, (listing.fav_count || 0) + (adding ? 1 : -1));
+    const newCount = Math.max(0, localFavCount + (adding ? 1 : -1));
+    setLocalFavCount(newCount);
     db.from('listings').update({ fav_count: newCount }).eq('id', listing.id);
   }
 
@@ -1037,7 +1041,7 @@ function ListingDetailPage({ listing, setPage, showToast, onStartConv, favs, tog
                 {!isOwn && listing.type==='byt' && <Btn variant="primary" color={ACCENT} radius={22} onClick={()=>setSwapModal(true)} style={{ justifyContent:'center', padding:'14px', fontSize:15 }}>🔄 Foreslå bytte</Btn>}
                 <button onClick={handleToggleFav} style={{ width:'100%', padding:'13px', borderRadius:22, border:`1.5px solid ${isFav?'#fca5a5':'#e5e5e5'}`, background:isFav?'#fff0f3':'#fff', color:isFav?'#e11d48':'#555', fontSize:14, fontWeight:700, cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center', gap:6, transition:'all 0.2s' }}>
                   {isFav ? '❤️ Gemt' : '🤍 Gem opslag'}
-                  {listing.fav_count > 0 && <span style={{ background:isFav?'#fca5a5':'#eee', color:isFav?'#c0392b':'#888', borderRadius:99, padding:'1px 8px', fontSize:12 }}>{listing.fav_count}</span>}
+                  {localFavCount > 0 && <span style={{ background:isFav?'#fca5a5':'#eee', color:isFav?'#c0392b':'#888', borderRadius:99, padding:'1px 8px', fontSize:12 }}>{localFavCount}</span>}
                 </button>
                 {(currentUserId || loggedIn) && (
                   <button onClick={()=>setShareModal(true)} style={{ width:'100%', padding:'13px', borderRadius:22, border:'1.5px solid #e5e5e5', background:'#fff', color:'#555', fontSize:14, fontWeight:700, cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center', gap:6 }}>
