@@ -1586,8 +1586,13 @@ function DashboardPage({ setPage, showToast, allListings, onListingCreated, inst
             headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${SUPA_KEY}` },
             body: JSON.stringify({ imageBase64: base64, mimeType: file.type }),
           });
-          resolve(await resp.json());
-        } catch { resolve({ hasChild: false, description: '' }); }
+          const data = await resp.json();
+          if (data.error) showToast('AI fejl: ' + data.error, 'error');
+          resolve(data);
+        } catch (err) {
+          showToast('AI analyse fejlede: ' + err.message, 'error');
+          resolve({ hasChild: false, description: '' });
+        }
       };
       reader.readAsDataURL(file);
     });
