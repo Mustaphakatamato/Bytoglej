@@ -627,7 +627,8 @@ function OpslagPage({ listings, loading, setPage, setActiveListing, favs, toggle
   const [city, setCity]     = useState('alle');
   const [sort, setSort]     = useState('newest');
   const [maxDist, setMaxDist] = useState('alle');
-  const [activeTag, setActiveTag] = useState('');
+  const [activeTags, setActiveTags] = useState([]);
+  const [tagDropOpen, setTagDropOpen] = useState(false);
   const [userCoords, setUserCoords] = useState(null);
   const [geoLoading, setGeoLoading] = useState(false);
   const [listingCoords, setListingCoords] = useState({});
@@ -663,7 +664,7 @@ function OpslagPage({ listings, loading, setPage, setActiveListing, favs, toggle
       const matchType   = filter==='alle' || l.type===filter;
       const matchCity   = city==='alle'   || l.city===city;
       const matchSearch = !dSearch || l.title.toLowerCase().includes(dSearch.toLowerCase()) || (l.institution_name||'').toLowerCase().includes(dSearch.toLowerCase()) || (l.tags||[]).some(t=>t.toLowerCase().includes(dSearch.toLowerCase()));
-      const matchTag = !activeTag || (l.tags||[]).includes(activeTag);
+      const matchTag = activeTags.length === 0 || activeTags.every(t => (l.tags||[]).includes(t));
       let matchDist = true;
       if (maxDist !== 'alle' && userCoords && l.city) {
         const coords = listingCoords[l.city];
@@ -685,7 +686,7 @@ function OpslagPage({ listings, loading, setPage, setActiveListing, favs, toggle
       });
     }
     return r;
-  }, [listings, filter, city, dSearch, sort, maxDist, userCoords, listingCoords, activeTag]);
+  }, [listings, filter, city, dSearch, sort, maxDist, userCoords, listingCoords, activeTags]);
 
   return (
     <div style={{ minHeight:'100vh', paddingTop:68, background:'#fffcf8' }}>
@@ -727,17 +728,32 @@ function OpslagPage({ listings, loading, setPage, setActiveListing, favs, toggle
             {geoLoading && <span style={{ position:'absolute', right:10, top:'50%', transform:'translateY(-50%)', fontSize:12 }}>⏳</span>}
             {!userCoords && maxDist!=='alle' && <div style={{ position:'absolute', top:'110%', left:0, background:'#fff', border:'1.5px solid #fca5a5', borderRadius:10, padding:'8px 12px', fontSize:12, color:'#b91c1c', whiteSpace:'nowrap', zIndex:10, boxShadow:'0 4px 12px rgba(0,0,0,0.1)' }}>Log ind for at bruge afstandsfilter</div>}
           </div>
-          {/* Row 3: tag dropdown */}
-          <div style={{ display:'flex', gap:8, alignItems:'center' }}>
-            <select value={activeTag} onChange={e=>setActiveTag(e.target.value)}
-              style={{ padding:'8px 12px', borderRadius:12, border:`1.5px solid ${activeTag?'#2563eb':'#eceae6'}`, fontSize:13, background:activeTag?'#eff6ff':'#f5f4f2', fontFamily:"'Nunito Sans',sans-serif", outline:'none', color:activeTag?'#2563eb':'#555', fontWeight:activeTag?700:400 }}>
-              <option value="">🏷️ Alle kategorier</option>
-              {LISTING_TAGS.map(t => (
-                <option key={t} value={t}>{t}</option>
-              ))}
-            </select>
-            {activeTag && (
-              <button onClick={()=>setActiveTag('')} style={{ padding:'7px 12px', borderRadius:10, border:'none', background:'#eff6ff', color:'#2563eb', fontSize:12, fontWeight:700, cursor:'pointer' }}>✕ Ryd</button>
+          {/* Row 3: multi-select tag dropdown */}
+          <div style={{ position:'relative' }}>
+            <button onClick={()=>setTagDropOpen(o=>!o)}
+              style={{ padding:'8px 14px', borderRadius:12, border:`1.5px solid ${activeTags.length?'#2563eb':'#eceae6'}`, background:activeTags.length?'#eff6ff':'#f5f4f2', fontSize:13, fontWeight:activeTags.length?700:400, color:activeTags.length?'#2563eb':'#555', cursor:'pointer', display:'flex', alignItems:'center', gap:6, whiteSpace:'nowrap' }}>
+              🏷️ Kategorier
+              {activeTags.length > 0 && <span style={{ background:'#2563eb', color:'#fff', borderRadius:99, padding:'1px 7px', fontSize:11, fontWeight:700 }}>{activeTags.length}</span>}
+              <span style={{ fontSize:10, color:'#aaa' }}>{tagDropOpen ? '▲' : '▼'}</span>
+            </button>
+            {tagDropOpen && (
+              <div style={{ position:'absolute', top:'calc(100% + 6px)', left:0, zIndex:500, background:'#fff', border:'1.5px solid #e5e5e5', borderRadius:14, boxShadow:'0 8px 28px rgba(0,0,0,0.12)', padding:12, minWidth:280 }}>
+                <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:10 }}>
+                  <span style={{ fontSize:12, fontWeight:700, color:'#555' }}>Vælg kategorier</span>
+                  {activeTags.length > 0 && <button onClick={()=>setActiveTags([])} style={{ fontSize:11, fontWeight:700, color:'#2563eb', background:'none', border:'none', cursor:'pointer' }}>Ryd alle</button>}
+                </div>
+                <div style={{ display:'flex', flexWrap:'wrap', gap:6 }}>
+                  {LISTING_TAGS.map(t => {
+                    const sel = activeTags.includes(t);
+                    return (
+                      <button key={t} onClick={()=>setActiveTags(prev => sel ? prev.filter(x=>x!==t) : [...prev, t])}
+                        style={{ padding:'5px 12px', borderRadius:99, fontSize:12, fontWeight:700, border:sel?'2px solid #2563eb':'1.5px solid #ddd', background:sel?'#eff6ff':'#f9f9f9', color:sel?'#2563eb':'#666', cursor:'pointer', transition:'all 0.12s' }}>
+                        {sel ? '✓ ' : ''}{t}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
             )}
           </div>
         </div>
@@ -756,7 +772,7 @@ function OpslagPage({ listings, loading, setPage, setActiveListing, favs, toggle
             <div style={{ fontSize:64, marginBottom:16 }}>🔍</div>
             <div style={{ fontFamily:"'Nunito',sans-serif", fontWeight:700, fontSize:20 }}>Ingen opslag fundet</div>
             <p style={{ marginTop:8, fontSize:15 }}>Prøv at ændre dine filtre</p>
-            <Btn variant="outline" onClick={()=>{ setFilter('alle'); setSearch(''); setCity('alle'); setActiveTag(''); }} radius={22} style={{ marginTop:20, padding:'11px 24px' }}>Nulstil filtre</Btn>
+            <Btn variant="outline" onClick={()=>{ setFilter('alle'); setSearch(''); setCity('alle'); setActiveTags([]); }} radius={22} style={{ marginTop:20, padding:'11px 24px' }}>Nulstil filtre</Btn>
           </div>
         ) : (
           <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fill,minmax(260px,1fr))', gap:20 }}>
