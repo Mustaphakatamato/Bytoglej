@@ -785,7 +785,7 @@ function OpslagPage({ listings, loading, setPage, setActiveListing, favs, toggle
     const cities = [...new Set(listings.map(l => l.city).filter(Boolean))];
     cities.forEach(async c => {
       if (listingCoords[c]) return;
-      const coords = await geocodeCity(c + ', Danmark');
+      const coords = await geocodeCity(c);
       if (coords) setListingCoords(prev => ({ ...prev, [c]: coords }));
     });
   }, [maxDist, viewMode, listings]);
