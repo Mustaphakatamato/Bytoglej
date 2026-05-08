@@ -751,6 +751,13 @@ function OpslagPage({ listings, loading, setPage, setActiveListing, favs, toggle
   const [maxDist, setMaxDist] = useState('alle');
   const [activeTags, setActiveTags] = useState([]);
   const [tagDropOpen, setTagDropOpen] = useState(false);
+  const tagDropRef = useRef(null);
+  useEffect(() => {
+    if (!tagDropOpen) return;
+    function handleClick(e) { if (tagDropRef.current && !tagDropRef.current.contains(e.target)) setTagDropOpen(false); }
+    document.addEventListener('mousedown', handleClick);
+    return () => document.removeEventListener('mousedown', handleClick);
+  }, [tagDropOpen]);
   const [viewMode, setViewMode] = useState('list'); // 'list' | 'map'
   const [userCoords, setUserCoords] = useState(null);
   const [userHasCoords, setUserHasCoords] = useState(null); // null=unknown, true/false
@@ -873,7 +880,7 @@ function OpslagPage({ listings, loading, setPage, setActiveListing, favs, toggle
               {!userCoords && maxDist!=='alle' && <div style={{ position:'absolute', top:'110%', left:0, background:'#fff', border:'1.5px solid #fca5a5', borderRadius:10, padding:'8px 12px', fontSize:12, color:'#b91c1c', whiteSpace:'nowrap', zIndex:10, boxShadow:'0 4px 12px rgba(0,0,0,0.1)' }}>Log ind for at bruge afstandsfilter</div>}
             </div>
             {/* Multi-select tag dropdown */}
-            <div style={{ position:'relative' }}>
+            <div ref={tagDropRef} style={{ position:'relative' }}>
               <button onClick={()=>setTagDropOpen(o=>!o)}
                 style={{ padding:'8px 14px', borderRadius:12, border:`1.5px solid ${activeTags.length?'#2563eb':'#eceae6'}`, background:activeTags.length?'#eff6ff':'#f5f4f2', fontSize:13, fontWeight:activeTags.length?700:400, color:activeTags.length?'#2563eb':'#555', cursor:'pointer', display:'flex', alignItems:'center', gap:6, whiteSpace:'nowrap' }}>
                 🏷️ Kategorier
@@ -881,7 +888,7 @@ function OpslagPage({ listings, loading, setPage, setActiveListing, favs, toggle
                 <span style={{ fontSize:10, color:'#aaa' }}>{tagDropOpen ? '▲' : '▼'}</span>
               </button>
               {tagDropOpen && (
-                <div style={{ position:'absolute', top:'calc(100% + 6px)', left:0, zIndex:500, background:'#fff', border:'1.5px solid #e5e5e5', borderRadius:14, boxShadow:'0 8px 28px rgba(0,0,0,0.12)', padding:12, minWidth:280 }}>
+                <div style={{ position:'absolute', top:'calc(100% + 6px)', left:0, zIndex:1000, background:'#fff', border:'1.5px solid #e5e5e5', borderRadius:14, boxShadow:'0 8px 28px rgba(0,0,0,0.12)', padding:12, minWidth:280 }}>
                   <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:10 }}>
                     <span style={{ fontSize:12, fontWeight:700, color:'#555' }}>Vælg kategorier</span>
                     {activeTags.length > 0 && <button onClick={()=>setActiveTags([])} style={{ fontSize:11, fontWeight:700, color:'#2563eb', background:'none', border:'none', cursor:'pointer' }}>Ryd alle</button>}
