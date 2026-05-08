@@ -1666,7 +1666,7 @@ function DashboardPage({ setPage, showToast, allListings, onListingCreated, inst
     imgPreviews.forEach(URL.revokeObjectURL);
     setImgFiles([]); setImgPreviews([]); setTipsOpen(false);
     setStep(1);
-    setForm({ title:'', type:'køb', price:'', age_group:'3-6 år', description:'', condition:'God', city:'København', emoji:'🧸', color:'#FFD166' });
+    setForm({ title:'', type:'køb', price:'', age_group:'3-6 år', description:'', condition:'God', city:'København', emoji:'🧸', color:'#FFD166', tags:[] });
     setAiSuggestion('');
   }
 
@@ -2239,9 +2239,9 @@ function DashboardPage({ setPage, showToast, allListings, onListingCreated, inst
               <label style={{ display:'block', fontSize:13, fontWeight:700, marginBottom:8 }}>Tags <span style={{ fontWeight:400, color:'#aaa' }}>(vælg op til 5)</span></label>
               <div style={{ display:'flex', gap:6, flexWrap:'wrap' }}>
                 {LISTING_TAGS.map(t => {
-                  const sel = form.tags.includes(t);
+                  const sel = (form.tags||[]).includes(t);
                   return (
-                    <button key={t} type="button" onClick={()=>setForm(f=>({ ...f, tags: sel ? f.tags.filter(x=>x!==t) : f.tags.length < 5 ? [...f.tags, t] : f.tags }))}
+                    <button key={t} type="button" onClick={()=>setForm(f=>({ ...f, tags: sel ? (f.tags||[]).filter(x=>x!==t) : (f.tags||[]).length < 5 ? [...(f.tags||[]), t] : (f.tags||[]) }))}
                       style={{ padding:'5px 12px', borderRadius:99, fontSize:12, fontWeight:700, border:sel?`2px solid #2563eb`:'2px solid #e5e5e5', background:sel?'#eff6ff':'#f9f9f9', color:sel?'#2563eb':'#777', cursor:'pointer', transition:'all 0.15s' }}>
                       {t}
                     </button>
