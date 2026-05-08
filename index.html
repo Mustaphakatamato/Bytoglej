@@ -3557,11 +3557,16 @@ function InstitutionProfilePage({ setPage, showToast, institution, onInstitution
 }
 
 // ─── APP ──────────────────────────────────────────────────────────────────────
+const ADMIN_EMAIL = 'mustaphakatamato@live.dk';
+
 function App() {
   const [page,           setPage]           = useState('home');
   const [activeListing,  setActiveListing]  = useState(null);
   const [loggedIn,       setLoggedIn]       = useState(false);
   const [institution,    setInstitution]    = useState(null);
+  const [isAdmin,        setIsAdmin]        = useState(false);
+  const [adminInst,      setAdminInst]      = useState(null);
+  const [allInstitutions,setAllInstitutions]= useState([]);
   const [toast,          setToast]          = useState(null);
   const [listings,       setListings]       = useState([]);
   const [loading,        setLoading]        = useState(true);
@@ -3571,9 +3576,13 @@ function App() {
 
   async function loadInstitution(email) {
     const e = email.toLowerCase();
+    if (e === ADMIN_EMAIL.toLowerCase()) {
+      setIsAdmin(true);
+      const { data: all } = await db.from('institutions').select('*').order('name');
+      if (all) setAllInstitutions(all);
+    }
     const { data } = await db.from('institutions').select('*').ilike('email', e).maybeSingle();
     if (data) { setInstitution(data); return; }
-    // Check if member of an institution
     const { data: mem } = await db.from('institution_members').select('role,institutions(*)').ilike('email', e).maybeSingle();
     if (mem?.institutions) setInstitution({ ...mem.institutions, _memberRole: mem.role });
   }
@@ -3607,7 +3616,7 @@ function App() {
     const { data: { subscription } } = db.auth.onAuthStateChange((event, session) => {
       if (event === 'PASSWORD_RECOVERY') { setPage('nulstil-kodeord'); return; }
       if (session) { setLoggedIn(true); loadInstitution(session.user.email); fetchUnread(session.user.id); }
-      else { setLoggedIn(false); setInstitution(null); setUnreadTotal(0); }
+      else { setLoggedIn(false); setInstitution(null); setUnreadTotal(0); setIsAdmin(false); setAdminInst(null); setAllInstitutions([]); }
     });
     return () => subscription.unsubscribe();
   }, []);
@@ -3655,9 +3664,28 @@ function App() {
   function showToast(msg, type='success') { setToast({ msg, type }); }
   function navigate(p) { setPage(p); window.scrollTo({ top:0, behavior:'smooth' }); }
 
+  const effectiveInstitution = adminInst || institution;
+
   return (
     <div>
-      <Nav page={page} setPage={navigate} loggedIn={loggedIn} setLoggedIn={setLoggedIn} unreadTotal={unreadTotal} institution={institution} />
+      {isAdmin && loggedIn && (
+        <div style={{ background:'#1a1a2e', color:'#e0e0ff', padding:'8px 20px', display:'flex', alignItems:'center', gap:12, fontSize:13, fontFamily:"'Nunito Sans',sans-serif", position:'relative', zIndex:9999, flexWrap:'wrap' }}>
+          <span style={{ fontWeight:700, color:'#a78bfa' }}>🔧 Admin</span>
+          <select
+            value={adminInst?.id || ''}
+            onChange={e => { const i = allInstitutions.find(x => x.id === e.target.value); setAdminInst(i || null); }}
+            style={{ background:'#2d2d4e', color:'#e0e0ff', border:'1px solid #4a4a6e', borderRadius:6, padding:'4px 10px', fontSize:12, cursor:'pointer', maxWidth:280 }}
+          >
+            <option value="">— Vælg institution at se som —</option>
+            {allInstitutions.map(i => <option key={i.id} value={i.id}>{i.name}{i.city ? ` · ${i.city}` : ''}</option>)}
+          </select>
+          {adminInst
+            ? <><span style={{ color:'#a78bfa' }}>Viser som: <strong style={{ color:'#fff' }}>{adminInst.name}</strong></span><button onClick={()=>setAdminInst(null)} style={{ background:'#3d2d6e', color:'#e0e0ff', border:'none', borderRadius:6, padding:'3px 10px', cursor:'pointer', fontSize:11, fontWeight:700 }}>✕ Afslut</button></>
+            : <span style={{ color:'#6b7280', fontSize:11 }}>Ingen institution valgt — viser din egen</span>
+          }
+        </div>
+      )}
+      <Nav page={page} setPage={navigate} loggedIn={loggedIn} setLoggedIn={setLoggedIn} unreadTotal={unreadTotal} institution={effectiveInstitution} />
 
       {page==='home'      && <HomePage setPage={navigate} setActiveListing={setActiveListing} listings={listings} loading={loading} favs={favs} toggleFav={toggleFav} />}
       {page==='opslag'    && <OpslagPage listings={listings} loading={loading} setPage={navigate} setActiveListing={setActiveListing} favs={favs} toggleFav={toggleFav} />}
@@ -3666,8 +3694,8 @@ function App() {
       {page==='signup'         && <SignupPage setPage={navigate} setLoggedIn={setLoggedIn} showToast={showToast} />}
       {page==='glemt-kodeord'  && <ForgotPasswordPage setPage={navigate} />}
       {page==='nulstil-kodeord'&& <ResetPasswordPage setPage={navigate} setLoggedIn={setLoggedIn} />}
-      {page==='dashboard' && <DashboardPage setPage={navigate} showToast={showToast} allListings={listings} onListingCreated={fetchListings} institution={institution} onInstitutionChange={setInstitution} favs={favs} toggleFav={toggleFav} setActiveListing={setActiveListing} unreadTotal={unreadTotal} />}
-      {page==='profil'    && <InstitutionProfilePage setPage={navigate} showToast={showToast} institution={institution} onInstitutionChange={setInstitution} />}
+      {page==='dashboard' && <DashboardPage setPage={navigate} showToast={showToast} allListings={listings} onListingCreated={fetchListings} institution={effectiveInstitution} onInstitutionChange={adminInst ? i=>setAdminInst(i) : setInstitution} favs={favs} toggleFav={toggleFav} setActiveListing={setActiveListing} unreadTotal={unreadTotal} />}
+      {page==='profil'    && <InstitutionProfilePage setPage={navigate} showToast={showToast} institution={effectiveInstitution} onInstitutionChange={adminInst ? i=>setAdminInst(i) : setInstitution} />}
       {page==='hvordan'   && <HowItWorksPage setPage={navigate} />}
       {page==='om-os'     && <OmOsPage setPage={navigate} />}
       {page==='kontakt'   && <KontaktPage />}
