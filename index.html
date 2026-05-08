@@ -314,8 +314,8 @@ function ListingCard({ listing, onClick, favs, toggleFav }) {
     setTimeout(()=>setPopping(false), 350);
     const newCount = Math.max(0, localFavCount + (adding ? 1 : -1));
     setLocalFavCount(newCount);
-    db.from('listings').update({ fav_count: newCount }).eq('id', listing.id)
-      .then(({ error }) => { if (error) console.error('[fav_count update error]', error); });
+    db.from('listings').update({ fav_count: newCount }).eq('id', listing.id).select()
+      .then(({ data, error }) => { console.log('[fav_count]', { newCount, id: listing.id, data, error }); });
   }
   function prevImg(e) { e.stopPropagation(); setImgIdx(i => (i - 1 + imgs.length) % imgs.length); }
   function nextImg(e) { e.stopPropagation(); setImgIdx(i => (i + 1) % imgs.length); }
