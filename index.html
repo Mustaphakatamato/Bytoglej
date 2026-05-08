@@ -2080,13 +2080,12 @@ function DashboardPage({ setPage, showToast, allListings, onListingCreated, inst
               </h1>
               <p style={{ color:'#888', fontSize:14, marginTop:4, display:'flex', alignItems:'center', gap:8, flexWrap:'wrap' }}>
                 <span>{institution ? `CVR: ${institution.cvr} · ${institution.city}` : instLoading ? '…' : 'Institution ikke fundet'}</span>
-                {institution && isAdmin && <button onClick={openEditProfile} style={{ background:'none', border:'none', color:PRIMARY, fontSize:13, fontWeight:700, cursor:'pointer', padding:0, display:'flex', alignItems:'center', gap:4 }}>✏️ Rediger profil</button>}
                 {institution?._memberRole && <span style={{ background:'#e8f0fb', color:ACCENT2, borderRadius:99, padding:'2px 10px', fontSize:11, fontWeight:700 }}>Medarbejder</span>}
               </p>
             </div>
           </div>
           <div style={{ display:'flex', gap:10, flexWrap:'wrap' }}>
-            {isAdmin && <Btn variant="outline" radius={22} onClick={openEditProfile} style={{ fontSize:isMobile?12:13, padding:isMobile?'8px 14px':'10px 18px' }}>✏️ Rediger profil</Btn>}
+            {institution && <Btn variant="outline" radius={22} onClick={openEditProfile} style={{ fontSize:isMobile?12:13, padding:isMobile?'8px 14px':'10px 18px' }}>✏️ Rediger profil</Btn>}
             {isAdmin && <Btn variant="outline" radius={22} onClick={()=>{ setMembersOpen(true); fetchMembers(); }} style={{ fontSize:isMobile?12:13, padding:isMobile?'8px 14px':'10px 18px' }}>👥 Brugere</Btn>}
             <Btn variant="primary" color={PRIMARY} radius={22} onClick={()=>setNewOpen(true)} style={{ fontSize:isMobile?14:15, padding:isMobile?'10px 18px':'12px 24px' }}>+ Opret opslag</Btn>
           </div>
@@ -2115,7 +2114,7 @@ function DashboardPage({ setPage, showToast, allListings, onListingCreated, inst
           <div style={{ background:'#fff', borderRadius:22, padding:isMobile?20:28, boxShadow:'0 2px 12px rgba(0,0,0,0.06)', marginBottom:isMobile?16:24 }}>
             <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:20, flexWrap:'wrap', gap:10 }}>
               <h2 style={{ fontFamily:"'Nunito',sans-serif", fontWeight:800, fontSize:20, margin:0 }}>Institutionsprofil</h2>
-              {isAdmin && <Btn variant="outline" radius={22} onClick={openEditProfile} style={{ fontSize:13, padding:'8px 18px', gap:6 }}>✏️ Rediger oplysninger</Btn>}
+              <Btn variant="outline" radius={22} onClick={openEditProfile} style={{ fontSize:13, padding:'8px 18px', gap:6 }}>✏️ Rediger oplysninger</Btn>
             </div>
             <div style={{ display:'grid', gridTemplateColumns:isMobile?'1fr':'1fr 1fr', gap:isMobile?12:20 }}>
               <div style={{ display:'flex', flexDirection:'column', gap:12 }}>
