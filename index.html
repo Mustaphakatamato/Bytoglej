@@ -2045,8 +2045,10 @@ function DashboardPage({ setPage, showToast, allListings, onListingCreated, inst
           .order('last_message_at', { ascending: false });
         incoming = inc;
       } else {
+        const ownerParts = [`owner_id.eq.${user.id}`];
+        if (inst?.name) ownerParts.push(`owner_name.eq.${inst.name}`);
         const { data: inc } = await db.from('conversations')
-          .select('*').eq('owner_id', user.id)
+          .select('*').or(ownerParts.join(','))
           .order('last_message_at', { ascending: false });
         incoming = inc;
       }
@@ -2751,7 +2753,7 @@ function relTime(ts) {
 
 // ─── MESSAGES PAGE ────────────────────────────────────────────────────────────
 function MessagesPage({ setPage, selectedConvId, setSelectedConvId, setActiveListing }) {
-  const { isAdminView: ctxIsAdmin, adminInstName } = useActiveUser();
+  const { isAdminView: ctxIsAdmin, adminInstName, institution: ctxInstitution } = useActiveUser();
   const [userId,      setUserId]      = useState(null);
   const [userEmail,   setUserEmail]   = useState(null);
   const [convs,       setConvs]       = useState([]);
@@ -2820,9 +2822,12 @@ function MessagesPage({ setPage, selectedConvId, setSelectedConvId, setActiveLis
 
   useEffect(() => {
     if (!userId) return;
-    const ch = db.channel('convs-rt').on('postgres_changes', { event:'*', schema:'public', table:'conversations' }, () => loadConvs(userId)).subscribe();
+    const ch = db.channel('convs-rt').on('postgres_changes', { event:'*', schema:'public', table:'conversations' }, () => {
+      if (ctxIsAdmin && adminInstName) loadConvsByName(adminInstName);
+      else loadConvs(userId);
+    }).subscribe();
     return () => db.removeChannel(ch);
-  }, [userId]);
+  }, [userId, ctxIsAdmin, adminInstName]);
 
   useEffect(() => {
     if (!userEmail) return;
@@ -2835,8 +2840,14 @@ function MessagesPage({ setPage, selectedConvId, setSelectedConvId, setActiveLis
 
   async function loadConvs(uid) {
     setLoading(true);
+    // Match på institution-navn i tillæg til user-id, så opslag med user_id=null også virker
+    const instName = ctxInstitution?.name;
+    const orParts = [`initiator_id.eq.${uid}`, `owner_id.eq.${uid}`];
+    if (instName) {
+      orParts.push(`owner_name.eq.${instName}`, `initiator_name.eq.${instName}`);
+    }
     const { data } = await db.from('conversations').select('*')
-      .or(`initiator_id.eq.${uid},owner_id.eq.${uid}`)
+      .or(orParts.join(','))
       .order('last_message_at', { ascending: false });
     if (data) setConvs(data);
     setLoading(false);
