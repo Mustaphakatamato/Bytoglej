@@ -1962,25 +1962,25 @@ function DashboardPage({ setPage, showToast, allListings, onListingCreated, inst
 
   // Feature #5: Edit profile handlers
   function openEditProfile() {
-    if (!institution) return;
     setEditProfileForm({
-      institution_type: institution.institution_type || '',
-      ownership_type: institution.ownership_type || '',
-      address: institution.address || '',
-      zipcode: institution.zipcode || '',
-      city: institution.city || '',
-      children_count: institution.children_count || '',
-      phone: institution.phone || '',
-      website: institution.website || '',
-      leader_name: institution.leader_name || '',
-      leader_phone: institution.leader_phone || '',
-      leader_email: institution.leader_email || '',
-      contact_name: institution.contact_name || '',
+      institution_type: institution?.institution_type || '',
+      ownership_type: institution?.ownership_type || '',
+      address: institution?.address || '',
+      zipcode: institution?.zipcode || '',
+      city: institution?.city || '',
+      children_count: institution?.children_count || '',
+      phone: institution?.phone || '',
+      website: institution?.website || '',
+      leader_name: institution?.leader_name || '',
+      leader_phone: institution?.leader_phone || '',
+      leader_email: institution?.leader_email || '',
+      contact_name: institution?.contact_name || '',
     });
     setEditProfileOpen(true);
   }
   async function handleSaveProfile() {
-    if (!institution || !editProfileForm) return;
+    if (!editProfileForm) return;
+    if (!institution) { showToast('Ingen institution fundet — opret din institution først', 'error'); return; }
     setEditProfileSaving(true);
     const { error } = await db.from('institutions').update({
       institution_type: editProfileForm.institution_type,
@@ -2085,7 +2085,7 @@ function DashboardPage({ setPage, showToast, allListings, onListingCreated, inst
             </div>
           </div>
           <div style={{ display:'flex', gap:10, flexWrap:'wrap' }}>
-            {institution && <Btn variant="outline" radius={22} onClick={openEditProfile} style={{ fontSize:isMobile?12:13, padding:isMobile?'8px 14px':'10px 18px' }}>✏️ Rediger profil</Btn>}
+            {authUserId && <Btn variant="outline" radius={22} onClick={openEditProfile} style={{ fontSize:isMobile?12:13, padding:isMobile?'8px 14px':'10px 18px' }}>✏️ Rediger profil</Btn>}
             {isAdmin && <Btn variant="outline" radius={22} onClick={()=>{ setMembersOpen(true); fetchMembers(); }} style={{ fontSize:isMobile?12:13, padding:isMobile?'8px 14px':'10px 18px' }}>👥 Brugere</Btn>}
             <Btn variant="primary" color={PRIMARY} radius={22} onClick={()=>setNewOpen(true)} style={{ fontSize:isMobile?14:15, padding:isMobile?'10px 18px':'12px 24px' }}>+ Opret opslag</Btn>
           </div>
