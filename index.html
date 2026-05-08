@@ -2162,7 +2162,7 @@ function DashboardPage({ setPage, showToast, allListings, onListingCreated, inst
       const { data } = await db.from('institutions').select('*').eq('email', user.email).maybeSingle();
       if (data) { inst = data; setInstitution(data); }
     }
-    const { data: listing, error } = await db.from('listings').insert({
+    const insertData = {
       title: form.title, type: form.type,
       price: form.type==='køb' ? Number(form.price)||null : null,
       age_group: form.age_group, description: form.description,
@@ -2171,9 +2171,10 @@ function DashboardPage({ setPage, showToast, allListings, onListingCreated, inst
       user_id: user?.id || null,
       emoji: form.emoji, color: form.color,
       tags: form.tags || [], images: [], bid_count: 0, is_active: true,
-      min_bid: form.type==='byd' && form.min_bid ? Number(form.min_bid) : null,
-    }).select().single();
-    if (error) { showToast('Noget gik galt — prøv igen', 'error'); setSaving(false); return; }
+    };
+    if (form.type==='byd' && form.min_bid) insertData.min_bid = Number(form.min_bid);
+    const { data: listing, error } = await db.from('listings').insert(insertData).select().single();
+    if (error) { console.error('Listing insert error:', error); showToast('Noget gik galt — prøv igen', 'error'); setSaving(false); return; }
     if (imgFiles.length > 0) {
       const urls = [];
       for (const file of imgFiles) {
