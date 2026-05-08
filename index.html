@@ -1103,7 +1103,10 @@ function ListingDetailPage({ listing, setPage, showToast, onStartConv, favs, tog
     showToast(`Opslag delt med ${selectedEmails.length} medarbejder${selectedEmails.length > 1 ? 'e' : ''}! 📤`);
   }
 
-  const isOwn = currentUserId && listing.user_id && currentUserId === listing.user_id;
+  const { isAdminView: ctxIsAdmin, adminInstName } = useActiveUser();
+  const isOwn = ctxIsAdmin && adminInstName
+    ? listing.institution_name === adminInstName
+    : (currentUserId && listing.user_id && currentUserId === listing.user_id);
 
   async function handleBuy() {
     setSaving(true);
