@@ -2757,9 +2757,10 @@ function MessagesPage({ setPage, selectedConvId, setSelectedConvId, setActiveLis
   async function deleteConv(conv, e) {
     e.stopPropagation();
     if (!window.confirm('Slet denne samtale permanent?')) return;
+    await db.from('chat_messages').delete().eq('conversation_id', conv.id);
     await db.from('conversations').delete().eq('id', conv.id);
     setConvs(cs => cs.filter(c => c.id !== conv.id));
-    if (active?.id === conv.id) setActive(null);
+    if (active?.id === conv.id) { setActive(null); setMsgs([]); }
   }
 
   async function handleAcceptBid(msg) {
