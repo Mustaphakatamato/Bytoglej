@@ -1011,6 +1011,7 @@ function ImageGallery({ images, color, emoji }) {
 // ─── LISTING DETAIL ───────────────────────────────────────────────────────────
 function ListingDetailPage({ listing, setPage, showToast, onStartConv, favs, toggleFav, setSelectedConvId, loggedIn }) {
   const [buyModal,  setBuyModal]  = useState(false);
+  const [buyStep,   setBuyStep]   = useState(1);
   const [bidModal,  setBidModal]  = useState(false);
   const [swapModal, setSwapModal] = useState(false);
   const [bidAmount, setBidAmount] = useState('');
@@ -1029,6 +1030,7 @@ function ListingDetailPage({ listing, setPage, showToast, onStartConv, favs, tog
   const [shareNote, setShareNote] = useState('');
   const [shareSending, setShareSending] = useState(false);
   const [myInstName, setMyInstName] = useState(null);
+  const [existingBid, setExistingBid] = useState(null); // pending bid by current user
 
   useEffect(() => {
     db.auth.getUser().then(async ({ data:{ user } }) => {
@@ -1052,6 +1054,14 @@ function ListingDetailPage({ listing, setPage, showToast, onStartConv, favs, tog
           const adminEntry = { id: 'admin', email: mem.institutions.email, role: 'admin' };
           setTeamMembers([adminEntry, ...(mems||[])]);
         }
+      }
+      // Fetch live bid_count and existing pending bid
+      const { data: liveList } = await db.from('listings').select('bid_count').eq('id', listing.id).maybeSingle();
+      if (liveList) setBidCount(liveList.bid_count || 0);
+      const { data: existingConv } = await db.from('conversations').select('id').eq('listing_id', listing.id).eq('initiator_id', user.id).maybeSingle();
+      if (existingConv) {
+        const { data: pendingBid } = await db.from('chat_messages').select('*').eq('conversation_id', existingConv.id).eq('message_type', 'bid').eq('bid_status', 'pending').order('created_at', { ascending: false }).limit(1).maybeSingle();
+        if (pendingBid) setExistingBid(pendingBid);
       }
     });
   }, []);
@@ -1097,32 +1107,51 @@ function ListingDetailPage({ listing, setPage, showToast, onStartConv, favs, tog
 
   async function handleBuy() {
     setSaving(true);
-    await db.from('messages').insert({ listing_id:listing.id, sender_name:'Anonym Institution', message:`Interesseret i køb: ${listing.title}` });
-    setSaving(false); setBuyModal(false);
-    showToast('Køb bekræftet! Institutionen kontakter jer snart.');
+    try {
+      const { data: { user } } = await db.auth.getUser();
+      const { data: inst } = await db.from('institutions').select('name').ilike('email', user.email).maybeSingle();
+      const buyerName = inst?.name || myInstName || user.email;
+      const buyMsg = `🏷️ ${buyerName} ønsker at købe "${listing.title}" til ${listing.price} kr.`;
+      let convId = null;
+      const { data: existing } = await db.from('conversations').select('id,owner_unread').eq('listing_id', listing.id).eq('initiator_id', user.id).maybeSingle();
+      if (existing) {
+        convId = existing.id;
+      } else {
+        const { data: conv } = await db.from('conversations').insert({
+          listing_id: listing.id, listing_title: listing.title,
+          listing_emoji: listing.emoji, listing_color: listing.color,
+          listing_image: listing.images?.[0] || null,
+          initiator_id: user.id, initiator_name: buyerName,
+          owner_id: listing.user_id, owner_name: listing.institution_name,
+        }).select().single();
+        convId = conv?.id;
+      }
+      if (convId) {
+        await db.from('chat_messages').insert({ conversation_id: convId, sender_id: user.id, sender_name: buyerName, content: buyMsg });
+        await db.from('conversations').update({ last_message: buyMsg, last_message_at: new Date().toISOString(), owner_unread: (existing?.owner_unread||0)+1 }).eq('id', convId);
+        if (setSelectedConvId) setSelectedConvId(convId);
+      }
+    } catch {}
+    setSaving(false); setBuyModal(false); setBuyStep(1);
+    showToast('Køb bekræftet! Sælger er notificeret via beskeder.');
+    setPage('beskeder');
   }
   async function handleBid() {
     if (!bidAmount) return;
     if (!currentUserId) { showToast('Log ind for at byde', 'error'); return; }
+    if (listing.min_bid && Number(bidAmount) < listing.min_bid) {
+      showToast(`Mindste bud er ${listing.min_bid} kr.`, 'error'); return;
+    }
     setSaving(true);
     const newCount = bidCount + 1;
-    await Promise.all([
-      db.from('bids').insert({ listing_id: listing.id, bidder_name: 'Anonym Institution', amount: Number(bidAmount) }),
-      db.from('listings').update({ bid_count: newCount }).eq('id', listing.id)
-    ]);
-    // Create or find conversation, then insert bid message
     try {
       const { data: { user } } = await db.auth.getUser();
-      const { data: inst } = await db.from('institutions').select('name').eq('email', user.email).maybeSingle();
+      const { data: inst } = await db.from('institutions').select('name').ilike('email', user.email).maybeSingle();
       const userName = inst?.name || user.email;
-      let convId = null;
-      let ownerUnread = 0;
-      const { data: existing } = await db.from('conversations')
-        .select('id,owner_unread').eq('listing_id', listing.id).eq('initiator_id', currentUserId).maybeSingle();
-      if (existing) {
-        convId = existing.id;
-        ownerUnread = existing.owner_unread || 0;
-      } else {
+      let convId = null; let ownerUnread = 0;
+      const { data: existing } = await db.from('conversations').select('id,owner_unread').eq('listing_id', listing.id).eq('initiator_id', currentUserId).maybeSingle();
+      if (existing) { convId = existing.id; ownerUnread = existing.owner_unread || 0; }
+      else {
         const { data: conv } = await db.from('conversations').insert({
           listing_id: listing.id, listing_title: listing.title,
           listing_emoji: listing.emoji, listing_color: listing.color,
@@ -1134,24 +1163,30 @@ function ListingDetailPage({ listing, setPage, showToast, onStartConv, favs, tog
       }
       if (convId) {
         const bidMsg = `Bud: ${bidAmount} kr.`;
-        await db.from('chat_messages').insert({
+        const { data: newBidMsg } = await db.from('chat_messages').insert({
           conversation_id: convId, sender_id: currentUserId, sender_name: userName,
-          content: bidMsg, message_type: 'bid',
-          bid_amount: Number(bidAmount), bid_status: 'pending',
-        });
-        await db.from('conversations').update({
-          last_message: bidMsg, last_message_at: new Date().toISOString(),
-          owner_unread: ownerUnread + 1,
-        }).eq('id', convId);
-        setSaving(false); setBidCount(newCount); setBidModal(false);
+          content: bidMsg, message_type: 'bid', bid_amount: Number(bidAmount), bid_status: 'pending',
+        }).select().single();
+        await db.from('conversations').update({ last_message: bidMsg, last_message_at: new Date().toISOString(), owner_unread: ownerUnread+1 }).eq('id', convId);
+        await db.from('listings').update({ bid_count: newCount }).eq('id', listing.id);
+        setBidCount(newCount); setBidModal(false); setSaving(false);
+        if (newBidMsg) setExistingBid(newBidMsg);
         showToast(`Bud på ${bidAmount} kr. afsendt! 🎉`);
         if (setSelectedConvId) setSelectedConvId(convId);
-        setPage('beskeder');
-        return;
+        setPage('beskeder'); return;
       }
-    } catch {}
-    setSaving(false); setBidCount(newCount); setBidModal(false);
-    showToast(`Bud på ${bidAmount} kr. afsendt! 🎉`);
+    } catch(err) { console.error(err); }
+    setSaving(false); setBidModal(false);
+  }
+
+  async function handleWithdrawBid() {
+    if (!existingBid) return;
+    if (!window.confirm('Træk dit bud tilbage?')) return;
+    await db.from('chat_messages').update({ bid_status: 'withdrawn' }).eq('id', existingBid.id);
+    const newCount = Math.max(0, bidCount - 1);
+    await db.from('listings').update({ bid_count: newCount }).eq('id', listing.id);
+    setBidCount(newCount); setExistingBid(null);
+    showToast('Bud trukket tilbage');
   }
   async function handleSwap() {
     const chosen = ownListings.find(l => l.id === selectedSwapId);
@@ -1276,34 +1311,76 @@ function ListingDetailPage({ listing, setPage, showToast, onStartConv, favs, tog
         </div>
       </div>
 
-      <Modal open={buyModal} onClose={()=>setBuyModal(false)} title="Bekræft køb">
-        <div style={{ display:'flex', flexDirection:'column', gap:16 }}>
-          <div style={{ background:'#f8f7f5', borderRadius:12, padding:16 }}>
-            <div style={{ fontFamily:"'Nunito',sans-serif", fontWeight:700, fontSize:16 }}>{listing.title}</div>
-            <div style={{ color:'#888', fontSize:13, marginTop:4 }}>{listing.institution_name} · {listing.city}</div>
+      <Modal open={buyModal} onClose={()=>{ setBuyModal(false); setBuyStep(1); }} title={buyStep===1?"Køb vare":"Er du sikker?"}>
+        {buyStep===1 ? (
+          <div style={{ display:'flex', flexDirection:'column', gap:16 }}>
+            <div style={{ background:'#f8f7f5', borderRadius:12, padding:16 }}>
+              <div style={{ fontFamily:"'Nunito',sans-serif", fontWeight:700, fontSize:16 }}>{listing.title}</div>
+              <div style={{ color:'#888', fontSize:13, marginTop:4 }}>{listing.institution_name} · {listing.city}</div>
+            </div>
+            <div style={{ display:'flex', justifyContent:'space-between', fontSize:15, fontWeight:600 }}>
+              <span>Pris</span>
+              <span style={{ color:PRIMARY, fontFamily:"'Nunito',sans-serif", fontWeight:900, fontSize:18 }}>{listing.price} kr.</span>
+            </div>
+            <div style={{ background:'#fffbef', border:'1.5px solid #ffe08a', borderRadius:10, padding:'12px 14px', fontSize:13, color:'#7a6000' }}>💡 Betaling og afhentning aftales direkte med institutionen efter bekræftelse.</div>
+            <Btn variant="primary" color={PRIMARY} radius={22} onClick={()=>setBuyStep(2)} style={{ justifyContent:'center', padding:'14px', fontSize:15 }}>Fortsæt →</Btn>
+            <Btn variant="ghost" onClick={()=>{ setBuyModal(false); setBuyStep(1); }} style={{ justifyContent:'center' }}>Annuller</Btn>
           </div>
-          <div style={{ display:'flex', justifyContent:'space-between', fontSize:15, fontWeight:600 }}>
-            <span>Pris</span>
-            <span style={{ color:PRIMARY, fontFamily:"'Nunito',sans-serif", fontWeight:900, fontSize:18 }}>{listing.price} kr.</span>
+        ) : (
+          <div style={{ display:'flex', flexDirection:'column', gap:16 }}>
+            <div style={{ background:'#e8f5ee', border:`2px solid ${PRIMARY}`, borderRadius:12, padding:16, textAlign:'center' }}>
+              <div style={{ fontSize:32, marginBottom:8 }}>🛒</div>
+              <div style={{ fontFamily:"'Nunito',sans-serif", fontWeight:800, fontSize:16 }}>Bekræft køb af</div>
+              <div style={{ fontFamily:"'Nunito',sans-serif", fontWeight:700, fontSize:15, color:PRIMARY, marginTop:4 }}>{listing.title}</div>
+              <div style={{ fontWeight:900, fontSize:22, color:PRIMARY, marginTop:8 }}>{listing.price} kr.</div>
+              <div style={{ color:'#888', fontSize:13, marginTop:4 }}>fra {listing.institution_name}</div>
+            </div>
+            <div style={{ fontSize:13, color:'#666', textAlign:'center' }}>Sælger modtager en besked og kontakter dig for at aftale betaling og afhentning.</div>
+            <Btn variant="primary" color={PRIMARY} radius={22} onClick={handleBuy} disabled={saving} style={{ justifyContent:'center', padding:'14px', fontSize:15 }}>{saving?<><Spinner/>Sender…</>:'✅ Bekræft køb'}</Btn>
+            <Btn variant="ghost" onClick={()=>setBuyStep(1)} style={{ justifyContent:'center' }}>← Tilbage</Btn>
           </div>
-          <div style={{ background:'#fffbef', border:'1.5px solid #ffe08a', borderRadius:10, padding:'12px 14px', fontSize:13, color:'#7a6000' }}>💡 Betaling og afhentning aftales direkte med institutionen.</div>
-          <Btn variant="primary" color={PRIMARY} radius={22} onClick={handleBuy} disabled={saving} style={{ justifyContent:'center', padding:'14px', fontSize:15 }}>{saving?<><Spinner/>Bekræfter…</>:'Bekræft køb'}</Btn>
-          <Btn variant="ghost" onClick={()=>setBuyModal(false)} style={{ justifyContent:'center' }}>Annuller</Btn>
-        </div>
+        )}
       </Modal>
 
       <Modal open={bidModal} onClose={()=>setBidModal(false)} title="Afgiv bud">
         <div style={{ display:'flex', flexDirection:'column', gap:16 }}>
           <div style={{ background:'#f8f7f5', borderRadius:12, padding:16 }}>
             <div style={{ fontFamily:"'Nunito',sans-serif", fontWeight:700, fontSize:16 }}>{listing.title}</div>
-            <div style={{ color:'#888', fontSize:13, marginTop:4 }}>{bidCount} nuværende bud</div>
+            <div style={{ color:'#888', fontSize:13, marginTop:4 }}>{bidCount} nuværende bud{listing.min_bid ? ` · Mindste bud: ${listing.min_bid} kr.` : ''}</div>
           </div>
-          <div>
-            <label style={{ display:'block', fontSize:13, fontWeight:700, marginBottom:8 }}>Dit bud (kr.)</label>
-            <input type="number" value={bidAmount} onChange={e=>setBidAmount(e.target.value)} placeholder="Fx 150" style={{ width:'100%', padding:'12px 14px', borderRadius:12, border:'1.5px solid #e5e5e5', fontSize:16, fontFamily:"'Nunito',sans-serif", fontWeight:700, outline:'none' }} />
-          </div>
-          <Btn variant="primary" color={ACCENT2} radius={22} onClick={handleBid} disabled={saving||!bidAmount} style={{ justifyContent:'center', padding:'14px', fontSize:15 }}>{saving?<><Spinner/>Sender…</>:'Send bud'}</Btn>
-          <Btn variant="ghost" onClick={()=>setBidModal(false)} style={{ justifyContent:'center' }}>Annuller</Btn>
+          {existingBid ? (
+            <div style={{ display:'flex', flexDirection:'column', gap:12 }}>
+              <div style={{ background:'#e8f0fb', border:`2px solid ${ACCENT2}`, borderRadius:12, padding:16, textAlign:'center' }}>
+                <div style={{ fontSize:13, color:'#666', marginBottom:4 }}>Dit aktuelle bud</div>
+                <div style={{ fontFamily:"'Nunito',sans-serif", fontWeight:900, fontSize:26, color:ACCENT2 }}>{existingBid.bid_amount} kr.</div>
+                <div style={{ fontSize:12, color:'#888', marginTop:4 }}>⏳ Afventer svar fra sælger</div>
+              </div>
+              <div>
+                <label style={{ display:'block', fontSize:13, fontWeight:700, marginBottom:8 }}>Opdater dit bud (kr.)</label>
+                <input type="number" value={bidAmount} onChange={e=>setBidAmount(e.target.value)} placeholder={`Fx ${existingBid.bid_amount}`} style={{ width:'100%', padding:'12px 14px', borderRadius:12, border:'1.5px solid #e5e5e5', fontSize:16, fontFamily:"'Nunito',sans-serif", fontWeight:700, outline:'none' }} />
+                {listing.min_bid && bidAmount && Number(bidAmount) < listing.min_bid && <p style={{ fontSize:12, color:'#e11d48', marginTop:4 }}>Mindste bud er {listing.min_bid} kr.</p>}
+              </div>
+              <Btn variant="primary" color={ACCENT2} radius={22} onClick={async()=>{
+                if (!bidAmount || (listing.min_bid && Number(bidAmount)<listing.min_bid)) return;
+                setSaving(true);
+                await db.from('chat_messages').update({ bid_amount: Number(bidAmount) }).eq('id', existingBid.id);
+                setExistingBid(e => ({...e, bid_amount: Number(bidAmount)}));
+                setSaving(false); setBidModal(false); setBidAmount('');
+                showToast('Bud opdateret ✓');
+              }} disabled={saving||!bidAmount} style={{ justifyContent:'center', padding:'14px', fontSize:15 }}>{saving?<><Spinner/>…</>:'Opdater bud'}</Btn>
+              <Btn variant="ghost" onClick={handleWithdrawBid} style={{ justifyContent:'center', color:'#e11d48' }}>🗑️ Træk bud tilbage</Btn>
+            </div>
+          ) : (
+            <>
+              <div>
+                <label style={{ display:'block', fontSize:13, fontWeight:700, marginBottom:8 }}>Dit bud (kr.){listing.min_bid ? ` — minimum ${listing.min_bid} kr.` : ''}</label>
+                <input type="number" value={bidAmount} onChange={e=>setBidAmount(e.target.value)} placeholder={listing.min_bid ? `Minimum ${listing.min_bid} kr.` : 'Fx 150'} min={listing.min_bid||1} style={{ width:'100%', padding:'12px 14px', borderRadius:12, border:'1.5px solid #e5e5e5', fontSize:16, fontFamily:"'Nunito',sans-serif", fontWeight:700, outline:'none' }} />
+                {listing.min_bid && bidAmount && Number(bidAmount) < listing.min_bid && <p style={{ fontSize:12, color:'#e11d48', marginTop:4 }}>Mindste bud er {listing.min_bid} kr.</p>}
+              </div>
+              <Btn variant="primary" color={ACCENT2} radius={22} onClick={handleBid} disabled={saving||!bidAmount||(listing.min_bid&&Number(bidAmount)<listing.min_bid)} style={{ justifyContent:'center', padding:'14px', fontSize:15 }}>{saving?<><Spinner/>Sender…</>:'Send bud'}</Btn>
+            </>
+          )}
+          <Btn variant="ghost" onClick={()=>setBidModal(false)} style={{ justifyContent:'center' }}>Luk</Btn>
         </div>
       </Modal>
 
@@ -2068,7 +2145,7 @@ function DashboardPage({ setPage, showToast, allListings, onListingCreated, inst
     imgPreviews.forEach(URL.revokeObjectURL);
     setImgFiles([]); setImgPreviews([]); setTipsOpen(false);
     setStep(1);
-    setForm({ title:'', type:'køb', price:'', age_group:'3-6 år', description:'', condition:'God', emoji:'🧸', color:'#FFD166', tags:[] });
+    setForm({ title:'', type:'køb', price:'', age_group:'3-6 år', description:'', condition:'God', emoji:'🧸', color:'#FFD166', tags:[], min_bid:'' });
   }
 
   async function handleCreate() {
@@ -2093,8 +2170,8 @@ function DashboardPage({ setPage, showToast, allListings, onListingCreated, inst
       institution_name: inst?.name || 'Min institution',
       user_id: user?.id || null,
       emoji: form.emoji, color: form.color,
-      tags: form.tags || [],
-      images: [], bid_count: 0, is_active: true
+      tags: form.tags || [], images: [], bid_count: 0, is_active: true,
+      min_bid: form.type==='byd' && form.min_bid ? Number(form.min_bid) : null,
     }).select().single();
     if (error) { showToast('Noget gik galt — prøv igen', 'error'); setSaving(false); return; }
     if (imgFiles.length > 0) {
@@ -2274,8 +2351,8 @@ function DashboardPage({ setPage, showToast, allListings, onListingCreated, inst
             ))}
           </div>
 
-          {/* Mine favoritter — skjult i admin-view */}
-          {!ctxIsAdmin && <div style={{ background:'#fff', borderRadius:22, padding:28, boxShadow:'0 2px 12px rgba(0,0,0,0.06)' }}>
+          {/* Mine favoritter */}
+          <div style={{ background:'#fff', borderRadius:22, padding:28, boxShadow:'0 2px 12px rgba(0,0,0,0.06)' }}>
             <div style={{ display:'flex', alignItems:'center', gap:10, marginBottom:20 }}>
               <h2 style={{ fontFamily:"'Nunito',sans-serif", fontWeight:800, fontSize:20 }}>Mine favoritter</h2>
               {favListings.length>0 && <div style={{ background:'#fff0f3', border:'1.5px solid #fca5a5', borderRadius:99, padding:'2px 10px', fontSize:12, fontWeight:700, color:'#e11d48' }}>{favListings.length}</div>}
@@ -2302,7 +2379,7 @@ function DashboardPage({ setPage, showToast, allListings, onListingCreated, inst
                 </div>
               </div>
             ))}
-          </div>}
+          </div>
         </div>
 
         {/* Feature #15: Incoming requests section */}
@@ -2489,6 +2566,12 @@ function DashboardPage({ setPage, showToast, allListings, onListingCreated, inst
                 {!form.price && <p style={{ fontSize:12, color:'#e53e3e', marginTop:4 }}>Pris er påkrævet ved køb-opslag</p>}
               </div>
             )}
+            {form.type==='byd' && (
+              <div>
+                <label style={{ display:'block', fontSize:13, fontWeight:700, marginBottom:6 }}>Mindste bud (kr.) <span style={{ fontWeight:400, color:'#aaa' }}>— valgfri</span></label>
+                <input type="number" value={form.min_bid||''} onChange={e=>setForm({...form,min_bid:e.target.value})} placeholder="Fx 100 — lad stå tom for intet minimum" min="1" style={{ width:'100%', padding:'11px 14px', borderRadius:10, border:'1.5px solid #e5e5e5', fontSize:14, outline:'none' }} />
+              </div>
+            )}
             <div>
               <label style={{ display:'block', fontSize:13, fontWeight:700, marginBottom:6 }}>Aldersgruppe</label>
               <select value={form.age_group} onChange={e=>setForm({...form,age_group:e.target.value})} style={{ width:'100%', padding:'11px 14px', borderRadius:10, border:'1.5px solid #e5e5e5', fontSize:14, outline:'none', background:'#fff' }}>
@@ -2656,6 +2739,11 @@ function MessagesPage({ setPage, selectedConvId, setSelectedConvId, setActiveLis
   const [rejectingBid,setRejectingBid]= useState(null);
   const [rejectNote,  setRejectNote]  = useState('');
   const [counterBidMsg,setCounterBidMsg] = useState(null);
+  const [composeOpen, setComposeOpen] = useState(false);
+  const [composeSearch, setComposeSearch] = useState('');
+  const [composeResults, setComposeResults] = useState([]);
+  const [composeTarget, setComposeTarget] = useState(null);
+  const [composeMsg, setComposeMsg] = useState('');
   const [counterAmount,setCounterAmount] = useState('');
   const [swapPreview,  setSwapPreview]  = useState(null);
   const [shares,      setShares]      = useState([]);
@@ -2735,6 +2823,35 @@ function MessagesPage({ setPage, selectedConvId, setSelectedConvId, setActiveLis
     setLoading(false);
   }
 
+  useEffect(() => {
+    if (!composeSearch.trim()) { setComposeResults([]); return; }
+    const t = setTimeout(async () => {
+      const { data } = await db.from('institutions').select('id,name,email,city').ilike('name', `%${composeSearch}%`).limit(6);
+      if (data) setComposeResults(data);
+    }, 300);
+    return () => clearTimeout(t);
+  }, [composeSearch]);
+
+  async function handleComposeSend() {
+    if (!composeTarget || !composeMsg.trim()) return;
+    const senderName = ctxIsAdmin && adminInstName ? adminInstName : (userEmail ? userEmail : 'Ukendt');
+    const { data: existing } = await db.from('conversations').select('id').eq('owner_name', composeTarget.name).ilike('initiator_name', senderName).maybeSingle();
+    let convId = existing?.id;
+    if (!convId) {
+      const { data: conv } = await db.from('conversations').insert({
+        listing_id: null, listing_title: 'Direkte besked', listing_emoji: '💬', listing_color: '#e0e7ff',
+        initiator_id: userId, initiator_name: senderName,
+        owner_id: null, owner_name: composeTarget.name,
+      }).select().single();
+      convId = conv?.id;
+    }
+    if (!convId) return;
+    await db.from('chat_messages').insert({ conversation_id: convId, sender_id: userId, sender_name: senderName, content: composeMsg });
+    await db.from('conversations').update({ last_message: composeMsg, last_message_at: new Date().toISOString() }).eq('id', convId);
+    setComposeOpen(false); setComposeSearch(''); setComposeTarget(null); setComposeMsg('');
+    loadConvs(userId);
+  }
+
   async function openConv(conv) {
     setActive(conv);
     setSelectedConvId(conv.id);
@@ -2786,11 +2903,34 @@ function MessagesPage({ setPage, selectedConvId, setSelectedConvId, setActiveLis
 
   async function archiveConv(conv, e) {
     e.stopPropagation();
-    const isInit = conv.initiator_id === userId;
+    const isInit = ctxIsAdmin ? conv.initiator_name === adminInstName : conv.initiator_id === userId;
     const field = isInit ? 'archived_by_initiator' : 'archived_by_owner';
     await db.from('conversations').update({ [field]: true }).eq('id', conv.id);
     setConvs(cs => cs.map(c => c.id === conv.id ? { ...c, [field]: true } : c));
     if (active?.id === conv.id) setActive(null);
+  }
+
+  async function unarchiveConv(conv, e) {
+    e.stopPropagation();
+    const isInit = ctxIsAdmin ? conv.initiator_name === adminInstName : conv.initiator_id === userId;
+    const field = isInit ? 'archived_by_initiator' : 'archived_by_owner';
+    await db.from('conversations').update({ [field]: false }).eq('id', conv.id);
+    setConvs(cs => cs.map(c => c.id === conv.id ? { ...c, [field]: false } : c));
+    if (active?.id === conv.id) setActive(null);
+  }
+
+  async function deleteAllArchived(e) {
+    e.stopPropagation();
+    const archived = convs.filter(c => isArchived(c));
+    if (!archived.length) return;
+    if (!window.confirm(`Slet ${archived.length} arkiverede samtaler permanent?`)) return;
+    if (!window.confirm('Er du helt sikker? Dette kan ikke fortrydes.')) return;
+    for (const c of archived) {
+      await db.from('chat_messages').delete().eq('conversation_id', c.id);
+      await db.from('conversations').delete().eq('id', c.id);
+    }
+    setConvs(cs => cs.filter(c => !isArchived(c)));
+    if (active && isArchived(active)) { setActive(null); setMessages([]); }
   }
 
   async function deleteConv(conv, e) {
@@ -2881,11 +3021,42 @@ function MessagesPage({ setPage, selectedConvId, setSelectedConvId, setActiveLis
           <div style={{ padding:'20px 18px 12px' }}>
             <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:10 }}>
               <h2 style={{ fontFamily:"'Nunito',sans-serif", fontWeight:900, fontSize:20 }}>Beskeder</h2>
-              {totalUnread > 0 && !showArchived && <div style={{ background:'#e11d48', color:'#fff', borderRadius:99, padding:'2px 9px', fontSize:12, fontWeight:800 }}>{totalUnread}</div>}
+              <div style={{ display:'flex', alignItems:'center', gap:8 }}>
+                {totalUnread > 0 && !showArchived && <div style={{ background:'#e11d48', color:'#fff', borderRadius:99, padding:'2px 9px', fontSize:12, fontWeight:800 }}>{totalUnread}</div>}
+                <button onClick={()=>setComposeOpen(true)} title="Ny besked" style={{ background:PRIMARY, border:'none', color:'#fff', borderRadius:99, width:30, height:30, fontSize:18, cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center', fontWeight:700 }}>✏️</button>
+              </div>
             </div>
+            {composeOpen && (
+              <div style={{ background:'#f8f7f5', borderRadius:14, padding:14, marginBottom:10, border:`1.5px solid ${PRIMARY}` }}>
+                <div style={{ fontWeight:700, fontSize:13, marginBottom:8 }}>✏️ Ny besked til institution</div>
+                <input value={composeSearch} onChange={e=>setComposeSearch(e.target.value)} placeholder="Søg institution ved navn…" style={{ width:'100%', padding:'9px 12px', borderRadius:10, border:'1.5px solid #e5e5e5', fontSize:13, outline:'none', marginBottom:6 }} />
+                {composeResults.length > 0 && !composeTarget && (
+                  <div style={{ background:'#fff', borderRadius:10, border:'1.5px solid #eee', marginBottom:6, maxHeight:140, overflowY:'auto' }}>
+                    {composeResults.map(r => (
+                      <div key={r.id} onClick={()=>{ setComposeTarget(r); setComposeSearch(r.name); setComposeResults([]); }} style={{ padding:'10px 12px', cursor:'pointer', borderBottom:'1px solid #f0eeeb', fontSize:13 }}>
+                        <strong>{r.name}</strong>{r.city ? <span style={{ color:'#aaa', marginLeft:6 }}>· {r.city}</span> : ''}
+                      </div>
+                    ))}
+                  </div>
+                )}
+                {composeTarget && (
+                  <>
+                    <textarea value={composeMsg} onChange={e=>setComposeMsg(e.target.value)} placeholder={`Skriv besked til ${composeTarget.name}…`} rows={3} style={{ width:'100%', padding:'9px 12px', borderRadius:10, border:'1.5px solid #e5e5e5', fontSize:13, resize:'none', outline:'none', marginBottom:6, fontFamily:"'Nunito Sans',sans-serif" }} />
+                    <div style={{ display:'flex', gap:8 }}>
+                      <button onClick={()=>{ setComposeTarget(null); setComposeSearch(''); setComposeMsg(''); }} style={{ flex:1, padding:'8px', borderRadius:10, background:'#f5f4f2', border:'none', fontWeight:700, fontSize:12, cursor:'pointer' }}>Annuller</button>
+                      <button onClick={handleComposeSend} disabled={!composeMsg.trim()} style={{ flex:2, padding:'8px', borderRadius:10, background:composeMsg.trim()?PRIMARY:'#e5e5e5', border:'none', color:'#fff', fontWeight:700, fontSize:12, cursor:composeMsg.trim()?'pointer':'default' }}>Send besked</button>
+                    </div>
+                  </>
+                )}
+                {!composeTarget && <button onClick={()=>{ setComposeOpen(false); setComposeSearch(''); setComposeResults([]); }} style={{ fontSize:12, color:'#aaa', background:'none', border:'none', cursor:'pointer', marginTop:4 }}>Annuller</button>}
+              </div>
+            )}
             <div style={{ display:'flex', gap:6, marginBottom:10 }}>
               <button onClick={()=>setShowArchived(false)} style={{ flex:1, padding:'6px 0', borderRadius:8, border:'none', background:!showArchived?PRIMARY:'#f0eeeb', color:!showArchived?'#fff':'#888', fontSize:12, fontWeight:700, cursor:'pointer' }}>Aktive</button>
               <button onClick={()=>setShowArchived(true)} style={{ flex:1, padding:'6px 0', borderRadius:8, border:'none', background:showArchived?PRIMARY:'#f0eeeb', color:showArchived?'#fff':'#888', fontSize:12, fontWeight:700, cursor:'pointer' }}>Arkiveret</button>
+              {showArchived && convs.filter(c=>isArchived(c)).length > 0 && (
+                <button onClick={deleteAllArchived} title="Slet alle arkiverede" style={{ padding:'6px 10px', borderRadius:8, border:'none', background:'#fff0f0', color:'#e11d48', fontSize:12, fontWeight:700, cursor:'pointer', flexShrink:0 }}>🗑️ Slet alle</button>
+              )}
             </div>
             <div style={{ position:'relative' }}>
               <span style={{ position:'absolute', left:12, top:'50%', transform:'translateY(-50%)', fontSize:14, color:'#bbb' }}>🔍</span>
@@ -2947,9 +3118,14 @@ function MessagesPage({ setPage, selectedConvId, setSelectedConvId, setActiveLis
                     </div>
                     <div style={{ fontSize:12, color:unread>0?'#333':'#aaa', fontWeight:unread>0?600:400, whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis' }}>{c.last_message || 'Samtale startet'}</div>
                   </div>
-                  <button onClick={e=>archived?deleteConv(c,e):archiveConv(c,e)} title={archived?'Slet samtale':'Arkiver'} style={{ background:'none', border:'none', fontSize:16, cursor:'pointer', padding:'4px', color:'#ccc', flexShrink:0, alignSelf:'center' }}>
-                    {archived ? '🗑️' : '📥'}
-                  </button>
+                  {archived ? (
+                    <div style={{ display:'flex', gap:2 }}>
+                      <button onClick={e=>unarchiveConv(c,e)} title="Flyt til indbakke" style={{ background:'none', border:'none', fontSize:15, cursor:'pointer', padding:'4px', color:'#888' }}>📤</button>
+                      <button onClick={e=>deleteConv(c,e)} title="Slet permanent" style={{ background:'none', border:'none', fontSize:15, cursor:'pointer', padding:'4px', color:'#ccc' }}>🗑️</button>
+                    </div>
+                  ) : (
+                    <button onClick={e=>archiveConv(c,e)} title="Arkiver" style={{ background:'none', border:'none', fontSize:16, cursor:'pointer', padding:'4px', color:'#ccc', flexShrink:0, alignSelf:'center' }}>📥</button>
+                  )}
                 </div>
               );
             })}
