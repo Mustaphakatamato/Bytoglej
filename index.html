@@ -1544,7 +1544,7 @@ function DashboardPage({ setPage, showToast, allListings, onListingCreated, inst
   const [institution, setInstitution] = useState(instProp || null);
   const [instLoading, setInstLoading] = useState(true);
   const [authUserId,  setAuthUserId]  = useState(null);
-  const [form, setForm] = useState({ title:'', type:'køb', price:'', age_group:'3-6 år', description:'', condition:'God', city:'København', emoji:'🧸', color:'#FFD166', tags:[] });
+  const [form, setForm] = useState({ title:'', type:'køb', price:'', age_group:'3-6 år', description:'', condition:'God', emoji:'🧸', color:'#FFD166', tags:[] });
   const [editListing, setEditListing] = useState(null);
   const [editForm,    setEditForm]    = useState(null);
   const [editSaving,  setEditSaving]  = useState(false);
@@ -1628,7 +1628,7 @@ function DashboardPage({ setPage, showToast, allListings, onListingCreated, inst
   }
 
   function openEdit(l) {
-    setEditForm({ title:l.title, type:l.type, price:l.price||'', age_group:l.age_group, description:l.description||'', condition:l.condition||'God', city:l.city, emoji:l.emoji||'🧸', color:l.color||'#FFD166', tags:l.tags||[] });
+    setEditForm({ title:l.title, type:l.type, price:l.price||'', age_group:l.age_group, description:l.description||'', condition:l.condition||'God', emoji:l.emoji||'🧸', color:l.color||'#FFD166', tags:l.tags||[] });
     setEditListing(l);
   }
 
@@ -1643,7 +1643,7 @@ function DashboardPage({ setPage, showToast, allListings, onListingCreated, inst
       title: editForm.title, type: editForm.type,
       price: editForm.type==='køb' ? Number(editForm.price)||null : null,
       age_group: editForm.age_group, description: editForm.description,
-      condition: editForm.condition, city: editForm.city,
+      condition: editForm.condition, city: institution?.city || editListing?.city || '',
       emoji: editForm.emoji, color: editForm.color,
       tags: editForm.tags || [],
     }).eq('id', editListing.id);
@@ -1723,7 +1723,7 @@ function DashboardPage({ setPage, showToast, allListings, onListingCreated, inst
     imgPreviews.forEach(URL.revokeObjectURL);
     setImgFiles([]); setImgPreviews([]); setTipsOpen(false);
     setStep(1);
-    setForm({ title:'', type:'køb', price:'', age_group:'3-6 år', description:'', condition:'God', city:'København', emoji:'🧸', color:'#FFD166', tags:[] });
+    setForm({ title:'', type:'køb', price:'', age_group:'3-6 år', description:'', condition:'God', emoji:'🧸', color:'#FFD166', tags:[] });
   }
 
   async function handleCreate() {
@@ -1744,7 +1744,7 @@ function DashboardPage({ setPage, showToast, allListings, onListingCreated, inst
       title: form.title, type: form.type,
       price: form.type==='køb' ? Number(form.price)||null : null,
       age_group: form.age_group, description: form.description,
-      condition: form.condition, city: form.city,
+      condition: form.condition, city: inst?.city || institution?.city || '',
       institution_name: inst?.name || 'Min institution',
       user_id: user?.id || null,
       emoji: form.emoji, color: form.color,
@@ -2064,19 +2064,11 @@ function DashboardPage({ setPage, showToast, allListings, onListingCreated, inst
                 <input type="number" value={editForm.price} onChange={e=>setEditForm({...editForm,price:e.target.value})} placeholder="Fx 250" style={{ width:'100%', padding:'11px 14px', borderRadius:10, border:'1.5px solid #e5e5e5', fontSize:14, outline:'none' }} />
               </div>
             )}
-            <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:10 }}>
-              <div>
-                <label style={{ display:'block', fontSize:13, fontWeight:700, marginBottom:6 }}>Aldersgruppe</label>
-                <select value={editForm.age_group} onChange={e=>setEditForm({...editForm,age_group:e.target.value})} style={{ width:'100%', padding:'11px 14px', borderRadius:10, border:'1.5px solid #e5e5e5', fontSize:14, outline:'none', background:'#fff' }}>
-                  {AGE_GROUPS.map(a=><option key={a}>{a}</option>)}
-                </select>
-              </div>
-              <div>
-                <label style={{ display:'block', fontSize:13, fontWeight:700, marginBottom:6 }}>By</label>
-                <select value={editForm.city} onChange={e=>setEditForm({...editForm,city:e.target.value})} style={{ width:'100%', padding:'11px 14px', borderRadius:10, border:'1.5px solid #e5e5e5', fontSize:14, outline:'none', background:'#fff' }}>
-                  {CITIES.filter(c=>c!=='alle').map(c=><option key={c}>{c}</option>)}
-                </select>
-              </div>
+            <div>
+              <label style={{ display:'block', fontSize:13, fontWeight:700, marginBottom:6 }}>Aldersgruppe</label>
+              <select value={editForm.age_group} onChange={e=>setEditForm({...editForm,age_group:e.target.value})} style={{ width:'100%', padding:'11px 14px', borderRadius:10, border:'1.5px solid #e5e5e5', fontSize:14, outline:'none', background:'#fff' }}>
+                {AGE_GROUPS.map(a=><option key={a}>{a}</option>)}
+              </select>
             </div>
             <div>
               <label style={{ display:'block', fontSize:13, fontWeight:700, marginBottom:6 }}>Beskrivelse</label>
@@ -2253,19 +2245,11 @@ function DashboardPage({ setPage, showToast, allListings, onListingCreated, inst
                 {!form.price && <p style={{ fontSize:12, color:'#e53e3e', marginTop:4 }}>Pris er påkrævet ved køb-opslag</p>}
               </div>
             )}
-            <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:10 }}>
-              <div>
-                <label style={{ display:'block', fontSize:13, fontWeight:700, marginBottom:6 }}>Aldersgruppe</label>
-                <select value={form.age_group} onChange={e=>setForm({...form,age_group:e.target.value})} style={{ width:'100%', padding:'11px 14px', borderRadius:10, border:'1.5px solid #e5e5e5', fontSize:14, outline:'none', background:'#fff' }}>
-                  {AGE_GROUPS.map(a=><option key={a}>{a}</option>)}
-                </select>
-              </div>
-              <div>
-                <label style={{ display:'block', fontSize:13, fontWeight:700, marginBottom:6 }}>By</label>
-                <select value={form.city} onChange={e=>setForm({...form,city:e.target.value})} style={{ width:'100%', padding:'11px 14px', borderRadius:10, border:'1.5px solid #e5e5e5', fontSize:14, outline:'none', background:'#fff' }}>
-                  {CITIES.filter(c=>c!=='alle').map(c=><option key={c}>{c}</option>)}
-                </select>
-              </div>
+            <div>
+              <label style={{ display:'block', fontSize:13, fontWeight:700, marginBottom:6 }}>Aldersgruppe</label>
+              <select value={form.age_group} onChange={e=>setForm({...form,age_group:e.target.value})} style={{ width:'100%', padding:'11px 14px', borderRadius:10, border:'1.5px solid #e5e5e5', fontSize:14, outline:'none', background:'#fff' }}>
+                {AGE_GROUPS.map(a=><option key={a}>{a}</option>)}
+              </select>
             </div>
             <div>
               <label style={{ display:'block', fontSize:13, fontWeight:700, marginBottom:8 }}>Tags <span style={{ fontWeight:400, color:'#aaa' }}>(vælg op til 5)</span></label>
