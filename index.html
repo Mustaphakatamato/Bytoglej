@@ -1623,7 +1623,7 @@ function SignupPage({ setPage, setLoggedIn, showToast }) {
       children_count: Number(form.children_count)||null,
       phone: form.inst_phone||null, website: form.website||null,
       leader_name: form.leader_name, leader_phone: form.leader_phone, leader_email: form.leader_email,
-      contact_name: form.contact_name, email: form.email
+      contact_name: form.contact_name, email: form.email.toLowerCase()
     });
     // Geocode address in background (non-blocking)
     geocodeAddress(form.address, form.zipcode, form.city).then(coords => {
@@ -3545,10 +3545,11 @@ function App() {
   const [unreadTotal,    setUnreadTotal]    = useState(0);
 
   async function loadInstitution(email) {
-    const { data } = await db.from('institutions').select('*').eq('email', email).maybeSingle();
+    const e = email.toLowerCase();
+    const { data } = await db.from('institutions').select('*').ilike('email', e).maybeSingle();
     if (data) { setInstitution(data); return; }
     // Check if member of an institution
-    const { data: mem } = await db.from('institution_members').select('role,institutions(*)').eq('email', email).maybeSingle();
+    const { data: mem } = await db.from('institution_members').select('role,institutions(*)').ilike('email', e).maybeSingle();
     if (mem?.institutions) setInstitution({ ...mem.institutions, _memberRole: mem.role });
   }
 
