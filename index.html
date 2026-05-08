@@ -1170,6 +1170,7 @@ function ListingDetailPage({ listing, setPage, showToast, onStartConv, favs, tog
         }
         if (convId) {
           const swapContent = JSON.stringify({
+            swap_listing_id: chosen?.id || null,
             swap_title: chosen?.title || null,
             swap_emoji: chosen?.emoji || null,
             swap_color: chosen?.color || null,
@@ -2632,6 +2633,7 @@ function MessagesPage({ setPage, selectedConvId, setSelectedConvId, setActiveLis
   const [rejectNote,  setRejectNote]  = useState('');
   const [counterBidMsg,setCounterBidMsg] = useState(null);
   const [counterAmount,setCounterAmount] = useState('');
+  const [swapPreview,  setSwapPreview]  = useState(null);
   const [shares,      setShares]      = useState([]);
   const [activeShare, setActiveShare] = useState(null);
   const ww = useWindowWidth();
@@ -2994,14 +2996,18 @@ function MessagesPage({ setPage, selectedConvId, setSelectedConvId, setActiveLis
                               <div style={{ background:mine?'#FEF0E3':'#f0f2f5', border:`1.5px solid ${mine?ACCENT:'#e0ddd8'}`, borderRadius:16, padding:'14px 16px', minWidth:200 }}>
                                 <div style={{ fontSize:11, fontWeight:700, color:ACCENT, textTransform:'uppercase', letterSpacing:0.6, marginBottom:10 }}>🔄 Bytteforslag</div>
                                 {swapData?.swap_title ? (
-                                  <div style={{ display:'flex', alignItems:'center', gap:10, background:'#fff', borderRadius:10, padding:'10px 12px', marginBottom: swapData?.note ? 8 : 0 }}>
+                                  <div onClick={swapData.swap_listing_id ? async ()=>{ const {data}=await db.from('listings').select('*').eq('id',swapData.swap_listing_id).maybeSingle(); if(data) setSwapPreview(data); } : undefined}
+                                    style={{ display:'flex', alignItems:'center', gap:10, background:'#fff', borderRadius:10, padding:'10px 12px', marginBottom: swapData?.note ? 8 : 0, cursor: swapData.swap_listing_id ? 'pointer' : 'default', transition:'opacity 0.15s' }}
+                                    onMouseEnter={e=>{ if(swapData.swap_listing_id) e.currentTarget.style.opacity='0.85'; }}
+                                    onMouseLeave={e=>{ e.currentTarget.style.opacity='1'; }}>
                                     <div style={{ width:44, height:44, borderRadius:8, background:swapData.swap_image?'#e8e6e3':swapData.swap_color||'#FFD166', display:'flex', alignItems:'center', justifyContent:'center', fontSize:22, flexShrink:0, overflow:'hidden' }}>
                                       {swapData.swap_image ? <img src={swapData.swap_image} style={{ width:'100%', height:'100%', objectFit:'cover' }} alt="" /> : swapData.swap_emoji||'🧸'}
                                     </div>
-                                    <div>
+                                    <div style={{ flex:1 }}>
                                       <div style={{ fontSize:12, color:'#aaa', fontWeight:600 }}>Tilbyder:</div>
                                       <div style={{ fontWeight:700, fontSize:14, color:'#1c1a17' }}>{swapData.swap_title}</div>
                                     </div>
+                                    {swapData.swap_listing_id && <span style={{ fontSize:11, color:ACCENT, fontWeight:600 }}>Se opslag →</span>}
                                   </div>
                                 ) : null}
                                 {swapData?.note && (
@@ -3110,6 +3116,31 @@ function MessagesPage({ setPage, selectedConvId, setSelectedConvId, setActiveLis
           )}
         </div>}
       </div>
+      {/* Swap listing preview modal */}
+      {swapPreview && (
+        <div onClick={()=>setSwapPreview(null)} style={{ position:'fixed', inset:0, background:'rgba(0,0,0,0.5)', zIndex:2000, display:'flex', alignItems:'center', justifyContent:'center', padding:24 }}>
+          <div onClick={e=>e.stopPropagation()} style={{ background:'#fff', borderRadius:24, padding:28, maxWidth:480, width:'100%', boxShadow:'0 16px 48px rgba(0,0,0,0.18)', position:'relative', maxHeight:'80vh', overflowY:'auto' }}>
+            <button onClick={()=>setSwapPreview(null)} style={{ position:'absolute', top:16, right:16, background:'#f5f4f2', border:'none', borderRadius:99, width:32, height:32, fontSize:16, cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center' }}>✕</button>
+            <div style={{ fontFamily:"'Nunito',sans-serif", fontWeight:900, fontSize:11, color:ACCENT, textTransform:'uppercase', letterSpacing:0.8, marginBottom:12 }}>🔄 Tilbudt i bytte</div>
+            {/* Image */}
+            <div style={{ width:'100%', aspectRatio:'16/9', borderRadius:16, background:swapPreview.images?.[0]?'#e8e6e3':swapPreview.color||'#FFD166', display:'flex', alignItems:'center', justifyContent:'center', fontSize:64, marginBottom:16, overflow:'hidden' }}>
+              {swapPreview.images?.[0] ? <img src={swapPreview.images[0]} style={{ width:'100%', height:'100%', objectFit:'cover' }} alt="" /> : swapPreview.emoji||'🧸'}
+            </div>
+            <h2 style={{ fontFamily:"'Nunito',sans-serif", fontWeight:900, fontSize:22, marginBottom:6 }}>{swapPreview.title}</h2>
+            <div style={{ display:'flex', gap:12, flexWrap:'wrap', marginBottom:12 }}>
+              <span style={{ fontSize:13, color:'#888' }}>📍 {swapPreview.city}</span>
+              <span style={{ fontSize:13, color:'#888' }}>👶 {swapPreview.age_group}</span>
+              <span style={{ fontSize:13, color:'#888', fontWeight:600 }}>Stand: {swapPreview.condition}</span>
+            </div>
+            {swapPreview.description && <p style={{ fontSize:14, color:'#555', lineHeight:1.75, marginBottom:16 }}>{swapPreview.description}</p>}
+            <div style={{ fontSize:13, color:'#888' }}>Opslået af <strong style={{ color:'#333' }}>{swapPreview.institution_name}</strong></div>
+            <button onClick={()=>{ setSwapPreview(null); setActiveListing(swapPreview); setPage('listing'); }}
+              style={{ marginTop:16, width:'100%', padding:'13px', borderRadius:14, background:ACCENT, color:'#fff', border:'none', fontWeight:700, fontSize:14, cursor:'pointer' }}>
+              Se fuldt opslag →
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
