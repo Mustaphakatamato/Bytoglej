@@ -1113,7 +1113,7 @@ function ListingDetailPage({ listing, setPage, showToast, onStartConv, favs, tog
     try {
       const { data: { user } } = await db.auth.getUser();
       const { data: inst } = await db.from('institutions').select('name').ilike('email', user.email).maybeSingle();
-      const buyerName = inst?.name || myInstName || user.email;
+      const buyerName = (ctxIsAdmin && adminInstName) ? adminInstName : (inst?.name || myInstName || user.email);
       const buyMsg = `🏷️ ${buyerName} ønsker at købe "${listing.title}" til ${listing.price} kr.`;
       let convId = null;
       const { data: existing } = await db.from('conversations').select('id,owner_unread').eq('listing_id', listing.id).eq('initiator_id', user.id).maybeSingle();
@@ -1150,7 +1150,7 @@ function ListingDetailPage({ listing, setPage, showToast, onStartConv, favs, tog
     try {
       const { data: { user } } = await db.auth.getUser();
       const { data: inst } = await db.from('institutions').select('name').ilike('email', user.email).maybeSingle();
-      const userName = inst?.name || user.email;
+      const userName = (ctxIsAdmin && adminInstName) ? adminInstName : (inst?.name || user.email);
       let convId = null; let ownerUnread = 0;
       const { data: existing } = await db.from('conversations').select('id,owner_unread').eq('listing_id', listing.id).eq('initiator_id', currentUserId).maybeSingle();
       if (existing) { convId = existing.id; ownerUnread = existing.owner_unread || 0; }
@@ -1200,7 +1200,7 @@ function ListingDetailPage({ listing, setPage, showToast, onStartConv, favs, tog
       const { data:{ user } } = await db.auth.getUser();
       if (user) {
         const { data: inst } = await db.from('institutions').select('name').eq('email', user.email).maybeSingle();
-        const userName = inst?.name || user.email;
+        const userName = (ctxIsAdmin && adminInstName) ? adminInstName : (inst?.name || user.email);
         const { data: existing } = await db.from('conversations')
           .select('id,owner_unread').eq('listing_id', listing.id).eq('initiator_id', user.id).maybeSingle();
         let convId = existing?.id;
@@ -3880,7 +3880,7 @@ function App() {
       return;
     }
     const { data: inst } = await db.from('institutions').select('name').eq('email', user.email).maybeSingle();
-    const userName = inst?.name || user.email;
+    const userName = adminInst?.name || inst?.name || user.email;
     const { data: existing } = await db.from('conversations')
       .select('id').eq('listing_id', listing.id).eq('initiator_id', user.id).maybeSingle();
     if (existing) { setSelectedConvId(existing.id); navigate('beskeder'); return; }
