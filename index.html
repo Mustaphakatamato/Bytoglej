@@ -2104,14 +2104,6 @@ function DashboardPage({ setPage, showToast, allListings, onListingCreated, inst
                 })}
               </div>
             </div>
-            <div>
-              <label style={{ display:'block', fontSize:13, fontWeight:700, marginBottom:8 }}>Emoji</label>
-              <div style={{ display:'flex', gap:6, flexWrap:'wrap' }}>
-                {EMOJIS.map(e=>(
-                  <button key={e} onClick={()=>setEditForm({...editForm,emoji:e})} style={{ width:38, height:38, borderRadius:10, fontSize:20, border:editForm.emoji===e?`2px solid ${PRIMARY}`:'2px solid #f0eeeb', background:editForm.emoji===e?'#E8F5EE':'#fff' }}>{e}</button>
-                ))}
-              </div>
-            </div>
             <div style={{ display:'flex', gap:10, marginTop:4 }}>
               <button onClick={()=>{setEditListing(null);setEditForm(null);}} style={{ flex:1, padding:'13px', borderRadius:12, background:'#f5f4f2', border:'none', fontWeight:700, fontFamily:"'Nunito',sans-serif" }}>Annuller</button>
               <Btn variant="primary" color={PRIMARY} radius={22} onClick={handleUpdate} disabled={editSaving} style={{ flex:2, justifyContent:'center', padding:'13px', fontSize:14 }}>
@@ -2273,22 +2265,6 @@ function DashboardPage({ setPage, showToast, allListings, onListingCreated, inst
                 <select value={form.city} onChange={e=>setForm({...form,city:e.target.value})} style={{ width:'100%', padding:'11px 14px', borderRadius:10, border:'1.5px solid #e5e5e5', fontSize:14, outline:'none', background:'#fff' }}>
                   {CITIES.filter(c=>c!=='alle').map(c=><option key={c}>{c}</option>)}
                 </select>
-              </div>
-            </div>
-            <div>
-              <label style={{ display:'block', fontSize:13, fontWeight:700, marginBottom:8 }}>Vælg emoji</label>
-              <div style={{ display:'flex', gap:6, flexWrap:'wrap' }}>
-                {EMOJIS.map(e=>(
-                  <button key={e} onClick={()=>setForm({...form,emoji:e})} style={{ width:40, height:40, borderRadius:10, fontSize:20, border:form.emoji===e?`2px solid ${PRIMARY}`:'2px solid #f0eeeb', background:form.emoji===e?'#E8F5EE':'#fff' }}>{e}</button>
-                ))}
-              </div>
-            </div>
-            <div>
-              <label style={{ display:'block', fontSize:13, fontWeight:700, marginBottom:8 }}>Baggrundsfarve</label>
-              <div style={{ display:'flex', gap:8 }}>
-                {COLORS.map(c=>(
-                  <button key={c} onClick={()=>setForm({...form,color:c})} style={{ width:30, height:30, borderRadius:8, background:c, border:'none', outline:form.color===c?`3px solid ${PRIMARY}`:'3px solid transparent', outlineOffset:2 }} />
-                ))}
               </div>
             </div>
             <div>
