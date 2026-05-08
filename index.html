@@ -1920,13 +1920,22 @@ function DashboardPage({ setPage, showToast, allListings, onListingCreated, inst
         });
       }
 
-      // Load MY listings
-      await fetchMyListings(user.id, inst?.name);
+      // Load MY listings — admin view: only by name, not by userId
+      await fetchMyListings(isAdminView ? null : user.id, inst?.name);
 
-      // Feature #15: incoming conversations (where user is owner)
-      const { data: incoming } = await db.from('conversations')
-        .select('*').eq('owner_id', user.id)
-        .order('last_message_at', { ascending: false });
+      // Feature #15: incoming conversations
+      let incoming;
+      if (isAdminView && inst) {
+        const { data: inc } = await db.from('conversations')
+          .select('*').eq('owner_name', inst.name)
+          .order('last_message_at', { ascending: false });
+        incoming = inc;
+      } else {
+        const { data: inc } = await db.from('conversations')
+          .select('*').eq('owner_id', user.id)
+          .order('last_message_at', { ascending: false });
+        incoming = inc;
+      }
       if (!cancelled && incoming) setIncomingConvs(incoming);
 
       if (!cancelled) setInstLoading(false);
@@ -1937,7 +1946,8 @@ function DashboardPage({ setPage, showToast, allListings, onListingCreated, inst
 
   // Re-fetch when allListings changes (new listing created by someone else / realtime)
   useEffect(() => {
-    if (authUserId) fetchMyListings(authUserId, institution?.name);
+    if (isAdminView) { fetchMyListings(null, institution?.name); }
+    else if (authUserId) { fetchMyListings(authUserId, institution?.name); }
   }, [allListings]);
 
   async function fetchMyListings(userId, instName) {
@@ -1977,7 +1987,7 @@ function DashboardPage({ setPage, showToast, allListings, onListingCreated, inst
     if (error) { showToast('Noget gik galt', 'error'); return; }
     setEditListing(null); setEditForm(null);
     showToast('Opslag opdateret ✓');
-    fetchMyListings(authUserId, institution?.name);
+    fetchMyListings(isAdminView ? null : authUserId, institution?.name);
     onListingCreated();
   }
 
@@ -1986,7 +1996,7 @@ function DashboardPage({ setPage, showToast, allListings, onListingCreated, inst
     setConfirmDelete(null);
     if (error) { showToast('Noget gik galt', 'error'); return; }
     showToast('Opslag slettet');
-    fetchMyListings(authUserId, institution?.name);
+    fetchMyListings(isAdminView ? null : authUserId, institution?.name);
     onListingCreated();
   }
 
@@ -2092,7 +2102,7 @@ function DashboardPage({ setPage, showToast, allListings, onListingCreated, inst
     setNewOpen(false); resetModal();
     showToast('Opslag publiceret! 🎉');
     onListingCreated();
-    fetchMyListings(user?.id || authUserId, inst?.name || institution?.name);
+    fetchMyListings(isAdminView ? null : (user?.id || authUserId), inst?.name || institution?.name);
   }
 
   async function handleLogoUpload(e) {
@@ -2255,8 +2265,8 @@ function DashboardPage({ setPage, showToast, allListings, onListingCreated, inst
             ))}
           </div>
 
-          {/* Mine favoritter */}
-          <div style={{ background:'#fff', borderRadius:22, padding:28, boxShadow:'0 2px 12px rgba(0,0,0,0.06)' }}>
+          {/* Mine favoritter — skjult i admin-view */}
+          {!isAdminView && <div style={{ background:'#fff', borderRadius:22, padding:28, boxShadow:'0 2px 12px rgba(0,0,0,0.06)' }}>
             <div style={{ display:'flex', alignItems:'center', gap:10, marginBottom:20 }}>
               <h2 style={{ fontFamily:"'Nunito',sans-serif", fontWeight:800, fontSize:20 }}>Mine favoritter</h2>
               {favListings.length>0 && <div style={{ background:'#fff0f3', border:'1.5px solid #fca5a5', borderRadius:99, padding:'2px 10px', fontSize:12, fontWeight:700, color:'#e11d48' }}>{favListings.length}</div>}
@@ -2283,7 +2293,7 @@ function DashboardPage({ setPage, showToast, allListings, onListingCreated, inst
                 </div>
               </div>
             ))}
-          </div>
+          </div>}
         </div>
 
         {/* Feature #15: Incoming requests section */}
