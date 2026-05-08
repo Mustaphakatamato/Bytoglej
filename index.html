@@ -29,6 +29,7 @@
     @keyframes popIn       { 0%{ opacity:0; transform:scale(0.85) translateY(10px); } 100%{ opacity:1; transform:scale(1) translateY(0); } }
     @keyframes slideDown   { from { opacity:0; transform:translateY(-10px); } to { opacity:1; transform:translateY(0); } }
     @keyframes pulse       { 0%,100%{ transform:scale(1); opacity:0.7; } 50%{ transform:scale(1.4); opacity:1; } }
+    @keyframes scanBar     { 0%{ left:-40%; } 100%{ left:100%; } }
 
     .page-enter { animation: fadeSlideIn 0.35s ease both; }
 
@@ -1498,6 +1499,38 @@ function SignupPage({ setPage, setLoggedIn, showToast }) {
   );
 }
 
+// ─── SCANNING LOADER ─────────────────────────────────────────────────────────
+const SCAN_MSGS = [
+  { icon:'🔍', text:'Scanner billedet for personer…' },
+  { icon:'🛡️', text:'Beskytter børns privatliv…' },
+  { icon:'🤖', text:'AI-model analyserer pixels…' },
+  { icon:'🔬', text:'Tjekker ansigter og silhuetter…' },
+  { icon:'✨', text:'Næsten der…' },
+];
+function ScanningLoader() {
+  const [idx, setIdx] = useState(0);
+  const [fade, setFade] = useState(true);
+  useEffect(() => {
+    const iv = setInterval(() => {
+      setFade(false);
+      setTimeout(() => { setIdx(i => (i + 1) % SCAN_MSGS.length); setFade(true); }, 300);
+    }, 1800);
+    return () => clearInterval(iv);
+  }, []);
+  const msg = SCAN_MSGS[idx];
+  return (
+    <div style={{ border:'2px dashed #a8d5be', borderRadius:14, padding:'32px 20px', textAlign:'center', background:'linear-gradient(135deg,#f0faf5,#e8f5ee)' }}>
+      <div style={{ fontSize:38, marginBottom:10, transition:'opacity 0.3s', opacity:fade?1:0 }}>{msg.icon}</div>
+      <div style={{ fontSize:14, fontWeight:700, color:PRIMARY, marginBottom:6, transition:'opacity 0.3s', opacity:fade?1:0 }}>{msg.text}</div>
+      {/* Scanning bar */}
+      <div style={{ margin:'12px auto 0', width:'80%', height:4, background:'#c8e6d0', borderRadius:99, overflow:'hidden', position:'relative' }}>
+        <div style={{ position:'absolute', left:0, top:0, height:'100%', width:'40%', background:PRIMARY, borderRadius:99, animation:'scanBar 1.4s ease-in-out infinite' }} />
+      </div>
+      <div style={{ fontSize:11, color:'#aaa', marginTop:10 }}>Dette tager typisk 2–5 sekunder</div>
+    </div>
+  );
+}
+
 // ─── DASHBOARD ────────────────────────────────────────────────────────────────
 function DashboardPage({ setPage, showToast, allListings, onListingCreated, institution: instProp, onInstitutionChange, favs, toggleFav, setActiveListing, unreadTotal }) {
   const [newOpen,    setNewOpen]    = useState(false);
@@ -1632,12 +1665,15 @@ function DashboardPage({ setPage, showToast, allListings, onListingCreated, inst
   }
 
   const cocoModelRef = React.useRef(null);
+  const cocoLoadingRef = React.useRef(null);
   async function getCocoModel() {
-    if (!cocoModelRef.current) {
-      cocoModelRef.current = await window.cocoSsd.load();
-    }
+    if (cocoModelRef.current) return cocoModelRef.current;
+    if (!cocoLoadingRef.current) cocoLoadingRef.current = window.cocoSsd.load();
+    cocoModelRef.current = await cocoLoadingRef.current;
     return cocoModelRef.current;
   }
+  // Preload model in background as soon as dashboard mounts
+  useEffect(() => { getCocoModel(); }, []);
 
   async function detectPerson(file) {
     return new Promise(resolve => {
@@ -2302,14 +2338,9 @@ function DashboardPage({ setPage, showToast, allListings, onListingCreated, inst
               <input ref={fileRef} type="file" accept="image/*" multiple onChange={handleFileSelect} style={{ display:'none' }} disabled={aiAnalyzing} />
 
               {aiAnalyzing ? (
-                <div style={{ border:'2px dashed #a8d5be', borderRadius:14, padding:'28px 20px', textAlign:'center', background:'#f0faf5' }}>
-                  <div style={{ fontSize:32, marginBottom:8 }}>🤖</div>
-                  <div style={{ fontSize:14, fontWeight:700, color:PRIMARY, marginBottom:4 }}>Tjekker billedet…</div>
-                  <div style={{ fontSize:12, color:'#888' }}>Kontrollerer at ingen personer er synlige</div>
-                  <div style={{ marginTop:12, display:'flex', justifyContent:'center', gap:6 }}>
-                    {[0,1,2].map(i=><div key={i} style={{ width:8, height:8, borderRadius:'50%', background:PRIMARY, opacity:0.7, animation:`pulse 1.2s ${i*0.4}s infinite` }} />)}
-                  </div>
-                </div>
+                <ScanningLoader />
+              ) : null}
+              {aiAnalyzing ? null
               ) : imgPreviews.length === 0 ? (
                 <div onClick={()=>fileRef.current?.click()} style={{ border:'2px dashed #d4d0cb', borderRadius:14, padding:'28px 20px', textAlign:'center', cursor:'pointer', background:'#fafaf8' }}>
                   <div style={{ fontSize:36, marginBottom:8 }}>📷</div>
