@@ -2802,25 +2802,32 @@ function MessagesPage({ setPage, selectedConvId, setSelectedConvId, setActiveLis
     if (active?.id === conv.id) { setActive(null); setMsgs([]); }
   }
 
+  function effectiveSenderName() {
+    if (ctxIsAdmin && adminInstName) return adminInstName;
+    return active.owner_id === userId ? active.owner_name : active.initiator_name;
+  }
+
   async function handleAcceptBid(msg) {
+    const senderName = effectiveSenderName();
     await db.from('chat_messages').update({ bid_status: 'accepted' }).eq('id', msg.id);
-    const confirmMsg = `Bud på ${msg.bid_amount} kr. accepteret! 🎉`;
-    const senderName = ctxIsAdmin && adminInstName ? adminInstName : (active.owner_id === userId ? active.owner_name : active.initiator_name);
+    const confirmMsg = `${senderName} har accepteret dit bud på ${msg.bid_amount} kr. for "${active.listing_title}" 🎉`;
     await db.from('chat_messages').insert({ conversation_id: active.id, sender_id: userId, sender_name: senderName, content: confirmMsg });
     const upd = { last_message: confirmMsg, last_message_at: new Date().toISOString(), initiator_unread: (active.initiator_unread||0)+1 };
     await db.from('conversations').update(upd).eq('id', active.id);
     setActive(a => ({ ...a, ...upd }));
+    setMessages(ms => ms.map(m => m.id === msg.id ? { ...m, bid_status: 'accepted' } : m));
   }
 
   async function handleRejectBid() {
     const msg = rejectingBid;
+    const senderName = effectiveSenderName();
     await db.from('chat_messages').update({ bid_status: 'rejected', bid_note: rejectNote }).eq('id', msg.id);
-    const senderName = ctxIsAdmin && adminInstName ? adminInstName : (active.owner_id === userId ? active.owner_name : active.initiator_name);
-    const rejectMsg = `Bud afvist${rejectNote ? ': ' + rejectNote : ''}`;
+    const rejectMsg = `${senderName} har afvist dit bud på ${msg.bid_amount} kr. for "${active.listing_title}"${rejectNote ? ' – ' + rejectNote : ''}`;
     await db.from('chat_messages').insert({ conversation_id: active.id, sender_id: userId, sender_name: senderName, content: rejectMsg });
     const upd = { last_message: rejectMsg, last_message_at: new Date().toISOString(), initiator_unread: (active.initiator_unread||0)+1 };
     await db.from('conversations').update(upd).eq('id', active.id);
     setActive(a => ({ ...a, ...upd }));
+    setMessages(ms => ms.map(m => m.id === msg.id ? { ...m, bid_status: 'rejected', bid_note: rejectNote } : m));
     setRejectingBid(null); setRejectNote('');
   }
 
@@ -2829,8 +2836,8 @@ function MessagesPage({ setPage, selectedConvId, setSelectedConvId, setActiveLis
     if (!amount) return;
     const msg = counterBidMsg;
     await db.from('chat_messages').update({ bid_status: 'countered' }).eq('id', msg.id);
-    const senderName = ctxIsAdmin && adminInstName ? adminInstName : (active.owner_id === userId ? active.owner_name : active.initiator_name);
-    const counterContent = `Modbud: ${amount} kr.`;
+    const senderName = effectiveSenderName();
+    const counterContent = `Modbud: ${amount} kr. for "${active.listing_title}"`;
     await db.from('chat_messages').insert({
       conversation_id: active.id, sender_id: userId, sender_name: senderName,
       content: counterContent, message_type: 'bid', bid_amount: amount, bid_status: 'pending',
@@ -3019,7 +3026,9 @@ function MessagesPage({ setPage, selectedConvId, setSelectedConvId, setActiveLis
                     <p style={{ fontSize:14 }}>Send den første besked for at starte samtalen</p>
                   </div>
                 ) : (() => {
-                  const isOwnerInConv = active.owner_id === userId;
+                  const isOwnerInConv = ctxIsAdmin && adminInstName
+                    ? active.owner_name === adminInstName
+                    : active.owner_id === userId;
                   let lastDate = null;
                   return messages.map((m, i) => {
                     const mine = ctxIsAdmin && adminInstName
@@ -3071,25 +3080,30 @@ function MessagesPage({ setPage, selectedConvId, setSelectedConvId, setActiveLis
                             {!mine && <div style={{ width:30, height:30, borderRadius:'50%', background:'#f0eeeb', display:'flex', alignItems:'center', justifyContent:'center', fontSize:13, fontWeight:700, color:'#888', flexShrink:0, marginRight:8, alignSelf:'flex-end' }}>{m.sender_name.charAt(0).toUpperCase()}</div>}
                             <div style={{ maxWidth:'78%' }}>
                               {!mine && <div style={{ fontSize:11, fontWeight:700, color:'#aaa', marginBottom:3, marginLeft:2 }}>{m.sender_name}</div>}
-                              <div style={{ background:mine?'#e8f0fb':'#f0f2f5', border:`1.5px solid ${mine?ACCENT2:'#e0ddd8'}`, borderRadius:16, padding:'14px 16px' }}>
+                              <div style={{
+                                background: m.bid_status==='accepted' ? '#e8f5ee' : m.bid_status==='rejected' ? '#fff0f0' : mine ? '#e8f0fb' : '#f0f2f5',
+                                border: `2px solid ${m.bid_status==='accepted' ? PRIMARY : m.bid_status==='rejected' ? '#fca5a5' : mine ? ACCENT2 : '#e0ddd8'}`,
+                                borderRadius:16, padding:'14px 16px'
+                              }}>
                                 <div style={{ display:'flex', alignItems:'center', gap:8, marginBottom:8 }}>
-                                  <span style={{ fontSize:20 }}>📊</span>
-                                  <span style={{ fontFamily:"'Nunito',sans-serif", fontWeight:800, fontSize:17, color:ACCENT2 }}>{m.bid_amount} kr.</span>
+                                  <span style={{ fontSize:20 }}>{m.bid_status==='accepted'?'✅':m.bid_status==='rejected'?'❌':'📊'}</span>
+                                  <span style={{ fontFamily:"'Nunito',sans-serif", fontWeight:800, fontSize:17, color: m.bid_status==='accepted'?PRIMARY:m.bid_status==='rejected'?'#e11d48':ACCENT2 }}>{m.bid_amount} kr.</span>
                                   <span style={{ fontSize:12, color:'#888', fontWeight:600 }}>bud</span>
+                                  {m.bid_status==='accepted' && <span style={{ fontSize:11, fontWeight:700, color:PRIMARY, background:'#d1fae5', padding:'2px 8px', borderRadius:99 }}>Accepteret</span>}
+                                  {m.bid_status==='rejected' && <span style={{ fontSize:11, fontWeight:700, color:'#e11d48', background:'#fee2e2', padding:'2px 8px', borderRadius:99 }}>Afvist</span>}
+                                  {m.bid_status==='countered' && <span style={{ fontSize:11, fontWeight:700, color:'#b45309', background:'#fef9c3', padding:'2px 8px', borderRadius:99 }}>Modbud sendt</span>}
                                 </div>
+                                {m.bid_note && <div style={{ fontSize:12, color:'#666', marginBottom:8, fontStyle:'italic' }}>"{m.bid_note}"</div>}
                                 {m.bid_status === 'pending' && isOwnerInConv && !mine && (
-                                  <div style={{ display:'flex', gap:8, flexWrap:'wrap' }}>
-                                    <button onClick={()=>handleAcceptBid(m)} style={{ padding:'7px 14px', borderRadius:10, background:'#e8f5ee', border:`1.5px solid ${PRIMARY}`, color:PRIMARY, fontSize:12, fontWeight:700, cursor:'pointer' }}>✅ Accepter</button>
-                                    <button onClick={()=>{ setRejectingBid(m); setRejectNote(''); }} style={{ padding:'7px 14px', borderRadius:10, background:'#fff0f0', border:'1.5px solid #fca5a5', color:'#e11d48', fontSize:12, fontWeight:700, cursor:'pointer' }}>❌ Afvis</button>
-                                    <button onClick={()=>{ setCounterBidMsg(m); setCounterAmount(''); }} style={{ padding:'7px 14px', borderRadius:10, background:'#fff8e1', border:'1.5px solid #ffe08a', color:'#b45309', fontSize:12, fontWeight:700, cursor:'pointer' }}>🔄 Modbud</button>
+                                  <div style={{ display:'flex', gap:8, flexWrap:'wrap', marginTop:4 }}>
+                                    <button onClick={()=>handleAcceptBid(m)} style={{ padding:'8px 16px', borderRadius:10, background:PRIMARY, border:'none', color:'#fff', fontSize:12, fontWeight:700, cursor:'pointer' }}>✅ Accepter</button>
+                                    <button onClick={()=>{ setRejectingBid(m); setRejectNote(''); }} style={{ padding:'8px 16px', borderRadius:10, background:'#fff0f0', border:'1.5px solid #fca5a5', color:'#e11d48', fontSize:12, fontWeight:700, cursor:'pointer' }}>❌ Afvis</button>
+                                    <button onClick={()=>{ setCounterBidMsg(m); setCounterAmount(''); }} style={{ padding:'8px 16px', borderRadius:10, background:'#fff8e1', border:'1.5px solid #ffe08a', color:'#b45309', fontSize:12, fontWeight:700, cursor:'pointer' }}>🔄 Modbud</button>
                                   </div>
                                 )}
                                 {m.bid_status === 'pending' && (!isOwnerInConv || mine) && (
                                   <div style={{ fontSize:12, color:'#888', fontWeight:600 }}>⏳ Afventer svar</div>
                                 )}
-                                {m.bid_status === 'accepted' && <div style={{ fontSize:12, color:PRIMARY, fontWeight:700 }}>✅ Accepteret</div>}
-                                {m.bid_status === 'rejected' && <div style={{ fontSize:12, color:'#e11d48', fontWeight:700 }}>❌ Afvist{m.bid_note ? `: ${m.bid_note}` : ''}</div>}
-                                {m.bid_status === 'countered' && <div style={{ fontSize:12, color:'#b45309', fontWeight:700 }}>🔄 Modbud sendt</div>}
                               </div>
                               <div style={{ fontSize:10, color:'#bbb', marginTop:3, textAlign:mine?'right':'left' }}>{d.toLocaleTimeString('da-DK',{hour:'2-digit',minute:'2-digit'})}</div>
                             </div>
