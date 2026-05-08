@@ -1612,10 +1612,7 @@ function SignupPage({ setPage, setLoggedIn, showToast }) {
     setSaving(true); setAuthError(null);
     const { data, error } = await db.auth.signUp({
       email: form.email, password: form.pass,
-      options: {
-        data: { full_name: form.contact_name },
-        emailRedirectTo: 'https://mustaphakatamato.github.io/Bytoglej/',
-      }
+      options: { data: { full_name: form.contact_name } }
     });
     if (error) { setAuthError(error.message); setSaving(false); return; }
     await db.from('institutions').insert({
