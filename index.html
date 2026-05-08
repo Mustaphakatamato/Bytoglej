@@ -1849,7 +1849,7 @@ function ScanningLoader() {
 }
 
 // ─── DASHBOARD ────────────────────────────────────────────────────────────────
-function DashboardPage({ setPage, showToast, allListings, onListingCreated, institution: instProp, onInstitutionChange, favs, toggleFav, setActiveListing, unreadTotal }) {
+function DashboardPage({ setPage, showToast, allListings, onListingCreated, institution: instProp, onInstitutionChange, favs, toggleFav, setActiveListing, unreadTotal, isAdminView }) {
   const [newOpen,    setNewOpen]    = useState(false);
   const [step,       setStep]       = useState(1);
   const [saving,     setSaving]     = useState(false);
@@ -1896,15 +1896,19 @@ function DashboardPage({ setPage, showToast, allListings, onListingCreated, inst
       if (!user || cancelled) { setInstLoading(false); return; }
       setAuthUserId(user.id);
 
-      // Load institution (admin or member)
+      // Load institution (admin or member) — skip if admin is impersonating another institution
       let inst = null;
-      const { data: adminInst } = await db.from('institutions').select('*').ilike('email', user.email).maybeSingle();
-      if (adminInst) { inst = adminInst; }
-      else {
-        const { data: mem } = await db.from('institution_members').select('role,institutions(*)').eq('email', user.email).maybeSingle();
-        if (mem?.institutions) inst = { ...mem.institutions, _memberRole: mem.role };
+      if (isAdminView && instProp) {
+        inst = instProp;
+      } else {
+        const { data: ownInst } = await db.from('institutions').select('*').ilike('email', user.email).maybeSingle();
+        if (ownInst) { inst = ownInst; }
+        else {
+          const { data: mem } = await db.from('institution_members').select('role,institutions(*)').eq('email', user.email).maybeSingle();
+          if (mem?.institutions) inst = { ...mem.institutions, _memberRole: mem.role };
+        }
+        if (!cancelled && inst) setInstitution(inst);
       }
-      if (!cancelled && inst) setInstitution(inst);
 
       // Auto-geocode institution address if coordinates not yet stored
       if (inst && inst.address && !inst.latitude) {
@@ -3694,7 +3698,7 @@ function App() {
       {page==='signup'         && <SignupPage setPage={navigate} setLoggedIn={setLoggedIn} showToast={showToast} />}
       {page==='glemt-kodeord'  && <ForgotPasswordPage setPage={navigate} />}
       {page==='nulstil-kodeord'&& <ResetPasswordPage setPage={navigate} setLoggedIn={setLoggedIn} />}
-      {page==='dashboard' && <DashboardPage setPage={navigate} showToast={showToast} allListings={listings} onListingCreated={fetchListings} institution={effectiveInstitution} onInstitutionChange={adminInst ? i=>setAdminInst(i) : setInstitution} favs={favs} toggleFav={toggleFav} setActiveListing={setActiveListing} unreadTotal={unreadTotal} />}
+      {page==='dashboard' && <DashboardPage key={adminInst?.id || 'own'} setPage={navigate} showToast={showToast} allListings={listings} onListingCreated={fetchListings} institution={effectiveInstitution} onInstitutionChange={adminInst ? i=>setAdminInst(i) : setInstitution} favs={favs} toggleFav={toggleFav} setActiveListing={setActiveListing} unreadTotal={unreadTotal} isAdminView={!!adminInst} />}
       {page==='profil'    && <InstitutionProfilePage setPage={navigate} showToast={showToast} institution={effectiveInstitution} onInstitutionChange={adminInst ? i=>setAdminInst(i) : setInstitution} />}
       {page==='hvordan'   && <HowItWorksPage setPage={navigate} />}
       {page==='om-os'     && <OmOsPage setPage={navigate} />}
