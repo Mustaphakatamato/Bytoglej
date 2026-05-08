@@ -209,7 +209,7 @@ function Toast({ msg, type='success', onDone }) {
 }
 
 // ─── NAV ─────────────────────────────────────────────────────────────────────
-function Nav({ page, setPage, loggedIn, setLoggedIn, unreadTotal, institution }) {
+function Nav({ page, setPage, loggedIn, setLoggedIn, unreadTotal, institution, adminBar }) {
   const [scrolled, setScrolled] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
   const w = useWindowWidth();
@@ -227,7 +227,7 @@ function Nav({ page, setPage, loggedIn, setLoggedIn, unreadTotal, institution })
   const transparent = page==='home' && !scrolled && !menuOpen;
 
   return (
-    <nav style={{ position:'fixed', top:0, left:0, right:0, zIndex:500, background:transparent?'transparent':'rgba(255,252,248,0.96)', backdropFilter:transparent?'none':'blur(18px)', boxShadow:transparent?'none':'0 1px 0 rgba(0,0,0,0.07)', transition:'all 0.3s' }}>
+    <nav style={{ position:'fixed', top:adminBar?36:0, left:0, right:0, zIndex:500, background:transparent?'transparent':'rgba(255,252,248,0.96)', backdropFilter:transparent?'none':'blur(18px)', boxShadow:transparent?'none':'0 1px 0 rgba(0,0,0,0.07)', transition:'all 0.3s' }}>
       <div style={{ maxWidth:1140, margin:'0 auto', display:'flex', alignItems:'center', height:68, gap:isMobile?12:24, padding:'0 16px' }}>
         {/* Logo */}
         <div onClick={()=>setPage('home')} style={{ display:'flex', alignItems:'center', gap:10, cursor:'pointer', flexShrink:0 }}>
@@ -3685,7 +3685,7 @@ function App() {
           }
         </div>
       )}
-      <Nav page={page} setPage={navigate} loggedIn={loggedIn} setLoggedIn={setLoggedIn} unreadTotal={unreadTotal} institution={effectiveInstitution} />
+      <Nav page={page} setPage={navigate} loggedIn={loggedIn} setLoggedIn={setLoggedIn} unreadTotal={unreadTotal} institution={effectiveInstitution} adminBar={isAdmin && loggedIn} />
 
       {page==='home'      && <HomePage setPage={navigate} setActiveListing={setActiveListing} listings={listings} loading={loading} favs={favs} toggleFav={toggleFav} />}
       {page==='opslag'    && <OpslagPage listings={listings} loading={loading} setPage={navigate} setActiveListing={setActiveListing} favs={favs} toggleFav={toggleFav} />}
