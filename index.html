@@ -1169,8 +1169,16 @@ function ListingDetailPage({ listing, setPage, showToast, onStartConv, favs, tog
           convId = conv?.id;
         }
         if (convId) {
-          await db.from('chat_messages').insert({ conversation_id: convId, sender_id: user.id, sender_name: userName, content: offerText });
-          await db.from('conversations').update({ last_message: offerText, last_message_at: new Date().toISOString(), owner_unread: (existing?.owner_unread||0)+1 }).eq('id', convId);
+          const swapContent = JSON.stringify({
+            swap_title: chosen?.title || null,
+            swap_emoji: chosen?.emoji || null,
+            swap_color: chosen?.color || null,
+            swap_image: chosen?.images?.[0] || null,
+            note: swapOffer.trim() || null,
+          });
+          const lastMsg = chosen ? `🔄 Bytteforslag: "${chosen.title}"` : `🔄 Bytteforslag: ${swapOffer}`;
+          await db.from('chat_messages').insert({ conversation_id: convId, sender_id: user.id, sender_name: userName, content: swapContent, message_type: 'swap' });
+          await db.from('conversations').update({ last_message: lastMsg, last_message_at: new Date().toISOString(), owner_unread: (existing?.owner_unread||0)+1 }).eq('id', convId);
           setSaving(false); setSwapModal(false); setSelectedSwapId(null); setSwapOffer('');
           showToast('Bytteforslag sendt!');
           if (setSelectedConvId) setSelectedConvId(convId);
@@ -2971,12 +2979,39 @@ function MessagesPage({ setPage, selectedConvId, setSelectedConvId, setActiveLis
                     const showDate = dateStr !== lastDate;
                     lastDate = dateStr;
                     const prevMine = i>0 && messages[i-1].sender_id === userId;
-                    const grouped = mine === prevMine && !showDate && m.message_type !== 'bid' && messages[i-1]?.message_type !== 'bid';
+                    const grouped = mine === prevMine && !showDate && m.message_type !== 'bid' && messages[i-1]?.message_type !== 'bid' && m.message_type !== 'swap' && messages[i-1]?.message_type !== 'swap';
                     const isBid = m.message_type === 'bid';
+                    const isSwap = m.message_type === 'swap';
+                    const swapData = isSwap ? (() => { try { return JSON.parse(m.content); } catch { return null; } })() : null;
                     return (
                       <React.Fragment key={m.id}>
                         {showDate && <div style={{ textAlign:'center', margin:'12px 0 4px', fontSize:11, fontWeight:600, color:'#bbb', letterSpacing:0.5 }}>{dateStr}</div>}
-                        {isBid ? (
+                        {isSwap ? (
+                          <div style={{ display:'flex', justifyContent:mine?'flex-end':'flex-start', marginTop:10 }}>
+                            {!mine && <div style={{ width:30, height:30, borderRadius:'50%', background:'#f0eeeb', display:'flex', alignItems:'center', justifyContent:'center', fontSize:13, fontWeight:700, color:'#888', flexShrink:0, marginRight:8, alignSelf:'flex-end' }}>{m.sender_name.charAt(0).toUpperCase()}</div>}
+                            <div style={{ maxWidth:'78%' }}>
+                              {!mine && <div style={{ fontSize:11, fontWeight:700, color:'#aaa', marginBottom:3, marginLeft:2 }}>{m.sender_name}</div>}
+                              <div style={{ background:mine?'#FEF0E3':'#f0f2f5', border:`1.5px solid ${mine?ACCENT:'#e0ddd8'}`, borderRadius:16, padding:'14px 16px', minWidth:200 }}>
+                                <div style={{ fontSize:11, fontWeight:700, color:ACCENT, textTransform:'uppercase', letterSpacing:0.6, marginBottom:10 }}>🔄 Bytteforslag</div>
+                                {swapData?.swap_title ? (
+                                  <div style={{ display:'flex', alignItems:'center', gap:10, background:'#fff', borderRadius:10, padding:'10px 12px', marginBottom: swapData?.note ? 8 : 0 }}>
+                                    <div style={{ width:44, height:44, borderRadius:8, background:swapData.swap_image?'#e8e6e3':swapData.swap_color||'#FFD166', display:'flex', alignItems:'center', justifyContent:'center', fontSize:22, flexShrink:0, overflow:'hidden' }}>
+                                      {swapData.swap_image ? <img src={swapData.swap_image} style={{ width:'100%', height:'100%', objectFit:'cover' }} alt="" /> : swapData.swap_emoji||'🧸'}
+                                    </div>
+                                    <div>
+                                      <div style={{ fontSize:12, color:'#aaa', fontWeight:600 }}>Tilbyder:</div>
+                                      <div style={{ fontWeight:700, fontSize:14, color:'#1c1a17' }}>{swapData.swap_title}</div>
+                                    </div>
+                                  </div>
+                                ) : null}
+                                {swapData?.note && (
+                                  <div style={{ fontSize:13, color:'#555', marginTop: swapData?.swap_title ? 8 : 0, lineHeight:1.5 }}>{swapData.note}</div>
+                                )}
+                              </div>
+                              <div style={{ fontSize:10, color:'#bbb', marginTop:3, textAlign:mine?'right':'left' }}>{d.toLocaleTimeString('da-DK',{hour:'2-digit',minute:'2-digit'})}</div>
+                            </div>
+                          </div>
+                        ) : isBid ? (
                           <div style={{ display:'flex', justifyContent:mine?'flex-end':'flex-start', marginTop:10 }}>
                             {!mine && <div style={{ width:30, height:30, borderRadius:'50%', background:'#f0eeeb', display:'flex', alignItems:'center', justifyContent:'center', fontSize:13, fontWeight:700, color:'#888', flexShrink:0, marginRight:8, alignSelf:'flex-end' }}>{m.sender_name.charAt(0).toUpperCase()}</div>}
                             <div style={{ maxWidth:'78%' }}>
