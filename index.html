@@ -2749,9 +2749,16 @@ function MessagesPage({ setPage, selectedConvId, setSelectedConvId, setActiveLis
     e.stopPropagation();
     const isInit = conv.initiator_id === userId;
     const field = isInit ? 'archived_by_initiator' : 'archived_by_owner';
-    const newVal = !(isInit ? (conv.archived_by_initiator||false) : (conv.archived_by_owner||false));
-    await db.from('conversations').update({ [field]: newVal }).eq('id', conv.id);
-    setConvs(cs => cs.map(c => c.id === conv.id ? { ...c, [field]: newVal } : c));
+    await db.from('conversations').update({ [field]: true }).eq('id', conv.id);
+    setConvs(cs => cs.map(c => c.id === conv.id ? { ...c, [field]: true } : c));
+    if (active?.id === conv.id) setActive(null);
+  }
+
+  async function deleteConv(conv, e) {
+    e.stopPropagation();
+    if (!window.confirm('Slet denne samtale permanent?')) return;
+    await db.from('conversations').delete().eq('id', conv.id);
+    setConvs(cs => cs.filter(c => c.id !== conv.id));
     if (active?.id === conv.id) setActive(null);
   }
 
@@ -2893,8 +2900,8 @@ function MessagesPage({ setPage, selectedConvId, setSelectedConvId, setActiveLis
                     </div>
                     <div style={{ fontSize:12, color:unread>0?'#333':'#aaa', fontWeight:unread>0?600:400, whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis' }}>{c.last_message || 'Samtale startet'}</div>
                   </div>
-                  <button onClick={e=>archiveConv(c,e)} title={archived?'Fjern fra arkiv':'Arkiver'} style={{ background:'none', border:'none', fontSize:16, cursor:'pointer', padding:'4px', color:'#ccc', flexShrink:0, alignSelf:'center' }}>
-                    {archived ? '📤' : '📥'}
+                  <button onClick={e=>archived?deleteConv(c,e):archiveConv(c,e)} title={archived?'Slet samtale':'Arkiver'} style={{ background:'none', border:'none', fontSize:16, cursor:'pointer', padding:'4px', color:'#ccc', flexShrink:0, alignSelf:'center' }}>
+                    {archived ? '🗑️' : '📥'}
                   </button>
                 </div>
               );
