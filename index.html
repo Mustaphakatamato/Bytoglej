@@ -144,6 +144,20 @@ function Spinner() {
   return <div style={{ width:20, height:20, border:'2.5px solid rgba(255,255,255,0.3)', borderTopColor:'#fff', borderRadius:'50%', animation:'spin 0.7s linear infinite', flexShrink:0 }} />;
 }
 
+function InfoRow({ icon, label, value, link }) {
+  return (
+    <div style={{ display:'flex', gap:8, alignItems:'flex-start', marginBottom:7 }}>
+      <span style={{ fontSize:14, lineHeight:'20px', flexShrink:0 }}>{icon}</span>
+      <div style={{ minWidth:0 }}>
+        <span style={{ fontSize:11, color:'#aaa', display:'block' }}>{label}</span>
+        {link
+          ? <a href={link} target="_blank" rel="noopener noreferrer" style={{ fontSize:13, fontWeight:600, color:'#2563eb', wordBreak:'break-all', textDecoration:'none' }}>{value}</a>
+          : <span style={{ fontSize:13, fontWeight:600, color:'#333', wordBreak:'break-all' }}>{value}</span>}
+      </div>
+    </div>
+  );
+}
+
 function SkeletonCard() {
   return (
     <div style={{ background:'#fff', borderRadius:16, overflow:'hidden', boxShadow:'0 2px 12px rgba(0,0,0,0.06)' }}>
@@ -2007,6 +2021,46 @@ function DashboardPage({ setPage, showToast, allListings, onListingCreated, inst
           </div>
         </div>
 
+        {/* Institution profile card */}
+        {isAdmin && institution && (
+          <div style={{ background:'#fff', borderRadius:22, padding:isMobile?20:28, boxShadow:'0 2px 12px rgba(0,0,0,0.06)', marginTop:isMobile?16:24 }}>
+            <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:20, flexWrap:'wrap', gap:10 }}>
+              <h2 style={{ fontFamily:"'Nunito',sans-serif", fontWeight:800, fontSize:20, margin:0 }}>Institutionsprofil</h2>
+              <Btn variant="outline" radius={22} onClick={openEditProfile} style={{ fontSize:13, padding:'8px 18px', gap:6 }}>✏️ Rediger oplysninger</Btn>
+            </div>
+            <div style={{ display:'grid', gridTemplateColumns:isMobile?'1fr':'1fr 1fr', gap:isMobile?12:20 }}>
+              <div style={{ display:'flex', flexDirection:'column', gap:12 }}>
+                <div style={{ background:'#f8f7f5', borderRadius:14, padding:'14px 16px' }}>
+                  <div style={{ fontSize:11, fontWeight:700, color:'#aaa', textTransform:'uppercase', letterSpacing:0.8, marginBottom:8 }}>Institutionsoplysninger</div>
+                  <InfoRow icon="🏫" label="Type" value={institution.institution_type || '—'} />
+                  <InfoRow icon="🏛️" label="Driftsform" value={institution.ownership_type || '—'} />
+                  <InfoRow icon="👶" label="Antal børn" value={institution.children_count ? `${institution.children_count} indskrevne` : '—'} />
+                </div>
+                <div style={{ background:'#f8f7f5', borderRadius:14, padding:'14px 16px' }}>
+                  <div style={{ fontSize:11, fontWeight:700, color:'#aaa', textTransform:'uppercase', letterSpacing:0.8, marginBottom:8 }}>Kontakt</div>
+                  <InfoRow icon="📍" label="Adresse" value={institution.address ? `${institution.address}, ${institution.zipcode} ${institution.city}` : '—'} />
+                  <InfoRow icon="📞" label="Telefon" value={institution.phone || '—'} />
+                  <InfoRow icon="🌐" label="Hjemmeside" value={institution.website || '—'} link={institution.website} />
+                </div>
+              </div>
+              <div style={{ display:'flex', flexDirection:'column', gap:12 }}>
+                <div style={{ background:'#f8f7f5', borderRadius:14, padding:'14px 16px' }}>
+                  <div style={{ fontSize:11, fontWeight:700, color:'#aaa', textTransform:'uppercase', letterSpacing:0.8, marginBottom:8 }}>Institutionsleder</div>
+                  <InfoRow icon="👤" label="Navn" value={institution.leader_name || '—'} />
+                  <InfoRow icon="📞" label="Telefon" value={institution.leader_phone || '—'} />
+                  <InfoRow icon="✉️" label="E-mail" value={institution.leader_email || '—'} />
+                </div>
+                <div style={{ background:'#f8f7f5', borderRadius:14, padding:'14px 16px' }}>
+                  <div style={{ fontSize:11, fontWeight:700, color:'#aaa', textTransform:'uppercase', letterSpacing:0.8, marginBottom:8 }}>Kontaktperson (LegetøjsByt)</div>
+                  <InfoRow icon="👤" label="Navn" value={institution.contact_name || '—'} />
+                  <InfoRow icon="✉️" label="E-mail" value={institution.email || '—'} />
+                  <InfoRow icon="🔑" label="CVR" value={institution.cvr || '—'} />
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* Feature #15: Incoming requests section */}
         <div id="incoming-section" style={{ background:'#fff', borderRadius:22, padding:28, boxShadow:'0 2px 12px rgba(0,0,0,0.06)', marginTop:isMobile?16:24 }}>
           <div style={{ display:'flex', alignItems:'center', gap:10, marginBottom:20 }}>
@@ -2111,54 +2165,99 @@ function DashboardPage({ setPage, showToast, allListings, onListingCreated, inst
       {/* Feature #5: Edit Profile Modal */}
       <Modal open={editProfileOpen} onClose={()=>setEditProfileOpen(false)} title="Rediger institutionsprofil">
         {editProfileForm && (
-          <div style={{ display:'flex', flexDirection:'column', gap:14 }}>
+          <div style={{ display:'flex', flexDirection:'column', gap:16 }}>
+
+            {/* CVR info — read only */}
             <div style={{ background:'#f0f9f4', border:'1.5px solid #c6e8d4', borderRadius:12, padding:'12px 16px' }}>
               <div style={{ fontSize:12, color:'#5a9a74', fontWeight:700, marginBottom:4 }}>Fra CVR-registret (kan ikke ændres)</div>
               <div style={{ fontWeight:800, fontSize:15 }}>{institution?.name}</div>
               <div style={{ fontSize:13, color:'#888' }}>CVR: {institution?.cvr}</div>
             </div>
-            <div style={{ display:'grid', gridTemplateColumns:'1fr 110px', gap:10 }}>
-              <div>
-                <label style={{ display:'block', fontSize:12, fontWeight:700, marginBottom:5 }}>Adresse</label>
-                <input value={editProfileForm.address} onChange={e=>setEditProfileForm(f=>({...f,address:e.target.value}))} style={{ width:'100%', padding:'10px 12px', borderRadius:10, border:'1.5px solid #e5e5e5', fontSize:14, outline:'none' }} />
-              </div>
-              <div>
-                <label style={{ display:'block', fontSize:12, fontWeight:700, marginBottom:5 }}>Postnr.</label>
-                <input value={editProfileForm.zipcode} onChange={e=>setEditProfileForm(f=>({...f,zipcode:e.target.value}))} style={{ width:'100%', padding:'10px 12px', borderRadius:10, border:'1.5px solid #e5e5e5', fontSize:14, outline:'none' }} />
-              </div>
-            </div>
-            <div>
-              <label style={{ display:'block', fontSize:12, fontWeight:700, marginBottom:5 }}>By</label>
-              <input value={editProfileForm.city} onChange={e=>setEditProfileForm(f=>({...f,city:e.target.value}))} style={{ width:'100%', padding:'10px 12px', borderRadius:10, border:'1.5px solid #e5e5e5', fontSize:14, outline:'none' }} />
-            </div>
-            <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:10 }}>
-              <div>
-                <label style={{ display:'block', fontSize:12, fontWeight:700, marginBottom:5 }}>Telefon</label>
-                <input value={editProfileForm.phone} onChange={e=>setEditProfileForm(f=>({...f,phone:e.target.value}))} placeholder="+45 12 34 56 78" style={{ width:'100%', padding:'10px 12px', borderRadius:10, border:'1.5px solid #e5e5e5', fontSize:14, outline:'none' }} />
-              </div>
-              <div>
-                <label style={{ display:'block', fontSize:12, fontWeight:700, marginBottom:5 }}>Antal børn</label>
-                <input type="number" value={editProfileForm.children_count} onChange={e=>setEditProfileForm(f=>({...f,children_count:e.target.value}))} placeholder="Fx 60" style={{ width:'100%', padding:'10px 12px', borderRadius:10, border:'1.5px solid #e5e5e5', fontSize:14, outline:'none' }} />
-              </div>
-            </div>
-            <div>
-              <label style={{ display:'block', fontSize:12, fontWeight:700, marginBottom:5 }}>Hjemmeside</label>
-              <input value={editProfileForm.website} onChange={e=>setEditProfileForm(f=>({...f,website:e.target.value}))} placeholder="https://min-institution.dk" style={{ width:'100%', padding:'10px 12px', borderRadius:10, border:'1.5px solid #e5e5e5', fontSize:14, outline:'none' }} />
-            </div>
+
+            {/* Section: Om institutionen */}
             <div style={{ borderTop:'1px solid #f0eeeb', paddingTop:14 }}>
-              <div style={{ fontSize:12, fontWeight:700, color:'#888', marginBottom:10 }}>Institutionsleder</div>
+              <div style={{ fontSize:12, fontWeight:700, color:'#888', marginBottom:10, textTransform:'uppercase', letterSpacing:0.6 }}>Om institutionen</div>
               <div style={{ display:'flex', flexDirection:'column', gap:10 }}>
-                <input value={editProfileForm.leader_name} onChange={e=>setEditProfileForm(f=>({...f,leader_name:e.target.value}))} placeholder="Fulde navn" style={{ width:'100%', padding:'10px 12px', borderRadius:10, border:'1.5px solid #e5e5e5', fontSize:14, outline:'none' }} />
-                <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:10 }}>
-                  <input value={editProfileForm.leader_phone} onChange={e=>setEditProfileForm(f=>({...f,leader_phone:e.target.value}))} placeholder="Telefon" style={{ width:'100%', padding:'10px 12px', borderRadius:10, border:'1.5px solid #e5e5e5', fontSize:14, outline:'none' }} />
-                  <input value={editProfileForm.leader_email} onChange={e=>setEditProfileForm(f=>({...f,leader_email:e.target.value}))} placeholder="E-mail" style={{ width:'100%', padding:'10px 12px', borderRadius:10, border:'1.5px solid #e5e5e5', fontSize:14, outline:'none' }} />
+                <div>
+                  <label style={{ display:'block', fontSize:12, fontWeight:700, marginBottom:6 }}>Institutionstype</label>
+                  <SChoiceGroup value={editProfileForm.institution_type} onChange={v=>setEditProfileForm(f=>({...f,institution_type:v}))} primary={PRIMARY} options={['Vuggestue','Børnehave','Integreret institution','SFO / KSFO','Andet']} />
+                </div>
+                <div>
+                  <label style={{ display:'block', fontSize:12, fontWeight:700, marginBottom:6 }}>Driftsform</label>
+                  <SChoiceGroup value={editProfileForm.ownership_type} onChange={v=>setEditProfileForm(f=>({...f,ownership_type:v}))} primary={PRIMARY} options={['Offentlig','Privat','Selvejende']} />
+                </div>
+                <div>
+                  <label style={{ display:'block', fontSize:12, fontWeight:700, marginBottom:5 }}>Antal indskrevne børn</label>
+                  <input type="number" value={editProfileForm.children_count} onChange={e=>setEditProfileForm(f=>({...f,children_count:e.target.value}))} placeholder="Fx 60" style={{ width:'100%', padding:'10px 12px', borderRadius:10, border:'1.5px solid #e5e5e5', fontSize:14, outline:'none', boxSizing:'border-box' }} />
                 </div>
               </div>
             </div>
-            <div style={{ display:'flex', gap:10 }}>
-              <button onClick={()=>setEditProfileOpen(false)} style={{ flex:1, padding:'12px', borderRadius:12, background:'#f5f4f2', border:'none', fontWeight:700, cursor:'pointer' }}>Annuller</button>
+
+            {/* Section: Kontaktoplysninger */}
+            <div style={{ borderTop:'1px solid #f0eeeb', paddingTop:14 }}>
+              <div style={{ fontSize:12, fontWeight:700, color:'#888', marginBottom:10, textTransform:'uppercase', letterSpacing:0.6 }}>Kontaktoplysninger</div>
+              <div style={{ display:'flex', flexDirection:'column', gap:10 }}>
+                <div style={{ display:'grid', gridTemplateColumns:'1fr 110px', gap:10 }}>
+                  <div>
+                    <label style={{ display:'block', fontSize:12, fontWeight:700, marginBottom:5 }}>Adresse</label>
+                    <input value={editProfileForm.address} onChange={e=>setEditProfileForm(f=>({...f,address:e.target.value}))} style={{ width:'100%', padding:'10px 12px', borderRadius:10, border:'1.5px solid #e5e5e5', fontSize:14, outline:'none', boxSizing:'border-box' }} />
+                  </div>
+                  <div>
+                    <label style={{ display:'block', fontSize:12, fontWeight:700, marginBottom:5 }}>Postnr.</label>
+                    <input value={editProfileForm.zipcode} onChange={e=>setEditProfileForm(f=>({...f,zipcode:e.target.value}))} style={{ width:'100%', padding:'10px 12px', borderRadius:10, border:'1.5px solid #e5e5e5', fontSize:14, outline:'none', boxSizing:'border-box' }} />
+                  </div>
+                </div>
+                <div>
+                  <label style={{ display:'block', fontSize:12, fontWeight:700, marginBottom:5 }}>By</label>
+                  <input value={editProfileForm.city} onChange={e=>setEditProfileForm(f=>({...f,city:e.target.value}))} style={{ width:'100%', padding:'10px 12px', borderRadius:10, border:'1.5px solid #e5e5e5', fontSize:14, outline:'none', boxSizing:'border-box' }} />
+                </div>
+                <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:10 }}>
+                  <div>
+                    <label style={{ display:'block', fontSize:12, fontWeight:700, marginBottom:5 }}>Telefon</label>
+                    <input value={editProfileForm.phone} onChange={e=>setEditProfileForm(f=>({...f,phone:e.target.value}))} placeholder="+45 12 34 56 78" style={{ width:'100%', padding:'10px 12px', borderRadius:10, border:'1.5px solid #e5e5e5', fontSize:14, outline:'none', boxSizing:'border-box' }} />
+                  </div>
+                  <div>
+                    <label style={{ display:'block', fontSize:12, fontWeight:700, marginBottom:5 }}>Hjemmeside</label>
+                    <input value={editProfileForm.website} onChange={e=>setEditProfileForm(f=>({...f,website:e.target.value}))} placeholder="https://..." style={{ width:'100%', padding:'10px 12px', borderRadius:10, border:'1.5px solid #e5e5e5', fontSize:14, outline:'none', boxSizing:'border-box' }} />
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Section: Institutionsleder */}
+            <div style={{ borderTop:'1px solid #f0eeeb', paddingTop:14 }}>
+              <div style={{ fontSize:12, fontWeight:700, color:'#888', marginBottom:10, textTransform:'uppercase', letterSpacing:0.6 }}>Institutionsleder</div>
+              <div style={{ display:'flex', flexDirection:'column', gap:10 }}>
+                <div>
+                  <label style={{ display:'block', fontSize:12, fontWeight:700, marginBottom:5 }}>Fulde navn</label>
+                  <input value={editProfileForm.leader_name} onChange={e=>setEditProfileForm(f=>({...f,leader_name:e.target.value}))} placeholder="Fornavn Efternavn" style={{ width:'100%', padding:'10px 12px', borderRadius:10, border:'1.5px solid #e5e5e5', fontSize:14, outline:'none', boxSizing:'border-box' }} />
+                </div>
+                <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:10 }}>
+                  <div>
+                    <label style={{ display:'block', fontSize:12, fontWeight:700, marginBottom:5 }}>Telefon</label>
+                    <input value={editProfileForm.leader_phone} onChange={e=>setEditProfileForm(f=>({...f,leader_phone:e.target.value}))} placeholder="+45 12 34 56 78" style={{ width:'100%', padding:'10px 12px', borderRadius:10, border:'1.5px solid #e5e5e5', fontSize:14, outline:'none', boxSizing:'border-box' }} />
+                  </div>
+                  <div>
+                    <label style={{ display:'block', fontSize:12, fontWeight:700, marginBottom:5 }}>E-mail</label>
+                    <input value={editProfileForm.leader_email} onChange={e=>setEditProfileForm(f=>({...f,leader_email:e.target.value}))} placeholder="leder@institution.dk" style={{ width:'100%', padding:'10px 12px', borderRadius:10, border:'1.5px solid #e5e5e5', fontSize:14, outline:'none', boxSizing:'border-box' }} />
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Section: Kontaktperson */}
+            <div style={{ borderTop:'1px solid #f0eeeb', paddingTop:14 }}>
+              <div style={{ fontSize:12, fontWeight:700, color:'#888', marginBottom:10, textTransform:'uppercase', letterSpacing:0.6 }}>Kontaktperson (LegetøjsByt)</div>
+              <div>
+                <label style={{ display:'block', fontSize:12, fontWeight:700, marginBottom:5 }}>Dit fulde navn</label>
+                <input value={editProfileForm.contact_name} onChange={e=>setEditProfileForm(f=>({...f,contact_name:e.target.value}))} placeholder="Fornavn Efternavn" style={{ width:'100%', padding:'10px 12px', borderRadius:10, border:'1.5px solid #e5e5e5', fontSize:14, outline:'none', boxSizing:'border-box' }} />
+              </div>
+            </div>
+
+            <div style={{ display:'flex', gap:10, paddingTop:4 }}>
+              <button onClick={()=>setEditProfileOpen(false)} style={{ flex:1, padding:'12px', borderRadius:12, background:'#f5f4f2', border:'none', fontWeight:700, cursor:'pointer', fontSize:14 }}>Annuller</button>
               <Btn variant="primary" color={PRIMARY} radius={22} onClick={handleSaveProfile} disabled={editProfileSaving} style={{ flex:2, justifyContent:'center', padding:'12px', fontSize:14 }}>
-                {editProfileSaving ? <><Spinner/>Gemmer…</> : '✓ Gem profil'}
+                {editProfileSaving ? <><Spinner/>Gemmer…</> : '✓ Gem oplysninger'}
               </Btn>
             </div>
           </div>
