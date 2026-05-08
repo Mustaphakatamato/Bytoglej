@@ -1402,7 +1402,123 @@ function LoginPage({ setPage, setLoggedIn }) {
               {loading ? <><Spinner/>Logger ind…</> : 'Log ind →'}
             </button>
           </form>
-          <div style={{ textAlign:'center', marginTop:20, fontSize:13, color:'#888' }}>Ikke tilmeldt? <a onClick={()=>setPage('signup')} style={{ color:PRIMARY, fontWeight:700, cursor:'pointer' }}>Opret institution</a></div>
+          <div style={{ textAlign:'center', marginTop:16, fontSize:13 }}>
+            <a onClick={()=>setPage('glemt-kodeord')} style={{ color:PRIMARY, fontWeight:600, cursor:'pointer' }}>Glemt kodeord?</a>
+          </div>
+          <div style={{ textAlign:'center', marginTop:10, fontSize:13, color:'#888' }}>Ikke tilmeldt? <a onClick={()=>setPage('signup')} style={{ color:PRIMARY, fontWeight:700, cursor:'pointer' }}>Opret institution</a></div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ─── GLEMT KODEORD ────────────────────────────────────────────────────────────
+function ForgotPasswordPage({ setPage }) {
+  const [email, setEmail] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [sent, setSent] = useState(false);
+  const [error, setError] = useState(null);
+  async function handleSubmit(e) {
+    e.preventDefault(); setLoading(true); setError(null);
+    const { error } = await db.auth.resetPasswordForEmail(email, {
+      redirectTo: window.location.origin + window.location.pathname,
+    });
+    setLoading(false);
+    if (error) { setError('Noget gik galt. Prøv igen.'); return; }
+    setSent(true);
+  }
+  return (
+    <div style={{ minHeight:'100vh', display:'flex', alignItems:'center', justifyContent:'center', padding:'80px 24px', background:'linear-gradient(150deg,#fffcf8 0%,#f0f9f4 100%)' }} className="page-enter">
+      <div style={{ width:'100%', maxWidth:440 }}>
+        <div onClick={()=>setPage('home')} style={{ display:'flex', alignItems:'center', gap:10, cursor:'pointer', marginBottom:36, justifyContent:'center' }}>
+          <div style={{ width:40, height:40, borderRadius:12, background:PRIMARY, display:'flex', alignItems:'center', justifyContent:'center', fontSize:22 }}>♻️</div>
+          <span style={{ fontFamily:"'Nunito',sans-serif", fontWeight:900, fontSize:22 }}><span style={{ color:PRIMARY }}>Legetøjs</span>Byt</span>
+        </div>
+        <div style={{ background:'#fff', borderRadius:24, padding:40, boxShadow:'0 8px 40px rgba(0,0,0,0.08)' }}>
+          {sent ? (
+            <div style={{ textAlign:'center' }}>
+              <div style={{ fontSize:48, marginBottom:16 }}>📬</div>
+              <h1 style={{ fontFamily:"'Nunito',sans-serif", fontWeight:900, fontSize:24, marginBottom:10 }}>Tjek din indbakke</h1>
+              <p style={{ color:'#666', fontSize:14, lineHeight:1.7, marginBottom:24 }}>Vi har sendt et link til <strong>{email}</strong>. Klik på linket for at nulstille dit kodeord. Husk at tjekke spam-mappen.</p>
+              <a onClick={()=>setPage('login')} style={{ color:PRIMARY, fontWeight:700, cursor:'pointer', fontSize:14 }}>← Tilbage til login</a>
+            </div>
+          ) : (
+            <>
+              <h1 style={{ fontFamily:"'Nunito',sans-serif", fontWeight:900, fontSize:28, marginBottom:8, textAlign:'center' }}>Glemt kodeord?</h1>
+              <p style={{ color:'#888', fontSize:14, textAlign:'center', marginBottom:28 }}>Indtast jeres e-mail, så sender vi et nulstillingslink</p>
+              <form onSubmit={handleSubmit} style={{ display:'flex', flexDirection:'column', gap:16 }}>
+                <div>
+                  <label style={{ display:'block', fontSize:13, fontWeight:700, marginBottom:6 }}>E-mail</label>
+                  <input type="email" value={email} onChange={e=>setEmail(e.target.value)} placeholder="navn@institution.dk" required style={{ width:'100%', padding:'12px 14px', borderRadius:12, border:'1.5px solid #e5e5e5', fontSize:14, fontFamily:"'Nunito Sans',sans-serif", outline:'none' }} />
+                </div>
+                {error && <div style={{ background:'#FEF2F2', border:'1.5px solid #fca5a5', borderRadius:10, padding:'12px 16px', fontSize:13, color:'#b91c1c' }}>❌ {error}</div>}
+                <button type="submit" disabled={loading} style={{ background:loading?'#aaa':PRIMARY, color:'#fff', border:'none', borderRadius:22, padding:'14px', fontSize:15, fontWeight:700, transition:'all 0.2s', display:'flex', alignItems:'center', justifyContent:'center', gap:8 }}>
+                  {loading ? <><Spinner/>Sender…</> : 'Send nulstillingslink →'}
+                </button>
+              </form>
+              <div style={{ textAlign:'center', marginTop:20, fontSize:13 }}>
+                <a onClick={()=>setPage('login')} style={{ color:'#888', cursor:'pointer' }}>← Tilbage til login</a>
+              </div>
+            </>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ─── NULSTIL KODEORD ──────────────────────────────────────────────────────────
+function ResetPasswordPage({ setPage, setLoggedIn }) {
+  const [pass, setPass]       = useState('');
+  const [pass2, setPass2]     = useState('');
+  const [loading, setLoading] = useState(false);
+  const [error, setError]     = useState(null);
+  const [done, setDone]       = useState(false);
+  async function handleSubmit(e) {
+    e.preventDefault(); setError(null);
+    if (pass.length < 6) { setError('Kodeordet skal være mindst 6 tegn.'); return; }
+    if (pass !== pass2)  { setError('Kodeordene er ikke ens.'); return; }
+    setLoading(true);
+    const { error } = await db.auth.updateUser({ password: pass });
+    setLoading(false);
+    if (error) { setError('Noget gik galt. Prøv at anmode om et nyt link.'); return; }
+    setDone(true);
+  }
+  return (
+    <div style={{ minHeight:'100vh', display:'flex', alignItems:'center', justifyContent:'center', padding:'80px 24px', background:'linear-gradient(150deg,#fffcf8 0%,#f0f9f4 100%)' }} className="page-enter">
+      <div style={{ width:'100%', maxWidth:440 }}>
+        <div style={{ display:'flex', alignItems:'center', gap:10, marginBottom:36, justifyContent:'center' }}>
+          <div style={{ width:40, height:40, borderRadius:12, background:PRIMARY, display:'flex', alignItems:'center', justifyContent:'center', fontSize:22 }}>♻️</div>
+          <span style={{ fontFamily:"'Nunito',sans-serif", fontWeight:900, fontSize:22 }}><span style={{ color:PRIMARY }}>Legetøjs</span>Byt</span>
+        </div>
+        <div style={{ background:'#fff', borderRadius:24, padding:40, boxShadow:'0 8px 40px rgba(0,0,0,0.08)' }}>
+          {done ? (
+            <div style={{ textAlign:'center' }}>
+              <div style={{ fontSize:48, marginBottom:16 }}>✅</div>
+              <h1 style={{ fontFamily:"'Nunito',sans-serif", fontWeight:900, fontSize:24, marginBottom:10 }}>Kodeord opdateret!</h1>
+              <p style={{ color:'#666', fontSize:14, marginBottom:24 }}>Du er nu logget ind med dit nye kodeord.</p>
+              <button onClick={()=>{ setLoggedIn(true); setPage('dashboard'); }} style={{ background:PRIMARY, color:'#fff', border:'none', borderRadius:22, padding:'12px 28px', fontSize:14, fontWeight:700, cursor:'pointer' }}>
+                Gå til dashboard →
+              </button>
+            </div>
+          ) : (
+            <>
+              <h1 style={{ fontFamily:"'Nunito',sans-serif", fontWeight:900, fontSize:28, marginBottom:8, textAlign:'center' }}>Nyt kodeord</h1>
+              <p style={{ color:'#888', fontSize:14, textAlign:'center', marginBottom:28 }}>Vælg et nyt kodeord til jeres konto</p>
+              <form onSubmit={handleSubmit} style={{ display:'flex', flexDirection:'column', gap:16 }}>
+                {[{label:'Nyt kodeord',val:pass,set:setPass,ph:'Mindst 6 tegn'},{label:'Gentag kodeord',val:pass2,set:setPass2,ph:'Gentag kodeordet'}].map(f=>(
+                  <div key={f.label}>
+                    <label style={{ display:'block', fontSize:13, fontWeight:700, marginBottom:6 }}>{f.label}</label>
+                    <input type="password" value={f.val} onChange={e=>f.set(e.target.value)} placeholder={f.ph} required style={{ width:'100%', padding:'12px 14px', borderRadius:12, border:'1.5px solid #e5e5e5', fontSize:14, fontFamily:"'Nunito Sans',sans-serif", outline:'none' }} />
+                  </div>
+                ))}
+                {error && <div style={{ background:'#FEF2F2', border:'1.5px solid #fca5a5', borderRadius:10, padding:'12px 16px', fontSize:13, color:'#b91c1c' }}>❌ {error}</div>}
+                <button type="submit" disabled={loading} style={{ background:loading?'#aaa':PRIMARY, color:'#fff', border:'none', borderRadius:22, padding:'14px', fontSize:15, fontWeight:700, transition:'all 0.2s', display:'flex', alignItems:'center', justifyContent:'center', gap:8 }}>
+                  {loading ? <><Spinner/>Gemmer…</> : 'Gem nyt kodeord →'}
+                </button>
+              </form>
+            </>
+          )}
         </div>
       </div>
     </div>
@@ -3462,7 +3578,8 @@ function App() {
     db.auth.getSession().then(({ data: { session } }) => {
       if (session) { setLoggedIn(true); loadInstitution(session.user.email); fetchUnread(session.user.id); }
     });
-    const { data: { subscription } } = db.auth.onAuthStateChange((_event, session) => {
+    const { data: { subscription } } = db.auth.onAuthStateChange((event, session) => {
+      if (event === 'PASSWORD_RECOVERY') { setPage('nulstil-kodeord'); return; }
       if (session) { setLoggedIn(true); loadInstitution(session.user.email); fetchUnread(session.user.id); }
       else { setLoggedIn(false); setInstitution(null); setUnreadTotal(0); }
     });
@@ -3519,8 +3636,10 @@ function App() {
       {page==='home'      && <HomePage setPage={navigate} setActiveListing={setActiveListing} listings={listings} loading={loading} favs={favs} toggleFav={toggleFav} />}
       {page==='opslag'    && <OpslagPage listings={listings} loading={loading} setPage={navigate} setActiveListing={setActiveListing} favs={favs} toggleFav={toggleFav} />}
       {page==='listing'   && activeListing && <ListingDetailPage listing={activeListing} setPage={navigate} showToast={showToast} onStartConv={startConversation} favs={favs} toggleFav={toggleFav} setSelectedConvId={setSelectedConvId} loggedIn={loggedIn} />}
-      {page==='login'     && <LoginPage setPage={navigate} setLoggedIn={setLoggedIn} />}
-      {page==='signup'    && <SignupPage setPage={navigate} setLoggedIn={setLoggedIn} showToast={showToast} />}
+      {page==='login'          && <LoginPage setPage={navigate} setLoggedIn={setLoggedIn} />}
+      {page==='signup'         && <SignupPage setPage={navigate} setLoggedIn={setLoggedIn} showToast={showToast} />}
+      {page==='glemt-kodeord'  && <ForgotPasswordPage setPage={navigate} />}
+      {page==='nulstil-kodeord'&& <ResetPasswordPage setPage={navigate} setLoggedIn={setLoggedIn} />}
       {page==='dashboard' && <DashboardPage setPage={navigate} showToast={showToast} allListings={listings} onListingCreated={fetchListings} institution={institution} onInstitutionChange={setInstitution} favs={favs} toggleFav={toggleFav} setActiveListing={setActiveListing} unreadTotal={unreadTotal} />}
       {page==='hvordan'   && <HowItWorksPage setPage={navigate} />}
       {page==='om-os'     && <OmOsPage setPage={navigate} />}
