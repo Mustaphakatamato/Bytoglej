@@ -1677,10 +1677,14 @@ function SignupPage({ setPage, setLoggedIn, showToast }) {
   const set = (k,v) => setForm(f=>({...f,[k]:v}));
 
   async function checkCvr() {
-    if (cvr.length!==8) return;
+    if (cvr.length!==8 && cvr.length!==10) return;
     setCvrStatus('checking');
     try {
-      const res = await fetch(`https://cvrapi.dk/api?search=${cvr}&country=dk`);
+      // P-nummer (10 cifre) bruger ?pno= parameteren; CVR (8 cifre) bruger ?search=
+      const url = cvr.length===10
+        ? `https://cvrapi.dk/api?pno=${cvr}&country=dk`
+        : `https://cvrapi.dk/api?search=${cvr}&country=dk`;
+      const res = await fetch(url);
       const data = await res.json();
       if (!data || data.error) throw new Error('ikke fundet');
       setCvrStatus('ok');
@@ -1720,7 +1724,9 @@ function SignupPage({ setPage, setLoggedIn, showToast }) {
     });
     if (error) { setAuthError(error.message); setSaving(false); return; }
     await db.from('institutions').insert({
-      cvr, name: cvrData.name,
+      cvr: cvr.length===8 ? cvr : null,
+      pnr: cvr.length===10 ? cvr : null,
+      name: cvrData.name,
       institution_type: form.inst_type,
       ownership_type: form.ownership,
       address: form.address, zipcode: form.zipcode, city: form.city,
@@ -1738,9 +1744,9 @@ function SignupPage({ setPage, setLoggedIn, showToast }) {
     else { setLoggedIn(true); setPage('dashboard'); showToast('Velkommen til LegetøjsByt! 🎉'); }
   }
 
-  const steps = ['CVR','Om institutionen','Leder & kontakt','Opret konto'];
+  const steps = ['CVR / P-nr','Om institutionen','Leder & kontakt','Opret konto'];
   const stepTitles = ['Verificér institution','Om institutionen','Institutionsleder','Opret konto'];
-  const stepSubs   = ['Vi slår institutionen op via CVR-registret','Fortæl os lidt mere om jer','Hvem er den daglige leder?','Vælg login til platformen'];
+  const stepSubs   = ['Vi slår institutionen op via CVR- eller P-nummer-registret','Fortæl os lidt mere om jer','Hvem er den daglige leder?','Vælg login til platformen'];
 
   return (
     <div style={{minHeight:'100vh',display:'flex',alignItems:'center',justifyContent:'center',padding:'80px 24px 40px',background:'linear-gradient(150deg,#fffcf8 0%,#f0f9f4 100%)'}} className="page-enter">
@@ -1780,24 +1786,25 @@ function SignupPage({ setPage, setLoggedIn, showToast }) {
           {/* ── Step 1: CVR ── */}
           {step===1 && (
             <div style={{display:'flex',flexDirection:'column',gap:16}}>
-              <SField label="CVR-nummer (8 cifre)">
+              <SField label="CVR-nummer (8 cifre) eller P-nummer (10 cifre)">
                 <div style={{display:'flex',gap:10}}>
-                  <input value={cvr} onChange={e=>setCvr(e.target.value.replace(/\D/g,'').slice(0,8))} placeholder="12345678" maxLength={8}
+                  <input value={cvr} onChange={e=>setCvr(e.target.value.replace(/\D/g,'').slice(0,10))} placeholder="CVR: 12345678 / P-nr: 1234567890" maxLength={10}
                     onKeyDown={e=>e.key==='Enter'&&checkCvr()}
-                    style={{flex:1,padding:'11px 14px',borderRadius:12,border:`1.5px solid ${cvrStatus==='err'?'#ef4444':cvrStatus==='ok'?PRIMARY:'#e5e5e5'}`,fontSize:17,letterSpacing:3,fontWeight:700,outline:'none'}} />
-                  <Btn variant="primary" color={PRIMARY} radius={22} onClick={checkCvr} disabled={cvr.length!==8||cvrStatus==='checking'}>
+                    style={{flex:1,padding:'11px 14px',borderRadius:12,border:`1.5px solid ${cvrStatus==='err'?'#ef4444':cvrStatus==='ok'?PRIMARY:'#e5e5e5'}`,fontSize:15,letterSpacing:2,fontWeight:700,outline:'none'}} />
+                  <Btn variant="primary" color={PRIMARY} radius={22} onClick={checkCvr} disabled={(cvr.length!==8&&cvr.length!==10)||cvrStatus==='checking'}>
                     {cvrStatus==='checking'?<><Spinner/>Tjekker…</>:'Slå op'}
                   </Btn>
                 </div>
+                <div style={{fontSize:12,color:'#888',marginTop:6}}>Offentlige institutioner under kommunen bruger P-nummer (10 cifre). Private institutioner bruger CVR-nummer (8 cifre).</div>
               </SField>
-              {cvrStatus==='err' && <div style={{background:'#FEF2F2',border:'1.5px solid #fca5a5',borderRadius:10,padding:'12px 16px',fontSize:13,color:'#b91c1c'}}>❌ CVR-nummeret ikke fundet i registret. Kontrollér nummeret.</div>}
+              {cvrStatus==='err' && <div style={{background:'#FEF2F2',border:'1.5px solid #fca5a5',borderRadius:10,padding:'12px 16px',fontSize:13,color:'#b91c1c'}}>❌ Nummeret ikke fundet i registret. Tjek at du har indtastet CVR-nummer (8 cifre) eller P-nummer (10 cifre) korrekt.</div>}
               {cvrStatus==='ok' && cvrData && (
                 <div>
                   <div style={{background:'#E8F5EE',border:'1.5px solid #a7d7b8',borderRadius:14,padding:18,marginBottom:20}}>
                     <div style={{display:'flex',gap:12,alignItems:'flex-start'}}>
                       <div style={{fontSize:28,lineHeight:1}}>✅</div>
                       <div>
-                        <div style={{fontFamily:"'Nunito',sans-serif",fontWeight:800,fontSize:14,color:'#1a5c38',marginBottom:6}}>Fundet i CVR-registret</div>
+                        <div style={{fontFamily:"'Nunito',sans-serif",fontWeight:800,fontSize:14,color:'#1a5c38',marginBottom:6}}>Fundet i {cvr.length===10?'P-nummer-registret':'CVR-registret'}</div>
                         <div style={{fontWeight:700,fontSize:15}}>{cvrData.name}</div>
                         <div style={{fontSize:13,color:'#555',marginTop:3}}>{cvrData.address}, {cvrData.zipcode} {cvrData.city}</div>
                         {cvrData.phone && <div style={{fontSize:13,color:'#555',marginTop:2}}>📞 {cvrData.phone}</div>}
@@ -2286,7 +2293,7 @@ function DashboardPage({ setPage, showToast, allListings, onListingCreated, inst
                 {institution?.name || (instLoading ? 'Indlæser…' : 'Min institution')}
               </h1>
               <p style={{ color:'#888', fontSize:14, marginTop:4, display:'flex', alignItems:'center', gap:8, flexWrap:'wrap' }}>
-                <span>{institution ? `CVR: ${institution.cvr} · ${institution.city}` : instLoading ? '…' : 'Institution ikke fundet'}</span>
+                <span>{institution ? `${institution.pnr ? `P-nr: ${institution.pnr}` : `CVR: ${institution.cvr}`} · ${institution.city}` : instLoading ? '…' : 'Institution ikke fundet'}</span>
                 {institution?._memberRole && <span style={{ background:'#e8f0fb', color:ACCENT2, borderRadius:99, padding:'2px 10px', fontSize:11, fontWeight:700 }}>Medarbejder</span>}
               </p>
             </div>
@@ -3721,7 +3728,7 @@ function InstitutionProfilePage({ setPage, showToast, institution, onInstitution
           <div style={{ background:'#f0f9f4', border:'1.5px solid #c6e8d4', borderRadius:14, padding:'14px 18px' }}>
             <div style={{ fontSize:12, color:'#5a9a74', fontWeight:700, marginBottom:4 }}>Fra CVR-registret (kan ikke ændres)</div>
             <div style={{ fontWeight:800, fontSize:16 }}>{institution?.name}</div>
-            <div style={{ fontSize:13, color:'#888' }}>CVR: {institution?.cvr}</div>
+            <div style={{ fontSize:13, color:'#888' }}>{institution?.pnr ? `P-nummer: ${institution.pnr}` : `CVR: ${institution?.cvr}`}</div>
           </div>
 
           {/* Om institutionen */}
