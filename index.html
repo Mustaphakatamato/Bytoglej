@@ -2089,8 +2089,8 @@ function DashboardPage({ setPage, showToast, allListings, onListingCreated, inst
     if (!validTypes.includes(file.type)) { showToast('Kun JPG, PNG eller WEBP tilladt', 'error'); return; }
     setLogoUploading(true);
     const ext = file.name.split('.').pop().toLowerCase();
-    const path = `institution-logos/${authUserId}.${ext}`;
-    const { error: upErr } = await db.storage.from('listing-images').upload(path, file, { upsert: true });
+    const path = `institution-logos/${authUserId}-${Date.now()}.${ext}`;
+    const { error: upErr } = await db.storage.from('listing-images').upload(path, file);
     if (upErr) { showToast('Upload fejlede', 'error'); setLogoUploading(false); return; }
     const { data: { publicUrl } } = db.storage.from('listing-images').getPublicUrl(path);
     const { error: dbErr } = await db.from('institutions').update({ logo_url: publicUrl }).eq('email', institution.email);
