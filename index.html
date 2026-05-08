@@ -2620,7 +2620,7 @@ function relTime(ts) {
 }
 
 // ─── MESSAGES PAGE ────────────────────────────────────────────────────────────
-function MessagesPage({ setPage, selectedConvId, setSelectedConvId, setActiveListing }) {
+function MessagesPage({ setPage, selectedConvId, setSelectedConvId, setActiveListing, adminInstitution }) {
   const [userId,      setUserId]      = useState(null);
   const [userEmail,   setUserEmail]   = useState(null);
   const [convs,       setConvs]       = useState([]);
@@ -2651,10 +2651,14 @@ function MessagesPage({ setPage, selectedConvId, setSelectedConvId, setActiveLis
       if (!user) { setLoading(false); return; }
       setUserId(user.id);
       setUserEmail(user.email);
-      loadConvs(user.id);
-      loadShares(user.email);
+      if (adminInstitution) {
+        loadConvsByName(adminInstitution.name);
+      } else {
+        loadConvs(user.id);
+        loadShares(user.email);
+      }
     });
-  }, []);
+  }, [adminInstitution?.id]);
 
   async function loadShares(email) {
     const { data } = await db.from('listing_shares').select('*').eq('to_email', email).order('created_at', { ascending: false });
@@ -2697,6 +2701,15 @@ function MessagesPage({ setPage, selectedConvId, setSelectedConvId, setActiveLis
     setLoading(true);
     const { data } = await db.from('conversations').select('*')
       .or(`initiator_id.eq.${uid},owner_id.eq.${uid}`)
+      .order('last_message_at', { ascending: false });
+    if (data) setConvs(data);
+    setLoading(false);
+  }
+
+  async function loadConvsByName(name) {
+    setLoading(true);
+    const { data } = await db.from('conversations').select('*')
+      .or(`owner_name.eq.${name},initiator_name.eq.${name}`)
       .order('last_message_at', { ascending: false });
     if (data) setConvs(data);
     setLoading(false);
@@ -3703,7 +3716,7 @@ function App() {
       {page==='hvordan'   && <HowItWorksPage setPage={navigate} />}
       {page==='om-os'     && <OmOsPage setPage={navigate} />}
       {page==='kontakt'   && <KontaktPage />}
-      {page==='beskeder'  && <MessagesPage setPage={navigate} selectedConvId={selectedConvId} setSelectedConvId={setSelectedConvId} setActiveListing={setActiveListing} />}
+      {page==='beskeder'  && <MessagesPage key={adminInst?.id || 'own'} setPage={navigate} selectedConvId={selectedConvId} setSelectedConvId={setSelectedConvId} setActiveListing={setActiveListing} adminInstitution={adminInst || null} />}
 
       {toast && <Toast msg={toast.msg} type={toast.type} onDone={()=>setToast(null)} />}
     </div>
