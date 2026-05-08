@@ -11,6 +11,8 @@
   <script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" crossorigin></script>
   <script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" crossorigin></script>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@4.15.0/dist/tf.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/coco-ssd@2.2.3/dist/coco-ssd.min.js"></script>
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
     html { scroll-behavior: smooth; }
@@ -1505,7 +1507,6 @@ function DashboardPage({ setPage, showToast, allListings, onListingCreated, inst
   const [imgPreviews,setImgPreviews]= useState([]);
   const [tipsOpen,   setTipsOpen]   = useState(false);
   const [aiAnalyzing, setAiAnalyzing] = useState(false);
-  const [aiSuggestion, setAiSuggestion] = useState('');
   const [myListings, setMyListings] = useState([]);
   const [institution, setInstitution] = useState(instProp || null);
   const [instLoading, setInstLoading] = useState(true);
@@ -1630,26 +1631,30 @@ function DashboardPage({ setPage, showToast, allListings, onListingCreated, inst
     onListingCreated();
   }
 
-  async function analyzeImageFile(file) {
+  const cocoModelRef = React.useRef(null);
+  async function getCocoModel() {
+    if (!cocoModelRef.current) {
+      cocoModelRef.current = await window.cocoSsd.load();
+    }
+    return cocoModelRef.current;
+  }
+
+  async function detectPerson(file) {
     return new Promise(resolve => {
-      const reader = new FileReader();
-      reader.onload = async (ev) => {
-        const base64 = ev.target.result.split(',')[1];
+      const img = new Image();
+      img.onload = async () => {
         try {
-          const resp = await fetch(`${SUPA_URL}/functions/v1/analyze-image`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${SUPA_KEY}` },
-            body: JSON.stringify({ imageBase64: base64, mimeType: file.type }),
-          });
-          const data = await resp.json();
-          if (data.error) showToast('AI fejl: ' + data.error, 'error');
-          resolve(data);
-        } catch (err) {
-          showToast('AI analyse fejlede: ' + err.message, 'error');
-          resolve({ hasChild: false, description: '' });
+          const model = await getCocoModel();
+          const predictions = await model.detect(img);
+          const hasPerson = predictions.some(p => p.class === 'person' && p.score > 0.4);
+          resolve(hasPerson);
+        } catch {
+          resolve(false);
+        } finally {
+          URL.revokeObjectURL(img.src);
         }
       };
-      reader.readAsDataURL(file);
+      img.src = URL.createObjectURL(file);
     });
   }
 
@@ -1659,24 +1664,19 @@ function DashboardPage({ setPage, showToast, allListings, onListingCreated, inst
     e.target.value = '';
     if (!toAdd.length) return;
     setAiAnalyzing(true);
-    let firstDesc = '';
     const safeFiles = [], safePreviews = [];
     for (const file of toAdd) {
-      const preview = URL.createObjectURL(file);
-      const result = await analyzeImageFile(file);
-      if (result.hasChild) {
-        URL.revokeObjectURL(preview);
-        showToast('Billede afvist: børn må ikke være synlige på billederne', 'error');
+      const hasPerson = await detectPerson(file);
+      if (hasPerson) {
+        showToast('Billede afvist: personer må ikke være synlige på billederne', 'error');
       } else {
         safeFiles.push(file);
-        safePreviews.push(preview);
-        if (!firstDesc && result.description) firstDesc = result.description;
+        safePreviews.push(URL.createObjectURL(file));
       }
     }
     setImgFiles(f => [...f, ...safeFiles]);
     setImgPreviews(p => [...p, ...safePreviews]);
     setAiAnalyzing(false);
-    if (firstDesc) setAiSuggestion(firstDesc);
   }
   function removeImg(i) {
     URL.revokeObjectURL(imgPreviews[i]);
@@ -1688,7 +1688,6 @@ function DashboardPage({ setPage, showToast, allListings, onListingCreated, inst
     setImgFiles([]); setImgPreviews([]); setTipsOpen(false);
     setStep(1);
     setForm({ title:'', type:'køb', price:'', age_group:'3-6 år', description:'', condition:'God', city:'København', emoji:'🧸', color:'#FFD166', tags:[] });
-    setAiSuggestion('');
   }
 
   async function handleCreate() {
@@ -2279,25 +2278,6 @@ function DashboardPage({ setPage, showToast, allListings, onListingCreated, inst
               <label style={{ display:'block', fontSize:13, fontWeight:700, marginBottom:6 }}>Beskrivelse</label>
               <textarea value={form.description} onChange={e=>setForm({...form,description:e.target.value})} placeholder="Beskriv legetøjets stand, hvad der medfølger, mål osv." rows={3} style={{ width:'100%', padding:'11px 14px', borderRadius:10, border:`1.5px solid ${!form.description.trim()?'#fca5a5':'#e5e5e5'}`, fontSize:14, resize:'none', fontFamily:"'Nunito Sans',sans-serif", outline:'none' }} />
               {!form.description.trim() && <p style={{ fontSize:12, color:'#e53e3e', marginTop:4 }}>Beskrivelse er påkrævet</p>}
-              {aiSuggestion && !form.description && (
-                <div style={{ marginTop:8, background:'#f0faf5', border:'1.5px solid #a8d5be', borderRadius:10, padding:'10px 14px', display:'flex', gap:10, alignItems:'flex-start' }}>
-                  <span style={{ fontSize:18, flexShrink:0 }}>🤖</span>
-                  <div style={{ flex:1 }}>
-                    <div style={{ fontSize:11, fontWeight:700, color:PRIMARY, marginBottom:3, textTransform:'uppercase', letterSpacing:'0.05em' }}>AI-forslag</div>
-                    <div style={{ fontSize:13, color:'#444', lineHeight:1.5, marginBottom:8 }}>{aiSuggestion}</div>
-                    <div style={{ display:'flex', gap:8 }}>
-                      <button type="button" onClick={()=>{ setForm(f=>({...f,description:aiSuggestion})); setAiSuggestion(''); }}
-                        style={{ fontSize:12, fontWeight:700, color:'#fff', background:PRIMARY, border:'none', borderRadius:8, padding:'5px 14px', cursor:'pointer' }}>
-                        Brug dette
-                      </button>
-                      <button type="button" onClick={()=>setAiSuggestion('')}
-                        style={{ fontSize:12, fontWeight:600, color:'#888', background:'transparent', border:'none', cursor:'pointer' }}>
-                        Afvis
-                      </button>
-                    </div>
-                  </div>
-                </div>
-              )}
             </div>
             <div>
               <label style={{ display:'block', fontSize:13, fontWeight:700, marginBottom:8 }}>Stand</label>
@@ -2324,8 +2304,8 @@ function DashboardPage({ setPage, showToast, allListings, onListingCreated, inst
               {aiAnalyzing ? (
                 <div style={{ border:'2px dashed #a8d5be', borderRadius:14, padding:'28px 20px', textAlign:'center', background:'#f0faf5' }}>
                   <div style={{ fontSize:32, marginBottom:8 }}>🤖</div>
-                  <div style={{ fontSize:14, fontWeight:700, color:PRIMARY, marginBottom:4 }}>AI analyserer billedet…</div>
-                  <div style={{ fontSize:12, color:'#888' }}>Tjekker for børn og genererer beskrivelse</div>
+                  <div style={{ fontSize:14, fontWeight:700, color:PRIMARY, marginBottom:4 }}>Tjekker billedet…</div>
+                  <div style={{ fontSize:12, color:'#888' }}>Kontrollerer at ingen personer er synlige</div>
                   <div style={{ marginTop:12, display:'flex', justifyContent:'center', gap:6 }}>
                     {[0,1,2].map(i=><div key={i} style={{ width:8, height:8, borderRadius:'50%', background:PRIMARY, opacity:0.7, animation:`pulse 1.2s ${i*0.4}s infinite` }} />)}
                   </div>
@@ -2335,7 +2315,7 @@ function DashboardPage({ setPage, showToast, allListings, onListingCreated, inst
                   <div style={{ fontSize:36, marginBottom:8 }}>📷</div>
                   <div style={{ fontSize:14, fontWeight:700, color:'#555', marginBottom:4 }}>Klik for at uploade billeder</div>
                   <div style={{ fontSize:12, color:'#aaa' }}>JPG, PNG eller WEBP · Maks 6 billeder</div>
-                  <div style={{ fontSize:11, color:'#bbb', marginTop:4 }}>AI tjekker automatisk for børn på billederne</div>
+                  <div style={{ fontSize:11, color:'#bbb', marginTop:4 }}>Billeder med personer bliver automatisk afvist</div>
                 </div>
               ) : (
                 <div style={{ display:'grid', gridTemplateColumns:'repeat(3,1fr)', gap:8 }}>
