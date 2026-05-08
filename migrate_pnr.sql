@@ -5,9 +5,10 @@
 -- 1. Gør cvr nullable (offentlige institutioner behøver ikke CVR)
 ALTER TABLE institutions ALTER COLUMN cvr DROP NOT NULL;
 
--- 2. Tilføj pnr kolonne med unique constraint
+-- 2. Tilføj pnr og kommune kolonner
 ALTER TABLE institutions ADD COLUMN IF NOT EXISTS pnr text;
 ALTER TABLE institutions ADD CONSTRAINT institutions_pnr_unique UNIQUE (pnr);
+ALTER TABLE institutions ADD COLUMN IF NOT EXISTS kommune text;
 
 -- 3. Sikr at mindst ét af cvr eller pnr altid er udfyldt
 ALTER TABLE institutions ADD CONSTRAINT cvr_or_pnr_required

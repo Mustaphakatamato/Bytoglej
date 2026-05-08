@@ -1687,10 +1687,25 @@ function SignupPage({ setPage, setLoggedIn, showToast }) {
       const res = await fetch(url);
       const data = await res.json();
       if (!data || data.error) throw new Error('ikke fundet');
+
+      // Ved P-nummer: hent kommunenavn via overliggende CVR-nummer
+      let kommune = '';
+      if (cvr.length===10 && data.cvr) {
+        try {
+          const parentRes = await fetch(`https://cvrapi.dk/api?search=${data.cvr}&country=dk`);
+          const parentData = await parentRes.json();
+          if (parentData && !parentData.error) kommune = parentData.name;
+        } catch {}
+      }
+
       setCvrStatus('ok');
-      const cd = { name:data.name, address:data.address||'', zipcode:data.zipcode||'', city:data.city||'', type:data.company_type||'Institution', phone:data.phone||'', website:data.website||'' };
+      const cd = { name:data.name, address:data.address||'', zipcode:data.zipcode||'', city:data.city||'', type:data.company_type||'Institution', phone:data.phone||'', website:data.website||'', kommune };
       setCvrData(cd);
-      setForm(f=>({...f, address:cd.address, zipcode:cd.zipcode, city:cd.city, inst_phone:cd.phone, website:cd.website}));
+      setForm(f=>({
+        ...f,
+        address: cd.address, zipcode: cd.zipcode, city: cd.city, inst_phone: cd.phone, website: cd.website,
+        ...(cvr.length===10 ? { ownership:'Offentlig' } : {})
+      }));
     } catch { setCvrStatus('err'); }
   }
 
@@ -1727,6 +1742,7 @@ function SignupPage({ setPage, setLoggedIn, showToast }) {
       cvr: cvr.length===8 ? cvr : null,
       pnr: cvr.length===10 ? cvr : null,
       name: cvrData.name,
+      kommune: cvrData.kommune || null,
       institution_type: form.inst_type,
       ownership_type: form.ownership,
       address: form.address, zipcode: form.zipcode, city: form.city,
@@ -1807,6 +1823,7 @@ function SignupPage({ setPage, setLoggedIn, showToast }) {
                         <div style={{fontFamily:"'Nunito',sans-serif",fontWeight:800,fontSize:14,color:'#1a5c38',marginBottom:6}}>Fundet i {cvr.length===10?'P-nummer-registret':'CVR-registret'}</div>
                         <div style={{fontWeight:700,fontSize:15}}>{cvrData.name}</div>
                         <div style={{fontSize:13,color:'#555',marginTop:3}}>{cvrData.address}, {cvrData.zipcode} {cvrData.city}</div>
+                        {cvrData.kommune && <div style={{fontSize:13,color:'#555',marginTop:2}}>🏛️ Under: {cvrData.kommune}</div>}
                         {cvrData.phone && <div style={{fontSize:13,color:'#555',marginTop:2}}>📞 {cvrData.phone}</div>}
                         {cvrData.website && <div style={{fontSize:13,color:'#555',marginTop:2}}>🌐 {cvrData.website}</div>}
                       </div>
@@ -3724,11 +3741,12 @@ function InstitutionProfilePage({ setPage, showToast, institution, onInstitution
 
         <div style={{ background:'#fff', borderRadius:22, padding:isMobile?20:32, boxShadow:'0 2px 12px rgba(0,0,0,0.06)', display:'flex', flexDirection:'column', gap:24 }}>
 
-          {/* CVR — read only */}
+          {/* CVR/PNR — read only */}
           <div style={{ background:'#f0f9f4', border:'1.5px solid #c6e8d4', borderRadius:14, padding:'14px 18px' }}>
             <div style={{ fontSize:12, color:'#5a9a74', fontWeight:700, marginBottom:4 }}>Fra CVR-registret (kan ikke ændres)</div>
             <div style={{ fontWeight:800, fontSize:16 }}>{institution?.name}</div>
             <div style={{ fontSize:13, color:'#888' }}>{institution?.pnr ? `P-nummer: ${institution.pnr}` : `CVR: ${institution?.cvr}`}</div>
+            {institution?.kommune && <div style={{ fontSize:13, color:'#888', marginTop:2 }}>🏛️ Under: {institution.kommune}</div>}
           </div>
 
           {/* Om institutionen */}
