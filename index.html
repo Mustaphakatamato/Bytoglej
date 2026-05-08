@@ -1730,7 +1730,7 @@ function DashboardPage({ setPage, showToast, allListings, onListingCreated, inst
   const [memberEmail, setMemberEmail] = useState('');
   const [memberSaving, setMemberSaving] = useState(false);
 
-  const isAdmin = !institution?._memberRole;
+  const isAdmin = !!institution && !institution._memberRole;
 
   // Single effect: load auth user + institution + listings — fully self-contained
   useEffect(() => {
