@@ -84,7 +84,8 @@ const db = window.supabase.createClient(SUPA_URL, SUPA_KEY);
 // All components read from here instead of calling db.auth.getUser() for
 // institution/listing purposes. Admin impersonation overrides these values.
 const ActiveUserContext = React.createContext({
-  userId: null, userEmail: null, institution: null, isAdminView: false
+  userId: null, userEmail: null, institution: null, institutionId: null,
+  isAdminView: false, realUserId: null, adminInstName: null,
 });
 function useActiveUser() { return React.useContext(ActiveUserContext); }
 
@@ -1103,20 +1104,25 @@ function ListingDetailPage({ listing, setPage, showToast, onStartConv, favs, tog
     showToast(`Opslag delt med ${selectedEmails.length} medarbejder${selectedEmails.length > 1 ? 'e' : ''}! 📤`);
   }
 
-  const { isAdminView: ctxIsAdmin, adminInstName } = useActiveUser();
-  const isOwn = ctxIsAdmin && adminInstName
-    ? listing.institution_name === adminInstName
-    : (currentUserId && listing.user_id && currentUserId === listing.user_id);
+  const { isAdminView: ctxIsAdmin, adminInstName, institution: ctxInstitution, institutionId: ctxInstId } = useActiveUser();
+  // isOwn: sammenlign institution-navn (virker for admin, member og ejer)
+  const isOwn = !!(ctxInstitution && listing.institution_name === ctxInstitution.name);
 
   async function handleBuy() {
     setSaving(true);
     try {
       const { data: { user } } = await db.auth.getUser();
-      const { data: inst } = await db.from('institutions').select('name').ilike('email', user.email).maybeSingle();
+      const { data: inst } = await db.from('institutions').select('id,name').ilike('email', user.email).maybeSingle();
       const buyerName = inst?.name || myInstName || user.email;
+      const buyerInstId = inst?.id || ctxInstId || null;
+      const { data: ownerInst } = await db.from('institutions').select('id').eq('name', listing.institution_name).maybeSingle();
+      const ownerInstId = ownerInst?.id || null;
       const buyMsg = `🏷️ ${buyerName} ønsker at købe "${listing.title}" til ${listing.price} kr.`;
       let convId = null;
-      const { data: existing } = await db.from('conversations').select('id,owner_unread').eq('listing_id', listing.id).eq('initiator_id', user.id).maybeSingle();
+      const orFind = buyerInstId
+        ? `initiator_institution_id.eq.${buyerInstId},initiator_id.eq.${user.id}`
+        : `initiator_id.eq.${user.id}`;
+      const { data: existing } = await db.from('conversations').select('id,owner_unread').eq('listing_id', listing.id).or(orFind).maybeSingle();
       if (existing) {
         convId = existing.id;
       } else {
@@ -1125,7 +1131,9 @@ function ListingDetailPage({ listing, setPage, showToast, onStartConv, favs, tog
           listing_emoji: listing.emoji, listing_color: listing.color,
           listing_image: listing.images?.[0] || null,
           initiator_id: user.id, initiator_name: buyerName,
+          initiator_institution_id: buyerInstId,
           owner_id: listing.user_id, owner_name: listing.institution_name,
+          owner_institution_id: ownerInstId,
         }).select().single();
         convId = conv?.id;
       }
@@ -1149,10 +1157,16 @@ function ListingDetailPage({ listing, setPage, showToast, onStartConv, favs, tog
     const newCount = bidCount + 1;
     try {
       const { data: { user } } = await db.auth.getUser();
-      const { data: inst } = await db.from('institutions').select('name').ilike('email', user.email).maybeSingle();
+      const { data: inst } = await db.from('institutions').select('id,name').ilike('email', user.email).maybeSingle();
       const userName = inst?.name || user.email;
+      const bidderInstId = inst?.id || ctxInstId || null;
+      const { data: ownerInst } = await db.from('institutions').select('id').eq('name', listing.institution_name).maybeSingle();
+      const ownerInstId = ownerInst?.id || null;
       let convId = null; let ownerUnread = 0;
-      const { data: existing } = await db.from('conversations').select('id,owner_unread').eq('listing_id', listing.id).eq('initiator_id', currentUserId).maybeSingle();
+      const orFind = bidderInstId
+        ? `initiator_institution_id.eq.${bidderInstId},initiator_id.eq.${currentUserId}`
+        : `initiator_id.eq.${currentUserId}`;
+      const { data: existing } = await db.from('conversations').select('id,owner_unread').eq('listing_id', listing.id).or(orFind).maybeSingle();
       if (existing) { convId = existing.id; ownerUnread = existing.owner_unread || 0; }
       else {
         const { data: conv } = await db.from('conversations').insert({
@@ -1160,7 +1174,9 @@ function ListingDetailPage({ listing, setPage, showToast, onStartConv, favs, tog
           listing_emoji: listing.emoji, listing_color: listing.color,
           listing_image: listing.images?.[0] || null,
           initiator_id: currentUserId, initiator_name: userName,
+          initiator_institution_id: bidderInstId,
           owner_id: listing.user_id, owner_name: listing.institution_name,
+          owner_institution_id: ownerInstId,
         }).select().single();
         convId = conv?.id;
       }
@@ -1199,10 +1215,16 @@ function ListingDetailPage({ listing, setPage, showToast, onStartConv, favs, tog
     try {
       const { data:{ user } } = await db.auth.getUser();
       if (user) {
-        const { data: inst } = await db.from('institutions').select('name').eq('email', user.email).maybeSingle();
+        const { data: inst } = await db.from('institutions').select('id,name').eq('email', user.email).maybeSingle();
         const userName = inst?.name || user.email;
+        const swapperInstId = inst?.id || ctxInstId || null;
+        const { data: swapOwnerInst } = await db.from('institutions').select('id').eq('name', listing.institution_name).maybeSingle();
+        const swapOwnerInstId = swapOwnerInst?.id || null;
+        const orSwapFind = swapperInstId
+          ? `initiator_institution_id.eq.${swapperInstId},initiator_id.eq.${user.id}`
+          : `initiator_id.eq.${user.id}`;
         const { data: existing } = await db.from('conversations')
-          .select('id,owner_unread').eq('listing_id', listing.id).eq('initiator_id', user.id).maybeSingle();
+          .select('id,owner_unread').eq('listing_id', listing.id).or(orSwapFind).maybeSingle();
         let convId = existing?.id;
         if (!convId) {
           const { data: conv } = await db.from('conversations').insert({
@@ -1210,7 +1232,9 @@ function ListingDetailPage({ listing, setPage, showToast, onStartConv, favs, tog
             listing_emoji: listing.emoji, listing_color: listing.color,
             listing_image: listing.images?.[0] || null,
             initiator_id: user.id, initiator_name: userName,
+            initiator_institution_id: swapperInstId,
             owner_id: listing.user_id, owner_name: listing.institution_name,
+            owner_institution_id: swapOwnerInstId,
           }).select().single();
           convId = conv?.id;
         }
@@ -2037,18 +2061,16 @@ function DashboardPage({ setPage, showToast, allListings, onListingCreated, inst
       // Listings: admin view fetches only by institution name
       await fetchMyListings(ctxIsAdmin ? null : user.id, inst?.name);
 
-      // Incoming conversations: admin view fetches by institution name
+      // Incoming conversations: brug institution-ID som primær filter
       let incoming;
-      if (ctxIsAdmin && inst) {
+      const instId = inst?.id;
+      const orParts = [];
+      if (instId) orParts.push(`owner_institution_id.eq.${instId}`, `initiator_institution_id.eq.${instId}`);
+      if (!ctxIsAdmin) orParts.push(`owner_id.eq.${user.id}`, `initiator_id.eq.${user.id}`);
+      if (inst?.name) orParts.push(`owner_name.eq.${inst.name}`, `initiator_name.eq.${inst.name}`);
+      if (orParts.length) {
         const { data: inc } = await db.from('conversations')
-          .select('*').eq('owner_name', inst.name)
-          .order('last_message_at', { ascending: false });
-        incoming = inc;
-      } else {
-        const ownerParts = [`owner_id.eq.${user.id}`];
-        if (inst?.name) ownerParts.push(`owner_name.eq.${inst.name}`);
-        const { data: inc } = await db.from('conversations')
-          .select('*').or(ownerParts.join(','))
+          .select('*').or(orParts.join(','))
           .order('last_message_at', { ascending: false });
         incoming = inc;
       }
@@ -2753,7 +2775,7 @@ function relTime(ts) {
 
 // ─── MESSAGES PAGE ────────────────────────────────────────────────────────────
 function MessagesPage({ setPage, selectedConvId, setSelectedConvId, setActiveListing }) {
-  const { isAdminView: ctxIsAdmin, adminInstName, institution: ctxInstitution } = useActiveUser();
+  const { isAdminView: ctxIsAdmin, adminInstName, institution: ctxInstitution, institutionId: ctxInstId, realUserId, userId: ctxUserId } = useActiveUser();
   const [userId,      setUserId]      = useState(null);
   const [userEmail,   setUserEmail]   = useState(null);
   const [convs,       setConvs]       = useState([]);
@@ -2789,14 +2811,11 @@ function MessagesPage({ setPage, selectedConvId, setSelectedConvId, setActiveLis
       if (!user) { setLoading(false); return; }
       setUserId(user.id);
       setUserEmail(user.email);
-      if (ctxIsAdmin && adminInstName) {
-        loadConvsByName(adminInstName);
-      } else {
-        loadConvs(user.id);
-        loadShares(user.email);
-      }
+      // Brug altid institution-ID baseret load (loadConvs håndterer nu begge tilfælde)
+      loadConvs(user.id);
+      if (!ctxIsAdmin) loadShares(user.email);
     });
-  }, [ctxIsAdmin, adminInstName]);
+  }, [ctxIsAdmin, adminInstName, ctxInstId]);
 
   async function loadShares(email) {
     const { data } = await db.from('listing_shares').select('*').eq('to_email', email).order('created_at', { ascending: false });
@@ -2840,12 +2859,15 @@ function MessagesPage({ setPage, selectedConvId, setSelectedConvId, setActiveLis
 
   async function loadConvs(uid) {
     setLoading(true);
-    // Match på institution-navn i tillæg til user-id, så opslag med user_id=null også virker
+    const instId   = ctxInstId  || ctxInstitution?.id;
     const instName = ctxInstitution?.name;
-    const orParts = [`initiator_id.eq.${uid}`, `owner_id.eq.${uid}`];
-    if (instName) {
-      orParts.push(`owner_name.eq.${instName}`, `initiator_name.eq.${instName}`);
-    }
+    const orParts  = [];
+    // Primær: institution-ID (den nye, korrekte metode)
+    if (instId) orParts.push(`owner_institution_id.eq.${instId}`, `initiator_institution_id.eq.${instId}`);
+    // Fallback: user-ID og navn for ældre conversations uden institution_id
+    if (uid)      orParts.push(`initiator_id.eq.${uid}`, `owner_id.eq.${uid}`);
+    if (instName) orParts.push(`owner_name.eq.${instName}`, `initiator_name.eq.${instName}`);
+    if (!orParts.length) { setLoading(false); return; }
     const { data } = await db.from('conversations').select('*')
       .or(orParts.join(','))
       .order('last_message_at', { ascending: false });
@@ -2877,18 +2899,23 @@ function MessagesPage({ setPage, selectedConvId, setSelectedConvId, setActiveLis
     const { data: existing } = await db.from('conversations').select('id').eq('owner_name', composeTarget.name).ilike('initiator_name', senderName).maybeSingle();
     let convId = existing?.id;
     if (!convId) {
+      const effectiveUid = realUserId || userId;
+      const { data: targetInst } = await db.from('institutions').select('id').eq('name', composeTarget.name).maybeSingle();
       const { data: conv } = await db.from('conversations').insert({
         listing_id: null, listing_title: 'Direkte besked', listing_emoji: '💬', listing_color: '#e0e7ff',
-        initiator_id: userId, initiator_name: senderName,
+        initiator_id: effectiveUid, initiator_name: senderName,
+        initiator_institution_id: ctxInstId || null,
         owner_id: null, owner_name: composeTarget.name,
+        owner_institution_id: targetInst?.id || null,
       }).select().single();
       convId = conv?.id;
     }
     if (!convId) return;
-    await db.from('chat_messages').insert({ conversation_id: convId, sender_id: userId, sender_name: senderName, content: composeMsg });
+    const effectiveUid = realUserId || userId;
+    await db.from('chat_messages').insert({ conversation_id: convId, sender_id: effectiveUid, sender_name: senderName, content: composeMsg });
     await db.from('conversations').update({ last_message: composeMsg, last_message_at: new Date().toISOString() }).eq('id', convId);
     setComposeOpen(false); setComposeSearch(''); setComposeTarget(null); setComposeMsg('');
-    loadConvs(userId);
+    loadConvs(effectiveUid);
   }
 
   async function openConv(conv) {
@@ -2900,7 +2927,7 @@ function MessagesPage({ setPage, selectedConvId, setSelectedConvId, setActiveLis
     setMsgLoad(false);
     setTimeout(() => bottomRef.current?.scrollIntoView({ behavior:'smooth' }), 60);
     inputRef.current?.focus();
-    const isInit = conv.initiator_id === userId;
+    const isInit = amInitiator(conv);
     if ((isInit && conv.initiator_unread > 0) || (!isInit && conv.owner_unread > 0)) {
       const patch = isInit ? { initiator_unread: 0 } : { owner_unread: 0 };
       await db.from('conversations').update(patch).eq('id', conv.id);
@@ -2924,14 +2951,21 @@ function MessagesPage({ setPage, selectedConvId, setSelectedConvId, setActiveLis
 
   async function send() {
     const content = newMsg.trim();
-    if (!content || !active || !userId) return;
+    const effectiveUserId = realUserId || userId;
+    if (!content || !active || !effectiveUserId) return;
     setSending(true);
     setNewMsg('');
+    const instId = ctxInstId || ctxInstitution?.id;
+    // isInit: brug institution-ID hvis tilgængeligt, ellers navn/user-ID
+    const isInit = active.initiator_institution_id && instId
+      ? active.initiator_institution_id === instId
+      : (ctxIsAdmin && adminInstName
+        ? active.initiator_name === adminInstName
+        : active.initiator_id === effectiveUserId);
     const senderName = ctxIsAdmin && adminInstName
       ? adminInstName
-      : (active.initiator_id === userId ? active.initiator_name : active.owner_name);
-    await db.from('chat_messages').insert({ conversation_id: active.id, sender_id: userId, sender_name: senderName, content });
-    const isInit = active.initiator_id === userId;
+      : (isInit ? active.initiator_name : active.owner_name);
+    await db.from('chat_messages').insert({ conversation_id: active.id, sender_id: effectiveUserId, sender_name: senderName, content });
     const unreadPatch = isInit ? { owner_unread: (active.owner_unread||0)+1 } : { initiator_unread: (active.initiator_unread||0)+1 };
     const updated = { last_message: content, last_message_at: new Date().toISOString(), ...unreadPatch };
     await db.from('conversations').update(updated).eq('id', active.id);
@@ -2942,7 +2976,7 @@ function MessagesPage({ setPage, selectedConvId, setSelectedConvId, setActiveLis
 
   async function archiveConv(conv, e) {
     e.stopPropagation();
-    const isInit = ctxIsAdmin ? conv.initiator_name === adminInstName : conv.initiator_id === userId;
+    const isInit = amInitiator(conv);
     const field = isInit ? 'archived_by_initiator' : 'archived_by_owner';
     await db.from('conversations').update({ [field]: true }).eq('id', conv.id);
     setConvs(cs => cs.map(c => c.id === conv.id ? { ...c, [field]: true } : c));
@@ -2951,7 +2985,7 @@ function MessagesPage({ setPage, selectedConvId, setSelectedConvId, setActiveLis
 
   async function unarchiveConv(conv, e) {
     e.stopPropagation();
-    const isInit = ctxIsAdmin ? conv.initiator_name === adminInstName : conv.initiator_id === userId;
+    const isInit = amInitiator(conv);
     const field = isInit ? 'archived_by_initiator' : 'archived_by_owner';
     await db.from('conversations').update({ [field]: false }).eq('id', conv.id);
     setConvs(cs => cs.map(c => c.id === conv.id ? { ...c, [field]: false } : c));
@@ -2990,7 +3024,8 @@ function MessagesPage({ setPage, selectedConvId, setSelectedConvId, setActiveLis
     const senderName = effectiveSenderName();
     await db.from('chat_messages').update({ bid_status: 'accepted' }).eq('id', msg.id);
     const confirmMsg = `${senderName} har accepteret dit bud på ${msg.bid_amount} kr. for "${active.listing_title}" 🎉`;
-    await db.from('chat_messages').insert({ conversation_id: active.id, sender_id: userId, sender_name: senderName, content: confirmMsg });
+    const effUid1 = realUserId || userId;
+    await db.from('chat_messages').insert({ conversation_id: active.id, sender_id: effUid1, sender_name: senderName, content: confirmMsg });
     const upd = { last_message: confirmMsg, last_message_at: new Date().toISOString(), initiator_unread: (active.initiator_unread||0)+1 };
     await db.from('conversations').update(upd).eq('id', active.id);
     setActive(a => ({ ...a, ...upd }));
@@ -3002,7 +3037,8 @@ function MessagesPage({ setPage, selectedConvId, setSelectedConvId, setActiveLis
     const senderName = effectiveSenderName();
     await db.from('chat_messages').update({ bid_status: 'rejected', bid_note: rejectNote }).eq('id', msg.id);
     const rejectMsg = `${senderName} har afvist dit bud på ${msg.bid_amount} kr. for "${active.listing_title}"${rejectNote ? ' – ' + rejectNote : ''}`;
-    await db.from('chat_messages').insert({ conversation_id: active.id, sender_id: userId, sender_name: senderName, content: rejectMsg });
+    const effUid2 = realUserId || userId;
+    await db.from('chat_messages').insert({ conversation_id: active.id, sender_id: effUid2, sender_name: senderName, content: rejectMsg });
     const upd = { last_message: rejectMsg, last_message_at: new Date().toISOString(), initiator_unread: (active.initiator_unread||0)+1 };
     await db.from('conversations').update(upd).eq('id', active.id);
     setActive(a => ({ ...a, ...upd }));
@@ -3017,8 +3053,9 @@ function MessagesPage({ setPage, selectedConvId, setSelectedConvId, setActiveLis
     await db.from('chat_messages').update({ bid_status: 'countered' }).eq('id', msg.id);
     const senderName = effectiveSenderName();
     const counterContent = `Modbud: ${amount} kr. for "${active.listing_title}"`;
+    const effUid3 = realUserId || userId;
     await db.from('chat_messages').insert({
-      conversation_id: active.id, sender_id: userId, sender_name: senderName,
+      conversation_id: active.id, sender_id: effUid3, sender_name: senderName,
       content: counterContent, message_type: 'bid', bid_amount: amount, bid_status: 'pending',
     });
     const upd = { last_message: counterContent, last_message_at: new Date().toISOString(), initiator_unread: (active.initiator_unread||0)+1 };
@@ -3029,9 +3066,18 @@ function MessagesPage({ setPage, selectedConvId, setSelectedConvId, setActiveLis
 
   function onKey(e) { if (e.key==='Enter' && !e.shiftKey) { e.preventDefault(); send(); } }
 
-  const myUnread = c => c.initiator_id === userId ? (c.initiator_unread||0) : (c.owner_unread||0);
-  const otherName = c => c.initiator_id === userId ? c.owner_name : c.initiator_name;
-  const isArchived = c => c.initiator_id === userId ? (c.archived_by_initiator||false) : (c.archived_by_owner||false);
+  // Hjælpefunktion: er den aktuelle bruger/institution initiator på denne conversation?
+  function amInitiator(c) {
+    const instId = ctxInstId || ctxInstitution?.id;
+    const uid    = realUserId || userId;
+    if (c.initiator_institution_id && instId) return c.initiator_institution_id === instId;
+    if (ctxIsAdmin && adminInstName) return c.initiator_name === adminInstName;
+    return c.initiator_id === uid;
+  }
+
+  const myUnread = c => amInitiator(c) ? (c.initiator_unread||0) : (c.owner_unread||0);
+  const otherName  = c => amInitiator(c) ? c.owner_name : c.initiator_name;
+  const isArchived = c => amInitiator(c) ? (c.archived_by_initiator||false) : (c.archived_by_owner||false);
   const filtered = convs
     .filter(c => showArchived ? isArchived(c) : !isArchived(c))
     .filter(c => otherName(c).toLowerCase().includes(search.toLowerCase()) || c.listing_title.toLowerCase().includes(search.toLowerCase()));
@@ -3153,7 +3199,7 @@ function MessagesPage({ setPage, selectedConvId, setSelectedConvId, setActiveLis
                     </div>
                     <div style={{ fontSize:12, color:'#888', fontWeight:600, whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis', marginBottom:2 }}>
                       📦 {c.listing_title}
-                      {c.initiator_id === userId && <span style={{ marginLeft:6, background:'#f0f9f4', color:'#2d6a4f', borderRadius:99, padding:'1px 6px', fontSize:10, fontWeight:700 }}>Sendt</span>}
+                      {amInitiator(c) && <span style={{ marginLeft:6, background:'#f0f9f4', color:'#2d6a4f', borderRadius:99, padding:'1px 6px', fontSize:10, fontWeight:700 }}>Sendt</span>}
                     </div>
                     <div style={{ fontSize:12, color:unread>0?'#333':'#aaa', fontWeight:unread>0?600:400, whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis' }}>{c.last_message || 'Samtale startet'}</div>
                   </div>
@@ -3246,9 +3292,10 @@ function MessagesPage({ setPage, selectedConvId, setSelectedConvId, setActiveLis
                     : active.owner_id === userId;
                   let lastDate = null;
                   return messages.map((m, i) => {
+                    const effUid = realUserId || userId;
                     const mine = ctxIsAdmin && adminInstName
                       ? m.sender_name === adminInstName
-                      : m.sender_id === userId;
+                      : m.sender_id === effUid;
                     const d = new Date(m.created_at);
                     const dateStr = d.toLocaleDateString('da-DK',{weekday:'long',day:'numeric',month:'long'});
                     const showDate = dateStr !== lastDate;
@@ -3828,7 +3875,7 @@ function InstitutionProfilePage({ setPage, showToast, institution, onInstitution
 }
 
 // ─── APP ──────────────────────────────────────────────────────────────────────
-const ADMIN_EMAIL = 'mustaphakatamato@live.dk';
+const ADMIN_EMAIL = 'mustaphakatamato@live.dk'; // Fallback — erstattes af is_platform_admin i DB
 
 function App() {
   const [page,           setPage]           = useState('home');
@@ -3849,24 +3896,41 @@ function App() {
 
   async function loadInstitution(email) {
     const e = email.toLowerCase();
-    if (e === ADMIN_EMAIL.toLowerCase()) {
-      setIsAdmin(true);
-      const { data: all } = await db.from('institutions').select('*').order('name');
-      if (all) setAllInstitutions(all);
-    }
     const { data } = await db.from('institutions').select('*').ilike('email', e).maybeSingle();
-    if (data) { setInstitution(data); return; }
+    if (data) {
+      setInstitution(data);
+      // Tjek platform-admin via DB-flag (eller fallback til hardkodet email)
+      if (data.is_platform_admin || e === ADMIN_EMAIL.toLowerCase()) {
+        setIsAdmin(true);
+        const { data: all } = await db.from('institutions').select('*').order('name');
+        if (all) setAllInstitutions(all);
+      }
+      return;
+    }
     const { data: mem } = await db.from('institution_members').select('role,institutions(*)').ilike('email', e).maybeSingle();
     if (mem?.institutions) setInstitution({ ...mem.institutions, _memberRole: mem.role });
   }
 
+  async function getInstId(name) {
+    if (!name) return null;
+    const { data } = await db.from('institutions').select('id').eq('name', name).maybeSingle();
+    return data?.id || null;
+  }
+
   async function fetchUnread(userId) {
+    const instId = institution?.id || effectiveInstitution?.id;
+    const orParts = [`initiator_id.eq.${userId}`, `owner_id.eq.${userId}`];
+    if (instId) orParts.push(`owner_institution_id.eq.${instId}`, `initiator_institution_id.eq.${instId}`);
     const { data } = await db.from('conversations')
-      .select('initiator_id,initiator_unread,owner_id,owner_unread')
-      .or(`initiator_id.eq.${userId},owner_id.eq.${userId}`);
+      .select('initiator_id,initiator_unread,owner_id,owner_unread,owner_institution_id,initiator_institution_id')
+      .or(orParts.join(','));
     if (!data) return;
-    const total = data.reduce((sum, c) =>
-      sum + (c.initiator_id === userId ? (c.initiator_unread||0) : (c.owner_unread||0)), 0);
+    const total = data.reduce((sum, c) => {
+      const amInit = c.initiator_institution_id
+        ? c.initiator_institution_id === instId
+        : c.initiator_id === userId;
+      return sum + (amInit ? (c.initiator_unread||0) : (c.owner_unread||0));
+    }, 0);
     setUnreadTotal(total);
   }
 
@@ -3911,25 +3975,34 @@ function App() {
   async function startConversation(listing) {
     const { data:{ user } } = await db.auth.getUser();
     if (!user) { navigate('login'); return; }
-    if (listing.user_id === user.id) {
-      showToast('Dette er dit eget opslag.', 'info');
-      return;
+    const { data: myInst } = await db.from('institutions').select('id,name').ilike('email', user.email).maybeSingle();
+    const userName = myInst?.name || user.email;
+    const myInstId = myInst?.id || null;
+    if (listing.institution_name === userName) {
+      showToast('Dette er dit eget opslag.', 'info'); return;
     }
-    const { data: inst } = await db.from('institutions').select('name').eq('email', user.email).maybeSingle();
-    const userName = inst?.name || user.email;
+    // Find ejer-institution ID
+    const ownerInstId = await getInstId(listing.institution_name);
     const { data: existing } = await db.from('conversations')
-      .select('id').eq('listing_id', listing.id).eq('initiator_id', user.id).maybeSingle();
+      .select('id')
+      .eq('listing_id', listing.id)
+      .or(myInstId
+        ? `initiator_institution_id.eq.${myInstId},initiator_id.eq.${user.id}`
+        : `initiator_id.eq.${user.id}`)
+      .maybeSingle();
     if (existing) { setSelectedConvId(existing.id); navigate('beskeder'); return; }
     const { data: conv } = await db.from('conversations').insert({
-      listing_id:    listing.id,
-      listing_title: listing.title,
-      listing_emoji: listing.emoji,
-      listing_color: listing.color,
-      listing_image: listing.images?.[0] || null,
-      initiator_id:  user.id,
-      initiator_name: userName,
-      owner_id:      listing.user_id,
-      owner_name:    listing.institution_name,
+      listing_id:               listing.id,
+      listing_title:            listing.title,
+      listing_emoji:            listing.emoji,
+      listing_color:            listing.color,
+      listing_image:            listing.images?.[0] || null,
+      initiator_id:             user.id,
+      initiator_name:           userName,
+      initiator_institution_id: myInstId,
+      owner_id:                 listing.user_id,
+      owner_name:               listing.institution_name,
+      owner_institution_id:     ownerInstId,
     }).select().single();
     if (conv) { setSelectedConvId(conv.id); navigate('beskeder'); }
   }
@@ -3940,10 +4013,11 @@ function App() {
   const effectiveInstitution = adminInst || institution;
 
   const activeUserValue = {
-    userId:      adminInst ? null : realUserId,
-    userEmail:   adminInst ? adminInst.email : realEmail,
-    institution: effectiveInstitution,
-    isAdminView: !!adminInst,
+    userId:        realUserId,                          // Altid den rigtige auth-bruger
+    userEmail:     adminInst ? adminInst.email : realEmail,
+    institution:   effectiveInstitution,
+    institutionId: effectiveInstitution?.id || null,   // Effektiv institution (admin = impersoneret)
+    isAdminView:   !!adminInst,
     realUserId,
     adminInstName: adminInst?.name || null,
   };
