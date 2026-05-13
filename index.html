@@ -328,7 +328,7 @@ function Nav({ page, setPage, loggedIn, setLoggedIn, unreadTotal, institution, a
 // ─── LISTING CARD ─────────────────────────────────────────────────────────────
 const CONDITION_COLORS = { 'Ny':{ bg:'#e6f9f0', color:'#1a7a4a' }, 'Meget god':{ bg:'#e6f9f0', color:'#1a7a4a' }, 'God':{ bg:'#fff8e1', color:'#b45309' }, 'Acceptabel':{ bg:'#fee2e2', color:'#b91c1c' } };
 
-function ListingCard({ listing, onClick, favs, toggleFav }) {
+function ListingCard({ listing, onClick, favs, toggleFav, onInstitutionClick }) {
   const isFav = favs.includes(listing.id);
   const [popping, setPopping] = useState(false);
   const [imgIdx, setImgIdx] = useState(0);
@@ -387,7 +387,13 @@ function ListingCard({ listing, onClick, favs, toggleFav }) {
             ? <div style={{ fontFamily:"'Nunito',sans-serif", fontWeight:900, fontSize:17, color:PRIMARY, marginBottom:4 }}>{listing.price} kr.</div>
             : <div style={{ fontSize:13, color:ACCENT2, fontWeight:700, marginBottom:4 }}>Byttes kun</div>}
           <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between' }}>
-            <div style={{ fontSize:11, color:'#aaa' }}>{listing.institution_name}{listing.city ? `, ${listing.city}` : ''}</div>
+            <div style={{ fontSize:11, color:'#aaa' }}>
+              <span onClick={onInstitutionClick ? e=>{ e.stopPropagation(); onInstitutionClick(listing.institution_name); } : undefined}
+                style={{ cursor:onInstitutionClick?'pointer':'default', textDecoration:onInstitutionClick?'underline':'none', textDecorationColor:'#ccc' }}>
+                {listing.institution_name}
+              </span>
+              {listing.city ? `, ${listing.city}` : ''}
+            </div>
             {localFavCount > 0 && <div style={{ fontSize:11, color:'#e57373', fontWeight:700 }}>♥ {localFavCount}</div>}
           </div>
           {listing.tags?.length > 0 && (
@@ -482,7 +488,7 @@ function HowSection({ setPage }) {
   );
 }
 
-function ListingsPreview({ listings, loading, setPage, setActiveListing, favs, toggleFav }) {
+function ListingsPreview({ listings, loading, setPage, setActiveListing, favs, toggleFav, goToInstitution }) {
   const [search, setSearch] = useState('');
   const [filter, setFilter] = useState('alle');
   const w = useWindowWidth();
@@ -524,7 +530,7 @@ function ListingsPreview({ listings, loading, setPage, setActiveListing, favs, t
         {/* Cards */}
         <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fill,minmax(250px,1fr))', gap:20 }}>
           {loading ? [1,2,3,4].map(i=><SkeletonCard key={i}/>) : shown.map(l=>(
-            <ListingCard key={l.id} listing={l} favs={favs} toggleFav={toggleFav} onClick={()=>{ setActiveListing(l); setPage('listing'); }} />
+            <ListingCard key={l.id} listing={l} favs={favs} toggleFav={toggleFav} onClick={()=>{ setActiveListing(l); setPage('listing'); }} onInstitutionClick={goToInstitution} />
           ))}
         </div>
 
@@ -618,12 +624,12 @@ function Footer({ setPage }) {
   );
 }
 
-function HomePage({ setPage, setActiveListing, listings, loading, favs, toggleFav }) {
+function HomePage({ setPage, setActiveListing, listings, loading, favs, toggleFav, goToInstitution }) {
   return (
     <>
       <HeroSection setPage={setPage} />
       <HowSection setPage={setPage} />
-      <ListingsPreview listings={listings} loading={loading} setPage={setPage} setActiveListing={setActiveListing} favs={favs} toggleFav={toggleFav} />
+      <ListingsPreview listings={listings} loading={loading} setPage={setPage} setActiveListing={setActiveListing} favs={favs} toggleFav={toggleFav} goToInstitution={goToInstitution} />
       <MissionSection setPage={setPage} />
       <Footer setPage={setPage} />
     </>
@@ -750,7 +756,7 @@ function MapView({ listings, listingCoords, userCoords, onListingClick, isMobile
 }
 
 // ─── OPSLAG PAGE ──────────────────────────────────────────────────────────────
-function OpslagPage({ listings, loading, setPage, setActiveListing, favs, toggleFav }) {
+function OpslagPage({ listings, loading, setPage, setActiveListing, favs, toggleFav, goToInstitution }) {
   const ww = useWindowWidth();
   const isMobile = ww < 640;
   const [filter, setFilter] = useState('alle');
@@ -951,7 +957,7 @@ function OpslagPage({ listings, loading, setPage, setActiveListing, favs, toggle
         ) : (
           <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fill,minmax(260px,1fr))', gap:20 }}>
             {filtered.map(l=>(
-              <ListingCard key={l.id} listing={l} favs={favs} toggleFav={toggleFav} onClick={()=>handleListingClick(l)} />
+              <ListingCard key={l.id} listing={l} favs={favs} toggleFav={toggleFav} onClick={()=>handleListingClick(l)} onInstitutionClick={goToInstitution} />
             ))}
           </div>
         )}
@@ -1010,7 +1016,7 @@ function ImageGallery({ images, color, emoji }) {
 }
 
 // ─── LISTING DETAIL ───────────────────────────────────────────────────────────
-function ListingDetailPage({ listing, setPage, showToast, onStartConv, favs, toggleFav, setSelectedConvId, loggedIn }) {
+function ListingDetailPage({ listing, setPage, showToast, onStartConv, favs, toggleFav, setSelectedConvId, loggedIn, goToInstitution }) {
   const [buyModal,  setBuyModal]  = useState(false);
   const [buyStep,   setBuyStep]   = useState(1);
   const [bidModal,  setBidModal]  = useState(false);
@@ -1280,7 +1286,7 @@ function ListingDetailPage({ listing, setPage, showToast, onStartConv, favs, tog
               <span style={{ fontSize:13, color:listing.condition==='Ny'?PRIMARY:'#888', fontWeight:600 }}>Stand: {listing.condition}</span>
             </div>
             <h1 style={{ fontFamily:"'Nunito',sans-serif", fontWeight:900, fontSize:isMobile?24:30, letterSpacing:'-0.5px', marginBottom:8 }}>{listing.title}</h1>
-            <p style={{ color:'#888', fontSize:14, marginBottom:16 }}>Opslået af <strong style={{ color:'#333' }}>{listing.institution_name}</strong></p>
+            <p style={{ color:'#888', fontSize:14, marginBottom:16 }}>Opslået af <strong onClick={goToInstitution ? ()=>goToInstitution(listing.institution_name) : undefined} style={{ color:goToInstitution?PRIMARY:'#333', cursor:goToInstitution?'pointer':'default', textDecoration:goToInstitution?'underline':'none' }}>{listing.institution_name}</strong></p>
             <p style={{ color:'#555', lineHeight:1.75, fontSize:15, marginBottom:isMobile?20:32 }}>{listing.description}</p>
             {!isOwn && (
               <div style={{ background:'#fff', borderRadius:20, padding:isMobile?18:24, boxShadow:'0 2px 12px rgba(0,0,0,0.06)' }}>
@@ -1319,10 +1325,11 @@ function ListingDetailPage({ listing, setPage, showToast, onStartConv, favs, tog
                 )}
               </div>
               <div style={{ borderTop:'1px solid #f0f0f0', marginTop:20, paddingTop:16, display:'flex', flexDirection:'column', gap:10 }}>
-                {[['🏢','Institution',listing.institution_name],['📍','By',listing.city],['👶','Aldersgruppe',listing.age_group],['⭐','Stand',listing.condition]].map(([icon,label,val],i) => (
+                {[['🏢','Institution',listing.institution_name,'inst'],['📍','By',listing.city],['👶','Aldersgruppe',listing.age_group],['⭐','Stand',listing.condition]].map(([icon,label,val,key],i) => (
                   <div key={i} style={{ display:'flex', justifyContent:'space-between', fontSize:13 }}>
                     <span style={{ color:'#999' }}>{icon} {label}</span>
-                    <span style={{ fontWeight:600 }}>{val}</span>
+                    <span onClick={key==='inst'&&goToInstitution ? ()=>goToInstitution(val) : undefined}
+                      style={{ fontWeight:600, cursor:key==='inst'&&goToInstitution?'pointer':'default', color:key==='inst'&&goToInstitution?PRIMARY:'inherit', textDecoration:key==='inst'&&goToInstitution?'underline':'none' }}>{val}</span>
                   </div>
                 ))}
               </div>
@@ -2012,6 +2019,11 @@ function DashboardPage({ setPage, showToast, allListings, onListingCreated, inst
   const [trades, setTrades] = useState([]);
   const [tradesLoading, setTradesLoading] = useState(false);
 
+  // Feature #4: Activity (sent bids/offers)
+  const [activityOpen, setActivityOpen] = useState(false);
+  const [activity, setActivity] = useState([]);
+  const [actLoading, setActLoading] = useState(false);
+
   // Feature #15: Incoming requests
   const [incomingConvs, setIncomingConvs] = useState([]);
 
@@ -2088,7 +2100,8 @@ function DashboardPage({ setPage, showToast, allListings, onListingCreated, inst
   }, [allListings]);
 
   async function fetchMyListings(userId, instName) {
-    let q = db.from('listings').select('*').eq('is_active', true).order('created_at', { ascending: false });
+    // Hent både aktive og solgte (is_active=true OR is_sold=true)
+    let q = db.from('listings').select('*').or('is_active.eq.true,is_sold.eq.true').order('created_at', { ascending: false });
     if (userId && instName) {
       q = q.or(`user_id.eq.${userId},institution_name.eq.${instName}`);
     } else if (userId) {
@@ -2267,22 +2280,41 @@ function DashboardPage({ setPage, showToast, allListings, onListingCreated, inst
     e.target.value = '';
   }
 
-  // Feature #2: Transaction history
+  // Feature #2: Transaction history (completed deals)
   async function fetchTrades() {
-    if (!authUserId) return;
     setTradesLoading(true);
-    const { data: convs } = await db.from('conversations')
-      .select('id,listing_title,initiator_name,owner_name,initiator_id,owner_id')
-      .or(`initiator_id.eq.${authUserId},owner_id.eq.${authUserId}`);
-    if (!convs?.length) { setTradesLoading(false); return; }
-    const { data: bidMsgs } = await db.from('chat_messages')
-      .select('*').in('conversation_id', convs.map(c=>c.id))
-      .eq('message_type','bid').eq('bid_status','accepted')
-      .order('created_at', { ascending: false });
-    if (bidMsgs) {
-      setTrades(bidMsgs.map(msg => ({ ...msg, conv: convs.find(c=>c.id===msg.conversation_id) })));
-    }
+    const instId = institution?.id;
+    const uid = authUserId;
+    const orParts = [];
+    if (instId) orParts.push(`owner_institution_id.eq.${instId}`, `initiator_institution_id.eq.${instId}`);
+    if (uid) orParts.push(`initiator_id.eq.${uid}`, `owner_id.eq.${uid}`);
+    if (institution?.name) orParts.push(`owner_name.eq.${institution.name}`, `initiator_name.eq.${institution.name}`);
+    if (!orParts.length) { setTradesLoading(false); return; }
+    const { data } = await db.from('conversations')
+      .select('*')
+      .or(orParts.join(','))
+      .eq('deal_completed', true)
+      .order('deal_completed_at', { ascending: false });
+    if (data) setTrades(data);
     setTradesLoading(false);
+  }
+
+  // Feature #4: Activity – bud/tilbud afgivet af denne institution
+  async function fetchActivity() {
+    setActLoading(true);
+    const instId = institution?.id;
+    const uid = authUserId;
+    const orParts = [];
+    if (instId) orParts.push(`initiator_institution_id.eq.${instId}`);
+    if (uid) orParts.push(`initiator_id.eq.${uid}`);
+    if (institution?.name) orParts.push(`initiator_name.eq.${institution.name}`);
+    if (!orParts.length) { setActLoading(false); return; }
+    const { data } = await db.from('conversations')
+      .select('*')
+      .or(orParts.join(','))
+      .order('last_message_at', { ascending: false });
+    if (data) setActivity(data);
+    setActLoading(false);
   }
 
   // Feature #19: Members handlers
@@ -2348,10 +2380,10 @@ function DashboardPage({ setPage, showToast, allListings, onListingCreated, inst
 
         <div style={{ display:'grid', gridTemplateColumns:isMobile?'repeat(2,1fr)':'repeat(4,1fr)', gap:isMobile?12:16, marginBottom:isMobile?24:32 }}>
           {[
-            {icon:'📦', n:myListings.length, label:'Aktive opslag', onClick:()=>listingsRef.current?.scrollIntoView({behavior:'smooth',block:'start'}), clickable:true},
+            {icon:'📦', n:myListings.filter(l=>l.is_active&&!l.is_sold).length, label:'Aktive opslag', onClick:()=>listingsRef.current?.scrollIntoView({behavior:'smooth',block:'start'}), clickable:true},
             {icon:'🤝', n:trades.length||0, label:'Handler', onClick:()=>{ setTradesOpen(true); fetchTrades(); }, clickable:true},
-            {icon:'💬', n:unreadTotal||0, label:'Ulæste beskeder', onClick:()=>setPage('beskeder'), clickable:true},
-            {icon:'📬', n:incomingConvs.filter(c=>c.owner_unread>0).length||0, label:'Indkommende', onClick:()=>{ const el=document.getElementById('incoming-section'); if(el) el.scrollIntoView({behavior:'smooth'}); }, clickable:true},
+            {icon:'📤', n:activity.length||0, label:'Sendte tilbud', onClick:()=>{ setActivityOpen(true); fetchActivity(); }, clickable:true},
+            {icon:'📬', n:incomingConvs.filter(c=>!c.is_handled&&c.owner_unread>0).length||0, label:'Indkommende', onClick:()=>{ const el=document.getElementById('incoming-section'); if(el) el.scrollIntoView({behavior:'smooth'}); }, clickable:true},
           ].map((s,i)=>(
             <div key={i} onClick={s.onClick||undefined} style={{ background:'#fff', borderRadius:20, padding:'20px 24px', boxShadow:'0 2px 12px rgba(0,0,0,0.06)', animation:`slideUp 0.4s ease ${i*0.08}s both`, cursor:s.clickable?'pointer':'default', transition:'transform 0.15s, box-shadow 0.15s', position:'relative' }}
               onMouseEnter={e=>{ if(s.clickable){ e.currentTarget.style.transform='translateY(-2px)'; e.currentTarget.style.boxShadow='0 6px 20px rgba(0,0,0,0.10)'; }}}
@@ -2375,20 +2407,24 @@ function DashboardPage({ setPage, showToast, allListings, onListingCreated, inst
                 <p style={{ fontSize:14 }}>Ingen opslag endnu. Opret dit første!</p>
               </div>
             ) : myListings.map(l=>(
-              <div key={l.id} style={{ border:'1.5px solid #f0eeeb', borderRadius:14, marginBottom:10, overflow:'hidden' }}>
+              <div key={l.id} style={{ border:`1.5px solid ${l.is_sold?'#fecaca':'#f0eeeb'}`, borderRadius:14, marginBottom:10, overflow:'hidden', opacity:l.is_sold?0.85:1 }}>
                 <div onClick={()=>{ setActiveListing(l); setPage('listing'); }} style={{ display:'flex', alignItems:'center', gap:14, padding:'12px 14px', cursor:'pointer' }}>
-                  <div style={{ width:48, height:48, borderRadius:10, background:l.images?.[0]?'#e8e6e3':l.color||'#FFD166', display:'flex', alignItems:'center', justifyContent:'center', fontSize:24, flexShrink:0, overflow:'hidden' }}>
+                  <div style={{ width:48, height:48, borderRadius:10, background:l.images?.[0]?'#e8e6e3':l.color||'#FFD166', display:'flex', alignItems:'center', justifyContent:'center', fontSize:24, flexShrink:0, overflow:'hidden', position:'relative' }}>
                     {l.images?.[0] ? <img src={l.images[0]} style={{ width:'100%', height:'100%', objectFit:'cover' }} alt="" /> : l.emoji||'🧸'}
+                    {l.is_sold && <div style={{ position:'absolute', inset:0, background:'rgba(0,0,0,0.45)', display:'flex', alignItems:'center', justifyContent:'center', borderRadius:10 }}><span style={{ fontSize:9, fontWeight:900, color:'#fff', letterSpacing:0.3 }}>SOLGT</span></div>}
                   </div>
                   <div style={{ flex:1, minWidth:0 }}>
                     <div style={{ fontFamily:"'Nunito',sans-serif", fontWeight:700, fontSize:14, whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis' }}>{l.title}</div>
                     <div style={{ fontSize:12, color:'#999', marginTop:2 }}>{l.city} · {l.age_group}</div>
+                    {l.is_sold && l.sold_to && <div style={{ fontSize:11, color:'#e11d48', fontWeight:700, marginTop:2 }}>Solgt til {l.sold_to} · {new Date(l.sold_at).toLocaleDateString('da-DK',{day:'numeric',month:'short',year:'numeric'})}</div>}
                   </div>
-                  <Badge type={l.type} />
-                  <div style={{ display:'flex', gap:6, flexShrink:0 }} onClick={e=>e.stopPropagation()}>
+                  {l.is_sold
+                    ? <span style={{ background:'#fee2e2', color:'#e11d48', borderRadius:99, padding:'3px 10px', fontSize:11, fontWeight:800, flexShrink:0 }}>SOLGT</span>
+                    : <Badge type={l.type} />}
+                  {!l.is_sold && <div style={{ display:'flex', gap:6, flexShrink:0 }} onClick={e=>e.stopPropagation()}>
                     <button onClick={()=>openEdit(l)} style={{ background:'#f0f9f4', border:'none', borderRadius:8, padding:'6px 12px', fontSize:12, fontWeight:700, color:PRIMARY, cursor:'pointer' }}>Rediger</button>
                     <button onClick={()=>setConfirmDelete(l.id)} style={{ background:'#fff0f0', border:'none', borderRadius:8, padding:'6px 12px', fontSize:12, fontWeight:700, color:'#e11d48', cursor:'pointer' }}>Slet</button>
-                  </div>
+                  </div>}
                 </div>
                 {confirmDelete===l.id && (
                   <div style={{ background:'#fff5f5', borderTop:'1.5px solid #fecaca', padding:'10px 14px', display:'flex', alignItems:'center', justifyContent:'space-between' }}>
@@ -2434,41 +2470,43 @@ function DashboardPage({ setPage, showToast, allListings, onListingCreated, inst
           </div>
         </div>
 
-        {/* Feature #15: Incoming requests section */}
+        {/* Feature #15: Incoming requests section (ubehandlede) */}
         <div id="incoming-section" style={{ background:'#fff', borderRadius:22, padding:28, boxShadow:'0 2px 12px rgba(0,0,0,0.06)', marginTop:isMobile?16:24 }}>
           <div style={{ display:'flex', alignItems:'center', gap:10, marginBottom:20 }}>
             <h2 style={{ fontFamily:"'Nunito',sans-serif", fontWeight:800, fontSize:20 }}>Indkommende anmodninger</h2>
-            {incomingConvs.filter(c=>c.owner_unread>0).length > 0 && <div style={{ background:'#EF476F', color:'#fff', borderRadius:99, padding:'2px 10px', fontSize:12, fontWeight:800 }}>{incomingConvs.filter(c=>c.owner_unread>0).length} ny</div>}
+            {incomingConvs.filter(c=>!c.is_handled&&c.owner_unread>0).length > 0 && <div style={{ background:'#EF476F', color:'#fff', borderRadius:99, padding:'2px 10px', fontSize:12, fontWeight:800 }}>{incomingConvs.filter(c=>!c.is_handled&&c.owner_unread>0).length} ny</div>}
           </div>
-          {incomingConvs.length === 0 ? (
-            <div style={{ textAlign:'center', padding:'32px 0', color:'#bbb' }}>
-              <div style={{ fontSize:36, marginBottom:10 }}>📬</div>
-              <p style={{ fontSize:14 }}>Ingen indkommende anmodninger på dine opslag endnu</p>
-            </div>
-          ) : (
-            <div style={{ display:'flex', flexDirection:'column', gap:10 }}>
-              {incomingConvs.slice(0,10).map(c => (
-                <div key={c.id} onClick={()=>setPage('beskeder')} style={{ display:'flex', alignItems:'center', gap:14, padding:'12px 16px', border:`1.5px solid ${c.owner_unread>0?'#c6e8d4':'#f0eeeb'}`, borderRadius:14, cursor:'pointer', background:c.owner_unread>0?'#f0faf5':'#fff', transition:'all 0.15s' }}>
-                  <div style={{ width:44, height:44, borderRadius:12, background:c.listing_image?'#e8e6e3':c.listing_color||'#FFD166', display:'flex', alignItems:'center', justifyContent:'center', fontSize:22, flexShrink:0, overflow:'hidden', position:'relative' }}>
-                    {c.listing_image ? <img src={c.listing_image} style={{ width:'100%', height:'100%', objectFit:'cover' }} alt="" /> : c.listing_emoji||'🧸'}
-                    {c.owner_unread>0 && <div style={{ position:'absolute', top:-4, right:-4, width:16, height:16, background:'#EF476F', borderRadius:'50%', border:'2px solid #fff', display:'flex', alignItems:'center', justifyContent:'center', fontSize:8, fontWeight:800, color:'#fff' }}>{c.owner_unread>9?'9+':c.owner_unread}</div>}
-                  </div>
-                  <div style={{ flex:1, minWidth:0 }}>
-                    <div style={{ fontFamily:"'Nunito',sans-serif", fontWeight:c.owner_unread>0?700:600, fontSize:14, whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis' }}>
-                      {c.initiator_name}
+          {(() => {
+            const pending = incomingConvs.filter(c=>!c.is_handled);
+            if (pending.length === 0) return (
+              <div style={{ textAlign:'center', padding:'32px 0', color:'#bbb' }}>
+                <div style={{ fontSize:36, marginBottom:10 }}>📬</div>
+                <p style={{ fontSize:14 }}>Ingen ubehandlede anmodninger på dine opslag</p>
+              </div>
+            );
+            return (
+              <div style={{ display:'flex', flexDirection:'column', gap:10 }}>
+                {pending.slice(0,10).map(c => (
+                  <div key={c.id} onClick={()=>setPage('beskeder')} style={{ display:'flex', alignItems:'center', gap:14, padding:'12px 16px', border:`1.5px solid ${c.owner_unread>0?'#c6e8d4':'#f0eeeb'}`, borderRadius:14, cursor:'pointer', background:c.owner_unread>0?'#f0faf5':'#fff', transition:'all 0.15s' }}>
+                    <div style={{ width:44, height:44, borderRadius:12, background:c.listing_image?'#e8e6e3':c.listing_color||'#FFD166', display:'flex', alignItems:'center', justifyContent:'center', fontSize:22, flexShrink:0, overflow:'hidden', position:'relative' }}>
+                      {c.listing_image ? <img src={c.listing_image} style={{ width:'100%', height:'100%', objectFit:'cover' }} alt="" /> : c.listing_emoji||'🧸'}
+                      {c.owner_unread>0 && <div style={{ position:'absolute', top:-4, right:-4, width:16, height:16, background:'#EF476F', borderRadius:'50%', border:'2px solid #fff', display:'flex', alignItems:'center', justifyContent:'center', fontSize:8, fontWeight:800, color:'#fff' }}>{c.owner_unread>9?'9+':c.owner_unread}</div>}
                     </div>
-                    <div style={{ fontSize:12, color:'#888', marginTop:2, whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis' }}>📦 {c.listing_title}</div>
-                    <div style={{ fontSize:12, color:c.owner_unread>0?'#333':'#aaa', fontWeight:c.owner_unread>0?600:400, whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis' }}>{c.last_message || 'Samtale startet'}</div>
+                    <div style={{ flex:1, minWidth:0 }}>
+                      <div style={{ fontFamily:"'Nunito',sans-serif", fontWeight:c.owner_unread>0?700:600, fontSize:14, whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis' }}>{c.initiator_name}</div>
+                      <div style={{ fontSize:12, color:'#888', marginTop:2, whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis' }}>📦 {c.listing_title}</div>
+                      <div style={{ fontSize:12, color:c.owner_unread>0?'#333':'#aaa', fontWeight:c.owner_unread>0?600:400, whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis' }}>{c.last_message || 'Samtale startet'}</div>
+                    </div>
+                    <div style={{ display:'flex', flexDirection:'column', alignItems:'flex-end', gap:4, flexShrink:0 }}>
+                      <div style={{ fontSize:11, color:'#bbb' }}>{relTime(c.last_message_at)}</div>
+                      <div style={{ fontSize:11, color:PRIMARY, fontWeight:700 }}>→</div>
+                    </div>
                   </div>
-                  <div style={{ display:'flex', flexDirection:'column', alignItems:'flex-end', gap:4, flexShrink:0 }}>
-                    <div style={{ fontSize:11, color:'#bbb' }}>{relTime(c.last_message_at)}</div>
-                    <div style={{ fontSize:11, color:PRIMARY, fontWeight:700 }}>→</div>
-                  </div>
-                </div>
-              ))}
-              {incomingConvs.length > 10 && <button onClick={()=>setPage('beskeder')} style={{ background:'none', border:`1.5px solid ${PRIMARY}`, color:PRIMARY, borderRadius:99, padding:'8px 18px', fontSize:13, fontWeight:700, cursor:'pointer', alignSelf:'center', marginTop:4 }}>Se alle {incomingConvs.length} →</button>}
-            </div>
-          )}
+                ))}
+                {pending.length > 10 && <button onClick={()=>setPage('beskeder')} style={{ background:'none', border:`1.5px solid ${PRIMARY}`, color:PRIMARY, borderRadius:99, padding:'8px 18px', fontSize:13, fontWeight:700, cursor:'pointer', alignSelf:'center', marginTop:4 }}>Se alle {pending.length} →</button>}
+              </div>
+            );
+          })()}
         </div>
       </div>
 
@@ -2535,9 +2573,8 @@ function DashboardPage({ setPage, showToast, allListings, onListingCreated, inst
         )}
       </Modal>
 
-      {/* Feature #5: Edit Profile Modal */}
-      {/* Feature #2: Trades History Modal */}
-      <Modal open={tradesOpen} onClose={()=>setTradesOpen(false)} title="Historik over handler">
+      {/* Feature #7: Trades History Modal */}
+      <Modal open={tradesOpen} onClose={()=>setTradesOpen(false)} title="🤝 Gennemførte handler">
         <div>
           {tradesLoading ? (
             <div style={{ textAlign:'center', padding:'32px 0', color:'#bbb' }}>Indlæser…</div>
@@ -2547,21 +2584,66 @@ function DashboardPage({ setPage, showToast, allListings, onListingCreated, inst
               <p style={{ fontSize:14 }}>Ingen gennemførte handler endnu</p>
               <p style={{ fontSize:12, color:'#ccc', marginTop:6 }}>Handler optræder her når et bud accepteres</p>
             </div>
-          ) : trades.map(t => (
-            <div key={t.id} style={{ border:'1.5px solid #f0eeeb', borderRadius:14, padding:'14px 16px', marginBottom:10 }}>
-              <div style={{ display:'flex', justifyContent:'space-between', alignItems:'flex-start', marginBottom:6 }}>
-                <div style={{ fontFamily:"'Nunito',sans-serif", fontWeight:700, fontSize:14 }}>{t.conv?.listing_title || 'Ukendt opslag'}</div>
-                <div style={{ fontFamily:"'Nunito',sans-serif", fontWeight:900, fontSize:18, color:PRIMARY }}>{t.bid_amount} kr.</div>
+          ) : trades.map(t => {
+            const isSeller = t.owner_institution_id === institution?.id || t.owner_name === institution?.name;
+            const otherParty = isSeller ? t.initiator_name : t.owner_name;
+            const dealDate = t.deal_completed_at || t.handled_at;
+            return (
+              <div key={t.id} style={{ border:'1.5px solid #c6e8d4', borderRadius:14, padding:'14px 16px', marginBottom:10, background:'#f8fdf9' }}>
+                <div style={{ display:'flex', justifyContent:'space-between', alignItems:'flex-start', marginBottom:8 }}>
+                  <div style={{ flex:1, minWidth:0, marginRight:12 }}>
+                    <div style={{ fontFamily:"'Nunito',sans-serif", fontWeight:800, fontSize:14, marginBottom:2 }}>{t.listing_title || 'Direkte besked'}</div>
+                    <div style={{ fontSize:12, color:'#888' }}>
+                      {isSeller ? '📤 Solgt til' : '📥 Købt fra'} <strong style={{ color:'#333' }}>{otherParty}</strong>
+                    </div>
+                  </div>
+                  <span style={{ background:'#e8f5ee', color:PRIMARY, borderRadius:99, padding:'3px 10px', fontSize:11, fontWeight:800, flexShrink:0 }}>✅ Gennemført</span>
+                </div>
+                <div style={{ display:'flex', gap:12, flexWrap:'wrap', fontSize:11, color:'#aaa' }}>
+                  <span>📅 {dealDate ? new Date(dealDate).toLocaleDateString('da-DK',{day:'numeric',month:'long',year:'numeric'}) : '—'}</span>
+                  {t.deal_type && <span>🏷️ {t.deal_type === 'byd' ? 'Bud accepteret' : t.deal_type === 'byt' ? 'Bytte' : 'Køb'}</span>}
+                </div>
+                <button onClick={()=>setPage('beskeder')} style={{ marginTop:10, background:'none', border:`1.5px solid ${PRIMARY}`, color:PRIMARY, borderRadius:8, padding:'5px 12px', fontSize:12, fontWeight:700, cursor:'pointer' }}>Se samtale →</button>
               </div>
-              <div style={{ fontSize:12, color:'#888', display:'flex', gap:12, flexWrap:'wrap' }}>
-                <span>🏢 {t.conv?.initiator_id === authUserId ? t.conv?.owner_name : t.conv?.initiator_name}</span>
-                <span>📅 {new Date(t.created_at).toLocaleDateString('da-DK',{day:'numeric',month:'long',year:'numeric'})}</span>
-              </div>
-              <div style={{ marginTop:8 }}>
-                <span style={{ background:'#e8f5ee', color:PRIMARY, borderRadius:99, padding:'3px 10px', fontSize:11, fontWeight:700 }}>✅ Accepteret</span>
-              </div>
+            );
+          })}
+        </div>
+      </Modal>
+
+      {/* Feature #4: Activity Modal (sendte tilbud) */}
+      <Modal open={activityOpen} onClose={()=>setActivityOpen(false)} title="📤 Sendte tilbud og forespørgsler">
+        <div>
+          {actLoading ? (
+            <div style={{ textAlign:'center', padding:'32px 0', color:'#bbb' }}>Indlæser…</div>
+          ) : activity.length === 0 ? (
+            <div style={{ textAlign:'center', padding:'32px 0', color:'#bbb' }}>
+              <div style={{ fontSize:40, marginBottom:10 }}>📤</div>
+              <p style={{ fontSize:14 }}>Ingen afgivne bud eller byttetilbud endnu</p>
+              <p style={{ fontSize:12, color:'#ccc', marginTop:6 }}>Gå til Markedsplads for at finde opslag at byde på</p>
             </div>
-          ))}
+          ) : activity.map(c => {
+            const statusBadge = c.deal_completed
+              ? { label:'✅ Handel gennemført', bg:'#e8f5ee', color:PRIMARY }
+              : c.handled_action === 'rejected'
+                ? { label:'❌ Afvist', bg:'#fff0f0', color:'#e11d48' }
+                : c.handled_action === 'countered'
+                  ? { label:'🔄 Modbud modtaget', bg:'#fff8e1', color:'#b45309' }
+                  : { label:'⏳ Afventer svar', bg:'#f0f2f5', color:'#666' };
+            return (
+              <div key={c.id} onClick={()=>setPage('beskeder')} style={{ border:'1.5px solid #f0eeeb', borderRadius:14, padding:'14px 16px', marginBottom:10, cursor:'pointer', transition:'all 0.15s' }}
+                onMouseEnter={e=>e.currentTarget.style.borderColor='#c6e8d4'}
+                onMouseLeave={e=>e.currentTarget.style.borderColor='#f0eeeb'}>
+                <div style={{ display:'flex', justifyContent:'space-between', alignItems:'flex-start', marginBottom:6 }}>
+                  <div style={{ flex:1, minWidth:0, marginRight:12 }}>
+                    <div style={{ fontFamily:"'Nunito',sans-serif", fontWeight:700, fontSize:14, whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis' }}>{c.listing_title || 'Direkte besked'}</div>
+                    <div style={{ fontSize:12, color:'#888', marginTop:2 }}>Til <strong>{c.owner_name}</strong></div>
+                  </div>
+                  <span style={{ background:statusBadge.bg, color:statusBadge.color, borderRadius:99, padding:'3px 10px', fontSize:11, fontWeight:700, flexShrink:0 }}>{statusBadge.label}</span>
+                </div>
+                <div style={{ fontSize:11, color:'#bbb' }}>📅 {relTime(c.last_message_at)}</div>
+              </div>
+            );
+          })}
         </div>
       </Modal>
 
@@ -2915,6 +2997,7 @@ function MessagesPage({ setPage, selectedConvId, setSelectedConvId, setActiveLis
     await db.from('chat_messages').insert({ conversation_id: convId, sender_id: effectiveUid, sender_name: senderName, content: composeMsg });
     await db.from('conversations').update({ last_message: composeMsg, last_message_at: new Date().toISOString() }).eq('id', convId);
     setComposeOpen(false); setComposeSearch(''); setComposeTarget(null); setComposeMsg('');
+    setSelectedConvId(convId);
     loadConvs(effectiveUid);
   }
 
@@ -3026,9 +3109,25 @@ function MessagesPage({ setPage, selectedConvId, setSelectedConvId, setActiveLis
     const confirmMsg = `${senderName} har accepteret dit bud på ${msg.bid_amount} kr. for "${active.listing_title}" 🎉`;
     const effUid1 = realUserId || userId;
     await db.from('chat_messages').insert({ conversation_id: active.id, sender_id: effUid1, sender_name: senderName, content: confirmMsg });
-    const upd = { last_message: confirmMsg, last_message_at: new Date().toISOString(), initiator_unread: (active.initiator_unread||0)+1 };
+    // Mark listing as sold
+    if (active.listing_id) {
+      await db.from('listings').update({
+        is_sold: true, is_active: false,
+        sold_at: new Date().toISOString(),
+        sold_to: active.initiator_name,
+        sold_to_institution_id: active.initiator_institution_id || null,
+      }).eq('id', active.listing_id);
+    }
+    const now = new Date().toISOString();
+    const upd = {
+      last_message: confirmMsg, last_message_at: now,
+      initiator_unread: (active.initiator_unread||0)+1,
+      is_handled: true, handled_at: now, handled_action: 'accepted',
+      deal_completed: true, deal_completed_at: now, deal_type: 'byd',
+    };
     await db.from('conversations').update(upd).eq('id', active.id);
     setActive(a => ({ ...a, ...upd }));
+    setConvs(cs => cs.map(c => c.id === active.id ? { ...c, ...upd } : c));
     setMessages(ms => ms.map(m => m.id === msg.id ? { ...m, bid_status: 'accepted' } : m));
   }
 
@@ -3039,9 +3138,15 @@ function MessagesPage({ setPage, selectedConvId, setSelectedConvId, setActiveLis
     const rejectMsg = `${senderName} har afvist dit bud på ${msg.bid_amount} kr. for "${active.listing_title}"${rejectNote ? ' – ' + rejectNote : ''}`;
     const effUid2 = realUserId || userId;
     await db.from('chat_messages').insert({ conversation_id: active.id, sender_id: effUid2, sender_name: senderName, content: rejectMsg });
-    const upd = { last_message: rejectMsg, last_message_at: new Date().toISOString(), initiator_unread: (active.initiator_unread||0)+1 };
+    const now = new Date().toISOString();
+    const upd = {
+      last_message: rejectMsg, last_message_at: now,
+      initiator_unread: (active.initiator_unread||0)+1,
+      is_handled: true, handled_at: now, handled_action: 'rejected',
+    };
     await db.from('conversations').update(upd).eq('id', active.id);
     setActive(a => ({ ...a, ...upd }));
+    setConvs(cs => cs.map(c => c.id === active.id ? { ...c, ...upd } : c));
     setMessages(ms => ms.map(m => m.id === msg.id ? { ...m, bid_status: 'rejected', bid_note: rejectNote } : m));
     setRejectingBid(null); setRejectNote('');
   }
@@ -3058,9 +3163,16 @@ function MessagesPage({ setPage, selectedConvId, setSelectedConvId, setActiveLis
       conversation_id: active.id, sender_id: effUid3, sender_name: senderName,
       content: counterContent, message_type: 'bid', bid_amount: amount, bid_status: 'pending',
     });
-    const upd = { last_message: counterContent, last_message_at: new Date().toISOString(), initiator_unread: (active.initiator_unread||0)+1 };
+    const now = new Date().toISOString();
+    // Modbud markerer den gamle forespørgsel som håndteret, men åbner en ny runde
+    const upd = {
+      last_message: counterContent, last_message_at: now,
+      initiator_unread: (active.initiator_unread||0)+1,
+      is_handled: true, handled_at: now, handled_action: 'countered',
+    };
     await db.from('conversations').update(upd).eq('id', active.id);
     setActive(a => ({ ...a, ...upd }));
+    setConvs(cs => cs.map(c => c.id === active.id ? { ...c, ...upd } : c));
     setCounterBidMsg(null); setCounterAmount('');
   }
 
@@ -3874,6 +3986,74 @@ function InstitutionProfilePage({ setPage, showToast, institution, onInstitution
   );
 }
 
+// ─── INSTITUTION LISTINGS PAGE ────────────────────────────────────────────────
+function InstitutionListingsPage({ institutionName, setPage, setActiveListing, favs, toggleFav }) {
+  const [listings, setListings] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [inst, setInst] = useState(null);
+  const ww = useWindowWidth();
+  const isMobile = ww < 768;
+
+  useEffect(() => {
+    setLoading(true);
+    Promise.all([
+      db.from('listings').select('*').eq('institution_name', institutionName).eq('is_active', true).eq('is_sold', false).order('created_at', { ascending: false }),
+      db.from('institutions').select('*').eq('name', institutionName).maybeSingle(),
+    ]).then(([{ data: lst }, { data: instData }]) => {
+      if (lst) setListings(lst);
+      if (instData) setInst(instData);
+      setLoading(false);
+    });
+  }, [institutionName]);
+
+  return (
+    <div style={{ minHeight:'100vh', paddingTop:80, background:'#f8f5f0' }} className="page-enter">
+      <div style={{ maxWidth:1140, margin:'0 auto', padding:isMobile?'24px 16px':'36px 24px' }}>
+        <button onClick={()=>setPage('opslag')} style={{ background:'none', border:'none', color:PRIMARY, fontSize:14, fontWeight:700, cursor:'pointer', marginBottom:20, display:'flex', alignItems:'center', gap:6 }}>
+          ← Tilbage til opslag
+        </button>
+        <div style={{ background:'#fff', borderRadius:22, padding:isMobile?'20px 16px':'28px 32px', boxShadow:'0 2px 12px rgba(0,0,0,0.06)', marginBottom:24 }}>
+          <div style={{ display:'flex', alignItems:'center', gap:16, flexWrap:'wrap' }}>
+            <div style={{ width:60, height:60, borderRadius:16, background:PRIMARY, display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0, overflow:'hidden' }}>
+              {inst?.logo_url ? <img src={inst.logo_url} style={{ width:'100%', height:'100%', objectFit:'cover' }} alt="" /> : <span style={{ color:'#fff', fontFamily:"'Nunito',sans-serif", fontWeight:900, fontSize:22 }}>{institutionName.charAt(0).toUpperCase()}</span>}
+            </div>
+            <div style={{ flex:1, minWidth:0 }}>
+              <h1 style={{ fontFamily:"'Nunito',sans-serif", fontWeight:900, fontSize:isMobile?22:28, marginBottom:4 }}>{institutionName}</h1>
+              <div style={{ display:'flex', gap:12, flexWrap:'wrap', fontSize:13, color:'#888' }}>
+                {inst?.city && <span>📍 {inst.city}</span>}
+                {inst?.institution_type && <span>🏫 {inst.institution_type}</span>}
+                {inst?.ownership_type && <span>🏢 {inst.ownership_type}</span>}
+                {inst?.phone && <span>📞 {inst.phone}</span>}
+              </div>
+            </div>
+            <div style={{ background:'#E8F5EE', borderRadius:12, padding:'10px 18px', textAlign:'center', flexShrink:0 }}>
+              <div style={{ fontFamily:"'Nunito',sans-serif", fontWeight:900, fontSize:22, color:PRIMARY }}>{listings.length}</div>
+              <div style={{ fontSize:12, color:'#888' }}>aktive opslag</div>
+            </div>
+          </div>
+        </div>
+        {loading ? (
+          <div style={{ textAlign:'center', padding:'40px 0', color:'#bbb' }}>
+            <div style={{ fontSize:40, marginBottom:10 }}>⏳</div>
+            <p>Indlæser opslag…</p>
+          </div>
+        ) : listings.length === 0 ? (
+          <div style={{ textAlign:'center', padding:'40px 0', color:'#bbb', background:'#fff', borderRadius:22, boxShadow:'0 2px 12px rgba(0,0,0,0.06)' }}>
+            <div style={{ fontSize:40, marginBottom:10 }}>📭</div>
+            <p style={{ fontSize:14 }}>Ingen aktive opslag fra {institutionName}</p>
+          </div>
+        ) : (
+          <div style={{ display:'grid', gridTemplateColumns:isMobile?'repeat(2,1fr)':'repeat(auto-fill,minmax(260px,1fr))', gap:isMobile?12:16 }}>
+            {listings.map(l => (
+              <ListingCard key={l.id} listing={l} favs={favs} toggleFav={toggleFav} onClick={()=>{ setActiveListing(l); setPage('listing'); }} />
+            ))}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
 // ─── APP ──────────────────────────────────────────────────────────────────────
 const ADMIN_EMAIL = 'mustaphakatamato@live.dk'; // Fallback — erstattes af is_platform_admin i DB
 
@@ -3889,10 +4069,11 @@ function App() {
   const [listings,       setListings]       = useState([]);
   const [loading,        setLoading]        = useState(true);
   const [favs,           toggleFav]         = useFavs();
-  const [selectedConvId, setSelectedConvId] = useState(null);
-  const [unreadTotal,    setUnreadTotal]    = useState(0);
-  const [realUserId,     setRealUserId]     = useState(null);
-  const [realEmail,      setRealEmail]      = useState(null);
+  const [selectedConvId,        setSelectedConvId]        = useState(null);
+  const [unreadTotal,           setUnreadTotal]           = useState(0);
+  const [realUserId,            setRealUserId]            = useState(null);
+  const [realEmail,             setRealEmail]             = useState(null);
+  const [activeInstitutionName, setActiveInstitutionName] = useState(null);
 
   async function loadInstitution(email) {
     const e = email.toLowerCase();
@@ -4009,6 +4190,7 @@ function App() {
 
   function showToast(msg, type='success') { setToast({ msg, type }); }
   function navigate(p) { setPage(p); window.scrollTo({ top:0, behavior:'smooth' }); }
+  function goToInstitution(name) { setActiveInstitutionName(name); navigate('institution'); }
 
   const effectiveInstitution = adminInst || institution;
 
@@ -4044,9 +4226,10 @@ function App() {
       )}
       <Nav page={page} setPage={navigate} loggedIn={loggedIn} setLoggedIn={setLoggedIn} unreadTotal={unreadTotal} institution={effectiveInstitution} adminBar={isAdmin && loggedIn} />
 
-      {page==='home'      && <HomePage setPage={navigate} setActiveListing={setActiveListing} listings={listings} loading={loading} favs={favs} toggleFav={toggleFav} />}
-      {page==='opslag'    && <OpslagPage listings={listings} loading={loading} setPage={navigate} setActiveListing={setActiveListing} favs={favs} toggleFav={toggleFav} />}
-      {page==='listing'   && activeListing && <ListingDetailPage listing={activeListing} setPage={navigate} showToast={showToast} onStartConv={startConversation} favs={favs} toggleFav={toggleFav} setSelectedConvId={setSelectedConvId} loggedIn={loggedIn} />}
+      {page==='home'      && <HomePage setPage={navigate} setActiveListing={setActiveListing} listings={listings} loading={loading} favs={favs} toggleFav={toggleFav} goToInstitution={goToInstitution} />}
+      {page==='opslag'    && <OpslagPage listings={listings} loading={loading} setPage={navigate} setActiveListing={setActiveListing} favs={favs} toggleFav={toggleFav} goToInstitution={goToInstitution} />}
+      {page==='listing'   && activeListing && <ListingDetailPage listing={activeListing} setPage={navigate} showToast={showToast} onStartConv={startConversation} favs={favs} toggleFav={toggleFav} setSelectedConvId={setSelectedConvId} loggedIn={loggedIn} goToInstitution={goToInstitution} />}
+      {page==='institution' && activeInstitutionName && <InstitutionListingsPage institutionName={activeInstitutionName} setPage={navigate} setActiveListing={setActiveListing} favs={favs} toggleFav={toggleFav} />}
       {page==='login'          && <LoginPage setPage={navigate} setLoggedIn={setLoggedIn} />}
       {page==='signup'         && <SignupPage setPage={navigate} setLoggedIn={setLoggedIn} showToast={showToast} />}
       {page==='glemt-kodeord'  && <ForgotPasswordPage setPage={navigate} />}
