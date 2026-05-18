@@ -1,5 +1,5 @@
 'use client';
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { db } from '@/lib/supabase';
 import { PRIMARY, ACCENT, ACCENT2, TYPE_CFG, CONDITIONS, AGE_GROUPS, LISTING_TAGS } from '@/lib/constants';
@@ -38,33 +38,21 @@ function ScanningLoader() {
   );
 }
 
-function SChoiceGroup({value, onChange, options, primary}) {
-  return (
-    <div style={{display:'flex',gap:8,flexWrap:'wrap'}}>
-      {options.map(o=>(
-        <button key={o} type="button" onClick={()=>onChange(o)}
-          style={{padding:'9px 16px',borderRadius:20,border:`2px solid ${value===o?primary:'#e5e5e5'}`,background:value===o?primary:'#fff',color:value===o?'#fff':'#444',fontSize:13,fontWeight:600,cursor:'pointer',transition:'all 0.15s'}}>
-          {o}
-        </button>
-      ))}
-    </div>
-  );
-}
-
 export default function DashboardClient() {
   const router = useRouter();
   const {
     listings: allListings,
     fetchListings: onListingCreated,
-    effectiveInstitution,
     showToast,
     favs,
     toggleFav,
     setActiveListing,
     unreadTotal,
+    institution: ctxAppInstitution,
     setInstitution: setAppInstitution,
     adminInst,
     setAdminInst,
+    effectiveInstitution,
   } = useApp();
   const { userId: ctxUserId, institution: ctxInstitution, isAdminView: ctxIsAdmin, adminInstName, realUserId: ctxRealUserId } = useActiveUser();
 
@@ -91,16 +79,20 @@ export default function DashboardClient() {
   const listingsRef = useRef(null);
   const [logoUploading, setLogoUploading] = useState(false);
 
+  // Feature #2: Transaction history
   const [tradesOpen, setTradesOpen] = useState(false);
   const [trades, setTrades] = useState([]);
   const [tradesLoading, setTradesLoading] = useState(false);
 
+  // Feature #4: Activity (sent bids/offers)
   const [activityOpen, setActivityOpen] = useState(false);
   const [activity, setActivity] = useState([]);
   const [actLoading, setActLoading] = useState(false);
 
+  // Feature #15: Incoming requests
   const [incomingConvs, setIncomingConvs] = useState([]);
 
+  // Feature #19: Members management
   const [membersOpen, setMembersOpen] = useState(false);
   const [members, setMembers] = useState([]);
   const [memberEmail, setMemberEmail] = useState('');
@@ -116,16 +108,19 @@ export default function DashboardClient() {
     }
   }
 
+  // Single effect: load auth user + institution + listings — fully self-contained
   useEffect(() => {
     let cancelled = false;
     async function boot() {
       setInstLoading(true);
+      // For real auth operations we still need the actual auth user
       const { data: { user } } = await db.auth.getUser();
       if (!user || cancelled) { setInstLoading(false); return; }
       setAuthUserId(user.id);
 
       let inst = null;
       if (ctxIsAdmin && instProp) {
+        // Admin impersonating: use the selected institution directly, skip DB fetch
         inst = instProp;
       } else {
         const { data: ownInst } = await db.from('institutions').select('*').ilike('email', user.email).maybeSingle();
@@ -137,6 +132,7 @@ export default function DashboardClient() {
         if (!cancelled && inst) setInstitution(inst);
       }
 
+      // Auto-geocode
       if (inst && inst.address && !inst.latitude) {
         geocodeAddress(inst.address, inst.zipcode, inst.city).then(coords => {
           if (coords) {
@@ -146,8 +142,10 @@ export default function DashboardClient() {
         });
       }
 
+      // Listings: admin view fetches only by institution name
       await fetchMyListings(ctxIsAdmin ? null : user.id, inst?.name);
 
+      // Incoming conversations: brug institution-ID som primær filter
       let incoming;
       const instId = inst?.id;
       const orParts = [];
@@ -167,12 +165,14 @@ export default function DashboardClient() {
     return () => { cancelled = true; };
   }, []);
 
+  // Re-fetch when allListings changes (new listing created by someone else / realtime)
   useEffect(() => {
     if (ctxIsAdmin) { fetchMyListings(null, instProp?.name || institution?.name); }
     else if (authUserId) { fetchMyListings(authUserId, institution?.name); }
   }, [allListings]);
 
   async function fetchMyListings(userId, instName) {
+    // Hent både aktive og solgte (is_active=true OR is_sold=true)
     let q = db.from('listings').select('*').or('is_active.eq.true,is_sold.eq.true').order('created_at', { ascending: false });
     if (userId && instName) {
       q = q.or(`user_id.eq.${userId},institution_name.eq.${instName}`);
@@ -230,6 +230,7 @@ export default function DashboardClient() {
     cocoModelRef.current = await cocoLoadingRef.current;
     return cocoModelRef.current;
   }
+  // Preload model in background as soon as dashboard mounts
   useEffect(() => { getCocoModel(); }, []);
 
   async function detectPerson(file) {
@@ -292,6 +293,7 @@ export default function DashboardClient() {
       return;
     }
     setSaving(true);
+    // Always get fresh auth user so user_id is guaranteed
     const { data: { user } } = await db.auth.getUser();
     let inst = institution;
     if (!inst && user) {
@@ -352,6 +354,7 @@ export default function DashboardClient() {
     e.target.value = '';
   }
 
+  // Feature #2: Transaction history (completed deals)
   async function fetchTrades() {
     setTradesLoading(true);
     const instId = institution?.id;
@@ -370,6 +373,7 @@ export default function DashboardClient() {
     setTradesLoading(false);
   }
 
+  // Feature #4: Activity – bud/tilbud afgivet af denne institution
   async function fetchActivity() {
     setActLoading(true);
     const instId = institution?.id;
@@ -387,12 +391,12 @@ export default function DashboardClient() {
     setActLoading(false);
   }
 
+  // Feature #19: Members handlers
   async function fetchMembers() {
     if (!institution?.id) return;
     const { data } = await db.from('institution_members').select('*').eq('institution_id', institution.id).order('created_at');
     if (data) setMembers(data);
   }
-
   async function addMember() {
     if (!memberEmail.trim() || !institution?.id) return;
     setMemberSaving(true);
@@ -406,14 +410,13 @@ export default function DashboardClient() {
     fetchMembers();
     showToast('Bruger tilføjet ✓');
   }
-
   async function removeMember(id) {
     await db.from('institution_members').delete().eq('id', id);
     setMembers(ms => ms.filter(m => m.id !== id));
     showToast('Bruger fjernet');
   }
 
-  const favListings = allListings.filter(l=>favs?.includes(l.id));
+  const favListings = allListings ? allListings.filter(l=>favs?.includes(l.id)) : [];
   const ww = useWindowWidth();
   const isMobile = ww < 768;
 
@@ -422,6 +425,7 @@ export default function DashboardClient() {
       <div style={{ maxWidth:1140, margin:'0 auto', padding:isMobile?'24px 16px':'36px 24px' }}>
         <div style={{ display:'flex', alignItems:isMobile?'flex-start':'center', justifyContent:'space-between', marginBottom:isMobile?24:36, flexWrap:'wrap', gap:16 }}>
           <div style={{ display:'flex', alignItems:'center', gap:isMobile?14:20 }}>
+            {/* Logo avatar — click to upload */}
             <div onClick={()=>logoRef.current?.click()} title="Klik for at skifte logo" style={{ width:isMobile?56:72, height:isMobile?56:72, borderRadius:18, background:PRIMARY, display:'flex', alignItems:'center', justifyContent:'center', cursor:'pointer', overflow:'hidden', flexShrink:0, border:'3px solid #fff', boxShadow:'0 4px 16px rgba(0,0,0,0.12)', position:'relative' }}>
               {logoUploading
                 ? <Spinner />
@@ -468,6 +472,7 @@ export default function DashboardClient() {
 
         <div style={{ display:'grid', gridTemplateColumns:isMobile?'1fr':'1fr 1fr', gap:isMobile?16:24 }}>
 
+          {/* Mine opslag */}
           <div ref={listingsRef} style={{ background:'#fff', borderRadius:22, padding:28, boxShadow:'0 2px 12px rgba(0,0,0,0.06)' }}>
             <h2 style={{ fontFamily:"'Nunito',sans-serif", fontWeight:800, fontSize:20, marginBottom:20 }}>Mine opslag</h2>
             {myListings.length===0 ? (
@@ -508,6 +513,7 @@ export default function DashboardClient() {
             ))}
           </div>
 
+          {/* Mine favoritter */}
           <div style={{ background:'#fff', borderRadius:22, padding:28, boxShadow:'0 2px 12px rgba(0,0,0,0.06)' }}>
             <div style={{ display:'flex', alignItems:'center', gap:10, marginBottom:20 }}>
               <h2 style={{ fontFamily:"'Nunito',sans-serif", fontWeight:800, fontSize:20 }}>Mine favoritter</h2>
@@ -538,6 +544,7 @@ export default function DashboardClient() {
           </div>
         </div>
 
+        {/* Feature #15: Incoming requests section (ubehandlede) */}
         <div id="incoming-section" style={{ background:'#fff', borderRadius:22, padding:28, boxShadow:'0 2px 12px rgba(0,0,0,0.06)', marginTop:isMobile?16:24 }}>
           <div style={{ display:'flex', alignItems:'center', gap:10, marginBottom:20 }}>
             <h2 style={{ fontFamily:"'Nunito',sans-serif", fontWeight:800, fontSize:20 }}>Indkommende anmodninger</h2>
@@ -640,6 +647,7 @@ export default function DashboardClient() {
         )}
       </Modal>
 
+      {/* Feature #7: Trades History Modal */}
       <Modal open={tradesOpen} onClose={()=>setTradesOpen(false)} title="🤝 Gennemførte handler">
         <div>
           {tradesLoading ? (
@@ -676,6 +684,7 @@ export default function DashboardClient() {
         </div>
       </Modal>
 
+      {/* Feature #4: Activity Modal (sendte tilbud) */}
       <Modal open={activityOpen} onClose={()=>setActivityOpen(false)} title="📤 Sendte tilbud og forespørgsler">
         <div>
           {actLoading ? (
@@ -712,6 +721,7 @@ export default function DashboardClient() {
         </div>
       </Modal>
 
+      {/* Feature #19: Members Modal */}
       <Modal open={membersOpen} onClose={()=>setMembersOpen(false)} title="Brugere under institutionen">
         <div style={{ display:'flex', flexDirection:'column', gap:14 }}>
           <div style={{ background:'#f8f7f5', borderRadius:12, padding:'12px 14px', fontSize:13, color:'#666' }}>
@@ -809,6 +819,7 @@ export default function DashboardClient() {
               </div>
             </div>
 
+            {/* ── Billeder ── */}
             <div>
               <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:8 }}>
                 <label style={{ fontSize:13, fontWeight:700 }}>Billeder <span style={{ fontWeight:400, color:'#aaa' }}>(op til 6)</span></label>
@@ -848,6 +859,7 @@ export default function DashboardClient() {
               )}
             </div>
 
+            {/* ── Foto-tips ── */}
             <div style={{ background:'#fffcf5', border:'1.5px solid #ffe8a3', borderRadius:14, overflow:'hidden' }}>
               <button type="button" onClick={()=>setTipsOpen(o=>!o)}
                 style={{ width:'100%', background:'none', border:'none', padding:'12px 16px', display:'flex', alignItems:'center', justifyContent:'space-between', cursor:'pointer' }}>
