@@ -1,0 +1,160 @@
+'use client';
+import { usePathname, useRouter } from 'next/navigation';
+import { useApp, useActiveUser } from '@/providers/AppProvider';
+import { db } from '@/lib/supabase';
+import { PRIMARY } from '@/lib/constants';
+import { useWindowWidth } from '@/lib/hooks';
+import { useState, useEffect } from 'react';
+import { Btn } from '@/components/ui';
+
+export default function NavWrapper() {
+  const { loggedIn, setLoggedIn, unreadTotal, isAdmin, adminInst, setAdminInst, allInstitutions, toast, setToast } = useApp();
+  const { institution } = useActiveUser();
+  const pathname = usePathname();
+  const router = useRouter();
+  const isHome = pathname === '/';
+
+  return (
+    <>
+      {isAdmin && loggedIn && (
+        <div style={{ background:'#1a1a2e', color:'#e0e0ff', padding:'8px 20px', display:'flex', alignItems:'center', gap:12, fontSize:13, fontFamily:"'Nunito Sans',sans-serif", position:'fixed', top:0, left:0, right:0, zIndex:9999, flexWrap:'wrap' }}>
+          <span style={{ fontWeight:700, color:'#a78bfa' }}>🔧 Admin</span>
+          <select
+            value={adminInst?.id || ''}
+            onChange={e => { const i = allInstitutions.find(x => x.id === e.target.value); setAdminInst(i || null); }}
+            style={{ background:'#2d2d4e', color:'#e0e0ff', border:'1px solid #4a4a6e', borderRadius:6, padding:'4px 10px', fontSize:12, cursor:'pointer', maxWidth:280 }}>
+            <option value="">— Vælg institution at se som —</option>
+            {allInstitutions.map(i => <option key={i.id} value={i.id}>{i.name}{i.city ? ` · ${i.city}` : ''}</option>)}
+          </select>
+          {adminInst
+            ? <><span style={{ color:'#a78bfa' }}>Viser som: <strong style={{ color:'#fff' }}>{adminInst.name}</strong></span><button onClick={()=>setAdminInst(null)} style={{ background:'#3d2d6e', color:'#e0e0ff', border:'none', borderRadius:6, padding:'3px 10px', cursor:'pointer', fontSize:11, fontWeight:700 }}>✕ Afslut</button></>
+            : <span style={{ color:'#6b7280', fontSize:11 }}>Ingen institution valgt — viser din egen</span>}
+        </div>
+      )}
+      <Nav
+        pathname={pathname}
+        navigate={p => { router.push(p); window.scrollTo({ top:0, behavior:'smooth' }); }}
+        loggedIn={loggedIn}
+        setLoggedIn={setLoggedIn}
+        unreadTotal={unreadTotal}
+        institution={institution}
+        adminBar={isAdmin && loggedIn}
+      />
+      {toast && <ToastDisplay msg={toast.msg} type={toast.type} onDone={()=>setToast(null)} />}
+    </>
+  );
+}
+
+function ToastDisplay({ msg, type='success', onDone }) {
+  useEffect(() => { const t = setTimeout(onDone, 3200); return () => clearTimeout(t); }, []);
+  const icon = type==='success' ? '✅' : type==='error' ? '❌' : 'ℹ️';
+  return (
+    <div style={{ position:'fixed', bottom:'max(32px, env(safe-area-inset-bottom, 32px))', left:'50%', transform:'translateX(-50%)', background:'#1c1a17', color:'#fff', borderRadius:99, padding:'13px 26px', fontWeight:700, fontSize:14, fontFamily:"'Nunito',sans-serif", zIndex:2000, boxShadow:'0 10px 40px rgba(0,0,0,0.35)', display:'flex', alignItems:'center', gap:10, whiteSpace:'nowrap', animation:'slideUp 0.3s ease', maxWidth:'calc(100vw - 32px)' }}>
+      <span style={{ fontSize:18 }}>{icon}</span> {msg}
+    </div>
+  );
+}
+
+function Nav({ pathname, navigate, loggedIn, setLoggedIn, unreadTotal, institution, adminBar }) {
+  const [scrolled, setScrolled] = useState(false);
+  const [menuOpen, setMenuOpen] = useState(false);
+  const w = useWindowWidth();
+  const isMobile = w < 768;
+
+  useEffect(() => {
+    const fn = () => setScrolled(window.scrollY > 20);
+    window.addEventListener('scroll', fn);
+    return () => window.removeEventListener('scroll', fn);
+  }, []);
+
+  useEffect(() => { setMenuOpen(false); }, [pathname]);
+
+  const isHome = pathname === '/';
+  const transparent = isHome && !scrolled && !menuOpen;
+  const navTop = adminBar ? 36 : 0;
+
+  function go(path) { navigate(path); }
+
+  return (
+    <nav style={{ position:'fixed', top:navTop, left:0, right:0, zIndex:500, background:transparent?'transparent':'rgba(255,252,248,0.96)', backdropFilter:transparent?'none':'blur(18px)', boxShadow:transparent?'none':'0 1px 0 rgba(0,0,0,0.07)', transition:'all 0.3s' }}>
+      <div style={{ maxWidth:1140, margin:'0 auto', display:'flex', alignItems:'center', height:68, gap:isMobile?12:24, padding:'0 16px' }}>
+        <div onClick={()=>go('/')} style={{ display:'flex', alignItems:'center', gap:10, cursor:'pointer', flexShrink:0 }}>
+          <div style={{ width:36, height:36, borderRadius:10, background:PRIMARY, display:'flex', alignItems:'center', justifyContent:'center', fontSize:20 }}>♻️</div>
+          <span style={{ fontFamily:"'Nunito',sans-serif", fontWeight:900, fontSize:isMobile?18:20, letterSpacing:'-0.5px' }}>
+            <span style={{ color:transparent?'#fff':PRIMARY }}>Legetøjs</span>
+            <span style={{ color:transparent?'rgba(255,255,255,0.9)':'#1c1a17' }}>Byt</span>
+          </span>
+        </div>
+
+        {!isMobile && (
+          <div style={{ display:'flex', gap:4, flex:1, justifyContent:'center' }}>
+            {[['/opslag','Markedsplads'],['/hvordan','Sådan virker det'],['/om-os','Om os'],['/kontakt','Kontakt']].map(([p,label]) => (
+              <button key={p} onClick={()=>go(p)} style={{ background:'none', border:'none', padding:'8px 16px', fontSize:14, fontWeight:600, color:pathname===p?PRIMARY:transparent?'rgba(255,255,255,0.85)':'#555', borderRadius:8, borderBottom:pathname===p?`2px solid ${PRIMARY}`:'2px solid transparent', transition:'all 0.15s' }}>{label}</button>
+            ))}
+          </div>
+        )}
+
+        {isMobile && <div style={{ flex:1 }} />}
+
+        {!isMobile && (
+          <div style={{ display:'flex', gap:10, alignItems:'center', flexShrink:0 }}>
+            {loggedIn ? <>
+              <button onClick={()=>go('/dashboard')} style={{ background:'none', border:'none', fontWeight:600, fontSize:14, color:transparent?'rgba(255,255,255,0.9)':'#555', cursor:'pointer', padding:'8px 12px', borderRadius:8 }}>Min institution</button>
+              <button onClick={()=>go('/beskeder')} style={{ background:'none', border:'none', fontWeight:600, fontSize:14, color:transparent?'rgba(255,255,255,0.9)':'#555', cursor:'pointer', padding:'8px 12px', borderRadius:8, position:'relative', display:'flex', alignItems:'center', gap:6 }}>
+                💬 Beskeder
+                {unreadTotal > 0 && <span style={{ background:'#EF476F', color:'#fff', borderRadius:99, fontSize:11, fontWeight:700, minWidth:18, height:18, display:'flex', alignItems:'center', justifyContent:'center', padding:'0 5px', lineHeight:1 }}>{unreadTotal > 9 ? '9+' : unreadTotal}</span>}
+              </button>
+              <div onClick={async()=>{ await db.auth.signOut(); setLoggedIn(false); go('/'); }} title="Log ud" style={{ width:38, height:38, borderRadius:'50%', background:PRIMARY, display:'flex', alignItems:'center', justifyContent:'center', color:'#fff', fontWeight:800, fontSize:14, cursor:'pointer', overflow:'hidden', flexShrink:0, border:`2px solid ${PRIMARY}` }}>
+                {institution?.logo_url
+                  ? <img src={institution.logo_url} alt="logo" style={{ width:'100%', height:'100%', objectFit:'cover' }} />
+                  : <span>{institution?.name?.charAt(0)?.toUpperCase() || 'M'}</span>}
+              </div>
+            </> : <>
+              <Btn variant="ghost" onClick={()=>go('/login')} color={transparent?'rgba(255,255,255,0.9)':PRIMARY} radius={32} style={{ color:transparent?'rgba(255,255,255,0.9)':'#555' }}>Log ind</Btn>
+              <Btn variant="primary" onClick={()=>go('/signup')} color={PRIMARY} radius={22}>Tilmeld institution</Btn>
+            </>}
+          </div>
+        )}
+
+        {isMobile && (
+          <div style={{ display:'flex', alignItems:'center', gap:8, flexShrink:0 }}>
+            {loggedIn && unreadTotal > 0 && (
+              <button onClick={()=>go('/beskeder')} style={{ background:'none', border:'none', cursor:'pointer', position:'relative', padding:'6px', lineHeight:1 }}>
+                <span style={{ fontSize:22, color:transparent?'#fff':'#333' }}>💬</span>
+                <span style={{ position:'absolute', top:2, right:2, background:'#EF476F', color:'#fff', borderRadius:99, fontSize:10, fontWeight:800, minWidth:16, height:16, display:'flex', alignItems:'center', justifyContent:'center', padding:'0 3px', lineHeight:1 }}>{unreadTotal > 9 ? '9+' : unreadTotal}</span>
+              </button>
+            )}
+            <button onClick={()=>setMenuOpen(v=>!v)} style={{ background:'none', border:'none', cursor:'pointer', padding:'8px 4px', display:'flex', flexDirection:'column', gap:5, alignItems:'center', justifyContent:'center', width:36, height:36 }}>
+              <div style={{ width:22, height:2.5, background:transparent&&!menuOpen?'#fff':'#333', borderRadius:2, transition:'transform 0.2s, opacity 0.2s', transform:menuOpen?'rotate(45deg) translate(5px,5px)':'none' }} />
+              <div style={{ width:22, height:2.5, background:transparent&&!menuOpen?'#fff':'#333', borderRadius:2, opacity:menuOpen?0:1, transition:'opacity 0.2s' }} />
+              <div style={{ width:22, height:2.5, background:transparent&&!menuOpen?'#fff':'#333', borderRadius:2, transition:'transform 0.2s, opacity 0.2s', transform:menuOpen?'rotate(-45deg) translate(5px,-5px)':'none' }} />
+            </button>
+          </div>
+        )}
+      </div>
+
+      {isMobile && menuOpen && (
+        <div style={{ background:'rgba(255,252,248,0.99)', borderTop:'1px solid #f0eeeb', padding:'8px 16px 20px', animation:'slideDown 0.2s ease' }}>
+          {[['/opslag','🛍️ Markedsplads'],['/hvordan','❓ Sådan virker det'],['/om-os','ℹ️ Om os'],['/kontakt','✉️ Kontakt']].map(([p,label]) => (
+            <button key={p} onClick={()=>go(p)} style={{ display:'block', width:'100%', textAlign:'left', background:'none', border:'none', borderBottom:'1px solid #f0eeeb', padding:'14px 4px', fontSize:15, fontWeight:pathname===p?700:600, color:pathname===p?PRIMARY:'#333', cursor:'pointer' }}>{label}</button>
+          ))}
+          <div style={{ marginTop:12 }}>
+            {loggedIn ? <>
+              <button onClick={()=>go('/dashboard')} style={{ display:'block', width:'100%', textAlign:'left', background:'none', border:'none', borderBottom:'1px solid #f0eeeb', padding:'14px 4px', fontSize:15, fontWeight:600, color:'#333', cursor:'pointer' }}>🏢 Min institution</button>
+              <button onClick={()=>go('/beskeder')} style={{ display:'flex', alignItems:'center', gap:8, width:'100%', textAlign:'left', background:'none', border:'none', borderBottom:'1px solid #f0eeeb', padding:'14px 4px', fontSize:15, fontWeight:600, color:'#333', cursor:'pointer' }}>
+                💬 Beskeder
+                {unreadTotal > 0 && <span style={{ background:'#EF476F', color:'#fff', borderRadius:99, fontSize:11, fontWeight:800, minWidth:18, height:18, display:'flex', alignItems:'center', justifyContent:'center', padding:'0 5px' }}>{unreadTotal > 9 ? '9+' : unreadTotal}</span>}
+              </button>
+              <button onClick={async()=>{ await db.auth.signOut(); setLoggedIn(false); go('/'); }} style={{ marginTop:12, width:'100%', background:'#f5f4f2', border:'none', borderRadius:12, padding:'13px', fontSize:14, fontWeight:700, color:'#555', cursor:'pointer' }}>Log ud</button>
+            </> : (
+              <div style={{ display:'flex', flexDirection:'column', gap:10, marginTop:4 }}>
+                <Btn variant="outline" onClick={()=>go('/login')} color={PRIMARY} radius={22} style={{ justifyContent:'center', width:'100%' }}>Log ind</Btn>
+                <Btn variant="primary" onClick={()=>go('/signup')} color={PRIMARY} radius={22} style={{ justifyContent:'center', width:'100%' }}>Tilmeld institution</Btn>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+    </nav>
+  );
+}

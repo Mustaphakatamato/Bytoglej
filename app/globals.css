@@ -1,0 +1,47 @@
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+html { scroll-behavior: smooth; }
+body { font-family: 'Nunito Sans', sans-serif; background: #fffcf8; color: #1c1a17; -webkit-font-smoothing: antialiased; overflow-x: hidden; }
+
+@keyframes fadeSlideIn { from { opacity:0; transform:translateY(18px); } to { opacity:1; transform:translateY(0); } }
+@keyframes fadeIn      { from { opacity:0; } to { opacity:1; } }
+@keyframes slideUp     { from { opacity:0; transform:translateY(28px); } to { opacity:1; transform:translateY(0); } }
+@keyframes float       { 0%,100%{ transform:translateY(0); } 50%{ transform:translateY(-10px); } }
+@keyframes float2      { 0%,100%{ transform:translateY(0) rotate(-1deg); } 50%{ transform:translateY(-14px) rotate(1deg); } }
+@keyframes shimmer     { 0%{ background-position:-400px 0; } 100%{ background-position:400px 0; } }
+@keyframes bounceIn    { 0%{ transform:scale(0.7); } 60%{ transform:scale(1.15); } 100%{ transform:scale(1); } }
+@keyframes spin        { to { transform:rotate(360deg); } }
+@keyframes popIn       { 0%{ opacity:0; transform:scale(0.85) translateY(10px); } 100%{ opacity:1; transform:scale(1) translateY(0); } }
+@keyframes slideDown   { from { opacity:0; transform:translateY(-10px); } to { opacity:1; transform:translateY(0); } }
+@keyframes pulse       { 0%,100%{ transform:scale(1); opacity:0.7; } 50%{ transform:scale(1.4); opacity:1; } }
+@keyframes scanBar     { 0%{ left:-40%; } 100%{ left:100%; } }
+@keyframes favPop      { 0%{transform:scale(1)} 40%{transform:scale(1.45)} 70%{transform:scale(0.9)} 100%{transform:scale(1)} }
+
+.page-enter { animation: fadeSlideIn 0.35s ease both; }
+
+@media (max-width: 767px) {
+  .hide-mobile { display: none !important; }
+  .show-mobile { display: flex !important; }
+}
+@media (min-width: 768px) {
+  .hide-desktop { display: none !important; }
+}
+
+.skeleton {
+  background: linear-gradient(90deg, #f0efed 25%, #e8e7e4 50%, #f0efed 75%);
+  background-size: 400px 100%;
+  animation: shimmer 1.4s infinite linear;
+  border-radius: 8px;
+}
+
+::-webkit-scrollbar { width: 5px; }
+::-webkit-scrollbar-thumb { background: #ddd; border-radius: 99px; }
+
+input:focus, textarea:focus, select:focus { outline: 2px solid #2A7D4F; outline-offset: 1px; }
+::placeholder { color: #c0bdb8; }
+button { cursor: pointer; font-family: inherit; }
+
+.card { transition: transform 0.2s ease, box-shadow 0.2s ease; }
+.card:hover { transform: translateY(-5px); box-shadow: 0 20px 48px rgba(0,0,0,0.13) !important; }
+.fav-btn { transition: transform 0.15s ease; }
+.fav-btn:hover { transform: scale(1.25); }
+.fav-pop { animation: favPop 0.35s ease; }
