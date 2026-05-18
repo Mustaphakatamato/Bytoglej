@@ -2,7 +2,9 @@
 import { useState, useEffect, useRef, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import dynamic from 'next/dynamic';
-import { PRIMARY, CITIES, LISTING_TAGS } from '@/lib/constants';
+import { PRIMARY, LISTING_TAGS } from '@/lib/constants';
+
+const CITIES = ['alle','Aarhus','København','Odense','Aalborg','Esbjerg','Randers','Vejle','Kolding'];
 import { useWindowWidth, useDebounce, haversine } from '@/lib/hooks';
 import { Btn, SkeletonCard } from '@/components/ui';
 import ListingCard from '@/components/ListingCard';
