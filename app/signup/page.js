@@ -9,32 +9,170 @@ import { geocodeAddress, useDebounce } from '@/lib/hooks';
 import { LogoLockup } from '@/components/Logo';
 
 const FONT = "'Sora', sans-serif";
+const CORAL = '#E8593D';
 
-function SField({label, hint, children}) {
+function SField({ label, hint, children }) {
   return (
     <div>
-      <label style={{display:'block',fontSize:13,fontWeight:700,marginBottom:5}}>
-        {label}{hint&&<span style={{fontWeight:400,color:'#aaa',marginLeft:6}}>{hint}</span>}
+      <label style={{ display: 'block', fontSize: 13, fontWeight: 700, marginBottom: 5, fontFamily: FONT, color: INK }}>
+        {label}{hint && <span style={{ fontWeight: 400, color: INK2, marginLeft: 6 }}>{hint}</span>}
       </label>
       {children}
     </div>
   );
 }
-function SInput({value, onChange, type='text', placeholder, ...rest}) {
+
+function SInput({ value, onChange, type = 'text', placeholder, ...rest }) {
   return (
-    <input type={type} value={value} onChange={onChange} placeholder={placeholder}
-      style={{width:'100%',padding:'11px 14px',borderRadius:12,border:'1.5px solid #e5e5e5',fontSize:14,fontFamily:"'Nunito Sans',sans-serif",outline:'none'}} {...rest} />
+    <input
+      type={type}
+      value={value}
+      onChange={onChange}
+      placeholder={placeholder}
+      style={{
+        width: '100%',
+        padding: '11px 14px',
+        borderRadius: 12,
+        border: `1.5px solid ${PAPER3}`,
+        fontSize: 14,
+        fontFamily: FONT,
+        outline: 'none',
+        background: PAPER2,
+        color: INK,
+        transition: 'border-color 0.15s',
+        boxSizing: 'border-box',
+      }}
+      {...rest}
+    />
   );
 }
-function SChoiceGroup({value, onChange, options, primary}) {
+
+function SChoiceGroup({ value, onChange, options, primary }) {
   return (
-    <div style={{display:'flex',gap:8,flexWrap:'wrap'}}>
-      {options.map(o=>(
-        <button key={o} type="button" onClick={()=>onChange(o)}
-          style={{padding:'9px 16px',borderRadius:20,border:`2px solid ${value===o?primary:'#e5e5e5'}`,background:value===o?primary:'#fff',color:value===o?'#fff':'#444',fontSize:13,fontWeight:600,cursor:'pointer',transition:'all 0.15s'}}>
+    <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+      {options.map(o => (
+        <button
+          key={o}
+          type="button"
+          onClick={() => onChange(o)}
+          style={{
+            padding: '9px 18px',
+            borderRadius: 999,
+            border: value === o ? 'none' : `1.5px solid ${PAPER3}`,
+            background: value === o ? primary : PAPER2,
+            color: value === o ? '#fff' : INK2,
+            fontSize: 13,
+            fontWeight: 600,
+            fontFamily: FONT,
+            cursor: 'pointer',
+            transition: 'all 0.15s',
+          }}
+        >
           {o}
         </button>
       ))}
+    </div>
+  );
+}
+
+function pwStrength(p) {
+  return {
+    length:  p.length >= 8,
+    upper:   /[A-Z]/.test(p),
+    number:  /[0-9]/.test(p),
+    special: /[^a-zA-Z0-9]/.test(p),
+  };
+}
+
+function PasswordField({ value, onChange, placeholder }) {
+  const [show, setShow] = useState(false);
+  const strength = pwStrength(value);
+  const checks = [
+    { key: 'length',  label: 'Mindst 8 tegn' },
+    { key: 'upper',   label: 'Mindst ét stort bogstav (A-Z)' },
+    { key: 'number',  label: 'Mindst ét tal (0-9)' },
+    { key: 'special', label: 'Mindst ét specialtegn (!@#…)' },
+  ];
+
+  return (
+    <div>
+      <div style={{ position: 'relative' }}>
+        <input
+          type={show ? 'text' : 'password'}
+          value={value}
+          onChange={onChange}
+          placeholder={placeholder}
+          style={{
+            width: '100%',
+            padding: '11px 44px 11px 14px',
+            borderRadius: 12,
+            border: `1.5px solid ${PAPER3}`,
+            fontSize: 14,
+            fontFamily: FONT,
+            outline: 'none',
+            background: PAPER2,
+            color: INK,
+            transition: 'border-color 0.15s',
+            boxSizing: 'border-box',
+          }}
+        />
+        <button
+          type="button"
+          onClick={() => setShow(s => !s)}
+          style={{
+            position: 'absolute',
+            right: 12,
+            top: '50%',
+            transform: 'translateY(-50%)',
+            background: 'none',
+            border: 'none',
+            cursor: 'pointer',
+            padding: 4,
+            color: INK3,
+            display: 'flex',
+            alignItems: 'center',
+          }}
+          aria-label={show ? 'Skjul adgangskode' : 'Vis adgangskode'}
+        >
+          {show ? (
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M17.94 17.94A10.07 10.07 0 0112 20c-7 0-11-8-11-8a18.45 18.45 0 015.06-5.94" />
+              <path d="M9.9 4.24A9.12 9.12 0 0112 4c7 0 11 8 11 8a18.5 18.5 0 01-2.16 3.19" />
+              <line x1="1" y1="1" x2="23" y2="23" />
+            </svg>
+          ) : (
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
+              <circle cx="12" cy="12" r="3" />
+            </svg>
+          )}
+        </button>
+      </div>
+      {value.length > 0 && (
+        <div style={{ marginTop: 10, display: 'flex', flexDirection: 'column', gap: 5 }}>
+          {checks.map(({ key, label }) => {
+            const met = strength[key];
+            return (
+              <div key={key} style={{ display: 'flex', alignItems: 'center', gap: 7 }}>
+                <div style={{
+                  width: 7,
+                  height: 7,
+                  borderRadius: '50%',
+                  background: met ? GREEN_SOFT : PAPER3,
+                  flexShrink: 0,
+                }} />
+                <span style={{
+                  fontSize: 12,
+                  fontFamily: FONT,
+                  color: met ? PRIMARY : INK3,
+                }}>
+                  {label}
+                </span>
+              </div>
+            );
+          })}
+        </div>
+      )}
     </div>
   );
 }
@@ -124,19 +262,20 @@ export default function SignupPage() {
     setCvr(''); setCvrQuery(''); setCvrStatus(null); setCvrData(null);
     setLiveSuggestions([]); setShowDrop(false);
   }
+
   const [form, setForm] = useState({
     inst_type:'', ownership:'', address:'', zipcode:'', city:'',
     children_count:'', inst_phone:'', website:'',
     leader_name:'', leader_phone:'', leader_email:'',
     contact_name:'', email:'', pass:''
   });
-  const set = (k,v) => setForm(f=>({...f,[k]:v}));
+  const set = (k, v) => setForm(f => ({ ...f, [k]: v }));
 
   async function checkCvr() {
-    if (cvr.length!==8 && cvr.length!==10) return;
+    if (cvr.length !== 8 && cvr.length !== 10) return;
     setCvrStatus('checking');
     try {
-      const url = cvr.length===10
+      const url = cvr.length === 10
         ? `https://cvrapi.dk/api?produ=${cvr}&country=dk`
         : `https://cvrapi.dk/api?search=${cvr}&country=dk`;
       const res = await fetch(url);
@@ -144,7 +283,7 @@ export default function SignupPage() {
       if (!data || data.error) throw new Error('ikke fundet');
 
       let kommune = '';
-      if (cvr.length===10 && data.cvr) {
+      if (cvr.length === 10 && data.cvr) {
         try {
           const parentRes = await fetch(`https://cvrapi.dk/api?search=${data.cvr}&country=dk`);
           const parentData = await parentRes.json();
@@ -153,12 +292,12 @@ export default function SignupPage() {
       }
 
       setCvrStatus('ok');
-      const cd = { name:data.name, address:data.address||'', zipcode:data.zipcode||'', city:data.city||'', type:data.company_type||'Institution', phone:data.phone||'', website:data.website||'', kommune };
+      const cd = { name: data.name, address: data.address || '', zipcode: data.zipcode || '', city: data.city || '', type: data.company_type || 'Institution', phone: data.phone || '', website: data.website || '', kommune };
       setCvrData(cd);
-      setForm(f=>({
+      setForm(f => ({
         ...f,
         address: cd.address, zipcode: cd.zipcode, city: cd.city, inst_phone: cd.phone, website: cd.website,
-        ...(cvr.length===10 ? { ownership:'Offentlig' } : {})
+        ...(cvr.length === 10 ? { ownership: 'Offentlig' } : {})
       }));
     } catch { setCvrStatus('err'); }
   }
@@ -179,7 +318,8 @@ export default function SignupPage() {
   function validateStep4() {
     if (!form.contact_name.trim()) return 'Udfyld dit navn';
     if (!form.email.trim() || !form.email.includes('@')) return 'Udfyld gyldig e-mail';
-    if (form.pass.length < 6) return 'Kodeord skal være mindst 6 tegn';
+    const s = pwStrength(form.pass);
+    if (!s.length || !s.upper || !s.number || !s.special) return 'Adgangskoden opfylder ikke kravene';
     return null;
   }
 
@@ -193,15 +333,15 @@ export default function SignupPage() {
     });
     if (error) { setAuthError(error.message); setSaving(false); return; }
     await db.from('institutions').insert({
-      cvr: cvr.length===8 ? cvr : null,
-      pnr: cvr.length===10 ? cvr : null,
+      cvr: cvr.length === 8 ? cvr : null,
+      pnr: cvr.length === 10 ? cvr : null,
       name: cvrData.name,
       kommune: cvrData.kommune || null,
       institution_type: form.inst_type,
       ownership_type: form.ownership,
       address: form.address, zipcode: form.zipcode, city: form.city,
-      children_count: Number(form.children_count)||null,
-      phone: form.inst_phone||null, website: form.website||null,
+      children_count: Number(form.children_count) || null,
+      phone: form.inst_phone || null, website: form.website || null,
       leader_name: form.leader_name, leader_phone: form.leader_phone, leader_email: form.leader_email,
       contact_name: form.contact_name, email: form.email.toLowerCase()
     });
@@ -213,69 +353,72 @@ export default function SignupPage() {
     else { setLoggedIn(true); router.push('/dashboard'); showToast('Velkommen til byt&leg! 🎉'); }
   }
 
-  const steps = ['CVR / P-nr','Om institutionen','Leder & kontakt','Opret konto'];
-  const stepTitles = ['Verificér institution','Om institutionen','Institutionsleder','Opret konto'];
-  const stepSubs   = ['Vi slår institutionen op via CVR- eller P-nummer-registret','Fortæl os lidt mere om jer','Hvem er den daglige leder?','Vælg login til platformen'];
+  const steps = ['CVR / P-nr', 'Om institutionen', 'Leder & kontakt', 'Opret konto'];
+  const stepTitles = ['Verificér institution', 'Om institutionen', 'Institutionsleder', 'Opret konto'];
+  const stepSubs   = ['Vi slår institutionen op via CVR- eller P-nummer-registret', 'Fortæl os lidt mere om jer', 'Hvem er den daglige leder?', 'Vælg login til platformen'];
+
+  const stepPercent = step <= 4 ? step * 25 : 100;
 
   return (
-    <div style={{minHeight:'100vh',display:'flex',alignItems:'center',justifyContent:'center',padding:'80px 24px 40px',background:'var(--paper)'}} className="page-enter">
-      <div style={{width:'100%',maxWidth:560}}>
-        <div onClick={()=>router.push('/')} style={{cursor:'pointer',marginBottom:28,display:'flex',justifyContent:'center'}}><LogoLockup markSize={40} textSize={20} /></div>
+    <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '80px 24px 40px', background: PAPER }} className="page-enter">
+      <div style={{ width: '100%', maxWidth: 560 }}>
+        <div onClick={() => router.push('/')} style={{ cursor: 'pointer', marginBottom: 28, display: 'flex', justifyContent: 'center' }}>
+          <LogoLockup markSize={40} textSize={20} />
+        </div>
 
-        {step<=4 && (
-          <div style={{display:'flex',alignItems:'center',marginBottom:28,gap:0}}>
-            {steps.map((s,i)=>{
-              const done = step>i+1, active = step===i+1;
-              return (
-                <div key={i} style={{display:'contents'}}>
-                  <div style={{display:'flex',flexDirection:'column',alignItems:'center',flex:1,minWidth:0}}>
-                    <div style={{width:32,height:32,borderRadius:'50%',background:done?PRIMARY:active?PRIMARY:'#e5e5e5',display:'flex',alignItems:'center',justifyContent:'center',fontSize:14,fontWeight:800,color:done||active?'#fff':'#aaa',transition:'all 0.2s',boxShadow:active?`0 0 0 4px ${PRIMARY}33`:'none'}}>
-                      {done?'✓':i+1}
-                    </div>
-                    <div style={{fontSize:11,fontWeight:600,color:active?PRIMARY:done?PRIMARY:'#bbb',marginTop:4,textAlign:'center',whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis',maxWidth:80}}>{s}</div>
-                  </div>
-                  {i<steps.length-1 && <div style={{flex:2,height:2,background:step>i+1?PRIMARY:'#e5e5e5',transition:'all 0.3s',marginBottom:20}}/>}
-                </div>
-              );
-            })}
+        {/* Step progress bar */}
+        {step <= 4 && (
+          <div style={{ marginBottom: 24 }}>
+            <div style={{ width: '100%', height: 2, background: PAPER3, borderRadius: 99, overflow: 'hidden' }}>
+              <div style={{ width: `${stepPercent}%`, height: '100%', background: PRIMARY, borderRadius: 99, transition: 'width 0.3s ease' }} />
+            </div>
+            <div style={{ marginTop: 8, fontSize: 11, fontFamily: FONT, color: INK3, fontVariant: 'small-caps', letterSpacing: '0.04em', textAlign: 'left' }}>
+              Trin {step} af 4
+            </div>
           </div>
         )}
 
-        <div style={{background:'var(--paper)',borderRadius:24,padding:40,boxShadow:'0 8px 40px rgba(0,0,0,0.08)'}}>
-          {step<=4 && (
-            <div style={{marginBottom:28}}>
-              <h2 style={{fontFamily:"'Sora',sans-serif",fontWeight:900,fontSize:24,marginBottom:4}}>{stepTitles[step-1]}</h2>
-              <p style={{color:'#888',fontSize:14}}>{stepSubs[step-1]}</p>
+        <div style={{
+          background: PAPER,
+          borderRadius: 24,
+          padding: 40,
+          border: `1px solid ${PAPER2}`,
+          boxShadow: '0 2px 12px rgba(22,34,28,0.06)',
+        }}>
+          {step <= 4 && (
+            <div style={{ marginBottom: 28 }}>
+              <h2 style={{ fontFamily: FONT, fontWeight: 900, fontSize: 24, marginBottom: 4, color: INK }}>{stepTitles[step - 1]}</h2>
+              <p style={{ color: INK3, fontSize: 14, fontFamily: FONT }}>{stepSubs[step - 1]}</p>
             </div>
           )}
 
-          {step===1 && (
-            <div style={{display:'flex',flexDirection:'column',gap:16}}>
+          {step === 1 && (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
               <div>
-                <label style={{display:'block',fontSize:13,fontWeight:700,marginBottom:5,fontFamily:FONT}}>
+                <label style={{ display: 'block', fontSize: 13, fontWeight: 700, marginBottom: 5, fontFamily: FONT, color: INK }}>
                   Søg på institutionsnavn, CVR- eller P-nummer
                 </label>
 
                 {/* Search input + dropdown wrapper */}
-                <div ref={dropRef} style={{position:'relative'}}>
+                <div ref={dropRef} style={{ position: 'relative' }}>
                   <div style={{
-                    display:'flex',alignItems:'center',gap:10,
-                    padding:'10px 16px',
+                    display: 'flex', alignItems: 'center', gap: 10,
+                    padding: '10px 16px',
                     borderRadius: showDrop && liveSuggestions.length ? '14px 14px 0 0' : 14,
-                    border:`1.5px solid ${cvrStatus==='ok' ? PRIMARY : showDrop ? PRIMARY : PAPER3}`,
-                    background: cvrStatus==='ok' ? GREEN_TINT : PAPER2,
-                    transition:'border-color 0.15s',
+                    border: `1.5px solid ${cvrStatus === 'ok' ? PRIMARY : showDrop ? PRIMARY : PAPER3}`,
+                    background: cvrStatus === 'ok' ? GREEN_TINT : PAPER2,
+                    transition: 'border-color 0.15s',
                   }}>
                     {/* Search icon or spinner */}
                     {liveSearching
-                      ? <div style={{width:16,height:16,border:`2px solid ${PRIMARY}44`,borderTopColor:PRIMARY,borderRadius:'50%',animation:'spin 0.7s linear infinite',flexShrink:0}} />
-                      : cvrStatus==='ok'
-                        ? <div style={{width:16,height:16,borderRadius:'50%',background:PRIMARY,display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0}}>
-                            <svg width="9" height="7" viewBox="0 0 9 7" fill="none"><path d="M1 3.5L3.5 6L8 1" stroke="#fff" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/></svg>
+                      ? <div style={{ width: 16, height: 16, border: `2px solid ${PRIMARY}44`, borderTopColor: PRIMARY, borderRadius: '50%', animation: 'spin 0.7s linear infinite', flexShrink: 0 }} />
+                      : cvrStatus === 'ok'
+                        ? <div style={{ width: 16, height: 16, borderRadius: '50%', background: PRIMARY, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                            <svg width="9" height="7" viewBox="0 0 9 7" fill="none"><path d="M1 3.5L3.5 6L8 1" stroke="#fff" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" /></svg>
                           </div>
-                        : <svg width="15" height="15" viewBox="0 0 15 15" fill="none" style={{flexShrink:0,opacity:0.4}}>
-                            <circle cx="6.5" cy="6.5" r="5.5" stroke={INK} strokeWidth="1.5"/>
-                            <path d="M11 11L14 14" stroke={INK} strokeWidth="1.5" strokeLinecap="round"/>
+                        : <svg width="15" height="15" viewBox="0 0 15 15" fill="none" style={{ flexShrink: 0, opacity: 0.4 }}>
+                            <circle cx="6.5" cy="6.5" r="5.5" stroke={INK} strokeWidth="1.5" />
+                            <path d="M11 11L14 14" stroke={INK} strokeWidth="1.5" strokeLinecap="round" />
                           </svg>
                     }
                     <input
@@ -283,55 +426,54 @@ export default function SignupPage() {
                       onChange={e => {
                         const v = e.target.value;
                         setCvrQuery(v);
-                        // Reset if user edits after having selected
                         if (cvrStatus === 'ok') { setCvrStatus(null); setCvrData(null); setCvr(''); }
                       }}
                       placeholder="Fx 'Regnbuehuset' eller '12345678'"
                       style={{
-                        border:'none',background:'transparent',outline:'none',
-                        fontSize:14,fontFamily:FONT,flex:1,minWidth:0,
-                        color: cvrStatus==='ok' ? PRIMARY : INK,
-                        fontWeight: cvrStatus==='ok' ? 700 : 400,
+                        border: 'none', background: 'transparent', outline: 'none',
+                        fontSize: 14, fontFamily: FONT, flex: 1, minWidth: 0,
+                        color: cvrStatus === 'ok' ? PRIMARY : INK,
+                        fontWeight: cvrStatus === 'ok' ? 700 : 400,
                       }}
                     />
                     {cvrQuery && (
-                      <button onClick={resetCvr} style={{border:'none',background:'none',color:INK3,fontSize:13,cursor:'pointer',padding:0,lineHeight:1,flexShrink:0}}>✕</button>
+                      <button onClick={resetCvr} style={{ border: 'none', background: 'none', color: INK3, fontSize: 13, cursor: 'pointer', padding: 0, lineHeight: 1, flexShrink: 0 }}>✕</button>
                     )}
                   </div>
 
                   {/* Live suggestion dropdown */}
                   {showDrop && liveSuggestions.length > 0 && (
                     <div style={{
-                      position:'absolute',left:0,right:0,zIndex:200,
-                      background:PAPER,
-                      border:`1.5px solid ${PRIMARY}`,
-                      borderTop:'none',
-                      borderRadius:'0 0 14px 14px',
-                      overflow:'hidden',
-                      boxShadow:'0 8px 24px rgba(22,34,28,0.12)',
+                      position: 'absolute', left: 0, right: 0, zIndex: 200,
+                      background: PAPER,
+                      border: `1.5px solid ${PRIMARY}`,
+                      borderTop: 'none',
+                      borderRadius: '0 0 14px 14px',
+                      overflow: 'hidden',
+                      boxShadow: '0 8px 24px rgba(22,34,28,0.12)',
                     }}>
                       {liveSuggestions.map((s, i) => (
                         <button key={i} onClick={() => selectSuggestion(s)} style={{
-                          display:'block',width:'100%',textAlign:'left',
-                          padding:'14px 16px',border:'none',
-                          background:'transparent',cursor:'pointer',
+                          display: 'block', width: '100%', textAlign: 'left',
+                          padding: '14px 16px', border: 'none',
+                          background: 'transparent', cursor: 'pointer',
                           borderTop: i > 0 ? `1px solid ${PAPER2}` : 'none',
-                          transition:'background 0.12s',
+                          transition: 'background 0.12s',
                         }}
                           onMouseEnter={e => e.currentTarget.style.background = GREEN_TINT}
                           onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
                         >
-                          <div style={{display:'flex',alignItems:'center',gap:10}}>
-                            <div style={{flex:1,minWidth:0}}>
-                              <div style={{fontFamily:FONT,fontWeight:700,fontSize:14,color:INK,marginBottom:2,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                            <div style={{ flex: 1, minWidth: 0 }}>
+                              <div style={{ fontFamily: FONT, fontWeight: 700, fontSize: 14, color: INK, marginBottom: 2, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                                 {s.name}
                               </div>
-                              <div style={{fontSize:12,color:INK3,fontFamily:FONT}}>
+                              <div style={{ fontSize: 12, color: INK3, fontFamily: FONT }}>
                                 {[s.address, s.zipcode, s.city].filter(Boolean).join(', ')}
                               </div>
                             </div>
                             {s.cvr && (
-                              <span style={{background:GREEN_TINT,color:PRIMARY,borderRadius:99,padding:'3px 10px',fontSize:11,fontWeight:700,fontFamily:FONT,whiteSpace:'nowrap',flexShrink:0}}>
+                              <span style={{ background: GREEN_TINT, color: PRIMARY, borderRadius: 99, padding: '3px 10px', fontSize: 11, fontWeight: 700, fontFamily: FONT, whiteSpace: 'nowrap', flexShrink: 0 }}>
                                 CVR {s.cvr}
                               </span>
                             )}
@@ -344,124 +486,163 @@ export default function SignupPage() {
                   {/* No results state */}
                   {showDrop && liveSuggestions.length === 0 && !liveSearching && debouncedQuery.length >= 3 && (
                     <div style={{
-                      position:'absolute',left:0,right:0,zIndex:200,
-                      background:PAPER,border:`1.5px solid ${PAPER3}`,borderTop:'none',
-                      borderRadius:'0 0 14px 14px',padding:'14px 16px',
-                      fontSize:13,color:INK3,fontFamily:FONT,
+                      position: 'absolute', left: 0, right: 0, zIndex: 200,
+                      background: PAPER, border: `1.5px solid ${PAPER3}`, borderTop: 'none',
+                      borderRadius: '0 0 14px 14px', padding: '14px 16px',
+                      fontSize: 13, color: INK3, fontFamily: FONT,
                     }}>
                       Ingen institution fundet — prøv et andet navn eller CVR-nummer
                     </div>
                   )}
                 </div>
 
-                <div style={{fontSize:12,color:INK3,marginTop:7,fontFamily:FONT}}>
+                <div style={{ fontSize: 12, color: INK3, marginTop: 7, fontFamily: FONT }}>
                   Skriv institutionens navn, CVR-nummer (8 cifre) eller P-nummer (10 cifre) for kommunale institutioner.
                 </div>
               </div>
 
               {/* Confirmed institution card */}
-              {cvrStatus==='ok' && cvrData && (
+              {cvrStatus === 'ok' && cvrData && (
                 <div>
-                  <div style={{background:GREEN_TINT,border:`1.5px solid ${GREEN_SOFT}`,borderRadius:14,padding:18,marginBottom:16,borderLeft:`3px solid ${PRIMARY}`}}>
-                    <div style={{fontFamily:FONT,fontWeight:800,fontSize:13,color:PRIMARY,marginBottom:8}}>
-                      Fundet i {cvr.length===10?'P-nummer-registret':'CVR-registret'}
+                  <div style={{ background: GREEN_TINT, border: `1.5px solid ${GREEN_SOFT}`, borderRadius: 14, padding: 18, marginBottom: 16, borderLeft: `3px solid ${PRIMARY}` }}>
+                    <div style={{ fontFamily: FONT, fontWeight: 800, fontSize: 13, color: PRIMARY, marginBottom: 8 }}>
+                      Fundet i {cvr.length === 10 ? 'P-nummer-registret' : 'CVR-registret'}
                     </div>
-                    <div style={{fontFamily:FONT,fontWeight:700,fontSize:15,color:INK,marginBottom:4}}>{cvrData.name}</div>
-                    <div style={{fontSize:13,color:INK3,fontFamily:FONT}}>{cvrData.address}, {cvrData.zipcode} {cvrData.city}</div>
-                    {cvrData.kommune && <div style={{fontSize:13,color:INK3,marginTop:3,fontFamily:FONT}}>Under: {cvrData.kommune}</div>}
-                    {cvrData.phone  && <div style={{fontSize:13,color:INK3,marginTop:3,fontFamily:FONT}}>{cvrData.phone}</div>}
-                    {cvrData.website && <div style={{fontSize:13,color:INK3,marginTop:3,fontFamily:FONT}}>{cvrData.website}</div>}
+                    <div style={{ fontFamily: FONT, fontWeight: 700, fontSize: 15, color: INK, marginBottom: 4 }}>{cvrData.name}</div>
+                    <div style={{ fontSize: 13, color: INK3, fontFamily: FONT }}>{cvrData.address}, {cvrData.zipcode} {cvrData.city}</div>
+                    {cvrData.kommune && <div style={{ fontSize: 13, color: INK3, marginTop: 3, fontFamily: FONT }}>Under: {cvrData.kommune}</div>}
+                    {cvrData.phone   && <div style={{ fontSize: 13, color: INK3, marginTop: 3, fontFamily: FONT }}>{cvrData.phone}</div>}
+                    {cvrData.website && <div style={{ fontSize: 13, color: INK3, marginTop: 3, fontFamily: FONT }}>{cvrData.website}</div>}
                   </div>
-                  <Btn variant="primary" color={PRIMARY} radius={22} onClick={()=>setStep(2)} style={{justifyContent:'center',width:'100%',padding:'13px',fontSize:15}}>Fortsæt →</Btn>
+                  <Btn variant="primary" color={PRIMARY} radius={22} onClick={() => setStep(2)} style={{ justifyContent: 'center', width: '100%', padding: '13px', fontSize: 15 }}>Fortsæt →</Btn>
                 </div>
               )}
             </div>
           )}
 
-          {step===2 && (
-            <div style={{display:'flex',flexDirection:'column',gap:18}}>
+          {step === 2 && (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 18 }}>
               <SField label="Institutionstype">
-                <SChoiceGroup value={form.inst_type} onChange={v=>set('inst_type',v)} primary={PRIMARY} options={['Vuggestue','Børnehave','Integreret institution','SFO / KSFO','Andet']} />
+                <SChoiceGroup value={form.inst_type} onChange={v => set('inst_type', v)} primary={PRIMARY} options={['Vuggestue', 'Børnehave', 'Integreret institution', 'SFO / KSFO', 'Andet']} />
               </SField>
               <SField label="Driftsform">
-                <SChoiceGroup value={form.ownership} onChange={v=>set('ownership',v)} primary={PRIMARY} options={['Offentlig','Privat','Selvejende']} />
+                <SChoiceGroup value={form.ownership} onChange={v => set('ownership', v)} primary={PRIMARY} options={['Offentlig', 'Privat', 'Selvejende']} />
               </SField>
-              <div style={{display:'grid',gridTemplateColumns:'1fr 120px',gap:12}}>
-                <SField label="Adresse"><SInput value={form.address} onChange={e=>set('address',e.target.value)} placeholder="Vejnavn og husnummer" /></SField>
-                <SField label="Postnr."><SInput value={form.zipcode} onChange={e=>set('zipcode',e.target.value)} placeholder="1234" /></SField>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 120px', gap: 12 }}>
+                <SField label="Adresse"><SInput value={form.address} onChange={e => set('address', e.target.value)} placeholder="Vejnavn og husnummer" /></SField>
+                <SField label="Postnr."><SInput value={form.zipcode} onChange={e => set('zipcode', e.target.value)} placeholder="1234" /></SField>
               </div>
-              <SField label="By"><SInput value={form.city} onChange={e=>set('city',e.target.value)} placeholder="Fx København" /></SField>
-              <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:12}}>
-                <SField label="Institutionens telefon"><SInput value={form.inst_phone} onChange={e=>set('inst_phone',e.target.value)} placeholder="+45 12 34 56 78" /></SField>
-                <SField label="Antal indskrevne børn"><SInput value={form.children_count} onChange={e=>set('children_count',e.target.value)} type="number" placeholder="Fx 60" /></SField>
+              <SField label="By"><SInput value={form.city} onChange={e => set('city', e.target.value)} placeholder="Fx København" /></SField>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+                <SField label="Institutionens telefon"><SInput value={form.inst_phone} onChange={e => set('inst_phone', e.target.value)} placeholder="+45 12 34 56 78" /></SField>
+                <SField label="Antal indskrevne børn"><SInput value={form.children_count} onChange={e => set('children_count', e.target.value)} type="number" placeholder="Fx 60" /></SField>
               </div>
-              <SField label="Hjemmeside" hint="(valgfri)"><SInput value={form.website} onChange={e=>set('website',e.target.value)} placeholder="https://min-institution.dk" /></SField>
-              {authError && <div style={{background:'#FEF2F2',border:'1.5px solid #fca5a5',borderRadius:10,padding:'12px 16px',fontSize:13,color:'#b91c1c'}}>❌ {authError}</div>}
-              <div style={{display:'flex',gap:10,marginTop:4}}>
-                <Btn variant="outline" radius={22} onClick={()=>setStep(1)} style={{padding:'12px 20px',fontSize:14}}>← Tilbage</Btn>
-                <Btn variant="primary" color={PRIMARY} radius={22} onClick={()=>{ const e=validateStep2(); if(e){setAuthError(e);}else{setAuthError(null);setStep(3);} }} style={{flex:1,justifyContent:'center',padding:'13px',fontSize:15}}>Fortsæt →</Btn>
-              </div>
-            </div>
-          )}
-
-          {step===3 && (
-            <div style={{display:'flex',flexDirection:'column',gap:18}}>
-              <div style={{background:'#f8f5f0',borderRadius:12,padding:'12px 16px',fontSize:13,color:'#666'}}>
-                ℹ️ Disse oplysninger vises ikke offentligt, men bruges ved henvendelse om opslag.
-              </div>
-              <SField label="Institutionslederens fulde navn"><SInput value={form.leader_name} onChange={e=>set('leader_name',e.target.value)} placeholder="Fornavn Efternavn" /></SField>
-              <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:12}}>
-                <SField label="Telefon"><SInput value={form.leader_phone} onChange={e=>set('leader_phone',e.target.value)} placeholder="+45 12 34 56 78" /></SField>
-                <SField label="E-mail"><SInput value={form.leader_email} onChange={e=>set('leader_email',e.target.value)} type="email" placeholder="leder@institution.dk" /></SField>
-              </div>
-              {authError && <div style={{background:'#FEF2F2',border:'1.5px solid #fca5a5',borderRadius:10,padding:'12px 16px',fontSize:13,color:'#b91c1c'}}>❌ {authError}</div>}
-              <div style={{display:'flex',gap:10,marginTop:4}}>
-                <Btn variant="outline" radius={22} onClick={()=>setStep(2)} style={{padding:'12px 20px',fontSize:14}}>← Tilbage</Btn>
-                <Btn variant="primary" color={PRIMARY} radius={22} onClick={()=>{ const e=validateStep3(); if(e){setAuthError(e);}else{setAuthError(null);setStep(4);} }} style={{flex:1,justifyContent:'center',padding:'13px',fontSize:15}}>Fortsæt →</Btn>
+              <SField label="Hjemmeside" hint="(valgfri)"><SInput value={form.website} onChange={e => set('website', e.target.value)} placeholder="https://min-institution.dk" /></SField>
+              {authError && (
+                <div style={{ background: '#FEF2F2', borderLeft: '3px solid #EF4444', borderRadius: 12, padding: '12px 16px', fontSize: 13, color: '#B91C1C', fontFamily: FONT }}>
+                  {authError}
+                </div>
+              )}
+              <div style={{ display: 'flex', gap: 10, marginTop: 4 }}>
+                <Btn variant="outline" radius={22} onClick={() => setStep(1)} style={{ padding: '12px 20px', fontSize: 14 }}>← Tilbage</Btn>
+                <Btn variant="primary" color={PRIMARY} radius={22} onClick={() => { const e = validateStep2(); if (e) { setAuthError(e); } else { setAuthError(null); setStep(3); } }} style={{ flex: 1, justifyContent: 'center', padding: '13px', fontSize: 15 }}>Fortsæt →</Btn>
               </div>
             </div>
           )}
 
-          {step===4 && (
-            <div style={{display:'flex',flexDirection:'column',gap:18}}>
-              <div style={{background:'#f8f5f0',borderRadius:12,padding:'12px 16px',fontSize:13,color:'#666'}}>
-                ℹ️ Det er disse oplysninger I logger ind med. Det kan være den samme person som lederen, eller en administrator.
+          {step === 3 && (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 18 }}>
+              <div style={{ background: GREEN_TINT, borderLeft: `3px solid ${GREEN_SOFT}`, borderRadius: 12, padding: '12px 16px', fontSize: 13, color: INK2, fontFamily: FONT }}>
+                Disse oplysninger vises ikke offentligt, men bruges ved henvendelse om opslag.
               </div>
-              <SField label="Dit fulde navn"><SInput value={form.contact_name} onChange={e=>set('contact_name',e.target.value)} placeholder="Fornavn Efternavn" /></SField>
-              <SField label="E-mail (bruges til login)"><SInput value={form.email} onChange={e=>set('email',e.target.value)} type="email" placeholder="din@email.dk" /></SField>
-              <SField label="Kodeord" hint="(mindst 6 tegn)"><SInput value={form.pass} onChange={e=>set('pass',e.target.value)} type="password" placeholder="••••••••" /></SField>
-              {authError && <div style={{background:'#FEF2F2',border:'1.5px solid #fca5a5',borderRadius:10,padding:'12px 16px',fontSize:13,color:'#b91c1c'}}>❌ {authError}</div>}
-              <div style={{display:'flex',gap:10,marginTop:4}}>
-                <Btn variant="outline" radius={22} onClick={()=>setStep(3)} style={{padding:'12px 20px',fontSize:14}}>← Tilbage</Btn>
-                <Btn variant="primary" color={PRIMARY} radius={22} onClick={handleCreate} disabled={saving} style={{flex:1,justifyContent:'center',padding:'13px',fontSize:15}}>
-                  {saving?<><Spinner/>Opretter…</>:'Opret institution →'}
+              <SField label="Institutionslederens fulde navn"><SInput value={form.leader_name} onChange={e => set('leader_name', e.target.value)} placeholder="Fornavn Efternavn" /></SField>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+                <SField label="Telefon"><SInput value={form.leader_phone} onChange={e => set('leader_phone', e.target.value)} placeholder="+45 12 34 56 78" /></SField>
+                <SField label="E-mail"><SInput value={form.leader_email} onChange={e => set('leader_email', e.target.value)} type="email" placeholder="leder@institution.dk" /></SField>
+              </div>
+              {authError && (
+                <div style={{ background: '#FEF2F2', borderLeft: '3px solid #EF4444', borderRadius: 12, padding: '12px 16px', fontSize: 13, color: '#B91C1C', fontFamily: FONT }}>
+                  {authError}
+                </div>
+              )}
+              <div style={{ display: 'flex', gap: 10, marginTop: 4 }}>
+                <Btn variant="outline" radius={22} onClick={() => setStep(2)} style={{ padding: '12px 20px', fontSize: 14 }}>← Tilbage</Btn>
+                <Btn variant="primary" color={PRIMARY} radius={22} onClick={() => { const e = validateStep3(); if (e) { setAuthError(e); } else { setAuthError(null); setStep(4); } }} style={{ flex: 1, justifyContent: 'center', padding: '13px', fontSize: 15 }}>Fortsæt →</Btn>
+              </div>
+            </div>
+          )}
+
+          {step === 4 && (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 18 }}>
+              <div style={{ background: GREEN_TINT, borderLeft: `3px solid ${GREEN_SOFT}`, borderRadius: 12, padding: '12px 16px', fontSize: 13, color: INK2, fontFamily: FONT }}>
+                Det er disse oplysninger I logger ind med. Det kan være den samme person som lederen, eller en administrator.
+              </div>
+              <SField label="Dit fulde navn"><SInput value={form.contact_name} onChange={e => set('contact_name', e.target.value)} placeholder="Fornavn Efternavn" /></SField>
+              <SField label="E-mail (bruges til login)"><SInput value={form.email} onChange={e => set('email', e.target.value)} type="email" placeholder="din@email.dk" /></SField>
+              <SField label="Adgangskode">
+                <PasswordField value={form.pass} onChange={e => set('pass', e.target.value)} placeholder="••••••••" />
+              </SField>
+              {authError && (
+                <div style={{ background: '#FEF2F2', borderLeft: '3px solid #EF4444', borderRadius: 12, padding: '12px 16px', fontSize: 13, color: '#B91C1C', fontFamily: FONT }}>
+                  {authError}
+                </div>
+              )}
+              <div style={{ display: 'flex', gap: 10, marginTop: 4 }}>
+                <Btn variant="outline" radius={22} onClick={() => setStep(3)} style={{ padding: '12px 20px', fontSize: 14 }}>← Tilbage</Btn>
+                <Btn variant="primary" color={PRIMARY} radius={22} onClick={handleCreate} disabled={saving} style={{ flex: 1, justifyContent: 'center', padding: '13px', fontSize: 15 }}>
+                  {saving ? <><Spinner />Opretter…</> : 'Opret institution →'}
                 </Btn>
               </div>
             </div>
           )}
 
-          {step===5 && (
-            <div style={{textAlign:'center'}}>
-              {needsConfirm ? <>
-                <div style={{fontSize:72,marginBottom:16}}>📧</div>
-                <h2 style={{fontFamily:"'Sora',sans-serif",fontWeight:900,fontSize:26,marginBottom:10}}>Bekræft din e-mail</h2>
-                <p style={{color:'#555',fontSize:15,lineHeight:1.65,marginBottom:8}}>Vi har sendt en bekræftelsesmail til</p>
-                <p style={{fontWeight:700,fontSize:15,color:PRIMARY,marginBottom:24}}>{form.email}</p>
-                <p style={{color:'#888',fontSize:13,lineHeight:1.65,marginBottom:32}}>Klik på linket i mailen for at aktivere kontoen. Tjek evt. spam-mappen.</p>
-                <Btn variant="outline" radius={22} onClick={()=>router.push('/login')} style={{justifyContent:'center',padding:'13px',fontSize:14}}>Gå til login →</Btn>
-              </> : <>
-                <div style={{fontSize:72,marginBottom:16}}>🎉</div>
-                <h2 style={{fontFamily:"'Sora',sans-serif",fontWeight:900,fontSize:28,marginBottom:10}}>Velkommen til byt&amp;leg!</h2>
-                <p style={{color:'#888',fontSize:15,lineHeight:1.65,marginBottom:32}}>{cvrData?.name} er nu oprettet og verificeret.</p>
-                <div style={{display:'flex',flexDirection:'column',gap:10}}>
-                  <Btn variant="primary" color={PRIMARY} radius={22} onClick={()=>router.push('/dashboard')} style={{justifyContent:'center',padding:'13px',fontSize:14}}>Gå til dashboard →</Btn>
-                  <Btn variant="outline" radius={22} onClick={()=>router.push('/opslag')} style={{justifyContent:'center',padding:'13px',fontSize:14}}>Browse opslag</Btn>
-                </div>
-              </>}
+          {step === 5 && (
+            <div style={{ textAlign: 'center' }}>
+              {needsConfirm ? (
+                <>
+                  <div style={{
+                    width: 64, height: 64, borderRadius: '50%',
+                    background: GREEN_TINT, border: `2px solid ${GREEN_SOFT}`,
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    margin: '0 auto 20px',
+                  }}>
+                    <svg width="28" height="22" viewBox="0 0 28 22" fill="none">
+                      <rect x="1" y="1" width="26" height="20" rx="3" stroke={PRIMARY} strokeWidth="2"/>
+                      <path d="M1 4l13 9 13-9" stroke={PRIMARY} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                    </svg>
+                  </div>
+                  <h2 style={{ fontFamily: FONT, fontWeight: 900, fontSize: 26, marginBottom: 10, color: INK }}>Bekræft din e-mail</h2>
+                  <p style={{ color: INK2, fontSize: 15, lineHeight: 1.65, marginBottom: 8, fontFamily: FONT }}>Vi har sendt en bekræftelsesmail til</p>
+                  <p style={{ fontWeight: 700, fontSize: 15, color: PRIMARY, marginBottom: 24, fontFamily: FONT }}>{form.email}</p>
+                  <p style={{ color: INK3, fontSize: 13, lineHeight: 1.65, marginBottom: 32, fontFamily: FONT }}>Klik på linket i mailen for at aktivere kontoen. Tjek evt. spam-mappen.</p>
+                  <Btn variant="outline" radius={22} onClick={() => router.push('/login')} style={{ justifyContent: 'center', padding: '13px', fontSize: 14 }}>Gå til login →</Btn>
+                </>
+              ) : (
+                <>
+                  <div style={{
+                    width: 64, height: 64, borderRadius: '50%',
+                    background: PRIMARY,
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    margin: '0 auto 20px',
+                  }}>
+                    <span style={{ color: '#fff', fontSize: 28, fontFamily: FONT, fontWeight: 800, lineHeight: 1 }}>✓</span>
+                  </div>
+                  <h2 style={{ fontFamily: FONT, fontWeight: 900, fontSize: 28, marginBottom: 10, color: INK }}>Velkommen til byt&amp;leg!</h2>
+                  <p style={{ color: INK3, fontSize: 15, lineHeight: 1.65, marginBottom: 32, fontFamily: FONT }}>{cvrData?.name} er nu oprettet og verificeret.</p>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                    <Btn variant="primary" color={PRIMARY} radius={22} onClick={() => router.push('/dashboard')} style={{ justifyContent: 'center', padding: '13px', fontSize: 14 }}>Gå til dashboard →</Btn>
+                    <Btn variant="outline" radius={22} onClick={() => router.push('/opslag')} style={{ justifyContent: 'center', padding: '13px', fontSize: 14 }}>Browse opslag</Btn>
+                  </div>
+                </>
+              )}
             </div>
           )}
         </div>
-        <p style={{textAlign:'center',marginTop:20,fontSize:13,color:'#888'}}>Allerede tilmeldt? <a onClick={()=>router.push('/login')} style={{color:PRIMARY,fontWeight:700,cursor:'pointer'}}>Log ind her</a></p>
+
+        <p style={{ textAlign: 'center', marginTop: 20, fontSize: 13, fontFamily: FONT, color: INK3 }}>
+          Allerede tilmeldt?{' '}
+          <a onClick={() => router.push('/login')} style={{ color: PRIMARY, fontWeight: 700, cursor: 'pointer' }}>Log ind her</a>
+        </p>
       </div>
     </div>
   );
