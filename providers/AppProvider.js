@@ -49,11 +49,6 @@ export function AppProvider({ children }) {
     const { data } = await db.from('institutions').select('*').ilike('email', e).maybeSingle();
     if (data) {
       setInstitution(data);
-      if (data.is_platform_admin) {
-        setIsAdmin(true);
-        const { data: all } = await db.from('institutions').select('*').order('name');
-        if (all) setAllInstitutions(all);
-      }
       return;
     }
     const { data: mem } = await db.from('institution_members').select('role,institutions(*)').ilike('email', e).maybeSingle();
