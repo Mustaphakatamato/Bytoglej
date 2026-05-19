@@ -93,6 +93,7 @@ export default function DashboardClient() {
 
   const [membersOpen, setMembersOpen] = useState(false);
   const [members, setMembers] = useState([]);
+  const [invitations, setInvitations] = useState([]);
   const [memberEmail, setMemberEmail] = useState('');
   const [memberSaving, setMemberSaving] = useState(false);
 
@@ -348,16 +349,54 @@ export default function DashboardClient() {
 
   async function fetchMembers() {
     if (!institution?.id) return;
-    const { data } = await db.from('institution_members').select('*').eq('institution_id', institution.id).order('created_at');
-    if (data) setMembers(data);
+    const [{ data: mems }, { data: invs }] = await Promise.all([
+      db.from('institution_members').select('*').eq('institution_id', institution.id).order('created_at'),
+      db.from('institution_invitations').select('*').eq('institution_id', institution.id).is('accepted_at', null).gt('expires_at', new Date().toISOString()).order('created_at', { ascending: false }),
+    ]);
+    if (mems) setMembers(mems);
+    if (invs) setInvitations(invs);
   }
-  async function addMember() {
-    if (!memberEmail.trim() || !institution?.id) return;
+  async function inviteMember() {
+    const email = memberEmail.trim().toLowerCase();
+    if (!email || !institution?.id) return;
+    // Check for existing member
+    const alreadyMember = members.some(m => m.email.toLowerCase() === email);
+    const alreadyInvited = invitations.some(i => i.email.toLowerCase() === email);
+    if (alreadyMember) { showToast('Denne e-mail er allerede tilknyttet institutionen', 'error'); return; }
+    if (alreadyInvited) { showToast('En invitation er allerede sendt til denne e-mail', 'error'); return; }
     setMemberSaving(true);
-    const { error } = await db.from('institution_members').insert({ institution_id: institution.id, email: memberEmail.trim().toLowerCase(), role: 'member' });
+    // Insert invitation record
+    const { data: inv, error: invErr } = await db.from('institution_invitations').insert({
+      institution_id: institution.id,
+      institution_name: institution.name,
+      email,
+      invited_by: institution.name,
+    }).select().single();
+    if (invErr) {
+      showToast('Noget gik galt', 'error');
+      setMemberSaving(false);
+      return;
+    }
+    // Send email via API route
+    const res = await fetch('/api/invite', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ token: inv.token, email, institution_name: institution.name, invited_by: institution.name }),
+    });
     setMemberSaving(false);
-    if (error) { showToast(error.code==='23505' ? 'Brugeren er allerede tilføjet' : 'Noget gik galt', 'error'); return; }
-    setMemberEmail(''); fetchMembers(); showToast('Bruger tilføjet ✓');
+    if (!res.ok) {
+      await db.from('institution_invitations').delete().eq('id', inv.id);
+      showToast('E-mail kunne ikke sendes — prøv igen', 'error');
+      return;
+    }
+    setMemberEmail('');
+    fetchMembers();
+    showToast(`Invitation sendt til ${email} ✓`);
+  }
+  async function cancelInvitation(id) {
+    await db.from('institution_invitations').delete().eq('id', id);
+    setInvitations(is => is.filter(i => i.id !== id));
+    showToast('Invitation annulleret');
   }
   async function removeMember(id) {
     await db.from('institution_members').delete().eq('id', id);
@@ -400,7 +439,7 @@ export default function DashboardClient() {
           </div>
           <div style={{ display:'flex', gap:10, flexWrap:'wrap' }}>
             {authUserId && <Btn variant="outline" color={PRIMARY} radius={22} onClick={()=>router.push('/profil')} style={{ fontSize:isMobile?12:13, padding:isMobile?'8px 14px':'10px 18px', fontFamily:FONT }}>Rediger profil</Btn>}
-            {isAdmin && <Btn variant="outline" color={PRIMARY} radius={22} onClick={()=>{ setMembersOpen(true); fetchMembers(); }} style={{ fontSize:isMobile?12:13, padding:isMobile?'8px 14px':'10px 18px', fontFamily:FONT }}>Brugere</Btn>}
+            {isAdmin && <Btn variant="outline" color={PRIMARY} radius={22} onClick={()=>{ setMembersOpen(true); fetchMembers(); }} style={{ fontSize:isMobile?12:13, padding:isMobile?'8px 14px':'10px 18px', fontFamily:FONT }}>Medarbejdere</Btn>}
             <Btn variant="primary" color={PRIMARY} radius={22} onClick={()=>setNewOpen(true)} style={{ fontSize:isMobile?14:15, padding:isMobile?'10px 18px':'12px 24px', fontFamily:FONT }}>+ Opret opslag</Btn>
           </div>
         </div>
@@ -672,33 +711,66 @@ export default function DashboardClient() {
       </Modal>
 
       {/* Members modal */}
-      <Modal open={membersOpen} onClose={()=>setMembersOpen(false)} title="Brugere under institutionen">
-        <div style={{ display:'flex', flexDirection:'column', gap:14 }}>
-          <div style={{ background:GREEN_TINT, borderRadius:12, padding:'12px 14px', fontSize:13, color:INK, fontFamily:FONT, borderLeft:`3px solid ${GREEN_SOFT}` }}>
-            Tilføj medarbejdere der skal kunne uploade og favorisere opslag. De logger ind med deres egen e-mail.
+      <Modal open={membersOpen} onClose={()=>setMembersOpen(false)} title="Medarbejdere">
+        <div style={{ display:'flex', flexDirection:'column', gap:16 }}>
+          <div style={{ background:GREEN_TINT, borderRadius:'0 10px 10px 0', padding:'12px 14px', fontSize:13, color:INK, fontFamily:FONT, borderLeft:`3px solid ${GREEN_SOFT}`, lineHeight:1.55 }}>
+            Inviter medarbejdere med deres e-mailadresse. De modtager en invitation og opretter selv deres konto.
           </div>
+
+          {/* Invite input */}
           <div style={{ display:'flex', gap:8 }}>
             <input value={memberEmail} onChange={e=>setMemberEmail(e.target.value)} placeholder="medarbejder@institution.dk" type="email"
-              onKeyDown={e=>e.key==='Enter'&&addMember()}
-              style={inputStyle} />
-            <Btn variant="primary" color={PRIMARY} radius={12} onClick={addMember} disabled={memberSaving||!memberEmail.trim()} style={{ padding:'11px 18px', fontSize:13 }}>
-              {memberSaving ? <Spinner /> : '+ Tilføj'}
+              onKeyDown={e=>e.key==='Enter'&&inviteMember()}
+              style={{ ...inputStyle, flex:1 }} />
+            <Btn variant="primary" color={PRIMARY} radius={99} onClick={inviteMember} disabled={memberSaving||!memberEmail.trim()} style={{ padding:'11px 18px', fontSize:13, whiteSpace:'nowrap' }}>
+              {memberSaving ? <Spinner /> : 'Send invitation'}
             </Btn>
           </div>
-          {members.length === 0
-            ? <div style={{ textAlign:'center', padding:'20px 0', color:INK3, fontSize:13, fontFamily:FONT }}>Ingen medarbejdere tilføjet endnu</div>
-            : members.map(m => (
-              <div key={m.id} style={{ display:'flex', alignItems:'center', gap:12, padding:'10px 14px', border:`1px solid rgba(22,34,28,0.08)`, borderRadius:12, background:PAPER }}>
-                <div style={{ width:36, height:36, borderRadius:'50%', background:GREEN_TINT, display:'flex', alignItems:'center', justifyContent:'center', fontSize:14, fontWeight:700, color:PRIMARY, flexShrink:0, fontFamily:FONT }}>
-                  {m.email.charAt(0).toUpperCase()}
+
+          {/* Pending invitations */}
+          {invitations.length > 0 && (
+            <div>
+              <div style={{ fontFamily:FONT, fontSize:12, fontWeight:700, color:INK3, textTransform:'uppercase', letterSpacing:0.5, marginBottom:8 }}>Afventer svar</div>
+              {invitations.map(inv => (
+                <div key={inv.id} style={{ display:'flex', alignItems:'center', gap:12, padding:'10px 14px', border:`1px solid rgba(22,34,28,0.08)`, borderRadius:12, background:PAPER, marginBottom:8 }}>
+                  <div style={{ width:36, height:36, borderRadius:'50%', background:'#FFFBEB', display:'flex', alignItems:'center', justifyContent:'center', fontSize:14, fontWeight:700, color:'#B45309', flexShrink:0, fontFamily:FONT }}>
+                    {inv.email.charAt(0).toUpperCase()}
+                  </div>
+                  <div style={{ flex:1, minWidth:0 }}>
+                    <div style={{ fontSize:14, fontWeight:600, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap', fontFamily:FONT, color:INK }}>{inv.email}</div>
+                    <div style={{ fontSize:11, color:'#B45309', marginTop:2, fontFamily:FONT, fontWeight:600 }}>
+                      Invitation sendt · udløber {new Date(inv.expires_at).toLocaleDateString('da-DK', { day:'numeric', month:'short' })}
+                    </div>
+                  </div>
+                  <button onClick={()=>cancelInvitation(inv.id)} style={{ background:'#FEF2F2', border:'none', borderRadius:99, padding:'5px 10px', fontSize:11, fontWeight:700, color:'#e11d48', cursor:'pointer', fontFamily:FONT }}>Annuller</button>
                 </div>
-                <div style={{ flex:1, minWidth:0 }}>
-                  <div style={{ fontSize:14, fontWeight:600, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap', fontFamily:FONT, color:INK }}>{m.email}</div>
-                  <div style={{ fontSize:11, color:INK3, marginTop:1, fontFamily:FONT }}>Medarbejder · Tilføjet {new Date(m.created_at).toLocaleDateString('da-DK')}</div>
-                </div>
-                <button onClick={()=>removeMember(m.id)} style={{ background:'#FEF2F2', border:'none', borderRadius:99, padding:'6px 12px', fontSize:12, fontWeight:700, color:'#e11d48', cursor:'pointer', fontFamily:FONT }}>Fjern</button>
-              </div>
-            ))}
+              ))}
+            </div>
+          )}
+
+          {/* Accepted members */}
+          <div>
+            {(members.length > 0 || invitations.length > 0) && (
+              <div style={{ fontFamily:FONT, fontSize:12, fontWeight:700, color:INK3, textTransform:'uppercase', letterSpacing:0.5, marginBottom:8 }}>Aktive medarbejdere</div>
+            )}
+            {members.length === 0 && invitations.length === 0
+              ? <div style={{ textAlign:'center', padding:'24px 0', color:INK3, fontSize:13, fontFamily:FONT }}>Ingen medarbejdere tilknyttet endnu</div>
+              : members.length === 0
+                ? <div style={{ textAlign:'center', padding:'12px 0', color:INK3, fontSize:13, fontFamily:FONT }}>Ingen aktive medarbejdere endnu</div>
+                : members.map(m => (
+                  <div key={m.id} style={{ display:'flex', alignItems:'center', gap:12, padding:'10px 14px', border:`1px solid rgba(22,34,28,0.08)`, borderRadius:12, background:PAPER, marginBottom:8 }}>
+                    <div style={{ width:36, height:36, borderRadius:'50%', background:GREEN_TINT, display:'flex', alignItems:'center', justifyContent:'center', fontSize:14, fontWeight:700, color:PRIMARY, flexShrink:0, fontFamily:FONT }}>
+                      {m.email.charAt(0).toUpperCase()}
+                    </div>
+                    <div style={{ flex:1, minWidth:0 }}>
+                      <div style={{ fontSize:14, fontWeight:600, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap', fontFamily:FONT, color:INK }}>{m.email}</div>
+                      <div style={{ fontSize:11, color:INK3, marginTop:1, fontFamily:FONT }}>Medarbejder · Tilmeldt {new Date(m.created_at).toLocaleDateString('da-DK')}</div>
+                    </div>
+                    <button onClick={()=>removeMember(m.id)} style={{ background:'#FEF2F2', border:'none', borderRadius:99, padding:'6px 12px', fontSize:12, fontWeight:700, color:'#e11d48', cursor:'pointer', fontFamily:FONT }}>Fjern</button>
+                  </div>
+                ))
+            }
+          </div>
         </div>
       </Modal>
 
