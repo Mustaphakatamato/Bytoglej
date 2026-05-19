@@ -6,6 +6,7 @@ import { Btn, Spinner } from '@/components/ui';
 import { db } from '@/lib/supabase';
 import { useApp } from '@/providers/AppProvider';
 import { geocodeAddress } from '@/lib/hooks';
+import { LogoLockup } from '@/components/Logo';
 
 function SField({label, hint, children}) {
   return (
@@ -132,7 +133,7 @@ export default function SignupPage() {
     });
     setSaving(false);
     if (data.user && !data.session) { setNeedsConfirm(true); setStep(5); }
-    else { setLoggedIn(true); router.push('/dashboard'); showToast('Velkommen til LegetøjsByt! 🎉'); }
+    else { setLoggedIn(true); router.push('/dashboard'); showToast('Velkommen til byt&leg! 🎉'); }
   }
 
   const steps = ['CVR / P-nr','Om institutionen','Leder & kontakt','Opret konto'];
@@ -140,12 +141,9 @@ export default function SignupPage() {
   const stepSubs   = ['Vi slår institutionen op via CVR- eller P-nummer-registret','Fortæl os lidt mere om jer','Hvem er den daglige leder?','Vælg login til platformen'];
 
   return (
-    <div style={{minHeight:'100vh',display:'flex',alignItems:'center',justifyContent:'center',padding:'80px 24px 40px',background:'linear-gradient(150deg,#fffcf8 0%,#f0f9f4 100%)'}} className="page-enter">
+    <div style={{minHeight:'100vh',display:'flex',alignItems:'center',justifyContent:'center',padding:'80px 24px 40px',background:'var(--paper)'}} className="page-enter">
       <div style={{width:'100%',maxWidth:560}}>
-        <div onClick={()=>router.push('/')} style={{display:'flex',alignItems:'center',gap:10,cursor:'pointer',marginBottom:28,justifyContent:'center'}}>
-          <div style={{width:40,height:40,borderRadius:12,background:PRIMARY,display:'flex',alignItems:'center',justifyContent:'center',fontSize:22}}>♻️</div>
-          <span style={{fontFamily:"'Nunito',sans-serif",fontWeight:900,fontSize:22}}><span style={{color:PRIMARY}}>Legetøjs</span>Byt</span>
-        </div>
+        <div onClick={()=>router.push('/')} style={{cursor:'pointer',marginBottom:28,display:'flex',justifyContent:'center'}}><LogoLockup markSize={40} textSize={20} /></div>
 
         {step<=4 && (
           <div style={{display:'flex',alignItems:'center',marginBottom:28,gap:0}}>
@@ -166,10 +164,10 @@ export default function SignupPage() {
           </div>
         )}
 
-        <div style={{background:'#fff',borderRadius:24,padding:40,boxShadow:'0 8px 40px rgba(0,0,0,0.08)'}}>
+        <div style={{background:'var(--paper)',borderRadius:24,padding:40,boxShadow:'0 8px 40px rgba(0,0,0,0.08)'}}>
           {step<=4 && (
             <div style={{marginBottom:28}}>
-              <h2 style={{fontFamily:"'Nunito',sans-serif",fontWeight:900,fontSize:24,marginBottom:4}}>{stepTitles[step-1]}</h2>
+              <h2 style={{fontFamily:"'Sora',sans-serif",fontWeight:900,fontSize:24,marginBottom:4}}>{stepTitles[step-1]}</h2>
               <p style={{color:'#888',fontSize:14}}>{stepSubs[step-1]}</p>
             </div>
           )}
@@ -194,7 +192,7 @@ export default function SignupPage() {
                     <div style={{display:'flex',gap:12,alignItems:'flex-start'}}>
                       <div style={{fontSize:28,lineHeight:1}}>✅</div>
                       <div>
-                        <div style={{fontFamily:"'Nunito',sans-serif",fontWeight:800,fontSize:14,color:'#1a5c38',marginBottom:6}}>Fundet i {cvr.length===10?'P-nummer-registret':'CVR-registret'}</div>
+                        <div style={{fontFamily:"'Sora',sans-serif",fontWeight:800,fontSize:14,color:'#1a5c38',marginBottom:6}}>Fundet i {cvr.length===10?'P-nummer-registret':'CVR-registret'}</div>
                         <div style={{fontWeight:700,fontSize:15}}>{cvrData.name}</div>
                         <div style={{fontSize:13,color:'#555',marginTop:3}}>{cvrData.address}, {cvrData.zipcode} {cvrData.city}</div>
                         {cvrData.kommune && <div style={{fontSize:13,color:'#555',marginTop:2}}>🏛️ Under: {cvrData.kommune}</div>}
@@ -275,14 +273,14 @@ export default function SignupPage() {
             <div style={{textAlign:'center'}}>
               {needsConfirm ? <>
                 <div style={{fontSize:72,marginBottom:16}}>📧</div>
-                <h2 style={{fontFamily:"'Nunito',sans-serif",fontWeight:900,fontSize:26,marginBottom:10}}>Bekræft din e-mail</h2>
+                <h2 style={{fontFamily:"'Sora',sans-serif",fontWeight:900,fontSize:26,marginBottom:10}}>Bekræft din e-mail</h2>
                 <p style={{color:'#555',fontSize:15,lineHeight:1.65,marginBottom:8}}>Vi har sendt en bekræftelsesmail til</p>
                 <p style={{fontWeight:700,fontSize:15,color:PRIMARY,marginBottom:24}}>{form.email}</p>
                 <p style={{color:'#888',fontSize:13,lineHeight:1.65,marginBottom:32}}>Klik på linket i mailen for at aktivere kontoen. Tjek evt. spam-mappen.</p>
                 <Btn variant="outline" radius={22} onClick={()=>router.push('/login')} style={{justifyContent:'center',padding:'13px',fontSize:14}}>Gå til login →</Btn>
               </> : <>
                 <div style={{fontSize:72,marginBottom:16}}>🎉</div>
-                <h2 style={{fontFamily:"'Nunito',sans-serif",fontWeight:900,fontSize:28,marginBottom:10}}>Velkommen til LegetøjsByt!</h2>
+                <h2 style={{fontFamily:"'Sora',sans-serif",fontWeight:900,fontSize:28,marginBottom:10}}>Velkommen til byt&amp;leg!</h2>
                 <p style={{color:'#888',fontSize:15,lineHeight:1.65,marginBottom:32}}>{cvrData?.name} er nu oprettet og verificeret.</p>
                 <div style={{display:'flex',flexDirection:'column',gap:10}}>
                   <Btn variant="primary" color={PRIMARY} radius={22} onClick={()=>router.push('/dashboard')} style={{justifyContent:'center',padding:'13px',fontSize:14}}>Gå til dashboard →</Btn>

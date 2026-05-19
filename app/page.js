@@ -6,6 +6,7 @@ import { useWindowWidth, useDebounce } from '@/lib/hooks';
 import { Btn, SkeletonCard } from '@/components/ui';
 import ListingCard from '@/components/ListingCard';
 import { useApp } from '@/providers/AppProvider';
+import { LogoLockup } from '@/components/Logo';
 
 function HeroSection() {
   const router = useRouter();
@@ -15,7 +16,7 @@ function HeroSection() {
     <section style={{ background:'linear-gradient(135deg,#a8d5c2 0%,#7bbfaa 60%,#5eab94 100%)', padding:isMobile?'100px 20px 60px':'120px 24px 80px', overflow:'hidden', position:'relative' }}>
       <div style={{ maxWidth:1140, margin:'0 auto', display:'grid', gridTemplateColumns:isMobile?'1fr':'1fr 1fr', gap:isMobile?32:64, alignItems:'center' }}>
         <div className="page-enter">
-          <h1 style={{ fontFamily:"'Nunito',sans-serif", fontWeight:900, fontSize:isMobile?'clamp(32px,9vw,48px)':'clamp(36px,5vw,60px)', lineHeight:1.1, letterSpacing:'-1.5px', marginBottom:16, color:'#1a3a2e' }}>
+          <h1 style={{ fontFamily:"'Sora',sans-serif", fontWeight:900, fontSize:isMobile?'clamp(32px,9vw,48px)':'clamp(36px,5vw,60px)', lineHeight:1.1, letterSpacing:'-1.5px', marginBottom:16, color:'#1a3a2e' }}>
             Byt, køb og sælg<br/>legetøj<br/><span style={{ color:'#2d6a4f' }}>nemt mellem<br/>institutioner</span>
           </h1>
           <p style={{ fontSize:isMobile?15:16, color:'#2d5045', lineHeight:1.7, marginBottom:28, maxWidth:440 }}>
@@ -66,7 +67,7 @@ function HowSection() {
     <section style={{ padding:isMobile?'60px 20px':'80px 24px', background:'#fff' }}>
       <div style={{ maxWidth:1140, margin:'0 auto' }}>
         <div style={{ textAlign:'center', marginBottom:isMobile?36:56 }}>
-          <h2 style={{ fontFamily:"'Nunito',sans-serif", fontWeight:900, fontSize:'clamp(22px,3.5vw,38px)', letterSpacing:'-0.5px', marginBottom:10 }}>Sådan fungerer Legetøjsbyt.dk</h2>
+          <h2 style={{ fontFamily:"'Sora',sans-serif", fontWeight:900, fontSize:'clamp(22px,3.5vw,38px)', letterSpacing:'-0.5px', marginBottom:10 }}>Sådan fungerer byt&amp;leg</h2>
           <p style={{ color:'#888', fontSize:15 }}>En simpel og sikker måde for institutioner at dele ressourcer på</p>
         </div>
         <div style={{ display:'grid', gridTemplateColumns:isMobile?'1fr':'repeat(3,1fr)', gap:isMobile?28:40, textAlign:'center' }}>
@@ -74,7 +75,7 @@ function HowSection() {
             <div key={i} style={{ animation:`slideUp 0.45s ease ${i*0.1}s both`, display:isMobile?'flex':'block', alignItems:isMobile?'flex-start':'', textAlign:isMobile?'left':'center', gap:isMobile?16:0 }}>
               <div style={{ width:60, height:60, borderRadius:'50%', background:'#e8f5ee', display:'flex', alignItems:'center', justifyContent:'center', fontSize:26, margin:isMobile?'0':'0 auto 16px', flexShrink:0 }}>{s.icon}</div>
               <div>
-                <h3 style={{ fontFamily:"'Nunito',sans-serif", fontWeight:800, fontSize:17, marginBottom:8 }}>{s.n}. {s.title}</h3>
+                <h3 style={{ fontFamily:"'Sora',sans-serif", fontWeight:800, fontSize:17, marginBottom:8 }}>{s.n}. {s.title}</h3>
                 <p style={{ color:PRIMARY, fontSize:13, lineHeight:1.65, maxWidth:isMobile?'none':240, margin:isMobile?0:'0 auto' }}>{s.desc}</p>
               </div>
             </div>
@@ -105,7 +106,7 @@ function ListingsPreview({ listings, loading, goToInstitution }) {
       <div style={{ maxWidth:1140, margin:'0 auto' }}>
         <div style={{ display:'flex', alignItems:'flex-end', justifyContent:'space-between', marginBottom:8, flexWrap:'wrap', gap:12 }}>
           <div>
-            <h2 style={{ fontFamily:"'Nunito',sans-serif", fontWeight:900, fontSize:'clamp(24px,3vw,36px)', letterSpacing:'-0.5px', marginBottom:4 }}>Markedsplads</h2>
+            <h2 style={{ fontFamily:"'Sora',sans-serif", fontWeight:900, fontSize:'clamp(24px,3vw,36px)', letterSpacing:'-0.5px', marginBottom:4 }}>Markedsplads</h2>
             <p style={{ color:'#888', fontSize:14 }}>Udforsk tusindvis af legetøj fra verificerede institutioner</p>
           </div>
           <Btn variant="primary" color={PRIMARY} radius={22} onClick={()=>router.push('/opslag')} style={{ padding:'11px 22px', fontSize:14, whiteSpace:'nowrap' }}>Se alle annoncer</Btn>
@@ -151,8 +152,8 @@ function MissionSection() {
     <section style={{ padding:isMobile?'60px 20px':'80px 24px', background:'#fff' }}>
       <div style={{ maxWidth:1140, margin:'0 auto', display:'grid', gridTemplateColumns:isMobile?'1fr':'1fr 1fr', gap:isMobile?32:64, alignItems:'center' }}>
         <div>
-          <h2 style={{ fontFamily:"'Nunito',sans-serif", fontWeight:900, fontSize:'clamp(24px,3.5vw,42px)', letterSpacing:'-0.5px', marginBottom:14 }}>Vores mission</h2>
-          <p style={{ color:'#555', fontSize:15, lineHeight:1.75, marginBottom:28 }}>Vi tror på en fremtid hvor legetøj får flere liv. Legetøjsbyt.dk forbinder danske institutioner i et bæredygtigt fællesskab, hvor ressourcer deles og miljøet passes på.</p>
+          <h2 style={{ fontFamily:"'Sora',sans-serif", fontWeight:900, fontSize:'clamp(24px,3.5vw,42px)', letterSpacing:'-0.5px', marginBottom:14 }}>Vores mission</h2>
+          <p style={{ color:'#555', fontSize:15, lineHeight:1.75, marginBottom:28 }}>Vi tror på en fremtid hvor legetøj får flere liv. byt&amp;leg forbinder danske institutioner i et bæredygtigt fællesskab, hvor ressourcer deles og miljøet passes på.</p>
           <div style={{ display:'flex', flexDirection:'column', gap:16 }}>
             {points.map((p,i) => (
               <div key={i} style={{ display:'flex', gap:14, alignItems:'flex-start' }}>
@@ -172,11 +173,11 @@ function MissionSection() {
               <img src="https://images.unsplash.com/photo-1580582932707-520aed937b7b?w=680&auto=format&fit=crop&q=80" alt="Klasseværelse" style={{ width:'100%', height:'100%', objectFit:'cover', display:'block' }} />
             </div>
             <div style={{ position:'absolute', top:-16, right:-16, background:'#fff', borderRadius:16, padding:'14px 20px', boxShadow:'0 8px 28px rgba(0,0,0,0.12)', textAlign:'center' }}>
-              <div style={{ fontFamily:"'Nunito',sans-serif", fontWeight:900, fontSize:28, color:ACCENT2 }}>156</div>
+              <div style={{ fontFamily:"'Sora',sans-serif", fontWeight:900, fontSize:28, color:ACCENT2 }}>156</div>
               <div style={{ fontSize:12, color:'#888' }}>institutioner tilmeldt</div>
             </div>
             <div style={{ position:'absolute', bottom:-16, left:-16, background:'#fff', borderRadius:16, padding:'14px 20px', boxShadow:'0 8px 28px rgba(0,0,0,0.12)', textAlign:'center' }}>
-              <div style={{ fontFamily:"'Nunito',sans-serif", fontWeight:900, fontSize:28, color:PRIMARY }}>2.847</div>
+              <div style={{ fontFamily:"'Sora',sans-serif", fontWeight:900, fontSize:28, color:PRIMARY }}>2.847</div>
               <div style={{ fontSize:12, color:'#888' }}>handler gennemført</div>
             </div>
           </div>
@@ -195,13 +196,12 @@ function Footer() {
       <div style={{ maxWidth:1140, margin:'0 auto' }}>
         <div style={{ display:'grid', gridTemplateColumns:isMobile?'1fr 1fr':'2fr 1fr 1fr 1fr', gap:isMobile?'28px 16px':48, marginBottom:40 }}>
           <div style={{ gridColumn:isMobile?'1 / -1':'auto' }}>
-            <div style={{ display:'flex', alignItems:'center', gap:10, marginBottom:14 }}>
-              <div style={{ width:32, height:32, borderRadius:8, background:PRIMARY, display:'flex', alignItems:'center', justifyContent:'center' }}>♻️</div>
-              <span style={{ fontFamily:"'Nunito',sans-serif", fontWeight:900, fontSize:18, color:'#fff' }}>LegetøjsByt</span>
+            <div style={{ marginBottom:14 }}>
+              <LogoLockup markSize={28} textSize={15} color="#fff" accentColor="#F1C44B" markBg="rgba(255,255,255,0.15)" />
             </div>
             <p style={{ fontSize:14, lineHeight:1.65, maxWidth:260 }}>Danmarks markedsplads for brugt institutionslegetøj. CVR-verificeret og bæredygtigt.</p>
           </div>
-          {[{title:'Platform',links:[['opslag','Markedsplads'],['hvordan','Sådan virker det']]},{title:'Support',links:[['kontakt','Kontakt os'],['kontakt','FAQ']]},{title:'Om os',links:[['om-os','Om LegetøjsByt'],['om-os','Vores værdier']]}].map((col,i) => (
+          {[{title:'Platform',links:[['opslag','Markedsplads'],['hvordan','Sådan virker det']]},{title:'Support',links:[['kontakt','Kontakt os'],['kontakt','FAQ']]},{title:'Om os',links:[['om-os','Om byt&leg'],['om-os','Vores værdier']]}].map((col,i) => (
             <div key={i}>
               <div style={{ color:'#fff', fontWeight:700, fontSize:14, marginBottom:14 }}>{col.title}</div>
               <div style={{ display:'flex', flexDirection:'column', gap:8 }}>
@@ -211,8 +211,8 @@ function Footer() {
           ))}
         </div>
         <div style={{ borderTop:'1px solid #2a2a2a', paddingTop:24, display:'flex', justifyContent:'space-between', fontSize:13, flexWrap:'wrap', gap:12 }}>
-          <span>© 2025 LegetøjsByt ApS</span>
-          <span>Lavet med ♻️ i Danmark</span>
+          <span>© 2025 byt&amp;leg</span>
+          <span>Lavet med 💚 i Danmark</span>
         </div>
       </div>
     </footer>

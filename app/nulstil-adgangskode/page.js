@@ -5,6 +5,7 @@ import { PRIMARY } from '@/lib/constants';
 import { Spinner } from '@/components/ui';
 import { db } from '@/lib/supabase';
 import { useApp } from '@/providers/AppProvider';
+import { LogoLockup } from '@/components/Logo';
 
 export default function ResetPasswordPage() {
   const router = useRouter();
@@ -25,17 +26,14 @@ export default function ResetPasswordPage() {
     setDone(true);
   }
   return (
-    <div style={{ minHeight:'100vh', display:'flex', alignItems:'center', justifyContent:'center', padding:'80px 24px', background:'linear-gradient(150deg,#fffcf8 0%,#f0f9f4 100%)' }} className="page-enter">
+    <div style={{ minHeight:'100vh', display:'flex', alignItems:'center', justifyContent:'center', padding:'80px 24px', background:'var(--paper)' }} className="page-enter">
       <div style={{ width:'100%', maxWidth:440 }}>
-        <div style={{ display:'flex', alignItems:'center', gap:10, marginBottom:36, justifyContent:'center' }}>
-          <div style={{ width:40, height:40, borderRadius:12, background:PRIMARY, display:'flex', alignItems:'center', justifyContent:'center', fontSize:22 }}>♻️</div>
-          <span style={{ fontFamily:"'Nunito',sans-serif", fontWeight:900, fontSize:22 }}><span style={{ color:PRIMARY }}>Legetøjs</span>Byt</span>
-        </div>
-        <div style={{ background:'#fff', borderRadius:24, padding:40, boxShadow:'0 8px 40px rgba(0,0,0,0.08)' }}>
+        <div onClick={()=>router.push('/')} style={{ cursor:'pointer', marginBottom:36, display:'flex', justifyContent:'center' }}><LogoLockup markSize={40} textSize={20} /></div>
+        <div style={{ background:'var(--paper)', borderRadius:24, padding:40, boxShadow:'0 8px 40px rgba(0,0,0,0.08)' }}>
           {done ? (
             <div style={{ textAlign:'center' }}>
               <div style={{ fontSize:48, marginBottom:16 }}>✅</div>
-              <h1 style={{ fontFamily:"'Nunito',sans-serif", fontWeight:900, fontSize:24, marginBottom:10 }}>Kodeord opdateret!</h1>
+              <h1 style={{ fontFamily:"'Sora',sans-serif", fontWeight:900, fontSize:24, marginBottom:10 }}>Kodeord opdateret!</h1>
               <p style={{ color:'#666', fontSize:14, marginBottom:24 }}>Du er nu logget ind med dit nye kodeord.</p>
               <button onClick={()=>{ setLoggedIn(true); router.push('/dashboard'); }} style={{ background:PRIMARY, color:'#fff', border:'none', borderRadius:22, padding:'12px 28px', fontSize:14, fontWeight:700, cursor:'pointer' }}>
                 Gå til dashboard →
@@ -43,7 +41,7 @@ export default function ResetPasswordPage() {
             </div>
           ) : (
             <>
-              <h1 style={{ fontFamily:"'Nunito',sans-serif", fontWeight:900, fontSize:28, marginBottom:8, textAlign:'center' }}>Nyt kodeord</h1>
+              <h1 style={{ fontFamily:"'Sora',sans-serif", fontWeight:900, fontSize:28, marginBottom:8, textAlign:'center' }}>Nyt kodeord</h1>
               <p style={{ color:'#888', fontSize:14, textAlign:'center', marginBottom:28 }}>Vælg et nyt kodeord til jeres konto</p>
               <form onSubmit={handleSubmit} style={{ display:'flex', flexDirection:'column', gap:16 }}>
                 {[{label:'Nyt kodeord',val:pass,set:setPass,ph:'Mindst 6 tegn'},{label:'Gentag kodeord',val:pass2,set:setPass2,ph:'Gentag kodeordet'}].map(f=>(

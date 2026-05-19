@@ -8,10 +8,10 @@ export default function KontaktPage() {
   const w = useWindowWidth();
   const isMobile = w < 640;
   const faqs = [
-    { q:'Hvem kan tilmelde sig LegetøjsByt?', a:'Alle CVR-registrerede institutioner i Danmark kan tilmelde sig. Det inkluderer vuggestuer, børnehaver, SFO\'er, folkeskoler, fritidsklubber og andre godkendte institutioner.' },
-    { q:'Hvad koster det at bruge platformen?', a:'LegetøjsByt er gratis at bruge. Vi tager ingen kommission eller gebyrer for handler. Målet er at fremme bæredygtig genbrug i institutionssektoren.' },
+    { q:'Hvem kan tilmelde sig byt&amp;leg?', a:'Alle CVR-registrerede institutioner i Danmark kan tilmelde sig. Det inkluderer vuggestuer, børnehaver, SFO\'er, folkeskoler, fritidsklubber og andre godkendte institutioner.' },
+    { q:'Hvad koster det at bruge platformen?', a:'byt&amp;leg er gratis at bruge. Vi tager ingen kommission eller gebyrer for handler. Målet er at fremme bæredygtig genbrug i institutionssektoren.' },
     { q:'Hvordan verificeres min institution?', a:'Når du angiver dit CVR-nummer, slår vi det automatisk op i Erhvervsstyrelsens register. Vi bekræfter at jeres institution er aktiv og godkendt. Processen tager typisk 1-2 hverdage.' },
-    { q:'Kan jeg sælge privat legetøj på platformen?', a:'Nej — LegetøjsByt er udelukkende for institutioner. Alt legetøj der handles på platformen skal tilhøre den pågældende institution og bruges i institutionsmæssig sammenhæng.' },
+    { q:'Kan jeg sælge privat legetøj på platformen?', a:'Nej — byt&amp;leg er udelukkende for institutioner. Alt legetøj der handles på platformen skal tilhøre den pågældende institution og bruges i institutionsmæssig sammenhæng.' },
     { q:'Hvad sker der hvis et produkt ikke er som beskrevet?', a:'Vi opfordrer altid til at inspicere produktet inden betaling. Har I en tvist, kan I kontakte os via support, og vi vil hjælpe med mægling mellem institutionerne.' },
     { q:'Tilbyder I transport eller levering?', a:'Vi samarbejder med transportpartnere der kan levere legetøj mellem institutioner. Vælg "Valgfri transportservice" under en handel for at se priser og muligheder i jeres område.' },
     { q:'Hvordan sletter jeg min institutions konto?', a:'Kontakt os på support@legetoejsbyt.dk, så sørger vi for at slette alle jeres data i overensstemmelse med GDPR. Handler og beskeder anonymiseres og opbevares i op til 30 dage herefter.' },
@@ -21,7 +21,7 @@ export default function KontaktPage() {
       <div style={{ maxWidth:760, margin:'0 auto', padding:isMobile?'32px 16px 60px':'48px 24px 80px' }}>
 
         <div style={{ textAlign:'center', marginBottom:isMobile?32:48 }}>
-          <h1 style={{ fontFamily:"'Nunito',sans-serif", fontWeight:900, fontSize:isMobile?28:38, letterSpacing:'-0.5px', marginBottom:10 }}>Kontakt os</h1>
+          <h1 style={{ fontFamily:"'Sora',sans-serif", fontWeight:900, fontSize:isMobile?28:38, letterSpacing:'-0.5px', marginBottom:10 }}>Kontakt os</h1>
           <p style={{ color:'#888', fontSize:16 }}>Vi er her for at hjælpe — skriv til os eller find svaret nedenfor</p>
         </div>
 
@@ -36,7 +36,7 @@ export default function KontaktPage() {
           ))}
         </div>
 
-        <h2 style={{ fontFamily:"'Nunito',sans-serif", fontWeight:800, fontSize:24, marginBottom:20 }}>Ofte stillede spørgsmål</h2>
+        <h2 style={{ fontFamily:"'Sora',sans-serif", fontWeight:800, fontSize:24, marginBottom:20 }}>Ofte stillede spørgsmål</h2>
         <div style={{ display:'flex', flexDirection:'column', gap:10 }}>
           {faqs.map((f,i) => (
             <div key={i} style={{ background:'#fff', borderRadius:14, overflow:'hidden', boxShadow:'0 1px 6px rgba(0,0,0,0.05)' }}>
