@@ -2,10 +2,23 @@
 import { usePathname, useRouter } from 'next/navigation';
 import { useApp, useActiveUser } from '@/providers/AppProvider';
 import { db } from '@/lib/supabase';
-import { PRIMARY } from '@/lib/constants';
+import { PRIMARY, INK, PAPER } from '@/lib/constants';
 import { useWindowWidth } from '@/lib/hooks';
 import { useState, useEffect } from 'react';
 import { Btn } from '@/components/ui';
+
+function Mark09({ size = 36, bg = PRIMARY }) {
+  const r = Math.round(size * 0.18);
+  return (
+    <svg width={size} height={size} viewBox="0 0 64 64" aria-label="byt&leg" style={{ flexShrink:0 }}>
+      <rect x="0" y="0" width="64" height="64" rx={r * 64 / size} fill={bg} />
+      <text x="32" y="27" textAnchor="middle" fontFamily="'Sora',sans-serif" fontWeight="800" fontSize="21" letterSpacing="-0.06em" fill={PAPER}>byt</text>
+      <text x="32" y="49" textAnchor="middle" fontFamily="'Sora',sans-serif" fontWeight="800" fontSize="21" letterSpacing="-0.06em" fill={PAPER}>
+        <tspan fill={PAPER}>&amp;</tspan>leg<tspan fill={PAPER}>.</tspan>
+      </text>
+    </svg>
+  );
+}
 
 export default function NavWrapper() {
   const { loggedIn, setLoggedIn, unreadTotal, isAdmin, adminInst, setAdminInst, allInstitutions, toast, setToast } = useApp();
@@ -76,13 +89,15 @@ function Nav({ pathname, navigate, loggedIn, setLoggedIn, unreadTotal, instituti
   function go(path) { navigate(path); }
 
   return (
-    <nav style={{ position:'fixed', top:navTop, left:0, right:0, zIndex:500, background:transparent?'transparent':'rgba(255,252,248,0.96)', backdropFilter:transparent?'none':'blur(18px)', boxShadow:transparent?'none':'0 1px 0 rgba(0,0,0,0.07)', transition:'all 0.3s' }}>
+    <nav style={{ position:'fixed', top:navTop, left:0, right:0, zIndex:500, background:transparent?'transparent':'rgba(246,242,234,0.96)', backdropFilter:transparent?'none':'blur(18px)', boxShadow:transparent?'none':'0 1px 0 rgba(22,34,28,0.08)', transition:'all 0.3s' }}>
       <div style={{ maxWidth:1140, margin:'0 auto', display:'flex', alignItems:'center', height:68, gap:isMobile?12:24, padding:'0 16px' }}>
         <div onClick={()=>go('/')} style={{ display:'flex', alignItems:'center', gap:10, cursor:'pointer', flexShrink:0 }}>
-          <div style={{ width:36, height:36, borderRadius:10, background:PRIMARY, display:'flex', alignItems:'center', justifyContent:'center', fontSize:20 }}>♻️</div>
-          <span style={{ fontFamily:"'Nunito',sans-serif", fontWeight:900, fontSize:isMobile?18:20, letterSpacing:'-0.5px' }}>
-            <span style={{ color:transparent?'#fff':PRIMARY }}>Legetøjs</span>
-            <span style={{ color:transparent?'rgba(255,255,255,0.9)':'#1c1a17' }}>Byt</span>
+          <Mark09 size={36} bg={transparent ? 'rgba(255,255,255,0.15)' : PRIMARY} />
+          <span style={{ fontFamily:"'Sora',sans-serif", fontWeight:800, fontSize:isMobile?17:19, letterSpacing:'-0.04em', lineHeight:1.05 }}>
+            <span style={{ display:'block', color:transparent?'#fff':INK }}>byt</span>
+            <span style={{ display:'block', color:transparent?'rgba(255,255,255,0.9)':INK }}>
+              <span style={{ color:transparent?'#fff':PRIMARY }}>&amp;</span>leg<span style={{ color:transparent?'#fff':PRIMARY }}>.</span>
+            </span>
           </span>
         </div>
 
@@ -134,7 +149,7 @@ function Nav({ pathname, navigate, loggedIn, setLoggedIn, unreadTotal, instituti
       </div>
 
       {isMobile && menuOpen && (
-        <div style={{ background:'rgba(255,252,248,0.99)', borderTop:'1px solid #f0eeeb', padding:'8px 16px 20px', animation:'slideDown 0.2s ease' }}>
+        <div style={{ background:'rgba(246,242,234,0.99)', borderTop:`1px solid #ECE6DA`, padding:'8px 16px 20px', animation:'slideDown 0.2s ease' }}>
           {[['/opslag','🛍️ Markedsplads'],['/hvordan','❓ Sådan virker det'],['/om-os','ℹ️ Om os'],['/kontakt','✉️ Kontakt']].map(([p,label]) => (
             <button key={p} onClick={()=>go(p)} style={{ display:'block', width:'100%', textAlign:'left', background:'none', border:'none', borderBottom:'1px solid #f0eeeb', padding:'14px 4px', fontSize:15, fontWeight:pathname===p?700:600, color:pathname===p?PRIMARY:'#333', cursor:'pointer' }}>{label}</button>
           ))}

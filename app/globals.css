@@ -1,6 +1,22 @@
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 html { scroll-behavior: smooth; }
-body { font-family: 'Nunito Sans', sans-serif; background: #fffcf8; color: #1c1a17; -webkit-font-smoothing: antialiased; overflow-x: hidden; }
+:root {
+  --green:       #2A7D4F;
+  --green-deep:  #133F2B;
+  --green-soft:  #CFE3D8;
+  --green-tint:  #E8F1EC;
+  --paper:       #F6F2EA;
+  --paper-2:     #ECE6DA;
+  --paper-3:     #DAD3C4;
+  --ink:         #16221C;
+  --ink-2:       #3A473D;
+  --ink-3:       #6B7570;
+  --coral:       #E8593D;
+  --butter:      #F1C44B;
+  --rose:        #F3D7D0;
+  --sky:         #6EA8D4;
+}
+body { font-family: 'Sora', sans-serif; background: var(--paper); color: var(--ink); -webkit-font-smoothing: antialiased; overflow-x: hidden; }
 
 @keyframes fadeSlideIn { from { opacity:0; transform:translateY(18px); } to { opacity:1; transform:translateY(0); } }
 @keyframes fadeIn      { from { opacity:0; } to { opacity:1; } }
@@ -27,7 +43,7 @@ body { font-family: 'Nunito Sans', sans-serif; background: #fffcf8; color: #1c1a
 }
 
 .skeleton {
-  background: linear-gradient(90deg, #f0efed 25%, #e8e7e4 50%, #f0efed 75%);
+  background: linear-gradient(90deg, var(--paper-2) 25%, var(--paper-3) 50%, var(--paper-2) 75%);
   background-size: 400px 100%;
   animation: shimmer 1.4s infinite linear;
   border-radius: 8px;
@@ -36,8 +52,8 @@ body { font-family: 'Nunito Sans', sans-serif; background: #fffcf8; color: #1c1a
 ::-webkit-scrollbar { width: 5px; }
 ::-webkit-scrollbar-thumb { background: #ddd; border-radius: 99px; }
 
-input:focus, textarea:focus, select:focus { outline: 2px solid #2A7D4F; outline-offset: 1px; }
-::placeholder { color: #c0bdb8; }
+input:focus, textarea:focus, select:focus { outline: 2px solid var(--green); outline-offset: 1px; }
+::placeholder { color: var(--ink-3); }
 button { cursor: pointer; font-family: inherit; }
 
 .card { transition: transform 0.2s ease, box-shadow 0.2s ease; }
