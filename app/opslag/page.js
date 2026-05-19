@@ -57,6 +57,21 @@ export default function OpslagPage() {
   const dSearch = useDebounce(search, 180);
 
   useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const params = new URLSearchParams(window.location.search);
+    const t = params.get('type');
+    const c = params.get('city');
+    const s = params.get('search');
+    const tgs = params.get('tags');
+    const md = params.get('maxDist');
+    if (t && t !== 'alle') setFilter(t);
+    if (c && c !== 'alle') setCity(c);
+    if (s) setSearch(s);
+    if (tgs) { try { setActiveTags(JSON.parse(tgs)); } catch {} }
+    if (md && md !== 'alle') setMaxDist(md);
+  }, []);
+
+  useEffect(() => {
     db.auth.getUser().then(async ({ data:{ user } }) => {
       if (!user) { setUserHasCoords(false); return; }
       const { data: inst } = await db.from('institutions').select('city,zipcode,latitude,longitude').eq('email', user.email).maybeSingle();

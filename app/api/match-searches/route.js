@@ -15,7 +15,8 @@ export async function POST(req) {
     // Fetch all saved searches
     const { data: savedSearches, error: fetchErr } = await db
       .from('saved_searches')
-      .select('id, email, institution_name, name, filters');
+      .select('id, email, institution_name, name, filters, notify')
+      .eq('notify', true);
 
     if (fetchErr) {
       return NextResponse.json({ error: fetchErr.message }, { status: 500 });

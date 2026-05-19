@@ -97,6 +97,8 @@ export default function DashboardClient() {
   const [memberEmail, setMemberEmail] = useState('');
   const [memberSaving, setMemberSaving] = useState(false);
 
+  const [savedSearches, setSavedSearches] = useState([]);
+
   const isAdmin = !!institution && !institution._memberRole;
 
   function onInstitutionChange(updated) {
@@ -149,6 +151,10 @@ export default function DashboardClient() {
         incoming = inc;
       }
       if (!cancelled && incoming) setIncomingConvs(incoming);
+
+      const { data: ss } = await db.from('saved_searches').select('*').eq('email', user.email).order('created_at', { ascending: false });
+      if (!cancelled && ss) setSavedSearches(ss);
+
       if (!cancelled) setInstLoading(false);
     }
     boot();
@@ -410,6 +416,40 @@ export default function DashboardClient() {
   }
 
   const favListings = allListings ? allListings.filter(l=>favs?.includes(l.id)) : [];
+
+  async function toggleSearchNotify(id, currentValue) {
+    const newVal = !currentValue;
+    await db.from('saved_searches').update({ notify: newVal }).eq('id', id);
+    setSavedSearches(prev => prev.map(s => s.id === id ? { ...s, notify: newVal } : s));
+  }
+
+  async function deleteSearch(id) {
+    await db.from('saved_searches').delete().eq('id', id);
+    setSavedSearches(prev => prev.filter(s => s.id !== id));
+    showToast('Søgning slettet');
+  }
+
+  function applySearch(filters) {
+    const params = new URLSearchParams();
+    if (filters.type && filters.type !== 'alle') params.set('type', filters.type);
+    if (filters.city && filters.city !== 'alle') params.set('city', filters.city);
+    if (filters.search) params.set('search', filters.search);
+    if (filters.tags && filters.tags.length) params.set('tags', JSON.stringify(filters.tags));
+    if (filters.maxDist && filters.maxDist !== 'alle') params.set('maxDist', filters.maxDist);
+    const qs = params.toString();
+    router.push('/opslag' + (qs ? '?' + qs : ''));
+  }
+
+  function filterSummary(filters) {
+    const parts = [];
+    if (filters.type && filters.type !== 'alle') parts.push(filters.type);
+    if (filters.city && filters.city !== 'alle') parts.push(`📍 ${filters.city}`);
+    if (filters.search) parts.push(`"${filters.search}"`);
+    if (filters.tags && filters.tags.length) parts.push(...filters.tags);
+    if (filters.maxDist && filters.maxDist !== 'alle') parts.push(`inden for ${filters.maxDist} km`);
+    return parts;
+  }
+
   const ww = useWindowWidth();
   const isMobile = ww < 768;
 
@@ -586,6 +626,72 @@ export default function DashboardClient() {
             );
           })()}
         </div>
+
+        {/* Gemte søgninger */}
+        {savedSearches.length > 0 && (
+          <div style={{ background:PAPER2, borderRadius:22, padding:isMobile?20:28, border:'1px solid rgba(22,34,28,0.07)', boxShadow:'0 1px 4px rgba(22,34,28,0.06)', marginTop:isMobile?16:24 }}>
+            <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:20, flexWrap:'wrap', gap:10 }}>
+              <h2 style={{ fontFamily:FONT, fontWeight:800, fontSize:18, color:INK, margin:0 }}>Gemte søgninger 🔔</h2>
+              <div style={{ display:'flex', alignItems:'center', gap:8 }}>
+                <span style={{ fontSize:12, color:INK3, fontFamily:FONT }}>Notificer alle</span>
+                <button
+                  onClick={async () => {
+                    const anyOff = savedSearches.some(s => !s.notify);
+                    const newVal = anyOff;
+                    await Promise.all(savedSearches.map(s => db.from('saved_searches').update({ notify: newVal }).eq('id', s.id)));
+                    setSavedSearches(prev => prev.map(s => ({ ...s, notify: newVal })));
+                  }}
+                  style={{ width:44, height:24, borderRadius:99, border:'none', cursor:'pointer', position:'relative', background: savedSearches.every(s=>s.notify) ? PRIMARY : PAPER3, transition:'background 0.2s' }}
+                >
+                  <div style={{ position:'absolute', top:3, left: savedSearches.every(s=>s.notify) ? 22 : 3, width:18, height:18, borderRadius:'50%', background:'#fff', transition:'left 0.2s', boxShadow:'0 1px 4px rgba(0,0,0,0.2)' }} />
+                </button>
+              </div>
+            </div>
+            <div style={{ display:'flex', flexDirection:'column', gap:10 }}>
+              {savedSearches.map(s => {
+                const pills = filterSummary(s.filters || {});
+                return (
+                  <div key={s.id} style={{ background:PAPER, borderRadius:14, padding:'14px 16px', border:`1px solid ${PAPER3}`, display:'flex', alignItems:'center', gap:12, flexWrap:'wrap' }}>
+                    <div style={{ flex:1, minWidth:0 }}>
+                      <div style={{ fontFamily:FONT, fontWeight:700, fontSize:14, color:INK, marginBottom:pills.length?6:0 }}>{s.name}</div>
+                      {pills.length > 0 && (
+                        <div style={{ display:'flex', gap:4, flexWrap:'wrap' }}>
+                          {pills.map((p,i) => (
+                            <span key={i} style={{ background:GREEN_TINT, color:PRIMARY, borderRadius:99, padding:'2px 10px', fontSize:11, fontWeight:700, fontFamily:FONT }}>{p}</span>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                    <div style={{ display:'flex', alignItems:'center', gap:10, flexShrink:0 }}>
+                      <div style={{ display:'flex', alignItems:'center', gap:6 }}>
+                        <span style={{ fontSize:11, color:INK3, fontFamily:FONT }}>🔔</span>
+                        <button
+                          onClick={() => toggleSearchNotify(s.id, s.notify)}
+                          style={{ width:40, height:22, borderRadius:99, border:'none', cursor:'pointer', position:'relative', background: s.notify ? PRIMARY : PAPER3, transition:'background 0.2s', flexShrink:0 }}
+                        >
+                          <div style={{ position:'absolute', top:2, left: s.notify ? 20 : 2, width:18, height:18, borderRadius:'50%', background:'#fff', transition:'left 0.2s', boxShadow:'0 1px 4px rgba(0,0,0,0.2)' }} />
+                        </button>
+                      </div>
+                      <button
+                        onClick={() => applySearch(s.filters || {})}
+                        style={{ padding:'7px 14px', borderRadius:99, background:PRIMARY, color:'#fff', border:'none', fontSize:12, fontWeight:700, cursor:'pointer', fontFamily:FONT, whiteSpace:'nowrap' }}
+                      >
+                        Anvend →
+                      </button>
+                      <button
+                        onClick={() => deleteSearch(s.id)}
+                        style={{ width:30, height:30, borderRadius:'50%', background:'none', border:`1.5px solid ${PAPER3}`, color:INK3, fontSize:14, cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0 }}
+                        title="Slet søgning"
+                      >
+                        ✕
+                      </button>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Edit modal */}
