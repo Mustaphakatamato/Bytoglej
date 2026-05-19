@@ -5,6 +5,7 @@ import { PRIMARY } from '@/lib/constants';
 import { Spinner } from '@/components/ui';
 import { db } from '@/lib/supabase';
 import { useApp } from '@/providers/AppProvider';
+import { ADMIN_EMAIL } from '@/lib/constants';
 
 export default function LoginPage() {
   const router = useRouter();
@@ -18,7 +19,8 @@ export default function LoginPage() {
     const { error } = await db.auth.signInWithPassword({ email, password: pass });
     setLoading(false);
     if (error) { setError('Forkert e-mail eller kodeord'); return; }
-    setLoggedIn(true); router.push('/dashboard');
+    setLoggedIn(true);
+    router.push(email.trim().toLowerCase() === ADMIN_EMAIL.toLowerCase() ? '/admin' : '/dashboard');
   }
   return (
     <div style={{ minHeight:'100vh', display:'flex', alignItems:'center', justifyContent:'center', padding:'80px 24px', background:'linear-gradient(150deg,#fffcf8 0%,#f0f9f4 100%)' }} className="page-enter">

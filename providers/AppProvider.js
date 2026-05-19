@@ -36,10 +36,20 @@ export function AppProvider({ children }) {
 
   async function loadInstitution(email) {
     const e = email.toLowerCase();
+
+    // Platform admin — no institution binding, neutral start
+    if (e === ADMIN_EMAIL.toLowerCase()) {
+      setIsAdmin(true);
+      setInstitution(null);
+      const { data: all } = await db.from('institutions').select('*').order('name');
+      if (all) setAllInstitutions(all);
+      return;
+    }
+
     const { data } = await db.from('institutions').select('*').ilike('email', e).maybeSingle();
     if (data) {
       setInstitution(data);
-      if (data.is_platform_admin || e === ADMIN_EMAIL.toLowerCase()) {
+      if (data.is_platform_admin) {
         setIsAdmin(true);
         const { data: all } = await db.from('institutions').select('*').order('name');
         if (all) setAllInstitutions(all);
