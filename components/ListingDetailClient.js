@@ -82,8 +82,6 @@ export default function ListingDetailClient() {
   const [shareSending, setShareSending] = useState(false);
   const [myInstName, setMyInstName] = useState(null);
   const [existingBid, setExistingBid] = useState(null);
-  const [reserveModal, setReserveModal] = useState(false);
-  const [reserving, setReserving] = useState(false);
 
   useEffect(() => {
     if (!listing) return;
@@ -337,28 +335,6 @@ export default function ListingDetailClient() {
     showToast('Bud trukket tilbage');
   }
 
-  async function handleReserve() {
-    setReserving(true);
-    const reservedUntil = new Date(Date.now() + 48 * 60 * 60 * 1000).toISOString();
-    await db.from('listings').update({
-      reserved_until: reservedUntil,
-      reserved_by_institution_id: ctxInstId || null,
-      reserved_by_institution_name: ctxInstitution?.name || null,
-    }).eq('id', listing.id);
-    setReserving(false);
-    setReserveModal(false);
-    showToast('Opslag reserveret i 48 timer! 🔒');
-  }
-
-  async function handleCancelReserve() {
-    await db.from('listings').update({
-      reserved_until: null,
-      reserved_by_institution_id: null,
-      reserved_by_institution_name: null,
-    }).eq('id', listing.id);
-    showToast('Reservation annulleret');
-  }
-
   async function handleSwap() {
     const chosen = ownListings.find(l => l.id === selectedSwapId);
     if (!chosen && !swapOffer.trim()) return;
@@ -417,9 +393,6 @@ export default function ListingDetailClient() {
   const ww = useWindowWidth();
   const isMobile = ww < 768;
 
-  const isReserved = listing.reserved_until && new Date(listing.reserved_until) > new Date();
-  const reservedByMe = isReserved && ctxInstitution?.name && listing.reserved_by_institution_name === ctxInstitution.name;
-
   return (
     <div style={{ minHeight:'100vh', paddingTop:80, background:PAPER }} className="page-enter">
       <div style={{ maxWidth:1140, margin:'0 auto', padding:'24px 16px 0' }}>
@@ -463,15 +436,6 @@ export default function ListingDetailClient() {
                 {!isOwn && listing.type==='køb' && <Btn variant="primary" color={PRIMARY} radius={22} onClick={()=>setBuyModal(true)} style={{ justifyContent:'center', padding:'14px', fontSize:15 }}>🏷️ Køb nu — {listing.price} kr.</Btn>}
                 {!isOwn && listing.type==='byd' && <Btn variant="primary" color={ACCENT2} radius={22} onClick={()=>setBidModal(true)} style={{ justifyContent:'center', padding:'14px', fontSize:15 }}>📊 Afgiv bud</Btn>}
                 {!isOwn && listing.type==='byt' && <Btn variant="primary" color={ACCENT} radius={22} onClick={()=>setSwapModal(true)} style={{ justifyContent:'center', padding:'14px', fontSize:15 }}>🔄 Foreslå bytte</Btn>}
-                {!isOwn && isReserved && !reservedByMe && (
-                  <div style={{ padding:'12px 14px', borderRadius:22, background:'#FFF3CD', color:'#856404', fontSize:13, fontWeight:700, textAlign:'center', border:'1.5px solid #FBBF24' }}>🔒 Reserveret af anden institution</div>
-                )}
-                {!isOwn && reservedByMe && (
-                  <button onClick={handleCancelReserve} style={{ width:'100%', padding:'12px', borderRadius:22, border:'1.5px solid #FBBF24', background:'#FFF3CD', color:'#856404', fontSize:13, fontWeight:700, cursor:'pointer' }}>✕ Annuller min reservation</button>
-                )}
-                {!isOwn && !isReserved && (listing.type==='køb' || listing.type==='byd') && loggedIn && (
-                  <button onClick={()=>setReserveModal(true)} style={{ width:'100%', padding:'12px', borderRadius:22, border:`1.5px solid ${PAPER3}`, background:PAPER2, color:INK2, fontSize:13, fontWeight:700, cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center', gap:6 }}>🔒 Reservér i 48 timer</button>
-                )}
                 <button onClick={handleToggleFav} style={{ width:'100%', padding:'13px', borderRadius:22, border:`1.5px solid ${isFav?'#fca5a5':'#e5e5e5'}`, background:isFav?'#fff0f3':'#fff', color:isFav?'#e11d48':'#555', fontSize:14, fontWeight:700, cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center', gap:6, transition:'all 0.2s' }}>
                   {isFav ? '❤️ Gemt' : '🤍 Gem opslag'}
                   {localFavCount > 0 && <span style={{ background:isFav?'#fca5a5':'#eee', color:isFav?'#c0392b':'#888', borderRadius:99, padding:'1px 8px', fontSize:12 }}>{localFavCount}</span>}
@@ -656,21 +620,6 @@ export default function ListingDetailClient() {
         </div>
       </Modal>
 
-      <Modal open={reserveModal} onClose={()=>setReserveModal(false)} title="Reservér opslag">
-        <div style={{ display:'flex', flexDirection:'column', gap:16 }}>
-          <div style={{ background:PAPER2, borderRadius:12, padding:16 }}>
-            <div style={{ fontFamily:FONT, fontWeight:700, fontSize:16, color:INK }}>{listing.title}</div>
-            <div style={{ color:INK3, fontSize:13, marginTop:4, fontFamily:FONT }}>{listing.institution_name}</div>
-          </div>
-          <div style={{ background:'#FFFBEB', border:'1.5px solid #FBBF24', borderRadius:12, padding:'12px 14px', fontSize:13, color:'#92400E', fontFamily:FONT }}>
-            Reservationen er gyldig i 48 timer. Sælger kan se at opslaget er reserveret.
-          </div>
-          <Btn variant="primary" color="#D97706" radius={22} onClick={handleReserve} disabled={reserving} style={{ justifyContent:'center', padding:'14px', fontSize:15 }}>
-            {reserving ? <><Spinner/>Reserverer…</> : '🔒 Bekræft reservation'}
-          </Btn>
-          <Btn variant="ghost" onClick={()=>setReserveModal(false)} style={{ justifyContent:'center' }}>Annuller</Btn>
-        </div>
-      </Modal>
     </div>
   );
 }

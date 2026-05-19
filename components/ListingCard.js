@@ -59,11 +59,6 @@ export default function ListingCard({ listing, onClick, favs, toggleFav, onInsti
             {imgs.map((_, i) => <div key={i} style={{ width: i === imgIdx ? 14 : 6, height: 6, borderRadius: 99, background: i === imgIdx ? '#fff' : 'rgba(255,255,255,0.4)', transition: 'all 0.2s' }} />)}
           </div>
         </>}
-        {listing.reserved_until && new Date(listing.reserved_until) > new Date() && (
-          <div style={{ position:'absolute', top:10, right:10, background:'rgba(133,100,4,0.85)', color:'#fff', borderRadius:8, padding:'3px 10px', fontSize:11, fontWeight:700, backdropFilter:'blur(4px)', zIndex:1 }}>
-            🔒 Reserveret
-          </div>
-        )}
         <button
           className={`fav-btn${popping ? ' fav-pop' : ''}`}
           onClick={handleFav}
