@@ -294,6 +294,11 @@ export default function DashboardClient() {
     setSaving(false); setNewOpen(false); resetModal();
     showToast('Opslag publiceret!');
     onListingCreated();
+    fetch('/api/match-searches', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ listingId: listing.id, title: listing.title, type: listing.type, tags: listing.tags || [], city: listing.city, age_group: listing.age_group }),
+    }).catch(() => {});
     fetchMyListings(ctxIsAdmin ? null : (user?.id || authUserId), inst?.name || institution?.name);
   }
 

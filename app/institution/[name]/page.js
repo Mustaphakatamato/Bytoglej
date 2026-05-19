@@ -2,7 +2,7 @@
 import { useState, useEffect } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 import { db } from '@/lib/supabase';
-import { PRIMARY } from '@/lib/constants';
+import { PRIMARY, GREEN_TINT, GREEN_SOFT, INK, INK2, INK3 } from '@/lib/constants';
 import { useWindowWidth } from '@/lib/hooks';
 import { useApp } from '@/providers/AppProvider';
 import ListingCard from '@/components/ListingCard';
@@ -11,10 +11,11 @@ export default function InstitutionPage() {
   const params = useParams();
   const institutionName = decodeURIComponent(params.name);
   const router = useRouter();
-  const { favs, toggleFav, setActiveListing } = useApp();
+  const { favs, toggleFav, setActiveListing, setSelectedConvId } = useApp();
   const [listings, setListings] = useState([]);
   const [loading, setLoading] = useState(true);
   const [inst, setInst] = useState(null);
+  const [contacting, setContacting] = useState(false);
   const ww = useWindowWidth();
   const isMobile = ww < 768;
 
@@ -29,6 +30,53 @@ export default function InstitutionPage() {
       setLoading(false);
     });
   }, [institutionName]);
+
+  async function handleContact() {
+    setContacting(true);
+    try {
+      const { data: { user } } = await db.auth.getUser();
+      if (!user) { router.push('/login'); setContacting(false); return; }
+      const { data: myInst } = await db.from('institutions').select('id,name').ilike('email', user.email).maybeSingle();
+      if (myInst?.name === institutionName) { setContacting(false); return; }
+      const { data: ownerInst } = await db.from('institutions').select('id,user_id,email,name').eq('name', institutionName).maybeSingle();
+      if (!ownerInst) { setContacting(false); return; }
+      const myInstId = myInst?.id || null;
+      const userName = myInst?.name || user.email;
+      const { data: existing } = await db.from('conversations')
+        .select('id')
+        .is('listing_id', null)
+        .eq('owner_institution_id', ownerInst.id)
+        .or(myInstId ? `initiator_institution_id.eq.${myInstId},initiator_id.eq.${user.id}` : `initiator_id.eq.${user.id}`)
+        .maybeSingle();
+      let convId = existing?.id;
+      if (!convId) {
+        const { data: conv } = await db.from('conversations').insert({
+          listing_id: null,
+          listing_title: `Besked til ${institutionName}`,
+          listing_emoji: '💬',
+          listing_color: '#CFE3D8',
+          listing_image: null,
+          initiator_id: user.id,
+          initiator_name: userName,
+          initiator_institution_id: myInstId,
+          owner_id: ownerInst.id,
+          owner_name: ownerInst.name,
+          owner_institution_id: ownerInst.id,
+        }).select().single();
+        convId = conv?.id;
+        if (convId && ownerInst.email && ownerInst.email.toLowerCase() !== user.email.toLowerCase()) {
+          fetch('/api/notify-message', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ ownerEmail: ownerInst.email, ownerName: ownerInst.name, senderName: userName, listingTitle: institutionName, listingEmoji: '💬', convId }),
+          }).catch(() => {});
+        }
+      }
+      if (convId && setSelectedConvId) setSelectedConvId(convId);
+      router.push('/beskeder');
+    } catch {}
+    setContacting(false);
+  }
 
   return (
     <div style={{ minHeight:'100vh', paddingTop:80, background:'#f8f5f0' }} className="page-enter">
@@ -56,6 +104,11 @@ export default function InstitutionPage() {
               <div style={{ fontFamily:"'Nunito',sans-serif", fontWeight:900, fontSize:22, color:PRIMARY }}>{listings.length}</div>
               <div style={{ fontSize:12, color:'#888' }}>aktive opslag</div>
             </div>
+          </div>
+          <div style={{ marginTop:16, paddingTop:16, borderTop:'1px solid #e8e6e3' }}>
+            <button onClick={handleContact} disabled={contacting} style={{ padding:'11px 24px', borderRadius:99, background:PRIMARY, color:'#fff', border:'none', fontFamily:"'Sora',sans-serif", fontWeight:700, fontSize:14, cursor:contacting?'not-allowed':'pointer', opacity:contacting?0.7:1, display:'flex', alignItems:'center', gap:8 }}>
+              {contacting ? '…' : '💬 Send besked til institution'}
+            </button>
           </div>
         </div>
         {loading ? (

@@ -29,7 +29,7 @@ async function geocodeCity(city) {
 
 export default function OpslagPage() {
   const router = useRouter();
-  const { listings, loadingListings: loading, setActiveListing, favs, toggleFav } = useApp();
+  const { listings, loadingListings: loading, setActiveListing, favs, toggleFav, showToast, loggedIn } = useApp();
   const ww = useWindowWidth();
   const isMobile = ww < 640;
   const [filter, setFilter] = useState('alle');
@@ -39,6 +39,9 @@ export default function OpslagPage() {
   const [maxDist, setMaxDist] = useState('alle');
   const [activeTags, setActiveTags] = useState([]);
   const [tagDropOpen, setTagDropOpen] = useState(false);
+  const [saveSearchModal, setSaveSearchModal] = useState(false);
+  const [saveSearchName, setSaveSearchName] = useState('');
+  const [savingSearch, setSavingSearch] = useState(false);
   const tagDropRef = useRef(null);
   useEffect(() => {
     if (!tagDropOpen) return;
@@ -110,6 +113,33 @@ export default function OpslagPage() {
     }
     return r;
   }, [listings, filter, city, dSearch, sort, maxDist, userCoords, listingCoords, activeTags]);
+
+  async function handleSaveSearch() {
+    if (!saveSearchName.trim()) return;
+    setSavingSearch(true);
+    try {
+      const { data: { user } } = await db.auth.getUser();
+      if (!user) { setSavingSearch(false); return; }
+      const { data: inst } = await db.from('institutions').select('id,name,email').ilike('email', user.email).maybeSingle();
+      const filters = {};
+      if (filter !== 'alle') filters.type = filter;
+      if (city !== 'alle') filters.city = city;
+      if (activeTags.length) filters.tags = activeTags;
+      if (dSearch) filters.search = dSearch;
+      if (maxDist !== 'alle') filters.maxDist = maxDist;
+      await db.from('saved_searches').insert({
+        institution_id: inst?.id || null,
+        email: inst?.email || user.email,
+        institution_name: inst?.name || null,
+        name: saveSearchName.trim(),
+        filters,
+      });
+      showToast?.('Søgning gemt! Vi notificerer jer ved nye match 🔔');
+    } catch {}
+    setSavingSearch(false);
+    setSaveSearchModal(false);
+    setSaveSearchName('');
+  }
 
   function handleListingClick(l) {
     setActiveListing(l);
@@ -338,11 +368,18 @@ export default function OpslagPage() {
             {dSearch && <span> for "<strong style={{ color: INK2 }}>{dSearch}</strong>"</span>}
             {viewMode === 'map' && !loading && <span style={{ marginLeft: 8, fontSize: 12 }}>— pins baseret på by</span>}
           </p>
-          {(filter !== 'alle' || city !== 'alle' || activeTags.length || maxDist !== 'alle' || dSearch) && (
-            <button onClick={() => { setFilter('alle'); setSearch(''); setCity('alle'); setActiveTags([]); setMaxDist('alle'); }} style={{ fontSize: 12, fontWeight: 600, color: PRIMARY, background: 'none', border: 'none', cursor: 'pointer', fontFamily: FONT, padding: 0 }}>
-              Nulstil filtre
-            </button>
-          )}
+          <div style={{ display:'flex', gap:10, alignItems:'center' }}>
+            {(filter !== 'alle' || city !== 'alle' || activeTags.length || maxDist !== 'alle' || dSearch) && (
+              <button onClick={() => { setFilter('alle'); setSearch(''); setCity('alle'); setActiveTags([]); setMaxDist('alle'); }} style={{ fontSize: 12, fontWeight: 600, color: PRIMARY, background: 'none', border: 'none', cursor: 'pointer', fontFamily: FONT, padding: 0 }}>
+                Nulstil filtre
+              </button>
+            )}
+            {loggedIn && (filter !== 'alle' || city !== 'alle' || activeTags.length || maxDist !== 'alle' || dSearch) && (
+              <button onClick={() => setSaveSearchModal(true)} style={{ fontSize: 12, fontWeight: 700, color: '#fff', background: PRIMARY, border: 'none', borderRadius: 99, cursor: 'pointer', fontFamily: FONT, padding: '5px 14px', display:'flex', alignItems:'center', gap:5 }}>
+                🔔 Gem søgning
+              </button>
+            )}
+          </div>
         </div>
 
         {viewMode === 'map' ? (
@@ -378,6 +415,28 @@ export default function OpslagPage() {
           </div>
         )}
       </div>
+
+      {saveSearchModal && (
+        <div onClick={()=>setSaveSearchModal(false)} style={{ position:'fixed', inset:0, background:'rgba(22,34,28,0.5)', zIndex:2000, display:'flex', alignItems:'center', justifyContent:'center', padding:24 }}>
+          <div onClick={e=>e.stopPropagation()} style={{ background:'#FDFAF4', borderRadius:20, padding:28, width:'100%', maxWidth:400, boxShadow:'0 20px 60px rgba(0,0,0,0.2)' }}>
+            <h2 style={{ fontFamily:FONT, fontWeight:800, fontSize:20, color:'#16221C', marginBottom:8, marginTop:0 }}>Gem søgning 🔔</h2>
+            <p style={{ fontSize:13, color:'#6B7570', marginBottom:20, fontFamily:FONT }}>Vi notificerer jer på e-mail når nye opslag matcher denne søgning.</p>
+            <label style={{ display:'block', fontFamily:FONT, fontWeight:700, fontSize:13, color:'#3A473D', marginBottom:6 }}>Navn på søgning</label>
+            <input
+              value={saveSearchName}
+              onChange={e=>setSaveSearchName(e.target.value)}
+              placeholder="Fx: Udeleg under 100 kr."
+              style={{ width:'100%', padding:'11px 14px', borderRadius:12, border:'1.5px solid #DAD3C4', background:'#ECE6DA', fontSize:14, fontFamily:FONT, color:'#16221C', outline:'none', boxSizing:'border-box', marginBottom:16 }}
+            />
+            <div style={{ display:'flex', gap:10 }}>
+              <button onClick={()=>setSaveSearchModal(false)} style={{ flex:1, padding:'12px', borderRadius:12, background:'#ECE6DA', border:'none', fontWeight:700, cursor:'pointer', fontFamily:FONT, fontSize:14, color:'#3A473D' }}>Annuller</button>
+              <button onClick={handleSaveSearch} disabled={savingSearch||!saveSearchName.trim()} style={{ flex:2, padding:'12px', borderRadius:99, background:PRIMARY, color:'#fff', border:'none', fontWeight:700, cursor:savingSearch||!saveSearchName.trim()?'not-allowed':'pointer', opacity:savingSearch||!saveSearchName.trim()?0.6:1, fontFamily:FONT, fontSize:14 }}>
+                {savingSearch ? 'Gemmer…' : '🔔 Gem søgning'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
