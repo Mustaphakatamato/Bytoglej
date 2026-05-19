@@ -1,8 +1,9 @@
 'use client';
 import { usePathname, useRouter } from 'next/navigation';
+import Link from 'next/link';
 import { useApp, useActiveUser } from '@/providers/AppProvider';
 import { db } from '@/lib/supabase';
-import { PRIMARY } from '@/lib/constants';
+import { PRIMARY, GREEN_DEEP, GREEN_SOFT, GREEN_TINT } from '@/lib/constants';
 import { useWindowWidth } from '@/lib/hooks';
 import { useState, useEffect } from 'react';
 import { Btn } from '@/components/ui';
@@ -12,23 +13,26 @@ export default function NavWrapper() {
   const { institution } = useActiveUser();
   const pathname = usePathname();
   const router = useRouter();
-  const isHome = pathname === '/';
 
   return (
     <>
       {isAdmin && loggedIn && (
-        <div style={{ background:'#1a1a2e', color:'#e0e0ff', padding:'8px 20px', display:'flex', alignItems:'center', gap:12, fontSize:13, fontFamily:"'Nunito Sans',sans-serif", position:'fixed', top:0, left:0, right:0, zIndex:9999, flexWrap:'wrap' }}>
-          <span style={{ fontWeight:700, color:'#a78bfa' }}>🔧 Admin</span>
+        <div style={{ background:GREEN_DEEP, color:'#fff', padding:'7px 20px', display:'flex', alignItems:'center', gap:12, fontSize:13, fontFamily:"'Sora',sans-serif", position:'fixed', top:0, left:0, right:0, zIndex:9999, flexWrap:'wrap' }}>
+          <Link href="/admin" style={{ fontWeight:800, fontSize:12, color:GREEN_SOFT, letterSpacing:'0.04em', textDecoration:'none', textTransform:'uppercase', flexShrink:0 }}>Admin</Link>
+          <div style={{ width:1, height:16, background:'rgba(255,255,255,0.15)', flexShrink:0 }} />
           <select
             value={adminInst?.id || ''}
             onChange={e => { const i = allInstitutions.find(x => x.id === e.target.value); setAdminInst(i || null); }}
-            style={{ background:'#2d2d4e', color:'#e0e0ff', border:'1px solid #4a4a6e', borderRadius:6, padding:'4px 10px', fontSize:12, cursor:'pointer', maxWidth:280 }}>
-            <option value="">— Vælg institution at se som —</option>
+            style={{ background:'rgba(255,255,255,0.1)', color:'#fff', border:'1px solid rgba(255,255,255,0.2)', borderRadius:6, padding:'4px 10px', fontSize:12, cursor:'pointer', maxWidth:280 }}>
+            <option value="">— Agér som institution —</option>
             {allInstitutions.map(i => <option key={i.id} value={i.id}>{i.name}{i.city ? ` · ${i.city}` : ''}</option>)}
           </select>
-          {adminInst
-            ? <><span style={{ color:'#a78bfa' }}>Viser som: <strong style={{ color:'#fff' }}>{adminInst.name}</strong></span><button onClick={()=>setAdminInst(null)} style={{ background:'#3d2d6e', color:'#e0e0ff', border:'none', borderRadius:6, padding:'3px 10px', cursor:'pointer', fontSize:11, fontWeight:700 }}>✕ Afslut</button></>
-            : <span style={{ color:'#6b7280', fontSize:11 }}>Ingen institution valgt — viser din egen</span>}
+          {adminInst && (
+            <>
+              <span style={{ fontSize:12, color:'rgba(255,255,255,0.75)' }}>Viser som: <strong style={{ color:'#fff' }}>{adminInst.name}</strong></span>
+              <button onClick={()=>setAdminInst(null)} style={{ background:'rgba(255,255,255,0.15)', color:'#fff', border:'none', borderRadius:6, padding:'3px 10px', cursor:'pointer', fontSize:11, fontWeight:700, fontFamily:"'Sora',sans-serif" }}>✕ Afslut</button>
+            </>
+          )}
         </div>
       )}
       <Nav
@@ -39,6 +43,7 @@ export default function NavWrapper() {
         unreadTotal={unreadTotal}
         institution={institution}
         adminBar={isAdmin && loggedIn}
+        isAdmin={isAdmin}
       />
       {toast && <ToastDisplay msg={toast.msg} type={toast.type} onDone={()=>setToast(null)} />}
     </>
@@ -55,7 +60,7 @@ function ToastDisplay({ msg, type='success', onDone }) {
   );
 }
 
-function Nav({ pathname, navigate, loggedIn, setLoggedIn, unreadTotal, institution, adminBar }) {
+function Nav({ pathname, navigate, loggedIn, setLoggedIn, unreadTotal, institution, adminBar, isAdmin }) {
   const [scrolled, setScrolled] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
   const w = useWindowWidth();
@@ -91,6 +96,12 @@ function Nav({ pathname, navigate, loggedIn, setLoggedIn, unreadTotal, instituti
             {[['/opslag','Markedsplads'],['/hvordan','Sådan virker det'],['/om-os','Om os'],['/kontakt','Kontakt']].map(([p,label]) => (
               <button key={p} onClick={()=>go(p)} style={{ background:'none', border:'none', padding:'8px 16px', fontSize:14, fontWeight:600, color:pathname===p?PRIMARY:transparent?'rgba(255,255,255,0.85)':'#555', borderRadius:8, borderBottom:pathname===p?`2px solid ${PRIMARY}`:'2px solid transparent', transition:'all 0.15s' }}>{label}</button>
             ))}
+            {isAdmin && loggedIn && (
+              <Link href="/admin" style={{ background:pathname==='/admin'?GREEN_TINT:'none', border:'none', padding:'8px 14px', fontSize:13, fontWeight:700, color:pathname==='/admin'?PRIMARY:'#777', borderRadius:8, borderBottom:pathname==='/admin'?`2px solid ${PRIMARY}`:'2px solid transparent', transition:'all 0.15s', textDecoration:'none', display:'inline-flex', alignItems:'center', gap:5 }}>
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><circle cx="12" cy="12" r="3"/><path d="M19.07 4.93a10 10 0 010 14.14"/><path d="M4.93 4.93a10 10 0 000 14.14"/></svg>
+                Admin
+              </Link>
+            )}
           </div>
         )}
 
@@ -145,6 +156,9 @@ function Nav({ pathname, navigate, loggedIn, setLoggedIn, unreadTotal, instituti
                 💬 Beskeder
                 {unreadTotal > 0 && <span style={{ background:'#EF476F', color:'#fff', borderRadius:99, fontSize:11, fontWeight:800, minWidth:18, height:18, display:'flex', alignItems:'center', justifyContent:'center', padding:'0 5px' }}>{unreadTotal > 9 ? '9+' : unreadTotal}</span>}
               </button>
+              {isAdmin && (
+                <Link href="/admin" style={{ display:'block', width:'100%', textAlign:'left', borderBottom:'1px solid #f0eeeb', padding:'14px 4px', fontSize:15, fontWeight:700, color:PRIMARY, textDecoration:'none' }}>⚙️ Admin</Link>
+              )}
               <button onClick={async()=>{ await db.auth.signOut(); setLoggedIn(false); go('/'); }} style={{ marginTop:12, width:'100%', background:'#f5f4f2', border:'none', borderRadius:12, padding:'13px', fontSize:14, fontWeight:700, color:'#555', cursor:'pointer' }}>Log ud</button>
             </> : (
               <div style={{ display:'flex', flexDirection:'column', gap:10, marginTop:4 }}>

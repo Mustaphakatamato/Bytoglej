@@ -1,0 +1,521 @@
+'use client';
+import { useState, useEffect, useCallback } from 'react';
+import { useRouter } from 'next/navigation';
+import { useApp, useActiveUser } from '@/providers/AppProvider';
+import { db } from '@/lib/supabase';
+import {
+  PRIMARY, GREEN_DEEP, GREEN_SOFT, GREEN_TINT,
+  PAPER, PAPER2, PAPER3,
+  INK, INK2, INK3,
+  CORAL, BUTTER, SKY,
+} from '@/lib/constants';
+
+const FONT = "'Sora', sans-serif";
+
+// ── Icons ───────────────────────────────────────────────────────────────────
+
+function IconBuilding() {
+  return <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M9 22V12h6v10"/><path d="M3 9h18"/></svg>;
+}
+function IconList() {
+  return <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg>;
+}
+function IconActivity() {
+  return <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>;
+}
+function IconSearch() {
+  return <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>;
+}
+function IconEye() {
+  return <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>;
+}
+function IconTrash() {
+  return <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4h6v2"/></svg>;
+}
+function IconToggle({ on }) {
+  return on
+    ? <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11"/></svg>
+    : <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg>;
+}
+function IconUsers() {
+  return <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 00-3-3.87"/><path d="M16 3.13a4 4 0 010 7.75"/></svg>;
+}
+function IconTag() {
+  return <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M20.59 13.41l-7.17 7.17a2 2 0 01-2.83 0L2 12V2h10l8.59 8.59a2 2 0 010 2.82z"/><line x1="7" y1="7" x2="7.01" y2="7"/></svg>;
+}
+function IconMail() {
+  return <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>;
+}
+
+// ── Stat card ────────────────────────────────────────────────────────────────
+
+function Stat({ label, value, color = PRIMARY, icon }) {
+  return (
+    <div style={{ background: PAPER2, border: `1px solid rgba(22,34,28,0.08)`, borderRadius: 16, padding: '20px 24px', display: 'flex', flexDirection: 'column', gap: 6 }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8, color: INK3, fontSize: 13, fontFamily: FONT, fontWeight: 600 }}>
+        <span style={{ color }}>{icon}</span>
+        {label}
+      </div>
+      <div style={{ fontFamily: FONT, fontWeight: 800, fontSize: 36, color: value > 0 ? color : INK3, letterSpacing: '-0.04em', lineHeight: 1 }}>
+        {value ?? '—'}
+      </div>
+    </div>
+  );
+}
+
+// ── Main page ────────────────────────────────────────────────────────────────
+
+const TABS = [
+  { id: 'overview', label: 'Overblik', Icon: IconActivity },
+  { id: 'institutions', label: 'Institutioner', Icon: IconBuilding },
+  { id: 'listings', label: 'Opslag', Icon: IconList },
+];
+
+export default function AdminPage() {
+  const { isAdmin, allInstitutions, setAdminInst, adminInst } = useApp();
+  const router = useRouter();
+  const [tab, setTab] = useState('overview');
+
+  // Guard
+  useEffect(() => {
+    if (isAdmin === false) router.replace('/');
+  }, [isAdmin]);
+
+  if (!isAdmin) {
+    return (
+      <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: PAPER }}>
+        <span style={{ fontFamily: FONT, color: INK3, fontSize: 15 }}>Kontrollerer adgang…</span>
+      </div>
+    );
+  }
+
+  return (
+    <div style={{ minHeight: '100vh', background: PAPER, paddingTop: 104 }}>
+      {/* Page header */}
+      <div style={{ maxWidth: 1200, margin: '0 auto', padding: '0 20px 32px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 14, marginBottom: 8 }}>
+          <div style={{ width: 42, height: 42, borderRadius: 12, background: GREEN_TINT, display: 'flex', alignItems: 'center', justifyContent: 'center', color: PRIMARY }}>
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><circle cx="12" cy="12" r="3"/><path d="M19.07 4.93a10 10 0 010 14.14"/><path d="M4.93 4.93a10 10 0 000 14.14"/></svg>
+          </div>
+          <div>
+            <h1 style={{ fontFamily: FONT, fontWeight: 800, fontSize: 26, color: INK, margin: 0, letterSpacing: '-0.04em' }}>Platform admin</h1>
+            <p style={{ fontFamily: FONT, fontSize: 13, color: INK3, margin: 0 }}>byt&amp;leg intern administration</p>
+          </div>
+        </div>
+
+        {/* Tabs */}
+        <div style={{ display: 'flex', gap: 4, marginTop: 24, borderBottom: `1px solid ${PAPER3}`, paddingBottom: 0 }}>
+          {TABS.map(({ id, label, Icon }) => (
+            <button key={id} onClick={() => setTab(id)} style={{ background: 'none', border: 'none', borderBottom: tab === id ? `2.5px solid ${PRIMARY}` : '2.5px solid transparent', padding: '10px 18px', fontFamily: FONT, fontWeight: tab === id ? 700 : 600, fontSize: 14, color: tab === id ? PRIMARY : INK3, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 7, borderRadius: '8px 8px 0 0', transition: 'color 0.15s', marginBottom: -1 }}>
+              <Icon /> {label}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      <div style={{ maxWidth: 1200, margin: '0 auto', padding: '0 20px 64px' }}>
+        {tab === 'overview'      && <OverviewTab institutions={allInstitutions} setAdminInst={setAdminInst} adminInst={adminInst} />}
+        {tab === 'institutions'  && <InstitutionsTab institutions={allInstitutions} setAdminInst={setAdminInst} adminInst={adminInst} />}
+        {tab === 'listings'      && <ListingsTab />}
+      </div>
+    </div>
+  );
+}
+
+// ── Overview tab ─────────────────────────────────────────────────────────────
+
+function OverviewTab({ institutions, setAdminInst, adminInst }) {
+  const [stats, setStats] = useState(null);
+  const [recent, setRecent] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    async function load() {
+      const [
+        { count: instCount },
+        { count: listCount },
+        { count: activeCount },
+        { count: memberCount },
+        { count: invCount },
+        { data: recentConvs },
+      ] = await Promise.all([
+        db.from('institutions').select('*', { count: 'exact', head: true }),
+        db.from('listings').select('*', { count: 'exact', head: true }),
+        db.from('listings').select('*', { count: 'exact', head: true }).eq('is_active', true),
+        db.from('institution_members').select('*', { count: 'exact', head: true }),
+        db.from('institution_invitations').select('*', { count: 'exact', head: true }).is('accepted_at', null).gt('expires_at', new Date().toISOString()),
+        db.from('conversations').select('id,created_at,listing_id,listings(title),status').order('created_at', { ascending: false }).limit(8),
+      ]);
+      setStats({ instCount, listCount, activeCount, memberCount, invCount });
+      setRecent(recentConvs || []);
+      setLoading(false);
+    }
+    load();
+  }, []);
+
+  if (loading) return <Spinner />;
+
+  return (
+    <div>
+      {/* Stats grid */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: 14, marginBottom: 32 }}>
+        <Stat label="Institutioner" value={stats.instCount} color={PRIMARY} icon={<IconBuilding />} />
+        <Stat label="Alle opslag" value={stats.listCount} color={INK2} icon={<IconTag />} />
+        <Stat label="Aktive opslag" value={stats.activeCount} color={PRIMARY} icon={<IconToggle on />} />
+        <Stat label="Medarbejdere" value={stats.memberCount} color={SKY} icon={<IconUsers />} />
+        <Stat label="Ventende invitationer" value={stats.invCount} color={BUTTER.replace('#','').length===6 ? CORAL : CORAL} icon={<IconMail />} />
+      </div>
+
+      {/* Recent conversations */}
+      <SectionHead title="Seneste handler" />
+      {recent.length === 0
+        ? <Empty text="Ingen samtaler endnu" />
+        : (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+            {recent.map(c => (
+              <div key={c.id} style={{ background: PAPER2, border: `1px solid rgba(22,34,28,0.07)`, borderRadius: 12, padding: '12px 18px', display: 'flex', alignItems: 'center', gap: 14 }}>
+                <div style={{ width: 8, height: 8, borderRadius: '50%', background: c.status === 'completed' ? PRIMARY : c.status === 'rejected' ? CORAL : PAPER3, flexShrink: 0 }} />
+                <div style={{ flex: 1, fontFamily: FONT, fontSize: 13, color: INK }}>
+                  {c.listings?.title || 'Ukendt opslag'}
+                </div>
+                <div style={{ fontFamily: FONT, fontSize: 12, color: INK3 }}>
+                  {new Date(c.created_at).toLocaleDateString('da-DK', { day: 'numeric', month: 'short' })}
+                </div>
+                <StatusBadge status={c.status} />
+              </div>
+            ))}
+          </div>
+        )
+      }
+
+      {/* Quick impersonate */}
+      <SectionHead title="Hurtig institution" style={{ marginTop: 32 }} />
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(240px, 1fr))', gap: 10 }}>
+        {institutions.slice(0, 6).map(inst => (
+          <InstCard key={inst.id} inst={inst} active={adminInst?.id === inst.id} onSelect={() => setAdminInst(adminInst?.id === inst.id ? null : inst)} />
+        ))}
+      </div>
+    </div>
+  );
+}
+
+// ── Institutions tab ─────────────────────────────────────────────────────────
+
+function InstitutionsTab({ institutions, setAdminInst, adminInst }) {
+  const [query, setQuery] = useState('');
+  const [detail, setDetail] = useState(null); // { inst, members, invitations, listings }
+  const [loadingDetail, setLoadingDetail] = useState(false);
+
+  const filtered = institutions.filter(i =>
+    !query || i.name?.toLowerCase().includes(query.toLowerCase()) || i.city?.toLowerCase().includes(query.toLowerCase()) || i.cvr?.includes(query)
+  );
+
+  async function openDetail(inst) {
+    setLoadingDetail(true);
+    setDetail({ inst, members: [], invitations: [], listings: [] });
+    const [{ data: members }, { data: invitations }, { data: listings }] = await Promise.all([
+      db.from('institution_members').select('*').eq('institution_id', inst.id),
+      db.from('institution_invitations').select('*').eq('institution_id', inst.id).order('created_at', { ascending: false }),
+      db.from('listings').select('id,title,is_active,listing_type,created_at').eq('institution_id', inst.id).order('created_at', { ascending: false }),
+    ]);
+    setDetail({ inst, members: members || [], invitations: invitations || [], listings: listings || [] });
+    setLoadingDetail(false);
+  }
+
+  return (
+    <div>
+      {/* Search */}
+      <div style={{ position: 'relative', maxWidth: 400, marginBottom: 20 }}>
+        <span style={{ position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)', color: INK3, display: 'flex' }}><IconSearch /></span>
+        <input value={query} onChange={e => setQuery(e.target.value)} placeholder="Søg på navn, by eller CVR…" style={{ width: '100%', padding: '10px 14px 10px 36px', border: `1.5px solid ${PAPER3}`, borderRadius: 10, fontFamily: FONT, fontSize: 14, background: PAPER2, color: INK, outline: 'none', boxSizing: 'border-box' }} />
+      </div>
+
+      {/* Table */}
+      <div style={{ background: PAPER2, border: `1px solid rgba(22,34,28,0.08)`, borderRadius: 16, overflow: 'hidden' }}>
+        <table style={{ width: '100%', borderCollapse: 'collapse', fontFamily: FONT, fontSize: 13 }}>
+          <thead>
+            <tr style={{ borderBottom: `1px solid ${PAPER3}` }}>
+              {['Institution', 'By', 'CVR', 'Opslag', 'Handling'].map(h => (
+                <th key={h} style={{ padding: '12px 16px', textAlign: 'left', color: INK3, fontWeight: 700, fontSize: 12, whiteSpace: 'nowrap' }}>{h}</th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {filtered.length === 0
+              ? <tr><td colSpan={5} style={{ padding: '28px 16px', textAlign: 'center', color: INK3, fontFamily: FONT }}>Ingen institutioner fundet</td></tr>
+              : filtered.map((inst, i) => (
+                <tr key={inst.id} style={{ borderBottom: i < filtered.length - 1 ? `1px solid ${PAPER3}` : 'none', background: detail?.inst?.id === inst.id ? GREEN_TINT : 'transparent', transition: 'background 0.15s' }}>
+                  <td style={{ padding: '13px 16px' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                      <div style={{ width: 32, height: 32, borderRadius: 8, background: GREEN_TINT, display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: FONT, fontWeight: 800, fontSize: 13, color: PRIMARY, flexShrink: 0 }}>
+                        {inst.logo_url ? <img src={inst.logo_url} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: 8 }} /> : inst.name?.charAt(0)?.toUpperCase()}
+                      </div>
+                      <span style={{ fontWeight: 700, color: INK }}>{inst.name}</span>
+                    </div>
+                  </td>
+                  <td style={{ padding: '13px 16px', color: INK2 }}>{inst.city || '—'}</td>
+                  <td style={{ padding: '13px 16px', color: INK3, fontFamily: 'monospace', fontSize: 12 }}>{inst.cvr || '—'}</td>
+                  <td style={{ padding: '13px 16px' }}>
+                    <span style={{ background: GREEN_TINT, color: PRIMARY, fontWeight: 700, fontSize: 12, padding: '3px 10px', borderRadius: 99 }}>
+                      {inst._listingCount ?? '…'}
+                    </span>
+                  </td>
+                  <td style={{ padding: '13px 16px' }}>
+                    <div style={{ display: 'flex', gap: 6 }}>
+                      <button onClick={() => openDetail(detail?.inst?.id === inst.id ? (setDetail(null) || null) : inst)} style={{ background: GREEN_TINT, border: `1px solid ${GREEN_SOFT}`, color: PRIMARY, borderRadius: 8, padding: '5px 12px', fontSize: 12, fontWeight: 700, cursor: 'pointer', fontFamily: FONT }}>
+                        {detail?.inst?.id === inst.id ? 'Luk' : 'Detaljer'}
+                      </button>
+                      <button
+                        onClick={() => setAdminInst(adminInst?.id === inst.id ? null : inst)}
+                        style={{ background: adminInst?.id === inst.id ? PRIMARY : PAPER3, border: 'none', color: adminInst?.id === inst.id ? '#fff' : INK2, borderRadius: 8, padding: '5px 12px', fontSize: 12, fontWeight: 700, cursor: 'pointer', fontFamily: FONT, display: 'flex', alignItems: 'center', gap: 5 }}
+                      >
+                        <IconEye /> {adminInst?.id === inst.id ? 'Stop' : 'Agér som'}
+                      </button>
+                    </div>
+                  </td>
+                </tr>
+              ))
+            }
+          </tbody>
+        </table>
+      </div>
+
+      {/* Detail panel */}
+      {detail && (
+        <div style={{ marginTop: 20, background: PAPER2, border: `1.5px solid ${GREEN_SOFT}`, borderRadius: 16, padding: '24px 28px' }}>
+          {loadingDetail ? <Spinner /> : <InstDetail detail={detail} />}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function InstCard({ inst, active, onSelect }) {
+  return (
+    <div style={{ background: active ? GREEN_TINT : PAPER2, border: `1.5px solid ${active ? PRIMARY : 'rgba(22,34,28,0.08)'}`, borderRadius: 12, padding: '14px 16px', display: 'flex', alignItems: 'center', gap: 12, cursor: 'pointer', transition: 'all 0.15s' }} onClick={onSelect}>
+      <div style={{ width: 36, height: 36, borderRadius: 10, background: active ? PRIMARY : PAPER3, display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: FONT, fontWeight: 800, fontSize: 14, color: active ? '#fff' : INK3, flexShrink: 0 }}>
+        {inst.name?.charAt(0)?.toUpperCase()}
+      </div>
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <div style={{ fontFamily: FONT, fontWeight: 700, fontSize: 13, color: active ? PRIMARY : INK, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{inst.name}</div>
+        <div style={{ fontFamily: FONT, fontSize: 11, color: INK3 }}>{inst.city || 'Ingen by'}</div>
+      </div>
+      {active && <span style={{ fontFamily: FONT, fontSize: 11, fontWeight: 700, color: PRIMARY }}>Aktiv</span>}
+    </div>
+  );
+}
+
+function InstDetail({ detail }) {
+  const { inst, members, invitations, listings } = detail;
+  return (
+    <div>
+      <h3 style={{ fontFamily: FONT, fontWeight: 800, fontSize: 18, color: INK, margin: '0 0 16px', letterSpacing: '-0.03em' }}>{inst.name}</h3>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))', gap: 10, marginBottom: 20 }}>
+        <InfoItem label="E-mail" value={inst.email || '—'} />
+        <InfoItem label="By" value={inst.city || '—'} />
+        <InfoItem label="CVR" value={inst.cvr || '—'} />
+        <InfoItem label="Institutionstype" value={inst.type || '—'} />
+        <InfoItem label="Oprettet" value={inst.created_at ? new Date(inst.created_at).toLocaleDateString('da-DK') : '—'} />
+      </div>
+
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 20 }}>
+        <div>
+          <p style={{ fontFamily: FONT, fontWeight: 700, fontSize: 12, color: INK3, textTransform: 'uppercase', letterSpacing: '0.06em', margin: '0 0 8px' }}>Medarbejdere ({members.length})</p>
+          {members.length === 0 ? <Empty text="Ingen" small /> : members.map(m => (
+            <div key={m.id} style={{ fontFamily: FONT, fontSize: 13, color: INK, padding: '6px 0', borderBottom: `1px solid ${PAPER3}`, display: 'flex', justifyContent: 'space-between' }}>
+              <span>{m.email}</span>
+              <span style={{ fontSize: 11, color: INK3, fontWeight: 600 }}>{m.role}</span>
+            </div>
+          ))}
+          {invitations.filter(i => !i.accepted_at && new Date(i.expires_at) > new Date()).length > 0 && (
+            <>
+              <p style={{ fontFamily: FONT, fontWeight: 700, fontSize: 12, color: CORAL, textTransform: 'uppercase', letterSpacing: '0.06em', margin: '14px 0 8px' }}>Afventer svar</p>
+              {invitations.filter(i => !i.accepted_at && new Date(i.expires_at) > new Date()).map(inv => (
+                <div key={inv.id} style={{ fontFamily: FONT, fontSize: 13, color: INK3, padding: '6px 0', borderBottom: `1px solid ${PAPER3}` }}>{inv.email}</div>
+              ))}
+            </>
+          )}
+        </div>
+        <div>
+          <p style={{ fontFamily: FONT, fontWeight: 700, fontSize: 12, color: INK3, textTransform: 'uppercase', letterSpacing: '0.06em', margin: '0 0 8px' }}>Opslag ({listings.length})</p>
+          {listings.length === 0 ? <Empty text="Ingen" small /> : listings.slice(0, 8).map(l => (
+            <div key={l.id} style={{ fontFamily: FONT, fontSize: 13, color: INK, padding: '6px 0', borderBottom: `1px solid ${PAPER3}`, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1, marginRight: 8 }}>{l.title}</span>
+              <span style={{ fontSize: 11, background: l.is_active ? GREEN_TINT : PAPER3, color: l.is_active ? PRIMARY : INK3, fontWeight: 700, padding: '2px 8px', borderRadius: 99, flexShrink: 0 }}>{l.is_active ? 'Aktiv' : 'Inaktiv'}</span>
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function InfoItem({ label, value }) {
+  return (
+    <div>
+      <div style={{ fontFamily: FONT, fontSize: 11, fontWeight: 700, color: INK3, textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 2 }}>{label}</div>
+      <div style={{ fontFamily: FONT, fontSize: 13, color: INK }}>{value}</div>
+    </div>
+  );
+}
+
+// ── Listings tab ─────────────────────────────────────────────────────────────
+
+function ListingsTab() {
+  const [listings, setListings] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [query, setQuery] = useState('');
+  const [filterType, setFilterType] = useState('');
+  const [filterActive, setFilterActive] = useState('');
+  const [confirm, setConfirm] = useState(null); // id to delete
+
+  const fetchAll = useCallback(async () => {
+    setLoading(true);
+    const { data } = await db.from('listings')
+      .select('id,title,listing_type,is_active,created_at,institution_id,institutions(name)')
+      .order('created_at', { ascending: false });
+    setListings(data || []);
+    setLoading(false);
+  }, []);
+
+  useEffect(() => { fetchAll(); }, [fetchAll]);
+
+  async function toggleActive(id, current) {
+    await db.from('listings').update({ is_active: !current }).eq('id', id);
+    setListings(prev => prev.map(l => l.id === id ? { ...l, is_active: !current } : l));
+  }
+
+  async function deleteListing(id) {
+    await db.from('listings').delete().eq('id', id);
+    setListings(prev => prev.filter(l => l.id !== id));
+    setConfirm(null);
+  }
+
+  const filtered = listings.filter(l => {
+    if (filterType && l.listing_type !== filterType) return false;
+    if (filterActive === 'active' && !l.is_active) return false;
+    if (filterActive === 'inactive' && l.is_active) return false;
+    if (query && !l.title?.toLowerCase().includes(query.toLowerCase()) && !l.institutions?.name?.toLowerCase().includes(query.toLowerCase())) return false;
+    return true;
+  });
+
+  return (
+    <div>
+      {/* Filters */}
+      <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', marginBottom: 20 }}>
+        <div style={{ position: 'relative', flex: '1 1 260px', minWidth: 200 }}>
+          <span style={{ position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)', color: INK3, display: 'flex' }}><IconSearch /></span>
+          <input value={query} onChange={e => setQuery(e.target.value)} placeholder="Søg på titel eller institution…" style={{ width: '100%', padding: '10px 14px 10px 36px', border: `1.5px solid ${PAPER3}`, borderRadius: 10, fontFamily: FONT, fontSize: 14, background: PAPER2, color: INK, outline: 'none', boxSizing: 'border-box' }} />
+        </div>
+        <select value={filterType} onChange={e => setFilterType(e.target.value)} style={{ padding: '10px 14px', border: `1.5px solid ${PAPER3}`, borderRadius: 10, fontFamily: FONT, fontSize: 13, background: PAPER2, color: INK, outline: 'none', cursor: 'pointer' }}>
+          <option value="">Alle typer</option>
+          <option value="køb">Køb</option>
+          <option value="byd">Byd</option>
+          <option value="byt">Byt</option>
+        </select>
+        <select value={filterActive} onChange={e => setFilterActive(e.target.value)} style={{ padding: '10px 14px', border: `1.5px solid ${PAPER3}`, borderRadius: 10, fontFamily: FONT, fontSize: 13, background: PAPER2, color: INK, outline: 'none', cursor: 'pointer' }}>
+          <option value="">Alle statusser</option>
+          <option value="active">Aktive</option>
+          <option value="inactive">Inaktive</option>
+        </select>
+      </div>
+
+      {loading ? <Spinner /> : (
+        <>
+          <div style={{ fontFamily: FONT, fontSize: 12, color: INK3, marginBottom: 10 }}>
+            Viser {filtered.length} af {listings.length} opslag
+          </div>
+          <div style={{ background: PAPER2, border: `1px solid rgba(22,34,28,0.08)`, borderRadius: 16, overflow: 'hidden' }}>
+            <table style={{ width: '100%', borderCollapse: 'collapse', fontFamily: FONT, fontSize: 13 }}>
+              <thead>
+                <tr style={{ borderBottom: `1px solid ${PAPER3}` }}>
+                  {['Titel', 'Institution', 'Type', 'Status', 'Oprettet', ''].map(h => (
+                    <th key={h} style={{ padding: '12px 16px', textAlign: 'left', color: INK3, fontWeight: 700, fontSize: 12, whiteSpace: 'nowrap' }}>{h}</th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {filtered.length === 0
+                  ? <tr><td colSpan={6} style={{ padding: '28px 16px', textAlign: 'center', color: INK3 }}>Ingen opslag fundet</td></tr>
+                  : filtered.map((l, i) => (
+                    <tr key={l.id} style={{ borderBottom: i < filtered.length - 1 ? `1px solid ${PAPER3}` : 'none' }}>
+                      <td style={{ padding: '12px 16px', fontWeight: 600, color: INK, maxWidth: 220 }}>
+                        <span style={{ display: 'block', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{l.title}</span>
+                      </td>
+                      <td style={{ padding: '12px 16px', color: INK2 }}>{l.institutions?.name || '—'}</td>
+                      <td style={{ padding: '12px 16px' }}>
+                        <TypeBadge type={l.listing_type} />
+                      </td>
+                      <td style={{ padding: '12px 16px' }}>
+                        <span style={{ background: l.is_active ? GREEN_TINT : PAPER3, color: l.is_active ? PRIMARY : INK3, fontWeight: 700, fontSize: 12, padding: '3px 10px', borderRadius: 99 }}>
+                          {l.is_active ? 'Aktiv' : 'Inaktiv'}
+                        </span>
+                      </td>
+                      <td style={{ padding: '12px 16px', color: INK3 }}>
+                        {new Date(l.created_at).toLocaleDateString('da-DK', { day: 'numeric', month: 'short', year: '2-digit' })}
+                      </td>
+                      <td style={{ padding: '12px 16px' }}>
+                        <div style={{ display: 'flex', gap: 6 }}>
+                          <button onClick={() => toggleActive(l.id, l.is_active)} title={l.is_active ? 'Deaktiver' : 'Aktiver'} style={{ background: l.is_active ? PAPER3 : GREEN_TINT, border: 'none', color: l.is_active ? INK3 : PRIMARY, borderRadius: 7, padding: '5px 8px', cursor: 'pointer', display: 'flex', alignItems: 'center' }}>
+                            <IconToggle on={!l.is_active} />
+                          </button>
+                          <button onClick={() => setConfirm(l.id)} title="Slet" style={{ background: '#FEF2F2', border: 'none', color: '#EF4444', borderRadius: 7, padding: '5px 8px', cursor: 'pointer', display: 'flex', alignItems: 'center' }}>
+                            <IconTrash />
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))
+                }
+              </tbody>
+            </table>
+          </div>
+        </>
+      )}
+
+      {/* Delete confirm */}
+      {confirm && (
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(22,34,28,0.35)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 9000 }}>
+          <div style={{ background: PAPER2, borderRadius: 20, padding: '32px 36px', maxWidth: 400, width: '90%', boxShadow: '0 20px 60px rgba(22,34,28,0.25)', textAlign: 'center' }}>
+            <div style={{ fontFamily: FONT, fontWeight: 800, fontSize: 20, color: INK, marginBottom: 10 }}>Slet opslag?</div>
+            <p style={{ fontFamily: FONT, fontSize: 14, color: INK3, marginBottom: 24 }}>Dette kan ikke fortrydes. Alle tilknyttede samtaler vil også blive slettet.</p>
+            <div style={{ display: 'flex', gap: 10, justifyContent: 'center' }}>
+              <button onClick={() => setConfirm(null)} style={{ padding: '11px 24px', borderRadius: 99, border: `1.5px solid ${PAPER3}`, background: PAPER2, fontFamily: FONT, fontWeight: 700, fontSize: 14, color: INK2, cursor: 'pointer' }}>Annuller</button>
+              <button onClick={() => deleteListing(confirm)} style={{ padding: '11px 24px', borderRadius: 99, border: 'none', background: CORAL, fontFamily: FONT, fontWeight: 700, fontSize: 14, color: '#fff', cursor: 'pointer' }}>Slet permanent</button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ── Helpers ──────────────────────────────────────────────────────────────────
+
+function SectionHead({ title, style: s }) {
+  return <h3 style={{ fontFamily: FONT, fontWeight: 700, fontSize: 14, color: INK2, margin: '0 0 12px', letterSpacing: '-0.01em', ...s }}>{title}</h3>;
+}
+
+function Spinner() {
+  return <div style={{ padding: '48px 0', textAlign: 'center', fontFamily: FONT, color: INK3, fontSize: 14 }}>Indlæser…</div>;
+}
+
+function Empty({ text, small }) {
+  return <div style={{ fontFamily: FONT, fontSize: small ? 12 : 14, color: INK3, padding: small ? '8px 0' : '24px 0' }}>{text}</div>;
+}
+
+function StatusBadge({ status }) {
+  const map = {
+    completed: { label: 'Afsluttet', bg: GREEN_TINT, color: PRIMARY },
+    rejected: { label: 'Afvist', bg: '#FEF2F2', color: '#EF4444' },
+    active: { label: 'Aktiv', bg: PAPER3, color: INK2 },
+  };
+  const s = map[status] || { label: status || 'Ukendt', bg: PAPER3, color: INK3 };
+  return <span style={{ background: s.bg, color: s.color, fontFamily: FONT, fontWeight: 700, fontSize: 11, padding: '3px 10px', borderRadius: 99 }}>{s.label}</span>;
+}
+
+function TypeBadge({ type }) {
+  const map = { køb: { label: 'Køb', bg: GREEN_TINT, color: PRIMARY }, byd: { label: 'Byd', bg: '#E6EEF7', color: SKY }, byt: { label: 'Byt', bg: '#FCEAE6', color: CORAL } };
+  const s = map[type] || { label: type, bg: PAPER3, color: INK3 };
+  return <span style={{ background: s.bg, color: s.color, fontFamily: FONT, fontWeight: 700, fontSize: 12, padding: '3px 10px', borderRadius: 99 }}>{s.label}</span>;
+}
