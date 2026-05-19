@@ -152,7 +152,7 @@ export default function DashboardClient() {
       }
       if (!cancelled && incoming) setIncomingConvs(incoming);
 
-      const { data: ss } = await db.from('saved_searches').select('*').eq('email', user.email).order('created_at', { ascending: false });
+      const { data: ss } = await db.from('saved_searches').select('*').ilike('email', user.email).order('created_at', { ascending: false });
       if (!cancelled && ss) setSavedSearches(ss);
 
       if (!cancelled) setInstLoading(false);

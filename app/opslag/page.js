@@ -144,12 +144,12 @@ export default function OpslagPage() {
       if (maxDist !== 'alle') filters.maxDist = maxDist;
       await db.from('saved_searches').insert({
         institution_id: inst?.id || null,
-        email: inst?.email || user.email,
+        email: user.email,
         institution_name: inst?.name || null,
         name: saveSearchName.trim(),
         filters,
       });
-      showToast?.('Søgning gemt! Vi notificerer jer ved nye match 🔔');
+      showToast?.('Søgning gemt! Slå notifikationer til på dit dashboard 🔔');
     } catch {}
     setSavingSearch(false);
     setSaveSearchModal(false);
@@ -435,7 +435,7 @@ export default function OpslagPage() {
         <div onClick={()=>setSaveSearchModal(false)} style={{ position:'fixed', inset:0, background:'rgba(22,34,28,0.5)', zIndex:2000, display:'flex', alignItems:'center', justifyContent:'center', padding:24 }}>
           <div onClick={e=>e.stopPropagation()} style={{ background:'#FDFAF4', borderRadius:20, padding:28, width:'100%', maxWidth:400, boxShadow:'0 20px 60px rgba(0,0,0,0.2)' }}>
             <h2 style={{ fontFamily:FONT, fontWeight:800, fontSize:20, color:'#16221C', marginBottom:8, marginTop:0 }}>Gem søgning 🔔</h2>
-            <p style={{ fontSize:13, color:'#6B7570', marginBottom:20, fontFamily:FONT }}>Vi notificerer jer på e-mail når nye opslag matcher denne søgning.</p>
+            <p style={{ fontSize:13, color:'#6B7570', marginBottom:20, fontFamily:FONT }}>Gem dine aktive filtre. Du kan slå e-mail-notifikationer til/fra på dit dashboard.</p>
             <label style={{ display:'block', fontFamily:FONT, fontWeight:700, fontSize:13, color:'#3A473D', marginBottom:6 }}>Navn på søgning</label>
             <input
               value={saveSearchName}
