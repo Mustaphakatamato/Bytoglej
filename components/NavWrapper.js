@@ -3,7 +3,7 @@ import { usePathname, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { useApp, useActiveUser } from '@/providers/AppProvider';
 import { db } from '@/lib/supabase';
-import { PRIMARY, GREEN_DEEP, GREEN_SOFT, GREEN_TINT, INK, PAPER } from '@/lib/constants';
+import { PRIMARY, GREEN_TINT, INK, PAPER } from '@/lib/constants';
 import { useWindowWidth } from '@/lib/hooks';
 import { useState, useEffect } from 'react';
 import { Btn } from '@/components/ui';
@@ -29,25 +29,6 @@ export default function NavWrapper() {
 
   return (
     <>
-      {isAdmin && loggedIn && (
-        <div style={{ background:GREEN_DEEP, color:'#fff', padding:'7px 20px', display:'flex', alignItems:'center', gap:12, fontSize:13, fontFamily:"'Sora',sans-serif", position:'fixed', top:0, left:0, right:0, zIndex:9999, flexWrap:'wrap' }}>
-          <Link href="/admin" style={{ fontWeight:800, fontSize:12, color:GREEN_SOFT, letterSpacing:'0.04em', textDecoration:'none', textTransform:'uppercase', flexShrink:0 }}>Admin</Link>
-          <div style={{ width:1, height:16, background:'rgba(255,255,255,0.15)', flexShrink:0 }} />
-          <select
-            value={adminInst?.id || ''}
-            onChange={e => { const i = allInstitutions.find(x => x.id === e.target.value); setAdminInst(i || null); }}
-            style={{ background:'rgba(255,255,255,0.1)', color:'#fff', border:'1px solid rgba(255,255,255,0.2)', borderRadius:6, padding:'4px 10px', fontSize:12, cursor:'pointer', maxWidth:280 }}>
-            <option value="">— Agér som institution —</option>
-            {allInstitutions.map(i => <option key={i.id} value={i.id}>{i.name}{i.city ? ` · ${i.city}` : ''}</option>)}
-          </select>
-          {adminInst && (
-            <>
-              <span style={{ fontSize:12, color:'rgba(255,255,255,0.75)' }}>Viser som: <strong style={{ color:'#fff' }}>{adminInst.name}</strong></span>
-              <button onClick={()=>setAdminInst(null)} style={{ background:'rgba(255,255,255,0.15)', color:'#fff', border:'none', borderRadius:6, padding:'3px 10px', cursor:'pointer', fontSize:11, fontWeight:700, fontFamily:"'Sora',sans-serif" }}>✕ Afslut</button>
-            </>
-          )}
-        </div>
-      )}
       <Nav
         pathname={pathname}
         navigate={p => { router.push(p); window.scrollTo({ top:0, behavior:'smooth' }); }}
@@ -55,7 +36,6 @@ export default function NavWrapper() {
         setLoggedIn={setLoggedIn}
         unreadTotal={unreadTotal}
         institution={institution}
-        adminBar={isAdmin && loggedIn}
         isAdmin={isAdmin}
       />
       {toast && <ToastDisplay msg={toast.msg} type={toast.type} onDone={()=>setToast(null)} />}
@@ -73,7 +53,7 @@ function ToastDisplay({ msg, type='success', onDone }) {
   );
 }
 
-function Nav({ pathname, navigate, loggedIn, setLoggedIn, unreadTotal, institution, adminBar, isAdmin }) {
+function Nav({ pathname, navigate, loggedIn, setLoggedIn, unreadTotal, institution, isAdmin }) {
   const [scrolled, setScrolled] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
   const w = useWindowWidth();
@@ -89,12 +69,11 @@ function Nav({ pathname, navigate, loggedIn, setLoggedIn, unreadTotal, instituti
 
   const isHome = pathname === '/';
   const transparent = isHome && !scrolled && !menuOpen;
-  const navTop = adminBar ? 36 : 0;
 
   function go(path) { navigate(path); }
 
   return (
-    <nav style={{ position:'fixed', top:navTop, left:0, right:0, zIndex:500, background:transparent?'transparent':'rgba(246,242,234,0.96)', backdropFilter:transparent?'none':'blur(18px)', boxShadow:transparent?'none':'0 1px 0 rgba(22,34,28,0.08)', transition:'all 0.3s' }}>
+    <nav style={{ position:'fixed', top:0, left:0, right:0, zIndex:500, background:transparent?'transparent':'rgba(246,242,234,0.96)', backdropFilter:transparent?'none':'blur(18px)', boxShadow:transparent?'none':'0 1px 0 rgba(22,34,28,0.08)', transition:'all 0.3s' }}>
       <div style={{ maxWidth:1140, margin:'0 auto', display:'flex', alignItems:'center', height:68, gap:isMobile?12:24, padding:'0 16px' }}>
         <Link href="/" style={{ display:'flex', alignItems:'center', gap:10, cursor:'pointer', flexShrink:0, textDecoration:'none' }}>
           <Mark09 size={36} bg={transparent ? 'rgba(255,255,255,0.15)' : PRIMARY} />
