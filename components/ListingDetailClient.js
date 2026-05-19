@@ -2,7 +2,9 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { db } from '@/lib/supabase';
-import { PRIMARY, ACCENT, ACCENT2 } from '@/lib/constants';
+import { PRIMARY, GREEN_DEEP, GREEN_SOFT, GREEN_TINT, PAPER, PAPER2, PAPER3, INK, INK2, INK3, CORAL, SKY, ACCENT, ACCENT2 } from '@/lib/constants';
+
+const FONT = "'Sora', sans-serif";
 import { useWindowWidth } from '@/lib/hooks';
 import { useApp, useActiveUser } from '@/providers/AppProvider';
 import { Badge, Btn, Spinner, Modal } from '@/components/ui';
@@ -33,7 +35,7 @@ function ImageGallery({ images, color, emoji }) {
       {images.length > 1 && (
         <div style={{ display:'flex', gap:8, marginTop:10, overflowX:'auto', paddingBottom:4 }}>
           {images.map((src,i)=>(
-            <div key={i} onClick={()=>setActive(i)} style={{ width:72, height:72, borderRadius:12, overflow:'hidden', flexShrink:0, cursor:'pointer', border:`2.5px solid ${i===active?'#06D6A0':'transparent'}`, transition:'border-color 0.15s' }}>
+            <div key={i} onClick={()=>setActive(i)} style={{ width:72, height:72, borderRadius:12, overflow:'hidden', flexShrink:0, cursor:'pointer', border:`2.5px solid ${i===active?PRIMARY:'transparent'}`, transition:'border-color 0.15s' }}>
               <img src={src} alt="" style={{ width:'100%', height:'100%', objectFit:'cover' }} />
             </div>
           ))}
@@ -117,11 +119,11 @@ export default function ListingDetailClient() {
 
   if (!listing) {
     return (
-      <div style={{ minHeight:'100vh', display:'flex', alignItems:'center', justifyContent:'center', paddingTop:80 }}>
+      <div style={{ minHeight:'100vh', display:'flex', alignItems:'center', justifyContent:'center', paddingTop:80, background:PAPER }}>
         <div style={{ textAlign:'center' }}>
-          <div style={{ fontSize:56, marginBottom:16 }}>📭</div>
-          <div style={{ fontFamily:"'Nunito',sans-serif", fontWeight:800, fontSize:22, marginBottom:16 }}>Intet opslag valgt</div>
-          <button onClick={()=>router.push('/opslag')} style={{ background:'none', border:`1.5px solid ${PRIMARY}`, color:PRIMARY, borderRadius:99, padding:'10px 22px', fontSize:14, fontWeight:700, cursor:'pointer' }}>← Tilbage til markedsplads</button>
+          <div style={{ fontFamily:"'Sora',sans-serif", fontWeight:800, fontSize:80, color:GREEN_SOFT, lineHeight:1, marginBottom:16, userSelect:'none' }}>—</div>
+          <div style={{ fontFamily:"'Sora',sans-serif", fontWeight:800, fontSize:22, marginBottom:16, color:INK }}>Intet opslag valgt</div>
+          <button onClick={()=>router.push('/opslag')} style={{ background:'none', border:`1.5px solid ${PRIMARY}`, color:PRIMARY, borderRadius:99, padding:'10px 22px', fontSize:14, fontWeight:700, cursor:'pointer', fontFamily:"'Sora',sans-serif" }}>← Tilbage til markedsplads</button>
         </div>
       </div>
     );
@@ -366,9 +368,9 @@ export default function ListingDetailClient() {
   const isMobile = ww < 768;
 
   return (
-    <div style={{ minHeight:'100vh', paddingTop:80, background:'#fffcf8' }} className="page-enter">
+    <div style={{ minHeight:'100vh', paddingTop:80, background:PAPER }} className="page-enter">
       <div style={{ maxWidth:1140, margin:'0 auto', padding:'24px 16px 0' }}>
-        <button onClick={()=>router.push('/opslag')} style={{ background:'none', border:'none', fontSize:14, fontWeight:600, color:'#666', cursor:'pointer', display:'flex', alignItems:'center', gap:6, padding:'8px 0', fontFamily:"'Nunito Sans',sans-serif" }}>← Tilbage til markedsplads</button>
+        <button onClick={()=>router.push('/opslag')} style={{ background:'none', border:'none', fontSize:14, fontWeight:600, color:INK3, cursor:'pointer', display:'flex', alignItems:'center', gap:6, padding:'8px 0', fontFamily:FONT }}>← Tilbage til markedsplads</button>
       </div>
       <div style={{ maxWidth:1140, margin:'0 auto', padding:isMobile?'16px 16px':'20px 24px' }}>
         <div style={{ display:'grid', gridTemplateColumns:isMobile?'1fr':'1fr 380px', gap:isMobile?24:40, alignItems:'start' }}>
@@ -380,31 +382,30 @@ export default function ListingDetailClient() {
               <span style={{ fontSize:13, color:'#888' }}>👶 {listing.age_group}</span>
               <span style={{ fontSize:13, color:listing.condition==='Ny'?PRIMARY:'#888', fontWeight:600 }}>Stand: {listing.condition}</span>
             </div>
-            <h1 style={{ fontFamily:"'Nunito',sans-serif", fontWeight:900, fontSize:isMobile?24:30, letterSpacing:'-0.5px', marginBottom:8 }}>{listing.title}</h1>
-            <p style={{ color:'#888', fontSize:14, marginBottom:16 }}>Opslået af <strong onClick={()=>goToInstitution(listing.institution_name)} style={{ color:PRIMARY, cursor:'pointer', textDecoration:'underline' }}>{listing.institution_name}</strong></p>
-            <p style={{ color:'#555', lineHeight:1.75, fontSize:15, marginBottom:isMobile?20:32 }}>{listing.description}</p>
+            <h1 style={{ fontFamily:FONT, fontWeight:800, fontSize:isMobile?24:30, letterSpacing:'-0.03em', marginBottom:8, color:INK }}>{listing.title}</h1>
+            <p style={{ color:INK3, fontSize:14, marginBottom:16, fontFamily:FONT }}>Opslået af <strong onClick={()=>goToInstitution(listing.institution_name)} style={{ color:PRIMARY, cursor:'pointer', textDecoration:'underline', textDecorationColor:GREEN_SOFT }}>{listing.institution_name}</strong></p>
+            <p style={{ color:INK2, lineHeight:1.75, fontSize:15, marginBottom:isMobile?20:32, fontFamily:FONT }}>{listing.description}</p>
             {!isOwn && (
-              <div style={{ background:'#fff', borderRadius:20, padding:isMobile?18:24, boxShadow:'0 2px 12px rgba(0,0,0,0.06)' }}>
-                <h3 style={{ fontFamily:"'Nunito',sans-serif", fontWeight:800, fontSize:18, marginBottom:8 }}>Kontakt institutionen</h3>
-                <p style={{ fontSize:13, color:'#888', marginBottom:16, lineHeight:1.55 }}>Send en besked direkte til {listing.institution_name} for at aftale nærmere, byde en pris eller foreslå et bytte.</p>
+              <div style={{ background:GREEN_TINT, borderRadius:20, padding:isMobile?18:24, borderLeft:`3px solid ${PRIMARY}` }}>
+                <h3 style={{ fontFamily:FONT, fontWeight:800, fontSize:18, marginBottom:8, color:INK }}>Kontakt institutionen</h3>
+                <p style={{ fontSize:13, color:INK3, marginBottom:16, lineHeight:1.55, fontFamily:FONT }}>Send en besked direkte til {listing.institution_name} for at aftale nærmere, byde en pris eller foreslå et bytte.</p>
                 <Btn variant="primary" color={PRIMARY} radius={22} onClick={()=>onStartConv && onStartConv(listing)} style={{ padding:'12px 24px', width:'100%', justifyContent:'center', fontSize:15 }}>
                   💬 Åbn besked
                 </Btn>
               </div>
             )}
             {isOwn && (
-              <div style={{ background:'#f0f9f4', borderRadius:20, padding:20, border:`1.5px solid #c6e8d4`, textAlign:'center' }}>
-                <div style={{ fontSize:24, marginBottom:6 }}>✏️</div>
-                <div style={{ fontWeight:700, fontSize:14, color:PRIMARY, marginBottom:4 }}>Dit eget opslag</div>
-                <div style={{ fontSize:13, color:'#5a9a74' }}>Rediger det fra din dashboard</div>
+              <div style={{ background:GREEN_TINT, borderRadius:20, padding:20, border:`1.5px solid ${GREEN_SOFT}`, textAlign:'center' }}>
+                <div style={{ fontFamily:FONT, fontWeight:800, fontSize:14, color:PRIMARY, marginBottom:4 }}>Dit eget opslag</div>
+                <div style={{ fontSize:13, color:INK3, fontFamily:FONT }}>Rediger det fra din dashboard</div>
               </div>
             )}
           </div>
 
           <div style={{ position:isMobile?'static':'sticky', top:96 }}>
-            <div style={{ background:'#fff', borderRadius:22, padding:28, boxShadow:'0 4px 28px rgba(0,0,0,0.10)', marginBottom:14 }}>
-              {listing.price && <div style={{ fontFamily:"'Nunito',sans-serif", fontWeight:900, fontSize:36, color:PRIMARY, marginBottom:8 }}>{listing.price} kr.</div>}
-              {bidCount > 0 && <div style={{ color:'#888', fontSize:13, marginBottom:16 }}><strong style={{ color:ACCENT2 }}>{bidCount} bud</strong> afgivet</div>}
+            <div style={{ background:PAPER2, borderRadius:22, padding:28, border:`1px solid ${PAPER3}`, marginBottom:14 }}>
+              {listing.price && <div style={{ fontFamily:FONT, fontWeight:800, fontSize:36, color:PRIMARY, marginBottom:8, letterSpacing:'-0.03em' }}>{listing.price} kr.</div>}
+              {bidCount > 0 && <div style={{ color:INK3, fontSize:13, marginBottom:16, fontFamily:FONT }}><strong style={{ color:SKY }}>{bidCount} bud</strong> afgivet</div>}
               <div style={{ display:'flex', flexDirection:'column', gap:10 }}>
                 {!isOwn && listing.type==='køb' && <Btn variant="primary" color={PRIMARY} radius={22} onClick={()=>setBuyModal(true)} style={{ justifyContent:'center', padding:'14px', fontSize:15 }}>🏷️ Køb nu — {listing.price} kr.</Btn>}
                 {!isOwn && listing.type==='byd' && <Btn variant="primary" color={ACCENT2} radius={22} onClick={()=>setBidModal(true)} style={{ justifyContent:'center', padding:'14px', fontSize:15 }}>📊 Afgiv bud</Btn>}
@@ -419,21 +420,21 @@ export default function ListingDetailClient() {
                   </button>
                 )}
               </div>
-              <div style={{ borderTop:'1px solid #f0f0f0', marginTop:20, paddingTop:16, display:'flex', flexDirection:'column', gap:10 }}>
-                {[['🏢','Institution',listing.institution_name,'inst'],['📍','By',listing.city],['👶','Aldersgruppe',listing.age_group],['⭐','Stand',listing.condition]].map(([icon,label,val,key],i) => (
-                  <div key={i} style={{ display:'flex', justifyContent:'space-between', fontSize:13 }}>
-                    <span style={{ color:'#999' }}>{icon} {label}</span>
+              <div style={{ borderTop:`1px solid ${PAPER3}`, marginTop:20, paddingTop:16, display:'flex', flexDirection:'column', gap:10 }}>
+                {[['Institution',listing.institution_name,'inst'],['By',listing.city],['Aldersgruppe',listing.age_group],['Stand',listing.condition]].map(([label,val,key],i) => (
+                  <div key={i} style={{ display:'flex', justifyContent:'space-between', fontSize:13, fontFamily:FONT }}>
+                    <span style={{ color:INK3 }}>{label}</span>
                     <span onClick={key==='inst' ? ()=>goToInstitution(val) : undefined}
-                      style={{ fontWeight:600, cursor:key==='inst'?'pointer':'default', color:key==='inst'?PRIMARY:'inherit', textDecoration:key==='inst'?'underline':'none' }}>{val}</span>
+                      style={{ fontWeight:600, cursor:key==='inst'?'pointer':'default', color:key==='inst'?PRIMARY:INK2, textDecoration:key==='inst'?'underline':'none', textDecorationColor:GREEN_SOFT }}>{val}</span>
                   </div>
                 ))}
               </div>
             </div>
-            <div style={{ background:'#E8F5EE', borderRadius:16, padding:'14px 18px', display:'flex', gap:10, alignItems:'center' }}>
-              <span style={{ fontSize:20 }}>✅</span>
+            <div style={{ background:GREEN_TINT, borderRadius:16, padding:'14px 18px', display:'flex', gap:12, alignItems:'center', borderLeft:`3px solid ${PRIMARY}` }}>
+              <div style={{ width:8, height:8, borderRadius:'50%', background:PRIMARY, flexShrink:0 }} />
               <div>
-                <div style={{ fontFamily:"'Nunito',sans-serif", fontWeight:700, fontSize:13, color:PRIMARY }}>CVR-verificeret institution</div>
-                <div style={{ fontSize:12, color:'#5a9a74' }}>Handler sker sikkert via platformen</div>
+                <div style={{ fontFamily:FONT, fontWeight:700, fontSize:13, color:PRIMARY }}>CVR-verificeret institution</div>
+                <div style={{ fontSize:12, color:INK3, fontFamily:FONT }}>Handler sker sikkert via platformen</div>
               </div>
             </div>
           </div>
@@ -443,28 +444,27 @@ export default function ListingDetailClient() {
       <Modal open={buyModal} onClose={()=>{ setBuyModal(false); setBuyStep(1); }} title={buyStep===1?"Køb vare":"Er du sikker?"}>
         {buyStep===1 ? (
           <div style={{ display:'flex', flexDirection:'column', gap:16 }}>
-            <div style={{ background:'#f8f7f5', borderRadius:12, padding:16 }}>
-              <div style={{ fontFamily:"'Nunito',sans-serif", fontWeight:700, fontSize:16 }}>{listing.title}</div>
-              <div style={{ color:'#888', fontSize:13, marginTop:4 }}>{listing.institution_name} · {listing.city}</div>
+            <div style={{ background:PAPER2, borderRadius:12, padding:16 }}>
+              <div style={{ fontFamily:FONT, fontWeight:700, fontSize:16, color:INK }}>{listing.title}</div>
+              <div style={{ color:INK3, fontSize:13, marginTop:4, fontFamily:FONT }}>{listing.institution_name} · {listing.city}</div>
             </div>
-            <div style={{ display:'flex', justifyContent:'space-between', fontSize:15, fontWeight:600 }}>
-              <span>Pris</span>
-              <span style={{ color:PRIMARY, fontFamily:"'Nunito',sans-serif", fontWeight:900, fontSize:18 }}>{listing.price} kr.</span>
+            <div style={{ display:'flex', justifyContent:'space-between', fontSize:15, fontWeight:600, fontFamily:FONT }}>
+              <span style={{ color:INK2 }}>Pris</span>
+              <span style={{ color:PRIMARY, fontWeight:800, fontSize:18 }}>{listing.price} kr.</span>
             </div>
-            <div style={{ background:'#fffbef', border:'1.5px solid #ffe08a', borderRadius:10, padding:'12px 14px', fontSize:13, color:'#7a6000' }}>💡 Betaling og afhentning aftales direkte med institutionen efter bekræftelse.</div>
+            <div style={{ background:GREEN_TINT, border:`1px solid ${GREEN_SOFT}`, borderRadius:10, padding:'12px 14px', fontSize:13, color:INK2, fontFamily:FONT }}>Betaling og afhentning aftales direkte med institutionen efter bekræftelse.</div>
             <Btn variant="primary" color={PRIMARY} radius={22} onClick={()=>setBuyStep(2)} style={{ justifyContent:'center', padding:'14px', fontSize:15 }}>Fortsæt →</Btn>
             <Btn variant="ghost" onClick={()=>{ setBuyModal(false); setBuyStep(1); }} style={{ justifyContent:'center' }}>Annuller</Btn>
           </div>
         ) : (
           <div style={{ display:'flex', flexDirection:'column', gap:16 }}>
-            <div style={{ background:'#e8f5ee', border:`2px solid ${PRIMARY}`, borderRadius:12, padding:16, textAlign:'center' }}>
-              <div style={{ fontSize:32, marginBottom:8 }}>🛒</div>
-              <div style={{ fontFamily:"'Nunito',sans-serif", fontWeight:800, fontSize:16 }}>Bekræft køb af</div>
-              <div style={{ fontFamily:"'Nunito',sans-serif", fontWeight:700, fontSize:15, color:PRIMARY, marginTop:4 }}>{listing.title}</div>
-              <div style={{ fontWeight:900, fontSize:22, color:PRIMARY, marginTop:8 }}>{listing.price} kr.</div>
-              <div style={{ color:'#888', fontSize:13, marginTop:4 }}>fra {listing.institution_name}</div>
+            <div style={{ background:GREEN_TINT, border:`2px solid ${PRIMARY}`, borderRadius:12, padding:16, textAlign:'center' }}>
+              <div style={{ fontFamily:FONT, fontWeight:800, fontSize:16, color:INK }}>Bekræft køb af</div>
+              <div style={{ fontFamily:FONT, fontWeight:700, fontSize:15, color:PRIMARY, marginTop:4 }}>{listing.title}</div>
+              <div style={{ fontWeight:800, fontSize:22, color:PRIMARY, marginTop:8, fontFamily:FONT }}>{listing.price} kr.</div>
+              <div style={{ color:INK3, fontSize:13, marginTop:4, fontFamily:FONT }}>fra {listing.institution_name}</div>
             </div>
-            <div style={{ fontSize:13, color:'#666', textAlign:'center' }}>Sælger modtager en besked og kontakter dig for at aftale betaling og afhentning.</div>
+            <div style={{ fontSize:13, color:INK3, textAlign:'center', fontFamily:FONT }}>Sælger modtager en besked og kontakter dig for at aftale betaling og afhentning.</div>
             <Btn variant="primary" color={PRIMARY} radius={22} onClick={handleBuy} disabled={saving} style={{ justifyContent:'center', padding:'14px', fontSize:15 }}>{saving?<><Spinner/>Sender…</>:'✅ Bekræft køb'}</Btn>
             <Btn variant="ghost" onClick={()=>setBuyStep(1)} style={{ justifyContent:'center' }}>← Tilbage</Btn>
           </div>
@@ -473,9 +473,9 @@ export default function ListingDetailClient() {
 
       <Modal open={bidModal} onClose={()=>setBidModal(false)} title="Afgiv bud">
         <div style={{ display:'flex', flexDirection:'column', gap:16 }}>
-          <div style={{ background:'#f8f7f5', borderRadius:12, padding:16 }}>
-            <div style={{ fontFamily:"'Nunito',sans-serif", fontWeight:700, fontSize:16 }}>{listing.title}</div>
-            <div style={{ color:'#888', fontSize:13, marginTop:4 }}>{bidCount} nuværende bud{listing.min_bid ? ` · Mindste bud: ${listing.min_bid} kr.` : ''}</div>
+          <div style={{ background:PAPER2, borderRadius:12, padding:16 }}>
+            <div style={{ fontFamily:FONT, fontWeight:700, fontSize:16, color:INK }}>{listing.title}</div>
+            <div style={{ color:INK3, fontSize:13, marginTop:4, fontFamily:FONT }}>{bidCount} nuværende bud{listing.min_bid ? ` · Mindste bud: ${listing.min_bid} kr.` : ''}</div>
           </div>
           {existingBid ? (
             <div style={{ display:'flex', flexDirection:'column', gap:12 }}>
@@ -515,9 +515,9 @@ export default function ListingDetailClient() {
 
       <Modal open={swapModal} onClose={()=>{ setSwapModal(false); setSelectedSwapId(null); setSwapOffer(''); }} title="Foreslå bytte">
         <div style={{ display:'flex', flexDirection:'column', gap:16 }}>
-          <div style={{ background:'#FEF0E3', borderRadius:12, padding:16 }}>
-            <div style={{ fontSize:13, color:'#c05a0a', fontWeight:600, marginBottom:4 }}>De tilbyder:</div>
-            <div style={{ fontFamily:"'Nunito',sans-serif", fontWeight:700, fontSize:16 }}>{listing.title}</div>
+          <div style={{ background:'#FCEAE6', borderRadius:12, padding:16, borderLeft:`3px solid ${CORAL}` }}>
+            <div style={{ fontSize:13, color:CORAL, fontWeight:600, marginBottom:4, fontFamily:FONT }}>De tilbyder:</div>
+            <div style={{ fontFamily:FONT, fontWeight:700, fontSize:16, color:INK }}>{listing.title}</div>
           </div>
           <div>
             <label style={{ display:'block', fontSize:13, fontWeight:700, marginBottom:10 }}>Vælg hvad I tilbyder i bytte:</label>
