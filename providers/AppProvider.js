@@ -37,7 +37,6 @@ export function AppProvider({ children }) {
   async function loadInstitution(email) {
     const e = email.toLowerCase();
 
-<<<<<<< HEAD
     // Platform admin — no institution binding, neutral start
     if (e === ADMIN_EMAIL.toLowerCase()) {
       setIsAdmin(true);
