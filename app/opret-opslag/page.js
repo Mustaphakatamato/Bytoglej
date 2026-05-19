@@ -1,0 +1,395 @@
+'use client';
+import { useState, useEffect, useRef } from 'react';
+import { useRouter } from 'next/navigation';
+import { db } from '@/lib/supabase';
+import { PRIMARY, GREEN_DEEP, GREEN_SOFT, GREEN_TINT, PAPER, PAPER2, PAPER3, INK, INK2, INK3, CORAL, TYPE_CFG, CONDITIONS, AGE_GROUPS, LISTING_TAGS } from '@/lib/constants';
+import { useWindowWidth } from '@/lib/hooks';
+import { useApp, useActiveUser } from '@/providers/AppProvider';
+import { Spinner } from '@/components/ui';
+
+const FONT = "'Sora', sans-serif";
+
+const EMOJIS = ['🧸','🎨','🎲','🚂','⚽','🎭','🎪','🎠','🏗️','🎡','🎯','🪁','🛝','🏖️','🎋','🪆','🎀','🪀','🎈','🪃'];
+const COLORS = ['#FFD166','#FF6B6B','#4ECDC4','#45B7D1','#96CEB4','#FFEAA7','#DDA0DD','#98D8C8','#F7DC6F','#BB8FCE'];
+
+const SCAN_MSGS = [
+  { icon:'🔍', text:'Scanner billedet for personer…' },
+  { icon:'🛡️', text:'Beskytter børns privatliv…' },
+  { icon:'🤖', text:'AI-model analyserer pixels…' },
+  { icon:'🔬', text:'Tjekker ansigter og silhuetter…' },
+  { icon:'✨', text:'Næsten der…' },
+];
+
+function ScanningLoader() {
+  const [idx, setIdx] = useState(0);
+  const [fade, setFade] = useState(true);
+  useEffect(() => {
+    const iv = setInterval(() => {
+      setFade(false);
+      setTimeout(() => { setIdx(i => (i + 1) % SCAN_MSGS.length); setFade(true); }, 300);
+    }, 1800);
+    return () => clearInterval(iv);
+  }, []);
+  const msg = SCAN_MSGS[idx];
+  return (
+    <div style={{ border:`2px dashed ${GREEN_SOFT}`, borderRadius:14, padding:'32px 20px', textAlign:'center', background:GREEN_TINT }}>
+      <div style={{ fontSize:38, marginBottom:10, transition:'opacity 0.3s', opacity:fade?1:0 }}>{msg.icon}</div>
+      <div style={{ fontSize:14, fontWeight:700, color:PRIMARY, marginBottom:6, transition:'opacity 0.3s', opacity:fade?1:0, fontFamily:FONT }}>{msg.text}</div>
+      <div style={{ margin:'12px auto 0', width:'80%', height:4, background:PAPER3, borderRadius:99, overflow:'hidden', position:'relative' }}>
+        <div style={{ position:'absolute', left:0, top:0, height:'100%', width:'40%', background:PRIMARY, borderRadius:99, animation:'scanBar 1.4s ease-in-out infinite' }} />
+      </div>
+      <div style={{ fontSize:11, color:INK3, marginTop:10, fontFamily:FONT }}>Dette tager typisk 2–5 sekunder</div>
+    </div>
+  );
+}
+
+function PreviewCard({ form, imgPreview }) {
+  const tc = TYPE_CFG[form.type] || { label: form.type, color: INK3, bg: PAPER2 };
+  return (
+    <div style={{ background:PAPER2, borderRadius:20, overflow:'hidden', border:'1px solid rgba(22,34,28,0.06)', boxShadow:'0 4px 24px rgba(22,34,28,0.10)' }}>
+      <div style={{ height:200, background:imgPreview ? '#ddd' : (form.color || GREEN_TINT), display:'flex', alignItems:'center', justifyContent:'center', position:'relative', overflow:'hidden' }}>
+        {imgPreview
+          ? <img src={imgPreview} alt="" style={{ width:'100%', height:'100%', objectFit:'cover' }} />
+          : <span style={{ fontSize:72, opacity:0.5 }}>{form.emoji || '🧸'}</span>
+        }
+      </div>
+      <div style={{ padding:'14px 16px 18px' }}>
+        <div style={{ display:'flex', gap:6, marginBottom:10, flexWrap:'wrap' }}>
+          <span style={{ background:tc.bg, color:tc.color, borderRadius:99, padding:'3px 10px', fontSize:11, fontWeight:700, fontFamily:FONT }}>{tc.label}</span>
+          {form.condition && <span style={{ background:PAPER3, color:INK2, borderRadius:99, padding:'3px 10px', fontSize:11, fontWeight:700, fontFamily:FONT }}>{form.condition}</span>}
+        </div>
+        <div style={{ fontFamily:FONT, fontWeight:700, fontSize:16, color:INK, marginBottom:6, lineHeight:1.3 }}>{form.title || 'Titel på opslag'}</div>
+        {form.description && <div style={{ fontSize:12, color:INK3, lineHeight:1.5, marginBottom:8, display:'-webkit-box', WebkitLineClamp:2, WebkitBoxOrient:'vertical', overflow:'hidden' }}>{form.description}</div>}
+        <div style={{ marginTop:8 }}>
+          {form.price && form.type === 'køb'
+            ? <div style={{ fontFamily:FONT, fontWeight:800, fontSize:18, color:PRIMARY }}>{form.price} kr.</div>
+            : form.type === 'byt' ? <div style={{ fontSize:13, color:CORAL, fontWeight:700, fontFamily:FONT }}>Byttes kun</div>
+            : form.type === 'byd' ? <div style={{ fontSize:13, color:'#7C3AED', fontWeight:700, fontFamily:FONT }}>Afgiv bud</div>
+            : null
+          }
+        </div>
+        {form.tags?.length > 0 && (
+          <div style={{ display:'flex', gap:4, flexWrap:'wrap', marginTop:10 }}>
+            {form.tags.map(t => <span key={t} style={{ background:GREEN_TINT, color:PRIMARY, borderRadius:99, padding:'2px 8px', fontSize:10, fontWeight:700, fontFamily:FONT }}>{t}</span>)}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+export default function OpretOpslagPage() {
+  const router = useRouter();
+  const { showToast, fetchListings } = useApp();
+  const { institution: ctxInstitution, userId: ctxUserId, isAdminView: ctxIsAdmin } = useActiveUser();
+  const ww = useWindowWidth();
+  const isMobile = ww < 768;
+  const fileRef = useRef(null);
+
+  const [step, setStep] = useState(1);
+  const [saving, setSaving] = useState(false);
+  const [aiAnalyzing, setAiAnalyzing] = useState(false);
+  const [institution, setInstitution] = useState(ctxInstitution || null);
+  const [imgFiles, setImgFiles] = useState([]);
+  const [imgPreviews, setImgPreviews] = useState([]);
+  const [form, setForm] = useState({
+    title:'', type:'køb', price:'', age_group:'3-6 år',
+    description:'', condition:'God', emoji:'🧸', color:'#FFD166',
+    tags:[], min_bid:'',
+  });
+
+  useEffect(() => {
+    db.auth.getUser().then(async ({ data:{ user } }) => {
+      if (!user) { router.push('/login'); return; }
+      if (!institution) {
+        const { data: own } = await db.from('institutions').select('*').ilike('email', user.email).maybeSingle();
+        if (own) { setInstitution(own); return; }
+        const { data: mem } = await db.from('institution_members').select('role,institutions(*)').eq('email', user.email).maybeSingle();
+        if (mem?.institutions) setInstitution({ ...mem.institutions, _memberRole: mem.role });
+      }
+    });
+  }, []);
+
+  async function handleFileSelect(e) {
+    const files = Array.from(e.target.files || []);
+    if (!files.length) return;
+    const remaining = 6 - imgFiles.length;
+    const toAdd = files.slice(0, remaining);
+    setAiAnalyzing(true);
+    const allowed = [];
+    for (const file of toAdd) {
+      const formData = new FormData();
+      formData.append('image', file);
+      try {
+        const res = await fetch('/api/scan-image', { method:'POST', body:formData });
+        const json = await res.json();
+        if (json.safe) { allowed.push(file); }
+        else { showToast(`Billedet "${file.name}" blev afvist — indeholder personer`, 'error'); }
+      } catch {
+        allowed.push(file);
+      }
+    }
+    setAiAnalyzing(false);
+    if (!allowed.length) return;
+    const newPreviews = allowed.map(f => URL.createObjectURL(f));
+    setImgFiles(prev => [...prev, ...allowed]);
+    setImgPreviews(prev => [...prev, ...newPreviews]);
+    e.target.value = '';
+  }
+
+  function removeImg(i) {
+    URL.revokeObjectURL(imgPreviews[i]);
+    setImgFiles(f => f.filter((_,j) => j!==i));
+    setImgPreviews(p => p.filter((_,j) => j!==i));
+  }
+
+  async function handleCreate() {
+    if (!form.title.trim()) return;
+    if (form.type === 'køb' && !String(form.price).trim()) { showToast('Angiv en pris for køb-opslag', 'error'); return; }
+    if (!form.description.trim()) { showToast('Tilføj en beskrivelse', 'error'); return; }
+    setSaving(true);
+    const { data:{ user } } = await db.auth.getUser();
+    let inst = institution;
+    if (!inst && user) {
+      const { data } = await db.from('institutions').select('*').ilike('email', user.email).maybeSingle();
+      if (data) inst = data;
+    }
+    const insertData = {
+      title: form.title, type: form.type,
+      price: form.type==='køb' ? Number(form.price)||null : null,
+      age_group: form.age_group, description: form.description,
+      condition: form.condition, city: inst?.city || '',
+      institution_name: inst?.name || 'Min institution',
+      user_id: user?.id || null,
+      emoji: form.emoji, color: form.color,
+      tags: form.tags || [], images: [], bid_count: 0, is_active: true,
+    };
+    if (form.type==='byd' && form.min_bid) insertData.min_bid = Number(form.min_bid);
+    const { data: listing, error } = await db.from('listings').insert(insertData).select().single();
+    if (error) { showToast('Noget gik galt — prøv igen', 'error'); setSaving(false); return; }
+    if (imgFiles.length > 0) {
+      const urls = [];
+      for (const file of imgFiles) {
+        const ext = file.name.split('.').pop().toLowerCase();
+        const path = `${listing.id}/${Date.now()}_${Math.random().toString(36).slice(2)}.${ext}`;
+        const { data: up } = await db.storage.from('listing-images').upload(path, file, { contentType: file.type });
+        if (up) { const { data:{publicUrl} } = db.storage.from('listing-images').getPublicUrl(up.path); urls.push(publicUrl); }
+      }
+      if (urls.length) await db.from('listings').update({ images: urls }).eq('id', listing.id);
+    }
+    fetch('/api/match-searches', {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({ listingId:listing.id, title:listing.title, type:listing.type, tags:listing.tags||[], city:listing.city, age_group:listing.age_group }),
+    }).catch(()=>{});
+    fetchListings?.();
+    setSaving(false);
+    showToast('Opslag publiceret! 🎉');
+    router.push('/dashboard');
+  }
+
+  const inputStyle = { width:'100%', padding:'12px 14px', borderRadius:12, border:`1.5px solid ${PAPER3}`, fontSize:14, outline:'none', fontFamily:FONT, background:'#fff', color:INK, boxSizing:'border-box' };
+  const labelStyle = { display:'block', fontSize:13, fontWeight:700, marginBottom:7, fontFamily:FONT, color:INK2 };
+
+  const step1Valid = form.title.trim() && (form.type !== 'køb' || form.price);
+  const step2Valid = form.description.trim();
+
+  return (
+    <div style={{ minHeight:'100vh', background:PAPER }} className="page-enter">
+
+      {/* Header */}
+      <div style={{ background:`linear-gradient(160deg, ${GREEN_DEEP} 0%, ${PRIMARY} 100%)`, paddingTop:90, paddingBottom:36, position:'relative', overflow:'hidden' }}>
+        <div style={{ position:'absolute', inset:0, display:'flex', alignItems:'center', justifyContent:'center', pointerEvents:'none' }}>
+          <span style={{ fontFamily:FONT, fontWeight:800, fontSize:isMobile?140:240, color:'rgba(255,255,255,0.04)', lineHeight:1, letterSpacing:'-0.05em', userSelect:'none' }}>+</span>
+        </div>
+        <div style={{ maxWidth:900, margin:'0 auto', padding:'0 24px', position:'relative' }}>
+          <button onClick={()=>router.push('/dashboard')} style={{ background:'rgba(255,255,255,0.12)', border:'none', borderRadius:99, padding:'7px 16px', color:'rgba(255,255,255,0.8)', fontSize:13, fontWeight:600, cursor:'pointer', fontFamily:FONT, marginBottom:20, display:'flex', alignItems:'center', gap:6 }}>
+            ← Tilbage til dashboard
+          </button>
+          <h1 style={{ fontFamily:FONT, fontWeight:800, fontSize:isMobile?26:36, color:'#fff', letterSpacing:'-0.04em', marginBottom:8, lineHeight:1.1 }}>Opret nyt opslag</h1>
+          <p style={{ fontSize:14, color:'rgba(255,255,255,0.6)', fontFamily:FONT, margin:0 }}>Udfyld oplysningerne nedenfor — det tager kun 2 minutter</p>
+
+          {/* Step indicator */}
+          <div style={{ display:'flex', alignItems:'center', gap:0, marginTop:28, maxWidth:320 }}>
+            {[{n:1,label:'Basisinfo'},{n:2,label:'Detaljer & billeder'}].map((s,i) => (
+              <div key={s.n} style={{ display:'flex', alignItems:'center', flex:i<1?0:1 }}>
+                <div style={{ display:'flex', alignItems:'center', gap:8, cursor: step>s.n?'pointer':'default' }} onClick={()=>{ if(step>s.n) setStep(s.n); }}>
+                  <div style={{ width:28, height:28, borderRadius:'50%', background: step>=s.n ? '#fff' : 'rgba(255,255,255,0.2)', display:'flex', alignItems:'center', justifyContent:'center', fontFamily:FONT, fontWeight:800, fontSize:13, color: step>=s.n ? PRIMARY : 'rgba(255,255,255,0.5)', flexShrink:0, transition:'all 0.2s' }}>{step>s.n ? '✓' : s.n}</div>
+                  <span style={{ fontSize:12, fontWeight:600, color: step>=s.n ? 'rgba(255,255,255,0.9)' : 'rgba(255,255,255,0.4)', fontFamily:FONT, whiteSpace:'nowrap' }}>{s.label}</span>
+                </div>
+                {i<1 && <div style={{ flex:1, height:2, background: step>1 ? 'rgba(255,255,255,0.5)' : 'rgba(255,255,255,0.15)', margin:'0 12px', minWidth:24, transition:'background 0.3s' }} />}
+              </div>
+            ))}
+          </div>
+        </div>
+        <svg viewBox="0 0 1440 48" style={{ position:'absolute', bottom:-1, left:0, right:0, width:'100%', display:'block' }} preserveAspectRatio="none">
+          <path d="M0,24 C360,48 1080,0 1440,24 L1440,48 L0,48 Z" fill={PAPER} />
+        </svg>
+      </div>
+
+      {/* Body */}
+      <div style={{ maxWidth:900, margin:'0 auto', padding:isMobile?'28px 16px 60px':'40px 24px 80px' }}>
+        <div style={{ display:'grid', gridTemplateColumns:isMobile?'1fr':'1fr 340px', gap:32, alignItems:'start' }}>
+
+          {/* Form */}
+          <div style={{ background:'#fff', borderRadius:24, padding:isMobile?'24px 20px':'36px 36px', boxShadow:'0 2px 16px rgba(22,34,28,0.07)', border:`1px solid ${PAPER2}` }}>
+            {step === 1 && (
+              <div style={{ display:'flex', flexDirection:'column', gap:20 }}>
+                <div>
+                  <label style={labelStyle}>Handelsform</label>
+                  <div style={{ display:'flex', gap:8 }}>
+                    {['køb','byd','byt'].map(t => (
+                      <button key={t} onClick={()=>setForm({...form,type:t})} style={{ flex:1, padding:'12px 8px', borderRadius:12, background:form.type===t?TYPE_CFG[t].bg:PAPER2, color:form.type===t?TYPE_CFG[t].color:INK3, fontFamily:FONT, fontWeight:700, fontSize:13, border:form.type===t?`2px solid ${TYPE_CFG[t].color}`:'2px solid transparent', cursor:'pointer', transition:'all 0.15s' }}>
+                        {TYPE_CFG[t].icon} {TYPE_CFG[t].label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                <div>
+                  <label style={labelStyle}>Titel <span style={{ color:'#e53e3e' }}>*</span></label>
+                  <input value={form.title} onChange={e=>setForm({...form,title:e.target.value})} placeholder="Fx: LEGO Duplo stor kasse, 120 klodser" style={inputStyle} />
+                </div>
+
+                {form.type === 'køb' && (
+                  <div>
+                    <label style={labelStyle}>Pris (kr.) <span style={{ color:'#e53e3e' }}>*</span></label>
+                    <input type="number" value={form.price} onChange={e=>setForm({...form,price:e.target.value})} placeholder="Fx 250" min="1" style={{ ...inputStyle, border:`1.5px solid ${!form.price?'#FCA5A5':PAPER3}` }} />
+                  </div>
+                )}
+                {form.type === 'byd' && (
+                  <div>
+                    <label style={labelStyle}>Mindste bud (kr.) <span style={{ fontWeight:400, color:INK3 }}>— valgfri</span></label>
+                    <input type="number" value={form.min_bid||''} onChange={e=>setForm({...form,min_bid:e.target.value})} placeholder="Lad stå tom for intet minimum" min="1" style={inputStyle} />
+                  </div>
+                )}
+
+                <div>
+                  <label style={labelStyle}>Aldersgruppe</label>
+                  <select value={form.age_group} onChange={e=>setForm({...form,age_group:e.target.value})} style={{ ...inputStyle, cursor:'pointer' }}>
+                    {AGE_GROUPS.map(a => <option key={a}>{a}</option>)}
+                  </select>
+                </div>
+
+                <div>
+                  <label style={labelStyle}>Kategorier <span style={{ fontWeight:400, color:INK3 }}>(vælg op til 5)</span></label>
+                  <div style={{ display:'flex', gap:6, flexWrap:'wrap' }}>
+                    {LISTING_TAGS.map(t => {
+                      const sel = (form.tags||[]).includes(t);
+                      return <button key={t} type="button" onClick={()=>setForm(f=>({ ...f, tags: sel ? (f.tags||[]).filter(x=>x!==t) : (f.tags||[]).length < 5 ? [...(f.tags||[]), t] : (f.tags||[]) }))} style={{ padding:'6px 14px', borderRadius:99, fontSize:12, fontWeight:700, border: sel ? `2px solid ${PRIMARY}` : '2px solid transparent', background: sel ? GREEN_TINT : PAPER2, color: sel ? PRIMARY : INK3, cursor:'pointer', fontFamily:FONT, transition:'all 0.12s' }}>{t}</button>;
+                    })}
+                  </div>
+                </div>
+
+                <button onClick={()=>{ if(step1Valid) setStep(2); }} disabled={!step1Valid} style={{ width:'100%', padding:'14px', borderRadius:99, background:step1Valid?PRIMARY:PAPER3, color:step1Valid?'#fff':INK3, border:'none', fontFamily:FONT, fontWeight:700, fontSize:15, cursor:step1Valid?'pointer':'not-allowed', marginTop:4, transition:'all 0.2s' }}>
+                  Næste: Detaljer & billeder →
+                </button>
+              </div>
+            )}
+
+            {step === 2 && (
+              <div style={{ display:'flex', flexDirection:'column', gap:20 }}>
+                <div>
+                  <label style={labelStyle}>Beskrivelse <span style={{ color:'#e53e3e' }}>*</span></label>
+                  <textarea value={form.description} onChange={e=>setForm({...form,description:e.target.value})} placeholder="Beskriv legetøjets stand, hvad der medfølger, mål, begrundelse for salg osv." rows={4} style={{ ...inputStyle, resize:'vertical', minHeight:100 }} />
+                </div>
+
+                <div>
+                  <label style={labelStyle}>Stand</label>
+                  <div style={{ display:'flex', gap:8, flexWrap:'wrap' }}>
+                    {CONDITIONS.map(c => (
+                      <button key={c} onClick={()=>setForm({...form,condition:c})} style={{ padding:'9px 18px', borderRadius:99, fontSize:13, fontWeight:600, border: form.condition===c ? `2px solid ${PRIMARY}` : '2px solid transparent', background: form.condition===c ? GREEN_TINT : PAPER2, color: form.condition===c ? PRIMARY : INK3, fontFamily:FONT, cursor:'pointer', transition:'all 0.12s' }}>{c}</button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Images */}
+                <div>
+                  <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:10 }}>
+                    <label style={{ ...labelStyle, marginBottom:0 }}>Billeder <span style={{ fontWeight:400, color:INK3 }}>(op til 6)</span></label>
+                    {imgFiles.length > 0 && imgFiles.length < 6 && !aiAnalyzing && (
+                      <button type="button" onClick={()=>fileRef.current?.click()} style={{ fontSize:12, fontWeight:700, color:PRIMARY, background:GREEN_TINT, border:'none', borderRadius:99, padding:'5px 12px', cursor:'pointer', fontFamily:FONT }}>+ Tilføj</button>
+                    )}
+                  </div>
+                  <input ref={fileRef} type="file" accept="image/*" multiple onChange={handleFileSelect} style={{ display:'none' }} disabled={aiAnalyzing} />
+                  {aiAnalyzing ? <ScanningLoader /> : imgPreviews.length === 0 ? (
+                    <div onClick={()=>fileRef.current?.click()} style={{ border:`2px dashed ${PAPER3}`, borderRadius:16, padding:'36px 20px', textAlign:'center', cursor:'pointer', background:PAPER, transition:'border-color 0.15s' }}
+                      onMouseEnter={e=>e.currentTarget.style.borderColor=PRIMARY}
+                      onMouseLeave={e=>e.currentTarget.style.borderColor=PAPER3}>
+                      <div style={{ width:52, height:52, borderRadius:'50%', background:GREEN_TINT, display:'flex', alignItems:'center', justifyContent:'center', margin:'0 auto 14px' }}>
+                        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke={PRIMARY} strokeWidth="1.8" strokeLinecap="round"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
+                      </div>
+                      <div style={{ fontSize:14, fontWeight:700, color:INK, marginBottom:4, fontFamily:FONT }}>Klik for at uploade billeder</div>
+                      <div style={{ fontSize:12, color:INK3, fontFamily:FONT }}>JPG, PNG eller WEBP · Maks 6 billeder</div>
+                      <div style={{ fontSize:11, color:INK3, marginTop:4, fontFamily:FONT }}>Billeder med personer bliver automatisk afvist</div>
+                    </div>
+                  ) : (
+                    <div style={{ display:'grid', gridTemplateColumns:'repeat(3,1fr)', gap:8 }}>
+                      {imgPreviews.map((src,i) => (
+                        <div key={i} style={{ position:'relative', aspectRatio:'1', borderRadius:12, overflow:'hidden' }}>
+                          <img src={src} alt="" style={{ width:'100%', height:'100%', objectFit:'cover' }} />
+                          <button onClick={()=>removeImg(i)} style={{ position:'absolute', top:6, right:6, width:24, height:24, borderRadius:'50%', background:'rgba(22,34,28,0.65)', border:'none', color:'#fff', fontSize:12, cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center' }}>✕</button>
+                          {i===0 && <div style={{ position:'absolute', bottom:6, left:6, background:'rgba(22,34,28,0.6)', borderRadius:6, padding:'2px 8px', fontSize:10, color:'#fff', fontWeight:700, fontFamily:FONT }}>Forside</div>}
+                        </div>
+                      ))}
+                      {imgFiles.length < 6 && (
+                        <div onClick={()=>fileRef.current?.click()} style={{ aspectRatio:'1', borderRadius:12, border:`2px dashed ${PAPER3}`, display:'flex', alignItems:'center', justifyContent:'center', cursor:'pointer', background:PAPER, fontSize:28, color:INK3 }}>+</div>
+                      )}
+                    </div>
+                  )}
+                </div>
+
+                {/* Emoji + Color */}
+                <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:16 }}>
+                  <div>
+                    <label style={labelStyle}>Emoji</label>
+                    <div style={{ display:'flex', flexWrap:'wrap', gap:6 }}>
+                      {EMOJIS.map(e => (
+                        <button key={e} onClick={()=>setForm(f=>({...f,emoji:e}))} style={{ width:36, height:36, borderRadius:8, border: form.emoji===e ? `2px solid ${PRIMARY}` : '2px solid transparent', background: form.emoji===e ? GREEN_TINT : PAPER2, fontSize:18, cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center', transition:'all 0.1s' }}>{e}</button>
+                      ))}
+                    </div>
+                  </div>
+                  <div>
+                    <label style={labelStyle}>Kortfarve</label>
+                    <div style={{ display:'flex', flexWrap:'wrap', gap:6 }}>
+                      {COLORS.map(c => (
+                        <button key={c} onClick={()=>setForm(f=>({...f,color:c}))} style={{ width:32, height:32, borderRadius:'50%', border: form.color===c ? `3px solid ${PRIMARY}` : '3px solid transparent', background:c, cursor:'pointer', outline: form.color===c ? `2px solid ${PRIMARY}` : 'none', outlineOffset:2, transition:'all 0.1s' }} />
+                      ))}
+                    </div>
+                  </div>
+                </div>
+
+                <div style={{ display:'flex', gap:10, marginTop:4 }}>
+                  <button onClick={()=>setStep(1)} style={{ flex:1, padding:'13px', borderRadius:99, background:PAPER2, color:INK2, border:'none', fontFamily:FONT, fontWeight:700, fontSize:14, cursor:'pointer' }}>
+                    ← Tilbage
+                  </button>
+                  <button onClick={handleCreate} disabled={saving||!step2Valid} style={{ flex:2, padding:'13px', borderRadius:99, background: saving||!step2Valid ? PAPER3 : PRIMARY, color: saving||!step2Valid ? INK3 : '#fff', border:'none', fontFamily:FONT, fontWeight:700, fontSize:15, cursor: saving||!step2Valid ? 'not-allowed' : 'pointer', display:'flex', alignItems:'center', justifyContent:'center', gap:8, transition:'all 0.2s' }}>
+                    {saving ? <><Spinner /> Publicerer…</> : '✓ Publicer opslag'}
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* Preview */}
+          {!isMobile && (
+            <div style={{ position:'sticky', top:96 }}>
+              <div style={{ fontSize:11, fontWeight:700, color:INK3, textTransform:'uppercase', letterSpacing:'0.08em', marginBottom:12, fontFamily:FONT }}>Live forhåndsvisning</div>
+              <PreviewCard form={form} imgPreview={imgPreviews[0]} />
+              {institution && (
+                <div style={{ marginTop:14, background:GREEN_TINT, borderRadius:14, padding:'12px 16px', display:'flex', gap:10, alignItems:'center' }}>
+                  <div style={{ width:36, height:36, borderRadius:10, background:PRIMARY, display:'flex', alignItems:'center', justifyContent:'center', color:'#fff', fontWeight:800, fontSize:14, fontFamily:FONT, flexShrink:0 }}>
+                    {institution.name?.charAt(0).toUpperCase()}
+                  </div>
+                  <div>
+                    <div style={{ fontFamily:FONT, fontWeight:700, fontSize:13, color:INK }}>{institution.name}</div>
+                    <div style={{ fontSize:11, color:INK3, fontFamily:FONT }}>{institution.city}</div>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}

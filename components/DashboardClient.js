@@ -9,36 +9,6 @@ import { Badge, Btn, Spinner, Modal } from '@/components/ui';
 
 const FONT = "'Sora', sans-serif";
 
-const SCAN_MSGS = [
-  { icon:'🔍', text:'Scanner billedet for personer…' },
-  { icon:'🛡️', text:'Beskytter børns privatliv…' },
-  { icon:'🤖', text:'AI-model analyserer pixels…' },
-  { icon:'🔬', text:'Tjekker ansigter og silhuetter…' },
-  { icon:'✨', text:'Næsten der…' },
-];
-
-function ScanningLoader() {
-  const [idx, setIdx] = useState(0);
-  const [fade, setFade] = useState(true);
-  useEffect(() => {
-    const iv = setInterval(() => {
-      setFade(false);
-      setTimeout(() => { setIdx(i => (i + 1) % SCAN_MSGS.length); setFade(true); }, 300);
-    }, 1800);
-    return () => clearInterval(iv);
-  }, []);
-  const msg = SCAN_MSGS[idx];
-  return (
-    <div style={{ border:`2px dashed ${GREEN_SOFT}`, borderRadius:14, padding:'32px 20px', textAlign:'center', background:GREEN_TINT }}>
-      <div style={{ fontSize:38, marginBottom:10, transition:'opacity 0.3s', opacity:fade?1:0 }}>{msg.icon}</div>
-      <div style={{ fontSize:14, fontWeight:700, color:PRIMARY, marginBottom:6, transition:'opacity 0.3s', opacity:fade?1:0, fontFamily:FONT }}>{msg.text}</div>
-      <div style={{ margin:'12px auto 0', width:'80%', height:4, background:PAPER3, borderRadius:99, overflow:'hidden', position:'relative' }}>
-        <div style={{ position:'absolute', left:0, top:0, height:'100%', width:'40%', background:PRIMARY, borderRadius:99, animation:'scanBar 1.4s ease-in-out infinite' }} />
-      </div>
-      <div style={{ fontSize:11, color:INK3, marginTop:10, fontFamily:FONT }}>Dette tager typisk 2–5 sekunder</div>
-    </div>
-  );
-}
 
 export default function DashboardClient() {
   const router = useRouter();
@@ -60,23 +30,14 @@ export default function DashboardClient() {
 
   const instProp = effectiveInstitution;
 
-  const [newOpen,    setNewOpen]    = useState(false);
-  const [step,       setStep]       = useState(1);
-  const [saving,     setSaving]     = useState(false);
-  const [imgFiles,   setImgFiles]   = useState([]);
-  const [imgPreviews,setImgPreviews]= useState([]);
-  const [tipsOpen,   setTipsOpen]   = useState(false);
-  const [aiAnalyzing, setAiAnalyzing] = useState(false);
   const [myListings, setMyListings] = useState([]);
   const [institution, setInstitution] = useState(instProp || null);
   const [instLoading, setInstLoading] = useState(true);
   const [authUserId,  setAuthUserId]  = useState(null);
-  const [form, setForm] = useState({ title:'', type:'køb', price:'', age_group:'3-6 år', description:'', condition:'God', emoji:'🧸', color:'#FFD166', tags:[] });
   const [editListing, setEditListing] = useState(null);
   const [editForm,    setEditForm]    = useState(null);
   const [editSaving,  setEditSaving]  = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(null);
-  const fileRef = useRef(null);
   const logoRef = useRef(null);
   const listingsRef = useRef(null);
   const [logoUploading, setLogoUploading] = useState(false);
@@ -207,105 +168,6 @@ export default function DashboardClient() {
     showToast('Opslag slettet');
     fetchMyListings(ctxIsAdmin ? null : authUserId, institution?.name);
     onListingCreated();
-  }
-
-  const cocoModelRef = useRef(null);
-  const cocoLoadingRef = useRef(null);
-  async function getCocoModel() {
-    if (cocoModelRef.current) return cocoModelRef.current;
-    if (!cocoLoadingRef.current) cocoLoadingRef.current = window.cocoSsd.load();
-    cocoModelRef.current = await cocoLoadingRef.current;
-    return cocoModelRef.current;
-  }
-  useEffect(() => { getCocoModel(); }, []);
-
-  async function detectPerson(file) {
-    return new Promise(resolve => {
-      const img = new Image();
-      img.onload = async () => {
-        try {
-          const model = await getCocoModel();
-          const predictions = await model.detect(img);
-          const hasPerson = predictions.some(p => p.class === 'person' && p.score > 0.4);
-          resolve(hasPerson);
-        } catch { resolve(false); }
-        finally { URL.revokeObjectURL(img.src); }
-      };
-      img.src = URL.createObjectURL(file);
-    });
-  }
-
-  async function handleFileSelect(e) {
-    const files = Array.from(e.target.files);
-    const toAdd = files.slice(0, 6 - imgFiles.length);
-    e.target.value = '';
-    if (!toAdd.length) return;
-    setAiAnalyzing(true);
-    const safeFiles = [], safePreviews = [];
-    for (const file of toAdd) {
-      const hasPerson = await detectPerson(file);
-      if (hasPerson) { showToast('Billede afvist: personer må ikke være synlige på billederne', 'error'); }
-      else { safeFiles.push(file); safePreviews.push(URL.createObjectURL(file)); }
-    }
-    setImgFiles(f => [...f, ...safeFiles]);
-    setImgPreviews(p => [...p, ...safePreviews]);
-    setAiAnalyzing(false);
-  }
-
-  function removeImg(i) {
-    URL.revokeObjectURL(imgPreviews[i]);
-    setImgFiles(f=>f.filter((_,j)=>j!==i));
-    setImgPreviews(p=>p.filter((_,j)=>j!==i));
-  }
-
-  function resetModal() {
-    imgPreviews.forEach(URL.revokeObjectURL);
-    setImgFiles([]); setImgPreviews([]); setTipsOpen(false); setStep(1);
-    setForm({ title:'', type:'køb', price:'', age_group:'3-6 år', description:'', condition:'God', emoji:'🧸', color:'#FFD166', tags:[], min_bid:'' });
-  }
-
-  async function handleCreate() {
-    if (!form.title.trim()) return;
-    if (form.type === 'køb' && !String(form.price).trim()) { showToast('Angiv en pris for køb-opslag', 'error'); return; }
-    setSaving(true);
-    const { data: { user } } = await db.auth.getUser();
-    let inst = institution;
-    if (!inst && user) {
-      const { data } = await db.from('institutions').select('*').eq('email', user.email).maybeSingle();
-      if (data) { inst = data; setInstitution(data); }
-    }
-    const insertData = {
-      title: form.title, type: form.type,
-      price: form.type==='køb' ? Number(form.price)||null : null,
-      age_group: form.age_group, description: form.description,
-      condition: form.condition, city: inst?.city || institution?.city || '',
-      institution_name: inst?.name || 'Min institution',
-      user_id: user?.id || null,
-      emoji: form.emoji, color: form.color,
-      tags: form.tags || [], images: [], bid_count: 0, is_active: true,
-    };
-    if (form.type==='byd' && form.min_bid) insertData.min_bid = Number(form.min_bid);
-    const { data: listing, error } = await db.from('listings').insert(insertData).select().single();
-    if (error) { console.error('Listing insert error:', error); showToast('Noget gik galt — prøv igen', 'error'); setSaving(false); return; }
-    if (imgFiles.length > 0) {
-      const urls = [];
-      for (const file of imgFiles) {
-        const ext = file.name.split('.').pop().toLowerCase();
-        const path = `${listing.id}/${Date.now()}_${Math.random().toString(36).slice(2)}.${ext}`;
-        const { data: up } = await db.storage.from('listing-images').upload(path, file, { contentType: file.type });
-        if (up) { const { data:{publicUrl} } = db.storage.from('listing-images').getPublicUrl(up.path); urls.push(publicUrl); }
-      }
-      if (urls.length > 0) await db.from('listings').update({ images: urls }).eq('id', listing.id);
-    }
-    setSaving(false); setNewOpen(false); resetModal();
-    showToast('Opslag publiceret!');
-    onListingCreated();
-    fetch('/api/match-searches', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ listingId: listing.id, title: listing.title, type: listing.type, tags: listing.tags || [], city: listing.city, age_group: listing.age_group }),
-    }).catch(() => {});
-    fetchMyListings(ctxIsAdmin ? null : (user?.id || authUserId), inst?.name || institution?.name);
   }
 
   async function handleLogoUpload(e) {
@@ -485,7 +347,7 @@ export default function DashboardClient() {
           <div style={{ display:'flex', gap:10, flexWrap:'wrap' }}>
             {authUserId && <Btn variant="outline" color={PRIMARY} radius={22} onClick={()=>router.push('/profil')} style={{ fontSize:isMobile?12:13, padding:isMobile?'8px 14px':'10px 18px', fontFamily:FONT }}>Rediger profil</Btn>}
             {isAdmin && <Btn variant="outline" color={PRIMARY} radius={22} onClick={()=>{ setMembersOpen(true); fetchMembers(); }} style={{ fontSize:isMobile?12:13, padding:isMobile?'8px 14px':'10px 18px', fontFamily:FONT }}>Medarbejdere</Btn>}
-            <Btn variant="primary" color={PRIMARY} radius={22} onClick={()=>setNewOpen(true)} style={{ fontSize:isMobile?14:15, padding:isMobile?'10px 18px':'12px 24px', fontFamily:FONT }}>+ Opret opslag</Btn>
+            <Btn variant="primary" color={PRIMARY} radius={22} onClick={()=>router.push('/opret-opslag')} style={{ fontSize:isMobile?14:15, padding:isMobile?'10px 18px':'12px 24px', fontFamily:FONT }}>+ Opret opslag</Btn>
           </div>
         </div>
 
@@ -886,145 +748,6 @@ export default function DashboardClient() {
         </div>
       </Modal>
 
-      {/* New listing modal */}
-      <Modal open={newOpen} onClose={()=>{setNewOpen(false);resetModal();}} title={`Nyt opslag — trin ${step}/2`}>
-        {step===1 && (
-          <div style={{ display:'flex', flexDirection:'column', gap:14 }}>
-            <div><label style={labelStyle}>Titel *</label>
-              <input value={form.title} onChange={e=>setForm({...form,title:e.target.value})} placeholder="Fx: LEGO Duplo stor kasse" style={inputStyle} /></div>
-            <div><label style={labelStyle}>Handelsform</label>
-              <div style={{ display:'flex', gap:8 }}>
-                {['køb','byd','byt'].map(t=>(
-                  <button key={t} onClick={()=>setForm({...form,type:t})} style={{ flex:1, padding:'10px', borderRadius:10, background:form.type===t?TYPE_CFG[t].bg:PAPER3, color:form.type===t?TYPE_CFG[t].color:INK3, fontFamily:FONT, fontWeight:700, fontSize:13, border:form.type===t?`2px solid ${TYPE_CFG[t].color}`:'2px solid transparent' }}>{TYPE_CFG[t].icon} {TYPE_CFG[t].label}</button>
-                ))}
-              </div>
-            </div>
-            {form.type==='køb' && (
-              <div><label style={labelStyle}>Pris (kr.) <span style={{ color:'#e53e3e' }}>*</span></label>
-                <input type="number" value={form.price} onChange={e=>setForm({...form,price:e.target.value})} placeholder="Fx 250" min="1" style={{ ...inputStyle, border:`1.5px solid ${!form.price?'#FCA5A5':PAPER3}` }} />
-                {!form.price && <p style={{ fontSize:12, color:'#e53e3e', marginTop:4, fontFamily:FONT }}>Pris er påkrævet ved køb-opslag</p>}
-              </div>
-            )}
-            {form.type==='byd' && (
-              <div><label style={labelStyle}>Mindste bud (kr.) <span style={{ fontWeight:400, color:INK3 }}>— valgfri</span></label>
-                <input type="number" value={form.min_bid||''} onChange={e=>setForm({...form,min_bid:e.target.value})} placeholder="Fx 100 — lad stå tom for intet minimum" min="1" style={inputStyle} /></div>
-            )}
-            <div><label style={labelStyle}>Aldersgruppe</label>
-              <select value={form.age_group} onChange={e=>setForm({...form,age_group:e.target.value})} style={{ ...inputStyle, cursor:'pointer' }}>
-                {AGE_GROUPS.map(a=><option key={a}>{a}</option>)}
-              </select>
-            </div>
-            <div><label style={labelStyle}>Tags <span style={{ fontWeight:400, color:INK3 }}>(vælg op til 5)</span></label>
-              <div style={{ display:'flex', gap:6, flexWrap:'wrap' }}>
-                {LISTING_TAGS.map(t => {
-                  const sel = (form.tags||[]).includes(t);
-                  return <button key={t} type="button" onClick={()=>setForm(f=>({ ...f, tags: sel ? (f.tags||[]).filter(x=>x!==t) : (f.tags||[]).length < 5 ? [...(f.tags||[]), t] : (f.tags||[]) }))} style={{ padding:'5px 12px', borderRadius:99, fontSize:12, fontWeight:700, border:sel?`2px solid ${PRIMARY}`:'2px solid transparent', background:sel?GREEN_TINT:PAPER3, color:sel?PRIMARY:INK3, cursor:'pointer', fontFamily:FONT }}>{t}</button>;
-                })}
-              </div>
-            </div>
-            <Btn variant="primary" color={PRIMARY} radius={22} onClick={()=>{ const ok = form.title.trim() && (form.type!=='køb'||form.price); if(ok) setStep(2); }} disabled={!form.title.trim()||(form.type==='køb'&&!form.price)} style={{ justifyContent:'center', padding:'13px', fontSize:14 }}>Næste →</Btn>
-          </div>
-        )}
-        {step===2 && (
-          <div style={{ display:'flex', flexDirection:'column', gap:16 }}>
-            <div><label style={labelStyle}>Beskrivelse</label>
-              <textarea value={form.description} onChange={e=>setForm({...form,description:e.target.value})} placeholder="Beskriv legetøjets stand, hvad der medfølger, mål osv." rows={3} style={{ ...inputStyle, resize:'none', border:`1.5px solid ${!form.description.trim()?'#FCA5A5':PAPER3}` }} />
-              {!form.description.trim() && <p style={{ fontSize:12, color:'#e53e3e', marginTop:4, fontFamily:FONT }}>Beskrivelse er påkrævet</p>}
-            </div>
-            <div><label style={labelStyle}>Stand</label>
-              <div style={{ display:'flex', gap:8, flexWrap:'wrap' }}>
-                {CONDITIONS.map(c=>(
-                  <button key={c} onClick={()=>setForm({...form,condition:c})} style={{ padding:'8px 14px', borderRadius:99, fontSize:13, fontWeight:600, border:form.condition===c?`2px solid ${PRIMARY}`:'2px solid transparent', background:form.condition===c?GREEN_TINT:PAPER3, color:form.condition===c?PRIMARY:INK3, fontFamily:FONT }}>{c}</button>
-                ))}
-              </div>
-            </div>
-
-            <div>
-              <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:8 }}>
-                <label style={{ ...labelStyle, marginBottom:0 }}>Billeder <span style={{ fontWeight:400, color:INK3 }}>(op til 6)</span></label>
-                {imgFiles.length < 6 && !aiAnalyzing && (
-                  <button type="button" onClick={()=>fileRef.current?.click()} style={{ fontSize:12, fontWeight:700, color:PRIMARY, background:GREEN_TINT, border:'none', borderRadius:99, padding:'5px 12px', cursor:'pointer', fontFamily:FONT }}>+ Tilføj billede</button>
-                )}
-              </div>
-              <input ref={fileRef} type="file" accept="image/*" multiple onChange={handleFileSelect} style={{ display:'none' }} disabled={aiAnalyzing} />
-              {aiAnalyzing ? (
-                <ScanningLoader />
-              ) : imgPreviews.length === 0 ? (
-                <div onClick={()=>fileRef.current?.click()} style={{ border:`2px dashed ${PAPER3}`, borderRadius:14, padding:'28px 20px', textAlign:'center', cursor:'pointer', background:PAPER }}>
-                  <div style={{ width:48, height:48, borderRadius:'50%', background:GREEN_TINT, display:'flex', alignItems:'center', justifyContent:'center', margin:'0 auto 12px' }}>
-                    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke={PRIMARY} strokeWidth="1.8" strokeLinecap="round"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
-                  </div>
-                  <div style={{ fontSize:14, fontWeight:700, color:INK, marginBottom:4, fontFamily:FONT }}>Klik for at uploade billeder</div>
-                  <div style={{ fontSize:12, color:INK3, fontFamily:FONT }}>JPG, PNG eller WEBP · Maks 6 billeder</div>
-                  <div style={{ fontSize:11, color:INK3, marginTop:4, fontFamily:FONT }}>Billeder med personer bliver automatisk afvist</div>
-                </div>
-              ) : (
-                <div style={{ display:'grid', gridTemplateColumns:'repeat(3,1fr)', gap:8 }}>
-                  {imgPreviews.map((src,i)=>(
-                    <div key={i} style={{ position:'relative', aspectRatio:'1', borderRadius:10, overflow:'hidden' }}>
-                      <img src={src} alt="" style={{ width:'100%', height:'100%', objectFit:'cover' }} />
-                      <button onClick={()=>removeImg(i)} style={{ position:'absolute', top:4, right:4, width:22, height:22, borderRadius:'50%', background:'rgba(22,34,28,0.6)', border:'none', color:'#fff', fontSize:12, cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center', lineHeight:1 }}>✕</button>
-                      {i===0 && <div style={{ position:'absolute', bottom:4, left:4, background:'rgba(22,34,28,0.55)', borderRadius:4, padding:'2px 6px', fontSize:10, color:'#fff', fontWeight:700, fontFamily:FONT }}>Forside</div>}
-                    </div>
-                  ))}
-                  {imgFiles.length < 6 && (
-                    <div onClick={()=>fileRef.current?.click()} style={{ aspectRatio:'1', borderRadius:10, border:`2px dashed ${PAPER3}`, display:'flex', alignItems:'center', justifyContent:'center', cursor:'pointer', background:PAPER }}>
-                      <span style={{ fontSize:24, color:INK3 }}>+</span>
-                    </div>
-                  )}
-                </div>
-              )}
-            </div>
-
-            <div style={{ background:'#FFFBEB', border:`1.5px solid #FDE68A`, borderRadius:14, overflow:'hidden' }}>
-              <button type="button" onClick={()=>setTipsOpen(o=>!o)} style={{ width:'100%', background:'none', border:'none', padding:'12px 16px', display:'flex', alignItems:'center', justifyContent:'space-between', cursor:'pointer' }}>
-                <span style={{ fontSize:13, fontWeight:700, color:'#7A5C00', fontFamily:FONT }}>Tips til gode produktbilleder</span>
-                <span style={{ fontSize:12, color:INK3, transition:'transform 0.2s', display:'inline-block', transform:tipsOpen?'rotate(180deg)':'none' }}>▼</span>
-              </button>
-              {tipsOpen && (
-                <div style={{ padding:'0 16px 16px', display:'flex', flexDirection:'column', gap:10 }}>
-                  {[
-                    ['💡','Godt lys','Tag billeder ved et vindue i dagslys. Undgå direkte sollys der skaber hårde skygger.'],
-                    ['🎯','Ren baggrund','Brug en hvid væg, et lyst gulv eller et stykke hvidt karton som baggrund.'],
-                    ['🔄','Alle vinkler','Tag billeder forfra, bagfra og fra siden — og et nærbillede af eventuelle detaljer.'],
-                    ['⚠️','Vis slitage ærligt','Fotografér ridser, brud og slidte dele. Det skaber tillid og færre misforståelser.'],
-                    ['📏','Vis størrelsen','Læg en genstand som en mønt eller lineal ved siden af for at vise proportioner.'],
-                    ['✨','Rent legetøj','Vask eller tør legetøjet af inden fotografering — det gør en stor forskel.'],
-                  ].map(([icon,title,desc])=>(
-                    <div key={title} style={{ display:'flex', gap:10, alignItems:'flex-start' }}>
-                      <span style={{ fontSize:18, lineHeight:1.4, flexShrink:0 }}>{icon}</span>
-                      <div>
-                        <div style={{ fontSize:13, fontWeight:700, color:INK, marginBottom:1, fontFamily:FONT }}>{title}</div>
-                        <div style={{ fontSize:12, color:INK3, lineHeight:1.55, fontFamily:FONT }}>{desc}</div>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-
-            {(() => {
-              const missingDesc = !form.description.trim();
-              const missingImg  = imgFiles.length === 0;
-              const missing = [missingDesc && 'beskrivelse', missingImg && 'mindst ét billede'].filter(Boolean);
-              return (<>
-                {missing.length > 0 && (
-                  <div style={{ background:'#FFFBEB', border:`1.5px solid #FDE68A`, borderRadius:10, padding:'10px 14px', fontSize:13, color:'#92400E', display:'flex', gap:8, alignItems:'center', fontFamily:FONT }}>
-                    <span>⚠️</span>
-                    <span>Mangler: <strong>{missing.join(' og ')}</strong></span>
-                  </div>
-                )}
-                <div style={{ display:'flex', gap:10 }}>
-                  <button onClick={()=>setStep(1)} style={{ flex:1, padding:'13px', borderRadius:99, background:PAPER3, border:'none', fontWeight:700, fontFamily:FONT, color:INK3 }}>← Tilbage</button>
-                  <Btn variant="primary" color={PRIMARY} radius={22} onClick={handleCreate} disabled={saving || missingDesc || missingImg} style={{ flex:2, justifyContent:'center', padding:'13px', fontSize:14 }}>
-                    {saving ? <><Spinner/>{imgFiles.length>0?'Uploader…':'Publicerer…'}</> : 'Publicer opslag'}
-                  </Btn>
-                </div>
-              </>);
-            })()}
-          </div>
-        )}
-      </Modal>
     </div>
   );
 }
