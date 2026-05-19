@@ -1,12 +1,14 @@
 'use client';
-import { useState } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
-import { PRIMARY } from '@/lib/constants';
+import { PRIMARY, GREEN_TINT, GREEN_SOFT, GREEN_DEEP, PAPER, PAPER2, PAPER3, INK, INK2, INK3 } from '@/lib/constants';
 import { Btn, Spinner } from '@/components/ui';
 import { db } from '@/lib/supabase';
 import { useApp } from '@/providers/AppProvider';
-import { geocodeAddress } from '@/lib/hooks';
+import { geocodeAddress, useDebounce } from '@/lib/hooks';
 import { LogoLockup } from '@/components/Logo';
+
+const FONT = "'Sora', sans-serif";
 
 function SField({label, hint, children}) {
   return (
@@ -47,6 +49,81 @@ export default function SignupPage() {
   const [saving, setSaving]       = useState(false);
   const [authError, setAuthError] = useState(null);
   const [needsConfirm, setNeedsConfirm] = useState(false);
+
+  // Live CVR search
+  const [cvrQuery, setCvrQuery]       = useState('');
+  const [liveSuggestions, setLiveSuggestions] = useState([]);
+  const [liveSearching, setLiveSearching]     = useState(false);
+  const [showDrop, setShowDrop]               = useState(false);
+  const dropRef = useRef(null);
+  const debouncedQuery = useDebounce(cvrQuery, 380);
+
+  // Close dropdown on outside click
+  useEffect(() => {
+    if (!showDrop) return;
+    function handler(e) { if (dropRef.current && !dropRef.current.contains(e.target)) setShowDrop(false); }
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, [showDrop]);
+
+  // Fire live search when debounced query changes
+  useEffect(() => {
+    if (debouncedQuery.length < 3 || cvrStatus === 'ok') {
+      setLiveSuggestions([]);
+      setShowDrop(false);
+      return;
+    }
+    let cancelled = false;
+    async function doSearch() {
+      setLiveSearching(true);
+      try {
+        const isNum = /^\d+$/.test(debouncedQuery);
+        const url = (isNum && debouncedQuery.length === 10)
+          ? `https://cvrapi.dk/api?produ=${debouncedQuery}&country=dk`
+          : `https://cvrapi.dk/api?search=${encodeURIComponent(debouncedQuery)}&country=dk`;
+        const res = await fetch(url);
+        const data = await res.json();
+        if (cancelled) return;
+        if (!data || data.error) {
+          setLiveSuggestions([]);
+          setShowDrop(false);
+        } else {
+          setLiveSuggestions([{
+            name:    data.name        || '',
+            address: data.address     || '',
+            zipcode: data.zipcode     || '',
+            city:    data.city        || '',
+            cvr:     data.vat ? String(data.vat) : '',
+            pnr:     data.pno ? String(data.pno) : null,
+            phone:   data.phone       || '',
+            website: data.website     || '',
+          }]);
+          setShowDrop(true);
+        }
+      } catch {
+        if (!cancelled) setLiveSuggestions([]);
+      }
+      if (!cancelled) setLiveSearching(false);
+    }
+    doSearch();
+    return () => { cancelled = true; };
+  }, [debouncedQuery, cvrStatus]);
+
+  function selectSuggestion(s) {
+    const finalCvr = s.pnr || s.cvr;
+    setCvr(finalCvr);
+    setCvrQuery(finalCvr);
+    setCvrStatus('ok');
+    setCvrData({ name: s.name, address: s.address, zipcode: s.zipcode, city: s.city, phone: s.phone, website: s.website, kommune: '' });
+    setForm(f => ({ ...f, address: s.address, zipcode: s.zipcode, city: s.city, inst_phone: s.phone, website: s.website }));
+    setShowDrop(false);
+    setLiveSuggestions([]);
+  }
+
+  function resetCvr() {
+    setCvr(''); setCvrQuery(''); setCvrStatus(null); setCvrData(null);
+    setLiveSuggestions([]); setShowDrop(false);
+  }
   const [form, setForm] = useState({
     inst_type:'', ownership:'', address:'', zipcode:'', city:'',
     children_count:'', inst_phone:'', website:'',
@@ -174,32 +251,126 @@ export default function SignupPage() {
 
           {step===1 && (
             <div style={{display:'flex',flexDirection:'column',gap:16}}>
-              <SField label="CVR-nummer (8 cifre) eller P-nummer (10 cifre)">
-                <div style={{display:'flex',gap:10}}>
-                  <input value={cvr} onChange={e=>setCvr(e.target.value.replace(/\D/g,'').slice(0,10))} placeholder="CVR: 12345678 / P-nr: 1234567890" maxLength={10}
-                    onKeyDown={e=>e.key==='Enter'&&checkCvr()}
-                    style={{flex:1,padding:'11px 14px',borderRadius:12,border:`1.5px solid ${cvrStatus==='err'?'#ef4444':cvrStatus==='ok'?PRIMARY:'#e5e5e5'}`,fontSize:15,letterSpacing:2,fontWeight:700,outline:'none'}} />
-                  <Btn variant="primary" color={PRIMARY} radius={22} onClick={checkCvr} disabled={(cvr.length!==8&&cvr.length!==10)||cvrStatus==='checking'}>
-                    {cvrStatus==='checking'?<><Spinner/>Tjekker…</>:'Slå op'}
-                  </Btn>
+              <div>
+                <label style={{display:'block',fontSize:13,fontWeight:700,marginBottom:5,fontFamily:FONT}}>
+                  Søg på institutionsnavn, CVR- eller P-nummer
+                </label>
+
+                {/* Search input + dropdown wrapper */}
+                <div ref={dropRef} style={{position:'relative'}}>
+                  <div style={{
+                    display:'flex',alignItems:'center',gap:10,
+                    padding:'10px 16px',
+                    borderRadius: showDrop && liveSuggestions.length ? '14px 14px 0 0' : 14,
+                    border:`1.5px solid ${cvrStatus==='ok' ? PRIMARY : showDrop ? PRIMARY : PAPER3}`,
+                    background: cvrStatus==='ok' ? GREEN_TINT : PAPER2,
+                    transition:'border-color 0.15s',
+                  }}>
+                    {/* Search icon or spinner */}
+                    {liveSearching
+                      ? <div style={{width:16,height:16,border:`2px solid ${PRIMARY}44`,borderTopColor:PRIMARY,borderRadius:'50%',animation:'spin 0.7s linear infinite',flexShrink:0}} />
+                      : cvrStatus==='ok'
+                        ? <div style={{width:16,height:16,borderRadius:'50%',background:PRIMARY,display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0}}>
+                            <svg width="9" height="7" viewBox="0 0 9 7" fill="none"><path d="M1 3.5L3.5 6L8 1" stroke="#fff" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/></svg>
+                          </div>
+                        : <svg width="15" height="15" viewBox="0 0 15 15" fill="none" style={{flexShrink:0,opacity:0.4}}>
+                            <circle cx="6.5" cy="6.5" r="5.5" stroke={INK} strokeWidth="1.5"/>
+                            <path d="M11 11L14 14" stroke={INK} strokeWidth="1.5" strokeLinecap="round"/>
+                          </svg>
+                    }
+                    <input
+                      value={cvrQuery}
+                      onChange={e => {
+                        const v = e.target.value;
+                        setCvrQuery(v);
+                        // Reset if user edits after having selected
+                        if (cvrStatus === 'ok') { setCvrStatus(null); setCvrData(null); setCvr(''); }
+                      }}
+                      placeholder="Fx 'Regnbuehuset' eller '12345678'"
+                      style={{
+                        border:'none',background:'transparent',outline:'none',
+                        fontSize:14,fontFamily:FONT,flex:1,minWidth:0,
+                        color: cvrStatus==='ok' ? PRIMARY : INK,
+                        fontWeight: cvrStatus==='ok' ? 700 : 400,
+                      }}
+                    />
+                    {cvrQuery && (
+                      <button onClick={resetCvr} style={{border:'none',background:'none',color:INK3,fontSize:13,cursor:'pointer',padding:0,lineHeight:1,flexShrink:0}}>✕</button>
+                    )}
+                  </div>
+
+                  {/* Live suggestion dropdown */}
+                  {showDrop && liveSuggestions.length > 0 && (
+                    <div style={{
+                      position:'absolute',left:0,right:0,zIndex:200,
+                      background:PAPER,
+                      border:`1.5px solid ${PRIMARY}`,
+                      borderTop:'none',
+                      borderRadius:'0 0 14px 14px',
+                      overflow:'hidden',
+                      boxShadow:'0 8px 24px rgba(22,34,28,0.12)',
+                    }}>
+                      {liveSuggestions.map((s, i) => (
+                        <button key={i} onClick={() => selectSuggestion(s)} style={{
+                          display:'block',width:'100%',textAlign:'left',
+                          padding:'14px 16px',border:'none',
+                          background:'transparent',cursor:'pointer',
+                          borderTop: i > 0 ? `1px solid ${PAPER2}` : 'none',
+                          transition:'background 0.12s',
+                        }}
+                          onMouseEnter={e => e.currentTarget.style.background = GREEN_TINT}
+                          onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
+                        >
+                          <div style={{display:'flex',alignItems:'center',gap:10}}>
+                            <div style={{flex:1,minWidth:0}}>
+                              <div style={{fontFamily:FONT,fontWeight:700,fontSize:14,color:INK,marginBottom:2,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>
+                                {s.name}
+                              </div>
+                              <div style={{fontSize:12,color:INK3,fontFamily:FONT}}>
+                                {[s.address, s.zipcode, s.city].filter(Boolean).join(', ')}
+                              </div>
+                            </div>
+                            {s.cvr && (
+                              <span style={{background:GREEN_TINT,color:PRIMARY,borderRadius:99,padding:'3px 10px',fontSize:11,fontWeight:700,fontFamily:FONT,whiteSpace:'nowrap',flexShrink:0}}>
+                                CVR {s.cvr}
+                              </span>
+                            )}
+                          </div>
+                        </button>
+                      ))}
+                    </div>
+                  )}
+
+                  {/* No results state */}
+                  {showDrop && liveSuggestions.length === 0 && !liveSearching && debouncedQuery.length >= 3 && (
+                    <div style={{
+                      position:'absolute',left:0,right:0,zIndex:200,
+                      background:PAPER,border:`1.5px solid ${PAPER3}`,borderTop:'none',
+                      borderRadius:'0 0 14px 14px',padding:'14px 16px',
+                      fontSize:13,color:INK3,fontFamily:FONT,
+                    }}>
+                      Ingen institution fundet — prøv et andet navn eller CVR-nummer
+                    </div>
+                  )}
                 </div>
-                <div style={{fontSize:12,color:'#888',marginTop:6}}>Offentlige institutioner under kommunen bruger P-nummer (10 cifre). Private institutioner bruger CVR-nummer (8 cifre).</div>
-              </SField>
-              {cvrStatus==='err' && <div style={{background:'#FEF2F2',border:'1.5px solid #fca5a5',borderRadius:10,padding:'12px 16px',fontSize:13,color:'#b91c1c'}}>❌ Nummeret ikke fundet i registret. Tjek at du har indtastet CVR-nummer (8 cifre) eller P-nummer (10 cifre) korrekt.</div>}
+
+                <div style={{fontSize:12,color:INK3,marginTop:7,fontFamily:FONT}}>
+                  Skriv institutionens navn, CVR-nummer (8 cifre) eller P-nummer (10 cifre) for kommunale institutioner.
+                </div>
+              </div>
+
+              {/* Confirmed institution card */}
               {cvrStatus==='ok' && cvrData && (
                 <div>
-                  <div style={{background:'#E8F5EE',border:'1.5px solid #a7d7b8',borderRadius:14,padding:18,marginBottom:20}}>
-                    <div style={{display:'flex',gap:12,alignItems:'flex-start'}}>
-                      <div style={{fontSize:28,lineHeight:1}}>✅</div>
-                      <div>
-                        <div style={{fontFamily:"'Sora',sans-serif",fontWeight:800,fontSize:14,color:'#1a5c38',marginBottom:6}}>Fundet i {cvr.length===10?'P-nummer-registret':'CVR-registret'}</div>
-                        <div style={{fontWeight:700,fontSize:15}}>{cvrData.name}</div>
-                        <div style={{fontSize:13,color:'#555',marginTop:3}}>{cvrData.address}, {cvrData.zipcode} {cvrData.city}</div>
-                        {cvrData.kommune && <div style={{fontSize:13,color:'#555',marginTop:2}}>🏛️ Under: {cvrData.kommune}</div>}
-                        {cvrData.phone && <div style={{fontSize:13,color:'#555',marginTop:2}}>📞 {cvrData.phone}</div>}
-                        {cvrData.website && <div style={{fontSize:13,color:'#555',marginTop:2}}>🌐 {cvrData.website}</div>}
-                      </div>
+                  <div style={{background:GREEN_TINT,border:`1.5px solid ${GREEN_SOFT}`,borderRadius:14,padding:18,marginBottom:16,borderLeft:`3px solid ${PRIMARY}`}}>
+                    <div style={{fontFamily:FONT,fontWeight:800,fontSize:13,color:PRIMARY,marginBottom:8}}>
+                      Fundet i {cvr.length===10?'P-nummer-registret':'CVR-registret'}
                     </div>
+                    <div style={{fontFamily:FONT,fontWeight:700,fontSize:15,color:INK,marginBottom:4}}>{cvrData.name}</div>
+                    <div style={{fontSize:13,color:INK3,fontFamily:FONT}}>{cvrData.address}, {cvrData.zipcode} {cvrData.city}</div>
+                    {cvrData.kommune && <div style={{fontSize:13,color:INK3,marginTop:3,fontFamily:FONT}}>Under: {cvrData.kommune}</div>}
+                    {cvrData.phone  && <div style={{fontSize:13,color:INK3,marginTop:3,fontFamily:FONT}}>{cvrData.phone}</div>}
+                    {cvrData.website && <div style={{fontSize:13,color:INK3,marginTop:3,fontFamily:FONT}}>{cvrData.website}</div>}
                   </div>
                   <Btn variant="primary" color={PRIMARY} radius={22} onClick={()=>setStep(2)} style={{justifyContent:'center',width:'100%',padding:'13px',fontSize:15}}>Fortsæt →</Btn>
                 </div>
