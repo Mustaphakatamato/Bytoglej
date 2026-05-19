@@ -142,13 +142,14 @@ export default function OpslagPage() {
       if (activeTags.length) filters.tags = activeTags;
       if (dSearch) filters.search = dSearch;
       if (maxDist !== 'alle') filters.maxDist = maxDist;
-      await db.from('saved_searches').insert({
+      const { error: insertErr } = await db.from('saved_searches').insert({
         institution_id: inst?.id || null,
         email: user.email,
         institution_name: inst?.name || null,
         name: saveSearchName.trim(),
         filters,
       });
+      if (insertErr) { showToast?.('Fejl: ' + insertErr.message, 'error'); setSavingSearch(false); return; }
       showToast?.('Søgning gemt! Slå notifikationer til på dit dashboard 🔔');
     } catch {}
     setSavingSearch(false);

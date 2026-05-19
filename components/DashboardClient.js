@@ -628,10 +628,10 @@ export default function DashboardClient() {
         </div>
 
         {/* Gemte søgninger */}
-        {savedSearches.length > 0 && (
-          <div style={{ background:PAPER2, borderRadius:22, padding:isMobile?20:28, border:'1px solid rgba(22,34,28,0.07)', boxShadow:'0 1px 4px rgba(22,34,28,0.06)', marginTop:isMobile?16:24 }}>
-            <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:20, flexWrap:'wrap', gap:10 }}>
-              <h2 style={{ fontFamily:FONT, fontWeight:800, fontSize:18, color:INK, margin:0 }}>Gemte søgninger 🔔</h2>
+        <div style={{ background:PAPER2, borderRadius:22, padding:isMobile?20:28, border:'1px solid rgba(22,34,28,0.07)', boxShadow:'0 1px 4px rgba(22,34,28,0.06)', marginTop:isMobile?16:24 }}>
+          <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:20, flexWrap:'wrap', gap:10 }}>
+            <h2 style={{ fontFamily:FONT, fontWeight:800, fontSize:18, color:INK, margin:0 }}>Gemte søgninger 🔔</h2>
+            {savedSearches.length > 0 && (
               <div style={{ display:'flex', alignItems:'center', gap:8 }}>
                 <span style={{ fontSize:12, color:INK3, fontFamily:FONT }}>Notificer alle</span>
                 <button
@@ -646,7 +646,15 @@ export default function DashboardClient() {
                   <div style={{ position:'absolute', top:3, left: savedSearches.every(s=>s.notify) ? 22 : 3, width:18, height:18, borderRadius:'50%', background:'#fff', transition:'left 0.2s', boxShadow:'0 1px 4px rgba(0,0,0,0.2)' }} />
                 </button>
               </div>
+            )}
+          </div>
+          {savedSearches.length === 0 ? (
+            <div style={{ textAlign:'center', padding:'32px 0' }}>
+              <div style={{ fontFamily:FONT, fontWeight:800, fontSize:40, color:GREEN_SOFT, marginBottom:10 }}>🔍</div>
+              <p style={{ fontSize:14, color:INK3, fontFamily:FONT, margin:0 }}>Ingen gemte søgninger endnu</p>
+              <p style={{ fontSize:12, color:INK3, fontFamily:FONT, marginTop:6 }}>Gå til <span onClick={()=>router.push('/opslag')} style={{ color:PRIMARY, fontWeight:700, cursor:'pointer' }}>markedspladsen</span> og tryk "Gem søgning"</p>
             </div>
+          ) : (
             <div style={{ display:'flex', flexDirection:'column', gap:10 }}>
               {savedSearches.map(s => {
                 const pills = filterSummary(s.filters || {});
@@ -672,17 +680,10 @@ export default function DashboardClient() {
                           <div style={{ position:'absolute', top:2, left: s.notify ? 20 : 2, width:18, height:18, borderRadius:'50%', background:'#fff', transition:'left 0.2s', boxShadow:'0 1px 4px rgba(0,0,0,0.2)' }} />
                         </button>
                       </div>
-                      <button
-                        onClick={() => applySearch(s.filters || {})}
-                        style={{ padding:'7px 14px', borderRadius:99, background:PRIMARY, color:'#fff', border:'none', fontSize:12, fontWeight:700, cursor:'pointer', fontFamily:FONT, whiteSpace:'nowrap' }}
-                      >
+                      <button onClick={() => applySearch(s.filters || {})} style={{ padding:'7px 14px', borderRadius:99, background:PRIMARY, color:'#fff', border:'none', fontSize:12, fontWeight:700, cursor:'pointer', fontFamily:FONT, whiteSpace:'nowrap' }}>
                         Anvend →
                       </button>
-                      <button
-                        onClick={() => deleteSearch(s.id)}
-                        style={{ width:30, height:30, borderRadius:'50%', background:'none', border:`1.5px solid ${PAPER3}`, color:INK3, fontSize:14, cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0 }}
-                        title="Slet søgning"
-                      >
+                      <button onClick={() => deleteSearch(s.id)} style={{ width:30, height:30, borderRadius:'50%', background:'none', border:`1.5px solid ${PAPER3}`, color:INK3, fontSize:14, cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0 }} title="Slet søgning">
                         ✕
                       </button>
                     </div>
@@ -690,8 +691,8 @@ export default function DashboardClient() {
                 );
               })}
             </div>
-          </div>
-        )}
+          )}
+        </div>
       </div>
 
       {/* Edit modal */}
