@@ -1,7 +1,10 @@
-'use client';
-
+import { Suspense } from 'react';
 import MessagesClient from '@/components/MessagesClient';
 
 export default function BeskederPage() {
-  return <MessagesClient />;
+  return (
+    <Suspense>
+      <MessagesClient />
+    </Suspense>
+  );
 }

@@ -2,10 +2,12 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { db } from '@/lib/supabase';
-import { PRIMARY, ACCENT, ACCENT2, TYPE_CFG, CONDITIONS, AGE_GROUPS, LISTING_TAGS } from '@/lib/constants';
+import { PRIMARY, GREEN_SOFT, GREEN_TINT, PAPER, PAPER2, PAPER3, INK, INK2, INK3, CORAL, TYPE_CFG, CONDITIONS, AGE_GROUPS, LISTING_TAGS } from '@/lib/constants';
 import { useWindowWidth, geocodeAddress, relTime } from '@/lib/hooks';
 import { useApp, useActiveUser } from '@/providers/AppProvider';
 import { Badge, Btn, Spinner, Modal } from '@/components/ui';
+
+const FONT = "'Sora', sans-serif";
 
 const SCAN_MSGS = [
   { icon:'🔍', text:'Scanner billedet for personer…' },
@@ -27,13 +29,13 @@ function ScanningLoader() {
   }, []);
   const msg = SCAN_MSGS[idx];
   return (
-    <div style={{ border:'2px dashed #a8d5be', borderRadius:14, padding:'32px 20px', textAlign:'center', background:'linear-gradient(135deg,#f0faf5,#e8f5ee)' }}>
+    <div style={{ border:`2px dashed ${GREEN_SOFT}`, borderRadius:14, padding:'32px 20px', textAlign:'center', background:GREEN_TINT }}>
       <div style={{ fontSize:38, marginBottom:10, transition:'opacity 0.3s', opacity:fade?1:0 }}>{msg.icon}</div>
-      <div style={{ fontSize:14, fontWeight:700, color:PRIMARY, marginBottom:6, transition:'opacity 0.3s', opacity:fade?1:0 }}>{msg.text}</div>
-      <div style={{ margin:'12px auto 0', width:'80%', height:4, background:'#c8e6d0', borderRadius:99, overflow:'hidden', position:'relative' }}>
+      <div style={{ fontSize:14, fontWeight:700, color:PRIMARY, marginBottom:6, transition:'opacity 0.3s', opacity:fade?1:0, fontFamily:FONT }}>{msg.text}</div>
+      <div style={{ margin:'12px auto 0', width:'80%', height:4, background:PAPER3, borderRadius:99, overflow:'hidden', position:'relative' }}>
         <div style={{ position:'absolute', left:0, top:0, height:'100%', width:'40%', background:PRIMARY, borderRadius:99, animation:'scanBar 1.4s ease-in-out infinite' }} />
       </div>
-      <div style={{ fontSize:11, color:'#aaa', marginTop:10 }}>Dette tager typisk 2–5 sekunder</div>
+      <div style={{ fontSize:11, color:INK3, marginTop:10, fontFamily:FONT }}>Dette tager typisk 2–5 sekunder</div>
     </div>
   );
 }
@@ -79,48 +81,39 @@ export default function DashboardClient() {
   const listingsRef = useRef(null);
   const [logoUploading, setLogoUploading] = useState(false);
 
-  // Feature #2: Transaction history
   const [tradesOpen, setTradesOpen] = useState(false);
   const [trades, setTrades] = useState([]);
   const [tradesLoading, setTradesLoading] = useState(false);
 
-  // Feature #4: Activity (sent bids/offers)
   const [activityOpen, setActivityOpen] = useState(false);
   const [activity, setActivity] = useState([]);
   const [actLoading, setActLoading] = useState(false);
 
-  // Feature #15: Incoming requests
   const [incomingConvs, setIncomingConvs] = useState([]);
 
-  // Feature #19: Members management
   const [membersOpen, setMembersOpen] = useState(false);
   const [members, setMembers] = useState([]);
+  const [invitations, setInvitations] = useState([]);
   const [memberEmail, setMemberEmail] = useState('');
   const [memberSaving, setMemberSaving] = useState(false);
 
   const isAdmin = !!institution && !institution._memberRole;
 
   function onInstitutionChange(updated) {
-    if (adminInst) {
-      setAdminInst(updated);
-    } else {
-      setAppInstitution(updated);
-    }
+    if (adminInst) { setAdminInst(updated); }
+    else { setAppInstitution(updated); }
   }
 
-  // Single effect: load auth user + institution + listings — fully self-contained
   useEffect(() => {
     let cancelled = false;
     async function boot() {
       setInstLoading(true);
-      // For real auth operations we still need the actual auth user
       const { data: { user } } = await db.auth.getUser();
       if (!user || cancelled) { setInstLoading(false); return; }
       setAuthUserId(user.id);
 
       let inst = null;
       if (ctxIsAdmin && instProp) {
-        // Admin impersonating: use the selected institution directly, skip DB fetch
         inst = instProp;
       } else {
         const { data: ownInst } = await db.from('institutions').select('*').ilike('email', user.email).maybeSingle();
@@ -132,7 +125,6 @@ export default function DashboardClient() {
         if (!cancelled && inst) setInstitution(inst);
       }
 
-      // Auto-geocode
       if (inst && inst.address && !inst.latitude) {
         geocodeAddress(inst.address, inst.zipcode, inst.city).then(coords => {
           if (coords) {
@@ -142,10 +134,8 @@ export default function DashboardClient() {
         });
       }
 
-      // Listings: admin view fetches only by institution name
       await fetchMyListings(ctxIsAdmin ? null : user.id, inst?.name);
 
-      // Incoming conversations: brug institution-ID som primær filter
       let incoming;
       const instId = inst?.id;
       const orParts = [];
@@ -165,22 +155,17 @@ export default function DashboardClient() {
     return () => { cancelled = true; };
   }, []);
 
-  // Re-fetch when allListings changes (new listing created by someone else / realtime)
   useEffect(() => {
     if (ctxIsAdmin) { fetchMyListings(null, instProp?.name || institution?.name); }
     else if (authUserId) { fetchMyListings(authUserId, institution?.name); }
   }, [allListings]);
 
   async function fetchMyListings(userId, instName) {
-    // Hent både aktive og solgte (is_active=true OR is_sold=true)
     let q = db.from('listings').select('*').or('is_active.eq.true,is_sold.eq.true').order('created_at', { ascending: false });
-    if (userId && instName) {
-      q = q.or(`user_id.eq.${userId},institution_name.eq.${instName}`);
-    } else if (userId) {
-      q = q.eq('user_id', userId);
-    } else if (instName) {
-      q = q.eq('institution_name', instName);
-    } else { return; }
+    if (userId && instName) { q = q.or(`user_id.eq.${userId},institution_name.eq.${instName}`); }
+    else if (userId) { q = q.eq('user_id', userId); }
+    else if (instName) { q = q.eq('institution_name', instName); }
+    else { return; }
     const { data } = await q;
     if (data) setMyListings(data);
   }
@@ -192,18 +177,14 @@ export default function DashboardClient() {
 
   async function handleUpdate() {
     if (!editForm.title.trim()) return;
-    if (editForm.type === 'køb' && !String(editForm.price).trim()) {
-      showToast('Angiv en pris for køb-opslag', 'error');
-      return;
-    }
+    if (editForm.type === 'køb' && !String(editForm.price).trim()) { showToast('Angiv en pris for køb-opslag', 'error'); return; }
     setEditSaving(true);
     const { error } = await db.from('listings').update({
       title: editForm.title, type: editForm.type,
       price: editForm.type==='køb' ? Number(editForm.price)||null : null,
       age_group: editForm.age_group, description: editForm.description,
       condition: editForm.condition, city: institution?.city || editListing?.city || '',
-      emoji: editForm.emoji, color: editForm.color,
-      tags: editForm.tags || [],
+      emoji: editForm.emoji, color: editForm.color, tags: editForm.tags || [],
     }).eq('id', editListing.id);
     setEditSaving(false);
     if (error) { showToast('Noget gik galt', 'error'); return; }
@@ -230,7 +211,6 @@ export default function DashboardClient() {
     cocoModelRef.current = await cocoLoadingRef.current;
     return cocoModelRef.current;
   }
-  // Preload model in background as soon as dashboard mounts
   useEffect(() => { getCocoModel(); }, []);
 
   async function detectPerson(file) {
@@ -242,11 +222,8 @@ export default function DashboardClient() {
           const predictions = await model.detect(img);
           const hasPerson = predictions.some(p => p.class === 'person' && p.score > 0.4);
           resolve(hasPerson);
-        } catch {
-          resolve(false);
-        } finally {
-          URL.revokeObjectURL(img.src);
-        }
+        } catch { resolve(false); }
+        finally { URL.revokeObjectURL(img.src); }
       };
       img.src = URL.createObjectURL(file);
     });
@@ -261,12 +238,8 @@ export default function DashboardClient() {
     const safeFiles = [], safePreviews = [];
     for (const file of toAdd) {
       const hasPerson = await detectPerson(file);
-      if (hasPerson) {
-        showToast('Billede afvist: personer må ikke være synlige på billederne', 'error');
-      } else {
-        safeFiles.push(file);
-        safePreviews.push(URL.createObjectURL(file));
-      }
+      if (hasPerson) { showToast('Billede afvist: personer må ikke være synlige på billederne', 'error'); }
+      else { safeFiles.push(file); safePreviews.push(URL.createObjectURL(file)); }
     }
     setImgFiles(f => [...f, ...safeFiles]);
     setImgPreviews(p => [...p, ...safePreviews]);
@@ -281,19 +254,14 @@ export default function DashboardClient() {
 
   function resetModal() {
     imgPreviews.forEach(URL.revokeObjectURL);
-    setImgFiles([]); setImgPreviews([]); setTipsOpen(false);
-    setStep(1);
+    setImgFiles([]); setImgPreviews([]); setTipsOpen(false); setStep(1);
     setForm({ title:'', type:'køb', price:'', age_group:'3-6 år', description:'', condition:'God', emoji:'🧸', color:'#FFD166', tags:[], min_bid:'' });
   }
 
   async function handleCreate() {
     if (!form.title.trim()) return;
-    if (form.type === 'køb' && !String(form.price).trim()) {
-      showToast('Angiv en pris for køb-opslag', 'error');
-      return;
-    }
+    if (form.type === 'køb' && !String(form.price).trim()) { showToast('Angiv en pris for køb-opslag', 'error'); return; }
     setSaving(true);
-    // Always get fresh auth user so user_id is guaranteed
     const { data: { user } } = await db.auth.getUser();
     let inst = institution;
     if (!inst && user) {
@@ -323,9 +291,8 @@ export default function DashboardClient() {
       }
       if (urls.length > 0) await db.from('listings').update({ images: urls }).eq('id', listing.id);
     }
-    setSaving(false);
-    setNewOpen(false); resetModal();
-    showToast('Opslag publiceret! 🎉');
+    setSaving(false); setNewOpen(false); resetModal();
+    showToast('Opslag publiceret!');
     onListingCreated();
     fetchMyListings(ctxIsAdmin ? null : (user?.id || authUserId), inst?.name || institution?.name);
   }
@@ -347,14 +314,11 @@ export default function DashboardClient() {
       setInstitution(updated);
       onInstitutionChange?.(updated);
       showToast('Logo opdateret ✓');
-    } else {
-      showToast('Kunne ikke gemme logo', 'error');
-    }
+    } else { showToast('Kunne ikke gemme logo', 'error'); }
     setLogoUploading(false);
     e.target.value = '';
   }
 
-  // Feature #2: Transaction history (completed deals)
   async function fetchTrades() {
     setTradesLoading(true);
     const instId = institution?.id;
@@ -364,16 +328,11 @@ export default function DashboardClient() {
     if (uid) orParts.push(`initiator_id.eq.${uid}`, `owner_id.eq.${uid}`);
     if (institution?.name) orParts.push(`owner_name.eq.${institution.name}`, `initiator_name.eq.${institution.name}`);
     if (!orParts.length) { setTradesLoading(false); return; }
-    const { data } = await db.from('conversations')
-      .select('*')
-      .or(orParts.join(','))
-      .eq('deal_completed', true)
-      .order('deal_completed_at', { ascending: false });
+    const { data } = await db.from('conversations').select('*').or(orParts.join(',')).eq('deal_completed', true).order('deal_completed_at', { ascending: false });
     if (data) setTrades(data);
     setTradesLoading(false);
   }
 
-  // Feature #4: Activity – bud/tilbud afgivet af denne institution
   async function fetchActivity() {
     setActLoading(true);
     const instId = institution?.id;
@@ -383,32 +342,61 @@ export default function DashboardClient() {
     if (uid) orParts.push(`initiator_id.eq.${uid}`);
     if (institution?.name) orParts.push(`initiator_name.eq.${institution.name}`);
     if (!orParts.length) { setActLoading(false); return; }
-    const { data } = await db.from('conversations')
-      .select('*')
-      .or(orParts.join(','))
-      .order('last_message_at', { ascending: false });
+    const { data } = await db.from('conversations').select('*').or(orParts.join(',')).order('last_message_at', { ascending: false });
     if (data) setActivity(data);
     setActLoading(false);
   }
 
-  // Feature #19: Members handlers
   async function fetchMembers() {
     if (!institution?.id) return;
-    const { data } = await db.from('institution_members').select('*').eq('institution_id', institution.id).order('created_at');
-    if (data) setMembers(data);
+    const [{ data: mems }, { data: invs }] = await Promise.all([
+      db.from('institution_members').select('*').eq('institution_id', institution.id).order('created_at'),
+      db.from('institution_invitations').select('*').eq('institution_id', institution.id).is('accepted_at', null).gt('expires_at', new Date().toISOString()).order('created_at', { ascending: false }),
+    ]);
+    if (mems) setMembers(mems);
+    if (invs) setInvitations(invs);
   }
-  async function addMember() {
-    if (!memberEmail.trim() || !institution?.id) return;
+  async function inviteMember() {
+    const email = memberEmail.trim().toLowerCase();
+    if (!email || !institution?.id) return;
+    // Check for existing member
+    const alreadyMember = members.some(m => m.email.toLowerCase() === email);
+    const alreadyInvited = invitations.some(i => i.email.toLowerCase() === email);
+    if (alreadyMember) { showToast('Denne e-mail er allerede tilknyttet institutionen', 'error'); return; }
+    if (alreadyInvited) { showToast('En invitation er allerede sendt til denne e-mail', 'error'); return; }
     setMemberSaving(true);
-    const { error } = await db.from('institution_members').insert({ institution_id: institution.id, email: memberEmail.trim().toLowerCase(), role: 'member' });
+    // Insert invitation record
+    const { data: inv, error: invErr } = await db.from('institution_invitations').insert({
+      institution_id: institution.id,
+      institution_name: institution.name,
+      email,
+      invited_by: institution.name,
+    }).select().single();
+    if (invErr) {
+      showToast('Noget gik galt', 'error');
+      setMemberSaving(false);
+      return;
+    }
+    // Send email via API route
+    const res = await fetch('/api/invite', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ token: inv.token, email, institution_name: institution.name, invited_by: institution.name }),
+    });
     setMemberSaving(false);
-    if (error) {
-      showToast(error.code==='23505' ? 'Brugeren er allerede tilføjet' : 'Noget gik galt', 'error');
+    if (!res.ok) {
+      await db.from('institution_invitations').delete().eq('id', inv.id);
+      showToast('E-mail kunne ikke sendes — prøv igen', 'error');
       return;
     }
     setMemberEmail('');
     fetchMembers();
-    showToast('Bruger tilføjet ✓');
+    showToast(`Invitation sendt til ${email} ✓`);
+  }
+  async function cancelInvitation(id) {
+    await db.from('institution_invitations').delete().eq('id', id);
+    setInvitations(is => is.filter(i => i.id !== id));
+    showToast('Invitation annulleret');
   }
   async function removeMember(id) {
     await db.from('institution_members').delete().eq('id', id);
@@ -420,92 +408,99 @@ export default function DashboardClient() {
   const ww = useWindowWidth();
   const isMobile = ww < 768;
 
+  const inputStyle = { width:'100%', padding:'11px 14px', borderRadius:10, border:`1.5px solid ${PAPER3}`, fontSize:14, outline:'none', fontFamily:FONT, background:PAPER2 };
+  const labelStyle = { display:'block', fontSize:13, fontWeight:700, marginBottom:6, fontFamily:FONT, color:INK2 };
+
   return (
-    <div style={{ minHeight:'100vh', paddingTop:80, background:'#f8f5f0' }} className="page-enter">
+    <div style={{ minHeight:'100vh', paddingTop:80, background:PAPER }} className="page-enter">
       <div style={{ maxWidth:1140, margin:'0 auto', padding:isMobile?'24px 16px':'36px 24px' }}>
+
+        {/* Header */}
         <div style={{ display:'flex', alignItems:isMobile?'flex-start':'center', justifyContent:'space-between', marginBottom:isMobile?24:36, flexWrap:'wrap', gap:16 }}>
           <div style={{ display:'flex', alignItems:'center', gap:isMobile?14:20 }}>
-            {/* Logo avatar — click to upload */}
-            <div onClick={()=>logoRef.current?.click()} title="Klik for at skifte logo" style={{ width:isMobile?56:72, height:isMobile?56:72, borderRadius:18, background:PRIMARY, display:'flex', alignItems:'center', justifyContent:'center', cursor:'pointer', overflow:'hidden', flexShrink:0, border:'3px solid #fff', boxShadow:'0 4px 16px rgba(0,0,0,0.12)', position:'relative' }}>
+            <div onClick={()=>logoRef.current?.click()} title="Klik for at skifte logo" style={{ width:isMobile?56:72, height:isMobile?56:72, borderRadius:18, background:PRIMARY, display:'flex', alignItems:'center', justifyContent:'center', cursor:'pointer', overflow:'hidden', flexShrink:0, border:`3px solid ${PAPER2}`, boxShadow:'0 2px 12px rgba(22,34,28,0.14)', position:'relative' }}>
               {logoUploading
                 ? <Spinner />
                 : institution?.logo_url
                   ? <img src={institution.logo_url} alt="logo" style={{ width:'100%', height:'100%', objectFit:'cover' }} />
-                  : <span style={{ color:'#fff', fontFamily:"'Nunito',sans-serif", fontWeight:900, fontSize:isMobile?22:28 }}>{institution?.name?.charAt(0)?.toUpperCase() || '?'}</span>}
-              <div style={{ position:'absolute', bottom:0, left:0, right:0, background:'rgba(0,0,0,0.45)', color:'#fff', fontSize:10, fontWeight:700, textAlign:'center', padding:'3px 0', letterSpacing:0.5 }}>SKIFT</div>
+                  : <span style={{ color:'#fff', fontFamily:FONT, fontWeight:800, fontSize:isMobile?22:28 }}>{institution?.name?.charAt(0)?.toUpperCase() || '?'}</span>}
+              <div style={{ position:'absolute', bottom:0, left:0, right:0, background:'rgba(22,34,28,0.52)', color:'#fff', fontSize:9, fontWeight:700, textAlign:'center', padding:'3px 0', letterSpacing:0.5, fontFamily:FONT }}>SKIFT</div>
             </div>
             <input ref={logoRef} type="file" accept="image/*" style={{ display:'none' }} onChange={handleLogoUpload} />
             <div>
-              <h1 style={{ fontFamily:"'Nunito',sans-serif", fontWeight:900, fontSize:isMobile?22:30, letterSpacing:'-0.5px' }}>
+              <h1 style={{ fontFamily:FONT, fontWeight:800, fontSize:isMobile?22:30, letterSpacing:'-0.03em', color:INK }}>
                 {institution?.name || (instLoading ? 'Indlæser…' : 'Min institution')}
               </h1>
-              <p style={{ color:'#888', fontSize:14, marginTop:4, display:'flex', alignItems:'center', gap:8, flexWrap:'wrap' }}>
+              <p style={{ color:INK3, fontSize:13, marginTop:4, display:'flex', alignItems:'center', gap:8, flexWrap:'wrap', fontFamily:FONT }}>
                 <span>{institution ? `${institution.pnr ? `P-nr: ${institution.pnr}` : `CVR: ${institution.cvr}`} · ${institution.city}` : instLoading ? '…' : 'Institution ikke fundet'}</span>
-                {institution?._memberRole && <span style={{ background:'#e8f0fb', color:ACCENT2, borderRadius:99, padding:'2px 10px', fontSize:11, fontWeight:700 }}>Medarbejder</span>}
+                {institution?._memberRole && <span style={{ background:GREEN_TINT, color:PRIMARY, borderRadius:99, padding:'2px 10px', fontSize:11, fontWeight:700, fontFamily:FONT }}>Medarbejder</span>}
               </p>
             </div>
           </div>
           <div style={{ display:'flex', gap:10, flexWrap:'wrap' }}>
-            {authUserId && <Btn variant="outline" radius={22} onClick={()=>router.push('/profil')} style={{ fontSize:isMobile?12:13, padding:isMobile?'8px 14px':'10px 18px' }}>✏️ Rediger profil</Btn>}
-            {isAdmin && <Btn variant="outline" radius={22} onClick={()=>{ setMembersOpen(true); fetchMembers(); }} style={{ fontSize:isMobile?12:13, padding:isMobile?'8px 14px':'10px 18px' }}>👥 Brugere</Btn>}
-            <Btn variant="primary" color={PRIMARY} radius={22} onClick={()=>setNewOpen(true)} style={{ fontSize:isMobile?14:15, padding:isMobile?'10px 18px':'12px 24px' }}>+ Opret opslag</Btn>
+            {authUserId && <Btn variant="outline" color={PRIMARY} radius={22} onClick={()=>router.push('/profil')} style={{ fontSize:isMobile?12:13, padding:isMobile?'8px 14px':'10px 18px', fontFamily:FONT }}>Rediger profil</Btn>}
+            {isAdmin && <Btn variant="outline" color={PRIMARY} radius={22} onClick={()=>{ setMembersOpen(true); fetchMembers(); }} style={{ fontSize:isMobile?12:13, padding:isMobile?'8px 14px':'10px 18px', fontFamily:FONT }}>Medarbejdere</Btn>}
+            <Btn variant="primary" color={PRIMARY} radius={22} onClick={()=>setNewOpen(true)} style={{ fontSize:isMobile?14:15, padding:isMobile?'10px 18px':'12px 24px', fontFamily:FONT }}>+ Opret opslag</Btn>
           </div>
         </div>
 
+        {/* Stats */}
         <div style={{ display:'grid', gridTemplateColumns:isMobile?'repeat(2,1fr)':'repeat(4,1fr)', gap:isMobile?12:16, marginBottom:isMobile?24:32 }}>
           {[
-            {icon:'📦', n:myListings.filter(l=>l.is_active&&!l.is_sold).length, label:'Aktive opslag', onClick:()=>listingsRef.current?.scrollIntoView({behavior:'smooth',block:'start'}), clickable:true},
-            {icon:'🤝', n:trades.length||0, label:'Handler', onClick:()=>{ setTradesOpen(true); fetchTrades(); }, clickable:true},
-            {icon:'📤', n:activity.length||0, label:'Sendte tilbud', onClick:()=>{ setActivityOpen(true); fetchActivity(); }, clickable:true},
-            {icon:'📬', n:incomingConvs.filter(c=>!c.is_handled&&c.owner_unread>0).length||0, label:'Indkommende', onClick:()=>{ const el=document.getElementById('incoming-section'); if(el) el.scrollIntoView({behavior:'smooth'}); }, clickable:true},
+            { n:myListings.filter(l=>l.is_active&&!l.is_sold).length, label:'Aktive opslag', color:PRIMARY, onClick:()=>listingsRef.current?.scrollIntoView({behavior:'smooth',block:'start'}) },
+            { n:trades.length||0, label:'Handler', color:PRIMARY, onClick:()=>{ setTradesOpen(true); fetchTrades(); } },
+            { n:activity.length||0, label:'Sendte tilbud', color:PRIMARY, onClick:()=>{ setActivityOpen(true); fetchActivity(); } },
+            { n:incomingConvs.filter(c=>!c.is_handled&&c.owner_unread>0).length||0, label:'Ulæste anmodninger', color:CORAL, onClick:()=>{ const el=document.getElementById('incoming-section'); if(el) el.scrollIntoView({behavior:'smooth'}); } },
           ].map((s,i)=>(
-            <div key={i} onClick={s.onClick||undefined} style={{ background:'#fff', borderRadius:20, padding:'20px 24px', boxShadow:'0 2px 12px rgba(0,0,0,0.06)', animation:`slideUp 0.4s ease ${i*0.08}s both`, cursor:s.clickable?'pointer':'default', transition:'transform 0.15s, box-shadow 0.15s', position:'relative' }}
-              onMouseEnter={e=>{ if(s.clickable){ e.currentTarget.style.transform='translateY(-2px)'; e.currentTarget.style.boxShadow='0 6px 20px rgba(0,0,0,0.10)'; }}}
-              onMouseLeave={e=>{ e.currentTarget.style.transform=''; e.currentTarget.style.boxShadow='0 2px 12px rgba(0,0,0,0.06)'; }}>
-              <div style={{ fontSize:24, marginBottom:6 }}>{s.icon}</div>
-              <div style={{ fontFamily:"'Nunito',sans-serif", fontWeight:900, fontSize:28, lineHeight:1, color:s.n>0&&s.label.includes('Ulæste')?'#EF476F':'#1c1a17' }}>{s.n}</div>
-              <div style={{ fontSize:13, color:'#888', marginTop:4 }}>{s.label}</div>
-              {s.clickable && <div style={{ position:'absolute', top:14, right:14, fontSize:14, color:'#ccc' }}>→</div>}
+            <div key={i} onClick={s.onClick} style={{ background:PAPER2, borderRadius:20, padding:'20px 22px', border:'1px solid rgba(22,34,28,0.07)', boxShadow:'0 1px 4px rgba(22,34,28,0.06)', animation:`slideUp 0.4s ease ${i*0.08}s both`, cursor:'pointer', transition:'transform 0.15s, box-shadow 0.15s' }}
+              onMouseEnter={e=>{ e.currentTarget.style.transform='translateY(-2px)'; e.currentTarget.style.boxShadow='0 4px 16px rgba(22,34,28,0.10)'; }}
+              onMouseLeave={e=>{ e.currentTarget.style.transform=''; e.currentTarget.style.boxShadow='0 1px 4px rgba(22,34,28,0.06)'; }}>
+              <div style={{ fontFamily:FONT, fontWeight:800, fontSize:32, lineHeight:1, color:s.n>0?s.color:INK3, marginBottom:4 }}>{s.n}</div>
+              <div style={{ fontSize:13, color:INK3, fontFamily:FONT }}>{s.label}</div>
+              <div style={{ fontSize:11, color:PAPER3, marginTop:6 }}>
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke={INK3} strokeWidth="2" strokeLinecap="round"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg>
+              </div>
             </div>
           ))}
         </div>
 
+        {/* Main grid */}
         <div style={{ display:'grid', gridTemplateColumns:isMobile?'1fr':'1fr 1fr', gap:isMobile?16:24 }}>
 
           {/* Mine opslag */}
-          <div ref={listingsRef} style={{ background:'#fff', borderRadius:22, padding:28, boxShadow:'0 2px 12px rgba(0,0,0,0.06)' }}>
-            <h2 style={{ fontFamily:"'Nunito',sans-serif", fontWeight:800, fontSize:20, marginBottom:20 }}>Mine opslag</h2>
+          <div ref={listingsRef} style={{ background:PAPER2, borderRadius:22, padding:isMobile?20:28, border:'1px solid rgba(22,34,28,0.07)', boxShadow:'0 1px 4px rgba(22,34,28,0.06)' }}>
+            <h2 style={{ fontFamily:FONT, fontWeight:800, fontSize:18, marginBottom:20, color:INK }}>Mine opslag</h2>
             {myListings.length===0 ? (
-              <div style={{ textAlign:'center', padding:'32px 0', color:'#bbb' }}>
-                <div style={{ fontSize:36, marginBottom:10 }}>📭</div>
-                <p style={{ fontSize:14 }}>Ingen opslag endnu. Opret dit første!</p>
+              <div style={{ textAlign:'center', padding:'40px 0' }}>
+                <div style={{ fontFamily:FONT, fontWeight:800, fontSize:48, color:GREEN_SOFT, lineHeight:1, marginBottom:12 }}>0</div>
+                <p style={{ fontSize:14, color:INK3, fontFamily:FONT }}>Ingen opslag endnu — opret dit første!</p>
               </div>
             ) : myListings.map(l=>(
-              <div key={l.id} style={{ border:`1.5px solid ${l.is_sold?'#fecaca':'#f0eeeb'}`, borderRadius:14, marginBottom:10, overflow:'hidden', opacity:l.is_sold?0.85:1 }}>
+              <div key={l.id} style={{ border:`1px solid ${l.is_sold?'#FECACA':'rgba(22,34,28,0.08)'}`, borderRadius:14, marginBottom:10, overflow:'hidden', opacity:l.is_sold?0.85:1, background:l.is_sold?'#FFF5F5':PAPER }}>
                 <div onClick={()=>{ setActiveListing(l); router.push('/opslag/detail'); }} style={{ display:'flex', alignItems:'center', gap:14, padding:'12px 14px', cursor:'pointer' }}>
-                  <div style={{ width:48, height:48, borderRadius:10, background:l.images?.[0]?'#e8e6e3':l.color||'#FFD166', display:'flex', alignItems:'center', justifyContent:'center', fontSize:24, flexShrink:0, overflow:'hidden', position:'relative' }}>
+                  <div style={{ width:48, height:48, borderRadius:10, background:l.images?.[0]?PAPER3:l.color||'#FFD166', display:'flex', alignItems:'center', justifyContent:'center', fontSize:24, flexShrink:0, overflow:'hidden', position:'relative' }}>
                     {l.images?.[0] ? <img src={l.images[0]} style={{ width:'100%', height:'100%', objectFit:'cover' }} alt="" /> : l.emoji||'🧸'}
-                    {l.is_sold && <div style={{ position:'absolute', inset:0, background:'rgba(0,0,0,0.45)', display:'flex', alignItems:'center', justifyContent:'center', borderRadius:10 }}><span style={{ fontSize:9, fontWeight:900, color:'#fff', letterSpacing:0.3 }}>SOLGT</span></div>}
+                    {l.is_sold && <div style={{ position:'absolute', inset:0, background:'rgba(22,34,28,0.45)', display:'flex', alignItems:'center', justifyContent:'center', borderRadius:10 }}><span style={{ fontSize:9, fontWeight:900, color:'#fff', letterSpacing:0.3, fontFamily:FONT }}>SOLGT</span></div>}
                   </div>
                   <div style={{ flex:1, minWidth:0 }}>
-                    <div style={{ fontFamily:"'Nunito',sans-serif", fontWeight:700, fontSize:14, whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis' }}>{l.title}</div>
-                    <div style={{ fontSize:12, color:'#999', marginTop:2 }}>{l.city} · {l.age_group}</div>
-                    {l.is_sold && l.sold_to && <div style={{ fontSize:11, color:'#e11d48', fontWeight:700, marginTop:2 }}>Solgt til {l.sold_to} · {new Date(l.sold_at).toLocaleDateString('da-DK',{day:'numeric',month:'short',year:'numeric'})}</div>}
+                    <div style={{ fontFamily:FONT, fontWeight:700, fontSize:14, whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis', color:INK }}>{l.title}</div>
+                    <div style={{ fontSize:12, color:INK3, marginTop:2, fontFamily:FONT }}>{l.city} · {l.age_group}</div>
+                    {l.is_sold && l.sold_to && <div style={{ fontSize:11, color:'#e11d48', fontWeight:700, marginTop:2, fontFamily:FONT }}>Solgt til {l.sold_to} · {new Date(l.sold_at).toLocaleDateString('da-DK',{day:'numeric',month:'short',year:'numeric'})}</div>}
                   </div>
                   {l.is_sold
-                    ? <span style={{ background:'#fee2e2', color:'#e11d48', borderRadius:99, padding:'3px 10px', fontSize:11, fontWeight:800, flexShrink:0 }}>SOLGT</span>
+                    ? <span style={{ background:'#FEE2E2', color:'#e11d48', borderRadius:99, padding:'3px 10px', fontSize:11, fontWeight:800, flexShrink:0, fontFamily:FONT }}>SOLGT</span>
                     : <Badge type={l.type} />}
                   {!l.is_sold && <div style={{ display:'flex', gap:6, flexShrink:0 }} onClick={e=>e.stopPropagation()}>
-                    <button onClick={()=>openEdit(l)} style={{ background:'#f0f9f4', border:'none', borderRadius:8, padding:'6px 12px', fontSize:12, fontWeight:700, color:PRIMARY, cursor:'pointer' }}>Rediger</button>
-                    <button onClick={()=>setConfirmDelete(l.id)} style={{ background:'#fff0f0', border:'none', borderRadius:8, padding:'6px 12px', fontSize:12, fontWeight:700, color:'#e11d48', cursor:'pointer' }}>Slet</button>
+                    <button onClick={()=>openEdit(l)} style={{ background:GREEN_TINT, border:'none', borderRadius:99, padding:'6px 12px', fontSize:12, fontWeight:700, color:PRIMARY, cursor:'pointer', fontFamily:FONT }}>Rediger</button>
+                    <button onClick={()=>setConfirmDelete(l.id)} style={{ background:'#FEF2F2', border:'none', borderRadius:99, padding:'6px 12px', fontSize:12, fontWeight:700, color:'#e11d48', cursor:'pointer', fontFamily:FONT }}>Slet</button>
                   </div>}
                 </div>
                 {confirmDelete===l.id && (
-                  <div style={{ background:'#fff5f5', borderTop:'1.5px solid #fecaca', padding:'10px 14px', display:'flex', alignItems:'center', justifyContent:'space-between' }}>
-                    <span style={{ fontSize:13, color:'#b91c1c', fontWeight:600 }}>Slet dette opslag permanent?</span>
+                  <div style={{ background:'#FFF5F5', borderTop:`1px solid #FECACA`, padding:'10px 14px', display:'flex', alignItems:'center', justifyContent:'space-between' }}>
+                    <span style={{ fontSize:13, color:'#B91C1C', fontWeight:600, fontFamily:FONT }}>Slet dette opslag permanent?</span>
                     <div style={{ display:'flex', gap:8 }}>
-                      <button onClick={()=>setConfirmDelete(null)} style={{ background:'#fff', border:'1.5px solid #e5e5e5', borderRadius:8, padding:'6px 14px', fontSize:12, fontWeight:600, cursor:'pointer' }}>Annuller</button>
-                      <button onClick={()=>handleDelete(l.id)} style={{ background:'#e11d48', border:'none', borderRadius:8, padding:'6px 14px', fontSize:12, fontWeight:700, color:'#fff', cursor:'pointer' }}>Ja, slet</button>
+                      <button onClick={()=>setConfirmDelete(null)} style={{ background:PAPER3, border:'none', borderRadius:99, padding:'6px 14px', fontSize:12, fontWeight:600, cursor:'pointer', fontFamily:FONT }}>Annuller</button>
+                      <button onClick={()=>handleDelete(l.id)} style={{ background:'#e11d48', border:'none', borderRadius:99, padding:'6px 14px', fontSize:12, fontWeight:700, color:'#fff', cursor:'pointer', fontFamily:FONT }}>Ja, slet</button>
                     </div>
                   </div>
                 )}
@@ -514,26 +509,28 @@ export default function DashboardClient() {
           </div>
 
           {/* Mine favoritter */}
-          <div style={{ background:'#fff', borderRadius:22, padding:28, boxShadow:'0 2px 12px rgba(0,0,0,0.06)' }}>
+          <div style={{ background:PAPER2, borderRadius:22, padding:isMobile?20:28, border:'1px solid rgba(22,34,28,0.07)', boxShadow:'0 1px 4px rgba(22,34,28,0.06)' }}>
             <div style={{ display:'flex', alignItems:'center', gap:10, marginBottom:20 }}>
-              <h2 style={{ fontFamily:"'Nunito',sans-serif", fontWeight:800, fontSize:20 }}>Mine favoritter</h2>
-              {favListings.length>0 && <div style={{ background:'#fff0f3', border:'1.5px solid #fca5a5', borderRadius:99, padding:'2px 10px', fontSize:12, fontWeight:700, color:'#e11d48' }}>{favListings.length}</div>}
+              <h2 style={{ fontFamily:FONT, fontWeight:800, fontSize:18, color:INK }}>Mine favoritter</h2>
+              {favListings.length>0 && <div style={{ background:'#FEF2F2', border:'1px solid #FECACA', borderRadius:99, padding:'2px 10px', fontSize:12, fontWeight:700, color:'#e11d48', fontFamily:FONT }}>{favListings.length}</div>}
             </div>
             {favListings.length===0 ? (
-              <div style={{ textAlign:'center', padding:'32px 0', color:'#bbb' }}>
-                <div style={{ fontSize:36, marginBottom:10 }}>🤍</div>
-                <p style={{ fontSize:14 }}>Tryk ❤️ på et opslag for at gemme det her</p>
-                <button onClick={()=>router.push('/opslag')} style={{ marginTop:14, background:'none', border:`1.5px solid ${PRIMARY}`, color:PRIMARY, borderRadius:99, padding:'8px 18px', fontSize:13, fontWeight:700, cursor:'pointer' }}>Browse opslag</button>
+              <div style={{ textAlign:'center', padding:'40px 0' }}>
+                <div style={{ fontFamily:FONT, fontWeight:800, fontSize:48, color:GREEN_SOFT, lineHeight:1, marginBottom:12 }}>♡</div>
+                <p style={{ fontSize:14, color:INK3, fontFamily:FONT }}>Tryk ❤️ på et opslag for at gemme det her</p>
+                <button onClick={()=>router.push('/opslag')} style={{ marginTop:14, background:'none', border:`1.5px solid ${PRIMARY}`, color:PRIMARY, borderRadius:99, padding:'8px 18px', fontSize:13, fontWeight:700, cursor:'pointer', fontFamily:FONT }}>Browse opslag</button>
               </div>
             ) : favListings.map(l=>(
-              <div key={l.id} style={{ display:'flex', alignItems:'center', gap:14, padding:'12px 14px', border:'1.5px solid #f0eeeb', borderRadius:14, marginBottom:10, cursor:'pointer', transition:'border-color 0.15s' }}
-                onClick={()=>{ setActiveListing(l); router.push('/opslag/detail'); }}>
-                <div style={{ width:48, height:48, borderRadius:10, background:l.images?.[0]?'#e8e6e3':l.color||'#FFD166', display:'flex', alignItems:'center', justifyContent:'center', fontSize:24, flexShrink:0, overflow:'hidden' }}>
+              <div key={l.id} style={{ display:'flex', alignItems:'center', gap:14, padding:'12px 14px', border:`1px solid rgba(22,34,28,0.08)`, borderRadius:14, marginBottom:10, cursor:'pointer', transition:'border-color 0.15s', background:PAPER }}
+                onClick={()=>{ setActiveListing(l); router.push('/opslag/detail'); }}
+                onMouseEnter={e=>e.currentTarget.style.borderColor=GREEN_SOFT}
+                onMouseLeave={e=>e.currentTarget.style.borderColor='rgba(22,34,28,0.08)'}>
+                <div style={{ width:48, height:48, borderRadius:10, background:l.images?.[0]?PAPER3:l.color||'#FFD166', display:'flex', alignItems:'center', justifyContent:'center', fontSize:24, flexShrink:0, overflow:'hidden' }}>
                   {l.images?.[0] ? <img src={l.images[0]} style={{ width:'100%', height:'100%', objectFit:'cover' }} alt="" /> : l.emoji||'🧸'}
                 </div>
                 <div style={{ flex:1, minWidth:0 }}>
-                  <div style={{ fontFamily:"'Nunito',sans-serif", fontWeight:700, fontSize:14, whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis' }}>{l.title}</div>
-                  <div style={{ fontSize:12, color:'#999', marginTop:2 }}>{l.institution_name} · {l.city}</div>
+                  <div style={{ fontFamily:FONT, fontWeight:700, fontSize:14, whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis', color:INK }}>{l.title}</div>
+                  <div style={{ fontSize:12, color:INK3, marginTop:2, fontFamily:FONT }}>{l.institution_name} · {l.city}</div>
                 </div>
                 <div style={{ display:'flex', flexDirection:'column', alignItems:'flex-end', gap:4, flexShrink:0 }}>
                   <Badge type={l.type} />
@@ -544,259 +541,272 @@ export default function DashboardClient() {
           </div>
         </div>
 
-        {/* Feature #15: Incoming requests section (ubehandlede) */}
-        <div id="incoming-section" style={{ background:'#fff', borderRadius:22, padding:28, boxShadow:'0 2px 12px rgba(0,0,0,0.06)', marginTop:isMobile?16:24 }}>
+        {/* Indkommende anmodninger */}
+        <div id="incoming-section" style={{ background:PAPER2, borderRadius:22, padding:isMobile?20:28, border:'1px solid rgba(22,34,28,0.07)', boxShadow:'0 1px 4px rgba(22,34,28,0.06)', marginTop:isMobile?16:24 }}>
           <div style={{ display:'flex', alignItems:'center', gap:10, marginBottom:20 }}>
-            <h2 style={{ fontFamily:"'Nunito',sans-serif", fontWeight:800, fontSize:20 }}>Indkommende anmodninger</h2>
-            {incomingConvs.filter(c=>!c.is_handled&&c.owner_unread>0).length > 0 && <div style={{ background:'#EF476F', color:'#fff', borderRadius:99, padding:'2px 10px', fontSize:12, fontWeight:800 }}>{incomingConvs.filter(c=>!c.is_handled&&c.owner_unread>0).length} ny</div>}
+            <h2 style={{ fontFamily:FONT, fontWeight:800, fontSize:18, color:INK }}>Indkommende anmodninger</h2>
+            {incomingConvs.filter(c=>!c.is_handled&&c.owner_unread>0).length > 0 && <div style={{ background:CORAL, color:'#fff', borderRadius:99, padding:'2px 10px', fontSize:12, fontWeight:800, fontFamily:FONT }}>{incomingConvs.filter(c=>!c.is_handled&&c.owner_unread>0).length} ny</div>}
           </div>
           {(() => {
             const pending = incomingConvs.filter(c=>!c.is_handled);
             if (pending.length === 0) return (
-              <div style={{ textAlign:'center', padding:'32px 0', color:'#bbb' }}>
-                <div style={{ fontSize:36, marginBottom:10 }}>📬</div>
-                <p style={{ fontSize:14 }}>Ingen ubehandlede anmodninger på dine opslag</p>
+              <div style={{ textAlign:'center', padding:'40px 0' }}>
+                <div style={{ fontFamily:FONT, fontWeight:800, fontSize:48, color:GREEN_SOFT, lineHeight:1, marginBottom:12 }}>—</div>
+                <p style={{ fontSize:14, color:INK3, fontFamily:FONT }}>Ingen ubehandlede anmodninger på dine opslag</p>
               </div>
             );
             return (
               <div style={{ display:'flex', flexDirection:'column', gap:10 }}>
                 {pending.slice(0,10).map(c => (
-                  <div key={c.id} onClick={()=>router.push('/beskeder')} style={{ display:'flex', alignItems:'center', gap:14, padding:'12px 16px', border:`1.5px solid ${c.owner_unread>0?'#c6e8d4':'#f0eeeb'}`, borderRadius:14, cursor:'pointer', background:c.owner_unread>0?'#f0faf5':'#fff', transition:'all 0.15s' }}>
-                    <div style={{ width:44, height:44, borderRadius:12, background:c.listing_image?'#e8e6e3':c.listing_color||'#FFD166', display:'flex', alignItems:'center', justifyContent:'center', fontSize:22, flexShrink:0, overflow:'hidden', position:'relative' }}>
+                  <div key={c.id} onClick={()=>router.push('/beskeder')} style={{ display:'flex', alignItems:'center', gap:14, padding:'12px 16px', border:`1px solid ${c.owner_unread>0?GREEN_SOFT:'rgba(22,34,28,0.08)'}`, borderRadius:14, cursor:'pointer', background:c.owner_unread>0?GREEN_TINT:PAPER, transition:'all 0.15s' }}
+                    onMouseEnter={e=>e.currentTarget.style.borderColor=PRIMARY}
+                    onMouseLeave={e=>e.currentTarget.style.borderColor=c.owner_unread>0?GREEN_SOFT:'rgba(22,34,28,0.08)'}>
+                    <div style={{ width:44, height:44, borderRadius:12, background:c.listing_image?PAPER3:c.listing_color||'#FFD166', display:'flex', alignItems:'center', justifyContent:'center', fontSize:22, flexShrink:0, overflow:'hidden', position:'relative' }}>
                       {c.listing_image ? <img src={c.listing_image} style={{ width:'100%', height:'100%', objectFit:'cover' }} alt="" /> : c.listing_emoji||'🧸'}
-                      {c.owner_unread>0 && <div style={{ position:'absolute', top:-4, right:-4, width:16, height:16, background:'#EF476F', borderRadius:'50%', border:'2px solid #fff', display:'flex', alignItems:'center', justifyContent:'center', fontSize:8, fontWeight:800, color:'#fff' }}>{c.owner_unread>9?'9+':c.owner_unread}</div>}
+                      {c.owner_unread>0 && <div style={{ position:'absolute', top:-4, right:-4, width:16, height:16, background:CORAL, borderRadius:'50%', border:`2px solid ${PAPER2}`, display:'flex', alignItems:'center', justifyContent:'center', fontSize:8, fontWeight:800, color:'#fff' }}>{c.owner_unread>9?'9+':c.owner_unread}</div>}
                     </div>
                     <div style={{ flex:1, minWidth:0 }}>
-                      <div style={{ fontFamily:"'Nunito',sans-serif", fontWeight:c.owner_unread>0?700:600, fontSize:14, whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis' }}>{c.initiator_name}</div>
-                      <div style={{ fontSize:12, color:'#888', marginTop:2, whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis' }}>📦 {c.listing_title}</div>
-                      <div style={{ fontSize:12, color:c.owner_unread>0?'#333':'#aaa', fontWeight:c.owner_unread>0?600:400, whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis' }}>{c.last_message || 'Samtale startet'}</div>
+                      <div style={{ fontFamily:FONT, fontWeight:c.owner_unread>0?700:600, fontSize:14, whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis', color:INK }}>{c.initiator_name}</div>
+                      <div style={{ fontSize:12, color:INK3, marginTop:2, whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis', fontFamily:FONT }}>{c.listing_title}</div>
+                      <div style={{ fontSize:12, color:c.owner_unread>0?INK:INK3, fontWeight:c.owner_unread>0?600:400, whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis', fontFamily:FONT }}>{c.last_message || 'Samtale startet'}</div>
                     </div>
                     <div style={{ display:'flex', flexDirection:'column', alignItems:'flex-end', gap:4, flexShrink:0 }}>
-                      <div style={{ fontSize:11, color:'#bbb' }}>{relTime(c.last_message_at)}</div>
-                      <div style={{ fontSize:11, color:PRIMARY, fontWeight:700 }}>→</div>
+                      <div style={{ fontSize:11, color:INK3, fontFamily:FONT }}>{relTime(c.last_message_at)}</div>
+                      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke={PRIMARY} strokeWidth="2.5" strokeLinecap="round"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg>
                     </div>
                   </div>
                 ))}
-                {pending.length > 10 && <button onClick={()=>router.push('/beskeder')} style={{ background:'none', border:`1.5px solid ${PRIMARY}`, color:PRIMARY, borderRadius:99, padding:'8px 18px', fontSize:13, fontWeight:700, cursor:'pointer', alignSelf:'center', marginTop:4 }}>Se alle {pending.length} →</button>}
+                {pending.length > 10 && <button onClick={()=>router.push('/beskeder')} style={{ background:'none', border:`1.5px solid ${PRIMARY}`, color:PRIMARY, borderRadius:99, padding:'8px 18px', fontSize:13, fontWeight:700, cursor:'pointer', alignSelf:'center', marginTop:4, fontFamily:FONT }}>Se alle {pending.length} →</button>}
               </div>
             );
           })()}
         </div>
       </div>
 
+      {/* Edit modal */}
       <Modal open={!!editListing} onClose={()=>{setEditListing(null);setEditForm(null);}} title="Rediger opslag">
         {editForm && (
           <div style={{ display:'flex', flexDirection:'column', gap:14 }}>
-            <div>
-              <label style={{ display:'block', fontSize:13, fontWeight:700, marginBottom:6 }}>Titel *</label>
-              <input value={editForm.title} onChange={e=>setEditForm({...editForm,title:e.target.value})} style={{ width:'100%', padding:'11px 14px', borderRadius:10, border:'1.5px solid #e5e5e5', fontSize:14, outline:'none' }} />
-            </div>
-            <div>
-              <label style={{ display:'block', fontSize:13, fontWeight:700, marginBottom:8 }}>Handelsform</label>
+            <div><label style={labelStyle}>Titel *</label>
+              <input value={editForm.title} onChange={e=>setEditForm({...editForm,title:e.target.value})} style={inputStyle} /></div>
+            <div><label style={labelStyle}>Handelsform</label>
               <div style={{ display:'flex', gap:8 }}>
                 {['køb','byd','byt'].map(t=>(
-                  <button key={t} onClick={()=>setEditForm({...editForm,type:t})} style={{ flex:1, padding:'10px', borderRadius:10, background:editForm.type===t?TYPE_CFG[t].bg:'#f5f4f2', color:editForm.type===t?TYPE_CFG[t].color:'#888', fontFamily:"'Nunito',sans-serif", fontWeight:700, fontSize:13, border:editForm.type===t?`2px solid ${TYPE_CFG[t].color}`:'2px solid transparent' }}>{TYPE_CFG[t].icon} {TYPE_CFG[t].label}</button>
+                  <button key={t} onClick={()=>setEditForm({...editForm,type:t})} style={{ flex:1, padding:'10px', borderRadius:10, background:editForm.type===t?TYPE_CFG[t].bg:PAPER3, color:editForm.type===t?TYPE_CFG[t].color:INK3, fontFamily:FONT, fontWeight:700, fontSize:13, border:editForm.type===t?`2px solid ${TYPE_CFG[t].color}`:'2px solid transparent' }}>{TYPE_CFG[t].icon} {TYPE_CFG[t].label}</button>
                 ))}
               </div>
             </div>
             {editForm.type==='køb' && (
-              <div>
-                <label style={{ display:'block', fontSize:13, fontWeight:700, marginBottom:6 }}>Pris (kr.)</label>
-                <input type="number" value={editForm.price} onChange={e=>setEditForm({...editForm,price:e.target.value})} placeholder="Fx 250" style={{ width:'100%', padding:'11px 14px', borderRadius:10, border:'1.5px solid #e5e5e5', fontSize:14, outline:'none' }} />
-              </div>
+              <div><label style={labelStyle}>Pris (kr.)</label>
+                <input type="number" value={editForm.price} onChange={e=>setEditForm({...editForm,price:e.target.value})} placeholder="Fx 250" style={inputStyle} /></div>
             )}
-            <div>
-              <label style={{ display:'block', fontSize:13, fontWeight:700, marginBottom:6 }}>Aldersgruppe</label>
-              <select value={editForm.age_group} onChange={e=>setEditForm({...editForm,age_group:e.target.value})} style={{ width:'100%', padding:'11px 14px', borderRadius:10, border:'1.5px solid #e5e5e5', fontSize:14, outline:'none', background:'#fff' }}>
+            <div><label style={labelStyle}>Aldersgruppe</label>
+              <select value={editForm.age_group} onChange={e=>setEditForm({...editForm,age_group:e.target.value})} style={{ ...inputStyle, cursor:'pointer' }}>
                 {AGE_GROUPS.map(a=><option key={a}>{a}</option>)}
               </select>
             </div>
-            <div>
-              <label style={{ display:'block', fontSize:13, fontWeight:700, marginBottom:6 }}>Beskrivelse</label>
-              <textarea value={editForm.description} onChange={e=>setEditForm({...editForm,description:e.target.value})} rows={3} style={{ width:'100%', padding:'11px 14px', borderRadius:10, border:'1.5px solid #e5e5e5', fontSize:14, resize:'none', fontFamily:"'Nunito Sans',sans-serif", outline:'none' }} />
-            </div>
-            <div>
-              <label style={{ display:'block', fontSize:13, fontWeight:700, marginBottom:8 }}>Stand</label>
+            <div><label style={labelStyle}>Beskrivelse</label>
+              <textarea value={editForm.description} onChange={e=>setEditForm({...editForm,description:e.target.value})} rows={3} style={{ ...inputStyle, resize:'none' }} /></div>
+            <div><label style={labelStyle}>Stand</label>
               <div style={{ display:'flex', gap:8, flexWrap:'wrap' }}>
                 {CONDITIONS.map(c=>(
-                  <button key={c} onClick={()=>setEditForm({...editForm,condition:c})} style={{ padding:'8px 14px', borderRadius:99, fontSize:13, fontWeight:600, border:editForm.condition===c?`2px solid ${PRIMARY}`:'2px solid #e5e5e5', background:editForm.condition===c?'#E8F5EE':'#fff', color:editForm.condition===c?PRIMARY:'#555' }}>{c}</button>
+                  <button key={c} onClick={()=>setEditForm({...editForm,condition:c})} style={{ padding:'8px 14px', borderRadius:99, fontSize:13, fontWeight:600, border:editForm.condition===c?`2px solid ${PRIMARY}`:'2px solid transparent', background:editForm.condition===c?GREEN_TINT:PAPER3, color:editForm.condition===c?PRIMARY:INK3, fontFamily:FONT }}>{c}</button>
                 ))}
               </div>
             </div>
-            <div>
-              <label style={{ display:'block', fontSize:13, fontWeight:700, marginBottom:8 }}>Tags <span style={{ fontWeight:400, color:'#aaa' }}>(op til 5)</span></label>
+            <div><label style={labelStyle}>Tags <span style={{ fontWeight:400, color:INK3 }}>(op til 5)</span></label>
               <div style={{ display:'flex', gap:6, flexWrap:'wrap' }}>
                 {LISTING_TAGS.map(t => {
                   const sel = editForm.tags?.includes(t);
-                  return (
-                    <button key={t} type="button" onClick={()=>setEditForm(f=>({ ...f, tags: sel ? f.tags.filter(x=>x!==t) : (f.tags||[]).length < 5 ? [...(f.tags||[]), t] : f.tags }))}
-                      style={{ padding:'5px 12px', borderRadius:99, fontSize:12, fontWeight:700, border:sel?'2px solid #2563eb':'2px solid #e5e5e5', background:sel?'#eff6ff':'#f9f9f9', color:sel?'#2563eb':'#777', cursor:'pointer', transition:'all 0.15s' }}>
-                      {t}
-                    </button>
-                  );
+                  return <button key={t} type="button" onClick={()=>setEditForm(f=>({ ...f, tags: sel ? f.tags.filter(x=>x!==t) : (f.tags||[]).length < 5 ? [...(f.tags||[]), t] : f.tags }))} style={{ padding:'5px 12px', borderRadius:99, fontSize:12, fontWeight:700, border:sel?`2px solid ${PRIMARY}`:'2px solid transparent', background:sel?GREEN_TINT:PAPER3, color:sel?PRIMARY:INK3, cursor:'pointer', fontFamily:FONT }}>{t}</button>;
                 })}
               </div>
             </div>
             <div style={{ display:'flex', gap:10, marginTop:4 }}>
-              <button onClick={()=>{setEditListing(null);setEditForm(null);}} style={{ flex:1, padding:'13px', borderRadius:12, background:'#f5f4f2', border:'none', fontWeight:700, fontFamily:"'Nunito',sans-serif" }}>Annuller</button>
+              <button onClick={()=>{setEditListing(null);setEditForm(null);}} style={{ flex:1, padding:'13px', borderRadius:99, background:PAPER3, border:'none', fontWeight:700, fontFamily:FONT, color:INK3 }}>Annuller</button>
               <Btn variant="primary" color={PRIMARY} radius={22} onClick={handleUpdate} disabled={editSaving} style={{ flex:2, justifyContent:'center', padding:'13px', fontSize:14 }}>
-                {editSaving ? <><Spinner/>Gemmer…</> : '✓ Gem ændringer'}
+                {editSaving ? <><Spinner/>Gemmer…</> : 'Gem ændringer'}
               </Btn>
             </div>
           </div>
         )}
       </Modal>
 
-      {/* Feature #7: Trades History Modal */}
-      <Modal open={tradesOpen} onClose={()=>setTradesOpen(false)} title="🤝 Gennemførte handler">
+      {/* Trades modal */}
+      <Modal open={tradesOpen} onClose={()=>setTradesOpen(false)} title="Gennemførte handler">
         <div>
-          {tradesLoading ? (
-            <div style={{ textAlign:'center', padding:'32px 0', color:'#bbb' }}>Indlæser…</div>
-          ) : trades.length === 0 ? (
-            <div style={{ textAlign:'center', padding:'32px 0', color:'#bbb' }}>
-              <div style={{ fontSize:40, marginBottom:10 }}>🤝</div>
-              <p style={{ fontSize:14 }}>Ingen gennemførte handler endnu</p>
-              <p style={{ fontSize:12, color:'#ccc', marginTop:6 }}>Handler optræder her når et bud accepteres</p>
-            </div>
-          ) : trades.map(t => {
-            const isSeller = t.owner_institution_id === institution?.id || t.owner_name === institution?.name;
-            const otherParty = isSeller ? t.initiator_name : t.owner_name;
-            const dealDate = t.deal_completed_at || t.handled_at;
-            return (
-              <div key={t.id} style={{ border:'1.5px solid #c6e8d4', borderRadius:14, padding:'14px 16px', marginBottom:10, background:'#f8fdf9' }}>
-                <div style={{ display:'flex', justifyContent:'space-between', alignItems:'flex-start', marginBottom:8 }}>
-                  <div style={{ flex:1, minWidth:0, marginRight:12 }}>
-                    <div style={{ fontFamily:"'Nunito',sans-serif", fontWeight:800, fontSize:14, marginBottom:2 }}>{t.listing_title || 'Direkte besked'}</div>
-                    <div style={{ fontSize:12, color:'#888' }}>
-                      {isSeller ? '📤 Solgt til' : '📥 Købt fra'} <strong style={{ color:'#333' }}>{otherParty}</strong>
+          {tradesLoading
+            ? <div style={{ textAlign:'center', padding:'32px 0', color:INK3, fontFamily:FONT }}>Indlæser…</div>
+            : trades.length === 0
+              ? (
+                <div style={{ textAlign:'center', padding:'40px 0' }}>
+                  <div style={{ fontFamily:FONT, fontWeight:800, fontSize:48, color:GREEN_SOFT, lineHeight:1, marginBottom:12 }}>0</div>
+                  <p style={{ fontSize:14, color:INK3, fontFamily:FONT }}>Ingen gennemførte handler endnu</p>
+                  <p style={{ fontSize:12, color:INK3, marginTop:6, fontFamily:FONT }}>Handler optræder her når et bud accepteres</p>
+                </div>
+              )
+              : trades.map(t => {
+                const isSeller = t.owner_institution_id === institution?.id || t.owner_name === institution?.name;
+                const otherParty = isSeller ? t.initiator_name : t.owner_name;
+                const dealDate = t.deal_completed_at || t.handled_at;
+                return (
+                  <div key={t.id} style={{ border:`1px solid ${GREEN_SOFT}`, borderRadius:14, padding:'14px 16px', marginBottom:10, background:GREEN_TINT }}>
+                    <div style={{ display:'flex', justifyContent:'space-between', alignItems:'flex-start', marginBottom:8 }}>
+                      <div style={{ flex:1, minWidth:0, marginRight:12 }}>
+                        <div style={{ fontFamily:FONT, fontWeight:800, fontSize:14, marginBottom:2, color:INK }}>{t.listing_title || 'Direkte besked'}</div>
+                        <div style={{ fontSize:12, color:INK3, fontFamily:FONT }}>
+                          {isSeller ? 'Solgt til' : 'Købt fra'} <strong style={{ color:INK }}>{otherParty}</strong>
+                        </div>
+                      </div>
+                      <span style={{ background:PRIMARY, color:'#fff', borderRadius:99, padding:'3px 10px', fontSize:11, fontWeight:800, flexShrink:0, fontFamily:FONT }}>Gennemført</span>
                     </div>
+                    <div style={{ display:'flex', gap:12, flexWrap:'wrap', fontSize:11, color:INK3, fontFamily:FONT }}>
+                      <span>{dealDate ? new Date(dealDate).toLocaleDateString('da-DK',{day:'numeric',month:'long',year:'numeric'}) : '—'}</span>
+                      {t.deal_type && <span>{t.deal_type === 'byd' ? 'Bud accepteret' : t.deal_type === 'byt' ? 'Bytte' : 'Køb'}</span>}
+                    </div>
+                    <button onClick={()=>router.push('/beskeder')} style={{ marginTop:10, background:'none', border:`1.5px solid ${PRIMARY}`, color:PRIMARY, borderRadius:99, padding:'5px 12px', fontSize:12, fontWeight:700, cursor:'pointer', fontFamily:FONT }}>Se samtale →</button>
                   </div>
-                  <span style={{ background:'#e8f5ee', color:PRIMARY, borderRadius:99, padding:'3px 10px', fontSize:11, fontWeight:800, flexShrink:0 }}>✅ Gennemført</span>
-                </div>
-                <div style={{ display:'flex', gap:12, flexWrap:'wrap', fontSize:11, color:'#aaa' }}>
-                  <span>📅 {dealDate ? new Date(dealDate).toLocaleDateString('da-DK',{day:'numeric',month:'long',year:'numeric'}) : '—'}</span>
-                  {t.deal_type && <span>🏷️ {t.deal_type === 'byd' ? 'Bud accepteret' : t.deal_type === 'byt' ? 'Bytte' : 'Køb'}</span>}
-                </div>
-                <button onClick={()=>router.push('/beskeder')} style={{ marginTop:10, background:'none', border:`1.5px solid ${PRIMARY}`, color:PRIMARY, borderRadius:8, padding:'5px 12px', fontSize:12, fontWeight:700, cursor:'pointer' }}>Se samtale →</button>
-              </div>
-            );
-          })}
+                );
+              })}
         </div>
       </Modal>
 
-      {/* Feature #4: Activity Modal (sendte tilbud) */}
-      <Modal open={activityOpen} onClose={()=>setActivityOpen(false)} title="📤 Sendte tilbud og forespørgsler">
+      {/* Activity modal */}
+      <Modal open={activityOpen} onClose={()=>setActivityOpen(false)} title="Sendte tilbud og forespørgsler">
         <div>
-          {actLoading ? (
-            <div style={{ textAlign:'center', padding:'32px 0', color:'#bbb' }}>Indlæser…</div>
-          ) : activity.length === 0 ? (
-            <div style={{ textAlign:'center', padding:'32px 0', color:'#bbb' }}>
-              <div style={{ fontSize:40, marginBottom:10 }}>📤</div>
-              <p style={{ fontSize:14 }}>Ingen afgivne bud eller byttetilbud endnu</p>
-              <p style={{ fontSize:12, color:'#ccc', marginTop:6 }}>Gå til Markedsplads for at finde opslag at byde på</p>
-            </div>
-          ) : activity.map(c => {
-            const statusBadge = c.deal_completed
-              ? { label:'✅ Handel gennemført', bg:'#e8f5ee', color:PRIMARY }
-              : c.handled_action === 'rejected'
-                ? { label:'❌ Afvist', bg:'#fff0f0', color:'#e11d48' }
-                : c.handled_action === 'countered'
-                  ? { label:'🔄 Modbud modtaget', bg:'#fff8e1', color:'#b45309' }
-                  : { label:'⏳ Afventer svar', bg:'#f0f2f5', color:'#666' };
-            return (
-              <div key={c.id} onClick={()=>router.push('/beskeder')} style={{ border:'1.5px solid #f0eeeb', borderRadius:14, padding:'14px 16px', marginBottom:10, cursor:'pointer', transition:'all 0.15s' }}
-                onMouseEnter={e=>e.currentTarget.style.borderColor='#c6e8d4'}
-                onMouseLeave={e=>e.currentTarget.style.borderColor='#f0eeeb'}>
-                <div style={{ display:'flex', justifyContent:'space-between', alignItems:'flex-start', marginBottom:6 }}>
-                  <div style={{ flex:1, minWidth:0, marginRight:12 }}>
-                    <div style={{ fontFamily:"'Nunito',sans-serif", fontWeight:700, fontSize:14, whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis' }}>{c.listing_title || 'Direkte besked'}</div>
-                    <div style={{ fontSize:12, color:'#888', marginTop:2 }}>Til <strong>{c.owner_name}</strong></div>
-                  </div>
-                  <span style={{ background:statusBadge.bg, color:statusBadge.color, borderRadius:99, padding:'3px 10px', fontSize:11, fontWeight:700, flexShrink:0 }}>{statusBadge.label}</span>
+          {actLoading
+            ? <div style={{ textAlign:'center', padding:'32px 0', color:INK3, fontFamily:FONT }}>Indlæser…</div>
+            : activity.length === 0
+              ? (
+                <div style={{ textAlign:'center', padding:'40px 0' }}>
+                  <div style={{ fontFamily:FONT, fontWeight:800, fontSize:48, color:GREEN_SOFT, lineHeight:1, marginBottom:12 }}>0</div>
+                  <p style={{ fontSize:14, color:INK3, fontFamily:FONT }}>Ingen afgivne bud eller byttetilbud endnu</p>
+                  <p style={{ fontSize:12, color:INK3, marginTop:6, fontFamily:FONT }}>Gå til Markedsplads for at finde opslag at byde på</p>
                 </div>
-                <div style={{ fontSize:11, color:'#bbb' }}>📅 {relTime(c.last_message_at)}</div>
-              </div>
-            );
-          })}
+              )
+              : activity.map(c => {
+                const statusBadge = c.deal_completed
+                  ? { label:'Handel gennemført', bg:GREEN_TINT, color:PRIMARY }
+                  : c.handled_action === 'rejected'
+                    ? { label:'Afvist', bg:'#FEF2F2', color:'#e11d48' }
+                    : c.handled_action === 'countered'
+                      ? { label:'Modbud modtaget', bg:'#FFFBEB', color:'#B45309' }
+                      : { label:'Afventer svar', bg:PAPER3, color:INK3 };
+                return (
+                  <div key={c.id} onClick={()=>router.push('/beskeder')} style={{ border:`1px solid rgba(22,34,28,0.08)`, borderRadius:14, padding:'14px 16px', marginBottom:10, cursor:'pointer', transition:'all 0.15s', background:PAPER }}
+                    onMouseEnter={e=>e.currentTarget.style.borderColor=GREEN_SOFT}
+                    onMouseLeave={e=>e.currentTarget.style.borderColor='rgba(22,34,28,0.08)'}>
+                    <div style={{ display:'flex', justifyContent:'space-between', alignItems:'flex-start', marginBottom:6 }}>
+                      <div style={{ flex:1, minWidth:0, marginRight:12 }}>
+                        <div style={{ fontFamily:FONT, fontWeight:700, fontSize:14, whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis', color:INK }}>{c.listing_title || 'Direkte besked'}</div>
+                        <div style={{ fontSize:12, color:INK3, marginTop:2, fontFamily:FONT }}>Til <strong style={{ color:INK }}>{c.owner_name}</strong></div>
+                      </div>
+                      <span style={{ background:statusBadge.bg, color:statusBadge.color, borderRadius:99, padding:'3px 10px', fontSize:11, fontWeight:700, flexShrink:0, fontFamily:FONT }}>{statusBadge.label}</span>
+                    </div>
+                    <div style={{ fontSize:11, color:INK3, fontFamily:FONT }}>{relTime(c.last_message_at)}</div>
+                  </div>
+                );
+              })}
         </div>
       </Modal>
 
-      {/* Feature #19: Members Modal */}
-      <Modal open={membersOpen} onClose={()=>setMembersOpen(false)} title="Brugere under institutionen">
-        <div style={{ display:'flex', flexDirection:'column', gap:14 }}>
-          <div style={{ background:'#f8f7f5', borderRadius:12, padding:'12px 14px', fontSize:13, color:'#666' }}>
-            ℹ️ Tilføj medarbejdere der skal kunne uploade og favorisere opslag. De logger ind med deres egen e-mail.
+      {/* Members modal */}
+      <Modal open={membersOpen} onClose={()=>setMembersOpen(false)} title="Medarbejdere">
+        <div style={{ display:'flex', flexDirection:'column', gap:16 }}>
+          <div style={{ background:GREEN_TINT, borderRadius:'0 10px 10px 0', padding:'12px 14px', fontSize:13, color:INK, fontFamily:FONT, borderLeft:`3px solid ${GREEN_SOFT}`, lineHeight:1.55 }}>
+            Inviter medarbejdere med deres e-mailadresse. De modtager en invitation og opretter selv deres konto.
           </div>
+
+          {/* Invite input */}
           <div style={{ display:'flex', gap:8 }}>
             <input value={memberEmail} onChange={e=>setMemberEmail(e.target.value)} placeholder="medarbejder@institution.dk" type="email"
-              onKeyDown={e=>e.key==='Enter'&&addMember()}
-              style={{ flex:1, padding:'11px 14px', borderRadius:10, border:'1.5px solid #e5e5e5', fontSize:14, outline:'none' }} />
-            <Btn variant="primary" color={PRIMARY} radius={12} onClick={addMember} disabled={memberSaving||!memberEmail.trim()} style={{ padding:'11px 18px', fontSize:13 }}>
-              {memberSaving ? <Spinner /> : '+ Tilføj'}
+              onKeyDown={e=>e.key==='Enter'&&inviteMember()}
+              style={{ ...inputStyle, flex:1 }} />
+            <Btn variant="primary" color={PRIMARY} radius={99} onClick={inviteMember} disabled={memberSaving||!memberEmail.trim()} style={{ padding:'11px 18px', fontSize:13, whiteSpace:'nowrap' }}>
+              {memberSaving ? <Spinner /> : 'Send invitation'}
             </Btn>
           </div>
-          {members.length === 0 ? (
-            <div style={{ textAlign:'center', padding:'20px 0', color:'#bbb', fontSize:13 }}>Ingen medarbejdere tilføjet endnu</div>
-          ) : members.map(m => (
-            <div key={m.id} style={{ display:'flex', alignItems:'center', gap:12, padding:'10px 14px', border:'1.5px solid #f0eeeb', borderRadius:12 }}>
-              <div style={{ width:36, height:36, borderRadius:'50%', background:'#e8f0fb', display:'flex', alignItems:'center', justifyContent:'center', fontSize:16, fontWeight:700, color:ACCENT2, flexShrink:0 }}>
-                {m.email.charAt(0).toUpperCase()}
-              </div>
-              <div style={{ flex:1, minWidth:0 }}>
-                <div style={{ fontSize:14, fontWeight:600, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{m.email}</div>
-                <div style={{ fontSize:11, color:'#aaa', marginTop:1 }}>Medarbejder · Tilføjet {new Date(m.created_at).toLocaleDateString('da-DK')}</div>
-              </div>
-              <button onClick={()=>removeMember(m.id)} style={{ background:'#fff0f0', border:'none', borderRadius:8, padding:'6px 12px', fontSize:12, fontWeight:700, color:'#e11d48', cursor:'pointer' }}>Fjern</button>
+
+          {/* Pending invitations */}
+          {invitations.length > 0 && (
+            <div>
+              <div style={{ fontFamily:FONT, fontSize:12, fontWeight:700, color:INK3, textTransform:'uppercase', letterSpacing:0.5, marginBottom:8 }}>Afventer svar</div>
+              {invitations.map(inv => (
+                <div key={inv.id} style={{ display:'flex', alignItems:'center', gap:12, padding:'10px 14px', border:`1px solid rgba(22,34,28,0.08)`, borderRadius:12, background:PAPER, marginBottom:8 }}>
+                  <div style={{ width:36, height:36, borderRadius:'50%', background:'#FFFBEB', display:'flex', alignItems:'center', justifyContent:'center', fontSize:14, fontWeight:700, color:'#B45309', flexShrink:0, fontFamily:FONT }}>
+                    {inv.email.charAt(0).toUpperCase()}
+                  </div>
+                  <div style={{ flex:1, minWidth:0 }}>
+                    <div style={{ fontSize:14, fontWeight:600, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap', fontFamily:FONT, color:INK }}>{inv.email}</div>
+                    <div style={{ fontSize:11, color:'#B45309', marginTop:2, fontFamily:FONT, fontWeight:600 }}>
+                      Invitation sendt · udløber {new Date(inv.expires_at).toLocaleDateString('da-DK', { day:'numeric', month:'short' })}
+                    </div>
+                  </div>
+                  <button onClick={()=>cancelInvitation(inv.id)} style={{ background:'#FEF2F2', border:'none', borderRadius:99, padding:'5px 10px', fontSize:11, fontWeight:700, color:'#e11d48', cursor:'pointer', fontFamily:FONT }}>Annuller</button>
+                </div>
+              ))}
             </div>
-          ))}
+          )}
+
+          {/* Accepted members */}
+          <div>
+            {(members.length > 0 || invitations.length > 0) && (
+              <div style={{ fontFamily:FONT, fontSize:12, fontWeight:700, color:INK3, textTransform:'uppercase', letterSpacing:0.5, marginBottom:8 }}>Aktive medarbejdere</div>
+            )}
+            {members.length === 0 && invitations.length === 0
+              ? <div style={{ textAlign:'center', padding:'24px 0', color:INK3, fontSize:13, fontFamily:FONT }}>Ingen medarbejdere tilknyttet endnu</div>
+              : members.length === 0
+                ? <div style={{ textAlign:'center', padding:'12px 0', color:INK3, fontSize:13, fontFamily:FONT }}>Ingen aktive medarbejdere endnu</div>
+                : members.map(m => (
+                  <div key={m.id} style={{ display:'flex', alignItems:'center', gap:12, padding:'10px 14px', border:`1px solid rgba(22,34,28,0.08)`, borderRadius:12, background:PAPER, marginBottom:8 }}>
+                    <div style={{ width:36, height:36, borderRadius:'50%', background:GREEN_TINT, display:'flex', alignItems:'center', justifyContent:'center', fontSize:14, fontWeight:700, color:PRIMARY, flexShrink:0, fontFamily:FONT }}>
+                      {m.email.charAt(0).toUpperCase()}
+                    </div>
+                    <div style={{ flex:1, minWidth:0 }}>
+                      <div style={{ fontSize:14, fontWeight:600, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap', fontFamily:FONT, color:INK }}>{m.email}</div>
+                      <div style={{ fontSize:11, color:INK3, marginTop:1, fontFamily:FONT }}>Medarbejder · Tilmeldt {new Date(m.created_at).toLocaleDateString('da-DK')}</div>
+                    </div>
+                    <button onClick={()=>removeMember(m.id)} style={{ background:'#FEF2F2', border:'none', borderRadius:99, padding:'6px 12px', fontSize:12, fontWeight:700, color:'#e11d48', cursor:'pointer', fontFamily:FONT }}>Fjern</button>
+                  </div>
+                ))
+            }
+          </div>
         </div>
       </Modal>
 
+      {/* New listing modal */}
       <Modal open={newOpen} onClose={()=>{setNewOpen(false);resetModal();}} title={`Nyt opslag — trin ${step}/2`}>
         {step===1 && (
           <div style={{ display:'flex', flexDirection:'column', gap:14 }}>
-            <div>
-              <label style={{ display:'block', fontSize:13, fontWeight:700, marginBottom:6 }}>Titel *</label>
-              <input value={form.title} onChange={e=>setForm({...form,title:e.target.value})} placeholder="Fx: LEGO Duplo stor kasse" style={{ width:'100%', padding:'11px 14px', borderRadius:10, border:'1.5px solid #e5e5e5', fontSize:14, outline:'none' }} />
-            </div>
-            <div>
-              <label style={{ display:'block', fontSize:13, fontWeight:700, marginBottom:8 }}>Handelsform</label>
+            <div><label style={labelStyle}>Titel *</label>
+              <input value={form.title} onChange={e=>setForm({...form,title:e.target.value})} placeholder="Fx: LEGO Duplo stor kasse" style={inputStyle} /></div>
+            <div><label style={labelStyle}>Handelsform</label>
               <div style={{ display:'flex', gap:8 }}>
                 {['køb','byd','byt'].map(t=>(
-                  <button key={t} onClick={()=>setForm({...form,type:t})} style={{ flex:1, padding:'10px', borderRadius:10, background:form.type===t?TYPE_CFG[t].bg:'#f5f4f2', color:form.type===t?TYPE_CFG[t].color:'#888', fontFamily:"'Nunito',sans-serif", fontWeight:700, fontSize:13, border:form.type===t?`2px solid ${TYPE_CFG[t].color}`:'2px solid transparent' }}>{TYPE_CFG[t].icon} {TYPE_CFG[t].label}</button>
+                  <button key={t} onClick={()=>setForm({...form,type:t})} style={{ flex:1, padding:'10px', borderRadius:10, background:form.type===t?TYPE_CFG[t].bg:PAPER3, color:form.type===t?TYPE_CFG[t].color:INK3, fontFamily:FONT, fontWeight:700, fontSize:13, border:form.type===t?`2px solid ${TYPE_CFG[t].color}`:'2px solid transparent' }}>{TYPE_CFG[t].icon} {TYPE_CFG[t].label}</button>
                 ))}
               </div>
             </div>
             {form.type==='køb' && (
-              <div>
-                <label style={{ display:'block', fontSize:13, fontWeight:700, marginBottom:6 }}>Pris (kr.) <span style={{ color:'#e53e3e' }}>*</span></label>
-                <input type="number" value={form.price} onChange={e=>setForm({...form,price:e.target.value})} placeholder="Fx 250" min="1" style={{ width:'100%', padding:'11px 14px', borderRadius:10, border:`1.5px solid ${!form.price?'#fca5a5':'#e5e5e5'}`, fontSize:14, outline:'none' }} />
-                {!form.price && <p style={{ fontSize:12, color:'#e53e3e', marginTop:4 }}>Pris er påkrævet ved køb-opslag</p>}
+              <div><label style={labelStyle}>Pris (kr.) <span style={{ color:'#e53e3e' }}>*</span></label>
+                <input type="number" value={form.price} onChange={e=>setForm({...form,price:e.target.value})} placeholder="Fx 250" min="1" style={{ ...inputStyle, border:`1.5px solid ${!form.price?'#FCA5A5':PAPER3}` }} />
+                {!form.price && <p style={{ fontSize:12, color:'#e53e3e', marginTop:4, fontFamily:FONT }}>Pris er påkrævet ved køb-opslag</p>}
               </div>
             )}
             {form.type==='byd' && (
-              <div>
-                <label style={{ display:'block', fontSize:13, fontWeight:700, marginBottom:6 }}>Mindste bud (kr.) <span style={{ fontWeight:400, color:'#aaa' }}>— valgfri</span></label>
-                <input type="number" value={form.min_bid||''} onChange={e=>setForm({...form,min_bid:e.target.value})} placeholder="Fx 100 — lad stå tom for intet minimum" min="1" style={{ width:'100%', padding:'11px 14px', borderRadius:10, border:'1.5px solid #e5e5e5', fontSize:14, outline:'none' }} />
-              </div>
+              <div><label style={labelStyle}>Mindste bud (kr.) <span style={{ fontWeight:400, color:INK3 }}>— valgfri</span></label>
+                <input type="number" value={form.min_bid||''} onChange={e=>setForm({...form,min_bid:e.target.value})} placeholder="Fx 100 — lad stå tom for intet minimum" min="1" style={inputStyle} /></div>
             )}
-            <div>
-              <label style={{ display:'block', fontSize:13, fontWeight:700, marginBottom:6 }}>Aldersgruppe</label>
-              <select value={form.age_group} onChange={e=>setForm({...form,age_group:e.target.value})} style={{ width:'100%', padding:'11px 14px', borderRadius:10, border:'1.5px solid #e5e5e5', fontSize:14, outline:'none', background:'#fff' }}>
+            <div><label style={labelStyle}>Aldersgruppe</label>
+              <select value={form.age_group} onChange={e=>setForm({...form,age_group:e.target.value})} style={{ ...inputStyle, cursor:'pointer' }}>
                 {AGE_GROUPS.map(a=><option key={a}>{a}</option>)}
               </select>
             </div>
-            <div>
-              <label style={{ display:'block', fontSize:13, fontWeight:700, marginBottom:8 }}>Tags <span style={{ fontWeight:400, color:'#aaa' }}>(vælg op til 5)</span></label>
+            <div><label style={labelStyle}>Tags <span style={{ fontWeight:400, color:INK3 }}>(vælg op til 5)</span></label>
               <div style={{ display:'flex', gap:6, flexWrap:'wrap' }}>
                 {LISTING_TAGS.map(t => {
                   const sel = (form.tags||[]).includes(t);
-                  return (
-                    <button key={t} type="button" onClick={()=>setForm(f=>({ ...f, tags: sel ? (f.tags||[]).filter(x=>x!==t) : (f.tags||[]).length < 5 ? [...(f.tags||[]), t] : (f.tags||[]) }))}
-                      style={{ padding:'5px 12px', borderRadius:99, fontSize:12, fontWeight:700, border:sel?`2px solid #2563eb`:'2px solid #e5e5e5', background:sel?'#eff6ff':'#f9f9f9', color:sel?'#2563eb':'#777', cursor:'pointer', transition:'all 0.15s' }}>
-                      {t}
-                    </button>
-                  );
+                  return <button key={t} type="button" onClick={()=>setForm(f=>({ ...f, tags: sel ? (f.tags||[]).filter(x=>x!==t) : (f.tags||[]).length < 5 ? [...(f.tags||[]), t] : (f.tags||[]) }))} style={{ padding:'5px 12px', borderRadius:99, fontSize:12, fontWeight:700, border:sel?`2px solid ${PRIMARY}`:'2px solid transparent', background:sel?GREEN_TINT:PAPER3, color:sel?PRIMARY:INK3, cursor:'pointer', fontFamily:FONT }}>{t}</button>;
                 })}
               </div>
             </div>
@@ -805,66 +815,59 @@ export default function DashboardClient() {
         )}
         {step===2 && (
           <div style={{ display:'flex', flexDirection:'column', gap:16 }}>
-            <div>
-              <label style={{ display:'block', fontSize:13, fontWeight:700, marginBottom:6 }}>Beskrivelse</label>
-              <textarea value={form.description} onChange={e=>setForm({...form,description:e.target.value})} placeholder="Beskriv legetøjets stand, hvad der medfølger, mål osv." rows={3} style={{ width:'100%', padding:'11px 14px', borderRadius:10, border:`1.5px solid ${!form.description.trim()?'#fca5a5':'#e5e5e5'}`, fontSize:14, resize:'none', fontFamily:"'Nunito Sans',sans-serif", outline:'none' }} />
-              {!form.description.trim() && <p style={{ fontSize:12, color:'#e53e3e', marginTop:4 }}>Beskrivelse er påkrævet</p>}
+            <div><label style={labelStyle}>Beskrivelse</label>
+              <textarea value={form.description} onChange={e=>setForm({...form,description:e.target.value})} placeholder="Beskriv legetøjets stand, hvad der medfølger, mål osv." rows={3} style={{ ...inputStyle, resize:'none', border:`1.5px solid ${!form.description.trim()?'#FCA5A5':PAPER3}` }} />
+              {!form.description.trim() && <p style={{ fontSize:12, color:'#e53e3e', marginTop:4, fontFamily:FONT }}>Beskrivelse er påkrævet</p>}
             </div>
-            <div>
-              <label style={{ display:'block', fontSize:13, fontWeight:700, marginBottom:8 }}>Stand</label>
+            <div><label style={labelStyle}>Stand</label>
               <div style={{ display:'flex', gap:8, flexWrap:'wrap' }}>
                 {CONDITIONS.map(c=>(
-                  <button key={c} onClick={()=>setForm({...form,condition:c})} style={{ padding:'8px 14px', borderRadius:99, fontSize:13, fontWeight:600, border:form.condition===c?`2px solid ${PRIMARY}`:'2px solid #e5e5e5', background:form.condition===c?'#E8F5EE':'#fff', color:form.condition===c?PRIMARY:'#555' }}>{c}</button>
+                  <button key={c} onClick={()=>setForm({...form,condition:c})} style={{ padding:'8px 14px', borderRadius:99, fontSize:13, fontWeight:600, border:form.condition===c?`2px solid ${PRIMARY}`:'2px solid transparent', background:form.condition===c?GREEN_TINT:PAPER3, color:form.condition===c?PRIMARY:INK3, fontFamily:FONT }}>{c}</button>
                 ))}
               </div>
             </div>
 
-            {/* ── Billeder ── */}
             <div>
               <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:8 }}>
-                <label style={{ fontSize:13, fontWeight:700 }}>Billeder <span style={{ fontWeight:400, color:'#aaa' }}>(op til 6)</span></label>
+                <label style={{ ...labelStyle, marginBottom:0 }}>Billeder <span style={{ fontWeight:400, color:INK3 }}>(op til 6)</span></label>
                 {imgFiles.length < 6 && !aiAnalyzing && (
-                  <button type="button" onClick={()=>fileRef.current?.click()}
-                    style={{ fontSize:12, fontWeight:700, color:PRIMARY, background:'#E8F5EE', border:'none', borderRadius:8, padding:'5px 12px', cursor:'pointer' }}>
-                    + Tilføj billede
-                  </button>
+                  <button type="button" onClick={()=>fileRef.current?.click()} style={{ fontSize:12, fontWeight:700, color:PRIMARY, background:GREEN_TINT, border:'none', borderRadius:99, padding:'5px 12px', cursor:'pointer', fontFamily:FONT }}>+ Tilføj billede</button>
                 )}
               </div>
               <input ref={fileRef} type="file" accept="image/*" multiple onChange={handleFileSelect} style={{ display:'none' }} disabled={aiAnalyzing} />
-
               {aiAnalyzing ? (
                 <ScanningLoader />
               ) : imgPreviews.length === 0 ? (
-                <div onClick={()=>fileRef.current?.click()} style={{ border:'2px dashed #d4d0cb', borderRadius:14, padding:'28px 20px', textAlign:'center', cursor:'pointer', background:'#fafaf8' }}>
-                  <div style={{ fontSize:36, marginBottom:8 }}>📷</div>
-                  <div style={{ fontSize:14, fontWeight:700, color:'#555', marginBottom:4 }}>Klik for at uploade billeder</div>
-                  <div style={{ fontSize:12, color:'#aaa' }}>JPG, PNG eller WEBP · Maks 6 billeder</div>
-                  <div style={{ fontSize:11, color:'#bbb', marginTop:4 }}>Billeder med personer bliver automatisk afvist</div>
+                <div onClick={()=>fileRef.current?.click()} style={{ border:`2px dashed ${PAPER3}`, borderRadius:14, padding:'28px 20px', textAlign:'center', cursor:'pointer', background:PAPER }}>
+                  <div style={{ width:48, height:48, borderRadius:'50%', background:GREEN_TINT, display:'flex', alignItems:'center', justifyContent:'center', margin:'0 auto 12px' }}>
+                    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke={PRIMARY} strokeWidth="1.8" strokeLinecap="round"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
+                  </div>
+                  <div style={{ fontSize:14, fontWeight:700, color:INK, marginBottom:4, fontFamily:FONT }}>Klik for at uploade billeder</div>
+                  <div style={{ fontSize:12, color:INK3, fontFamily:FONT }}>JPG, PNG eller WEBP · Maks 6 billeder</div>
+                  <div style={{ fontSize:11, color:INK3, marginTop:4, fontFamily:FONT }}>Billeder med personer bliver automatisk afvist</div>
                 </div>
               ) : (
                 <div style={{ display:'grid', gridTemplateColumns:'repeat(3,1fr)', gap:8 }}>
                   {imgPreviews.map((src,i)=>(
                     <div key={i} style={{ position:'relative', aspectRatio:'1', borderRadius:10, overflow:'hidden' }}>
                       <img src={src} alt="" style={{ width:'100%', height:'100%', objectFit:'cover' }} />
-                      <button onClick={()=>removeImg(i)} style={{ position:'absolute', top:4, right:4, width:22, height:22, borderRadius:'50%', background:'rgba(0,0,0,0.6)', border:'none', color:'#fff', fontSize:12, cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center', lineHeight:1 }}>✕</button>
-                      {i===0 && <div style={{ position:'absolute', bottom:4, left:4, background:'rgba(0,0,0,0.55)', borderRadius:4, padding:'2px 6px', fontSize:10, color:'#fff', fontWeight:700 }}>Forside</div>}
+                      <button onClick={()=>removeImg(i)} style={{ position:'absolute', top:4, right:4, width:22, height:22, borderRadius:'50%', background:'rgba(22,34,28,0.6)', border:'none', color:'#fff', fontSize:12, cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center', lineHeight:1 }}>✕</button>
+                      {i===0 && <div style={{ position:'absolute', bottom:4, left:4, background:'rgba(22,34,28,0.55)', borderRadius:4, padding:'2px 6px', fontSize:10, color:'#fff', fontWeight:700, fontFamily:FONT }}>Forside</div>}
                     </div>
                   ))}
                   {imgFiles.length < 6 && (
-                    <div onClick={()=>fileRef.current?.click()} style={{ aspectRatio:'1', borderRadius:10, border:'2px dashed #d4d0cb', display:'flex', alignItems:'center', justifyContent:'center', cursor:'pointer', background:'#fafaf8' }}>
-                      <span style={{ fontSize:24, color:'#ccc' }}>+</span>
+                    <div onClick={()=>fileRef.current?.click()} style={{ aspectRatio:'1', borderRadius:10, border:`2px dashed ${PAPER3}`, display:'flex', alignItems:'center', justifyContent:'center', cursor:'pointer', background:PAPER }}>
+                      <span style={{ fontSize:24, color:INK3 }}>+</span>
                     </div>
                   )}
                 </div>
               )}
             </div>
 
-            {/* ── Foto-tips ── */}
-            <div style={{ background:'#fffcf5', border:'1.5px solid #ffe8a3', borderRadius:14, overflow:'hidden' }}>
-              <button type="button" onClick={()=>setTipsOpen(o=>!o)}
-                style={{ width:'100%', background:'none', border:'none', padding:'12px 16px', display:'flex', alignItems:'center', justifyContent:'space-between', cursor:'pointer' }}>
-                <span style={{ fontSize:13, fontWeight:700, color:'#7a5c00' }}>📸 Tips til gode produktbilleder</span>
-                <span style={{ fontSize:12, color:'#aaa', transition:'transform 0.2s', transform:tipsOpen?'rotate(180deg)':'none' }}>▼</span>
+            <div style={{ background:'#FFFBEB', border:`1.5px solid #FDE68A`, borderRadius:14, overflow:'hidden' }}>
+              <button type="button" onClick={()=>setTipsOpen(o=>!o)} style={{ width:'100%', background:'none', border:'none', padding:'12px 16px', display:'flex', alignItems:'center', justifyContent:'space-between', cursor:'pointer' }}>
+                <span style={{ fontSize:13, fontWeight:700, color:'#7A5C00', fontFamily:FONT }}>Tips til gode produktbilleder</span>
+                <span style={{ fontSize:12, color:INK3, transition:'transform 0.2s', display:'inline-block', transform:tipsOpen?'rotate(180deg)':'none' }}>▼</span>
               </button>
               {tipsOpen && (
                 <div style={{ padding:'0 16px 16px', display:'flex', flexDirection:'column', gap:10 }}>
@@ -879,8 +882,8 @@ export default function DashboardClient() {
                     <div key={title} style={{ display:'flex', gap:10, alignItems:'flex-start' }}>
                       <span style={{ fontSize:18, lineHeight:1.4, flexShrink:0 }}>{icon}</span>
                       <div>
-                        <div style={{ fontSize:13, fontWeight:700, color:'#444', marginBottom:1 }}>{title}</div>
-                        <div style={{ fontSize:12, color:'#777', lineHeight:1.55 }}>{desc}</div>
+                        <div style={{ fontSize:13, fontWeight:700, color:INK, marginBottom:1, fontFamily:FONT }}>{title}</div>
+                        <div style={{ fontSize:12, color:INK3, lineHeight:1.55, fontFamily:FONT }}>{desc}</div>
                       </div>
                     </div>
                   ))}
@@ -894,15 +897,15 @@ export default function DashboardClient() {
               const missing = [missingDesc && 'beskrivelse', missingImg && 'mindst ét billede'].filter(Boolean);
               return (<>
                 {missing.length > 0 && (
-                  <div style={{ background:'#fff7ed', border:'1.5px solid #fed7aa', borderRadius:10, padding:'10px 14px', fontSize:13, color:'#92400e', display:'flex', gap:8, alignItems:'center' }}>
+                  <div style={{ background:'#FFFBEB', border:`1.5px solid #FDE68A`, borderRadius:10, padding:'10px 14px', fontSize:13, color:'#92400E', display:'flex', gap:8, alignItems:'center', fontFamily:FONT }}>
                     <span>⚠️</span>
                     <span>Mangler: <strong>{missing.join(' og ')}</strong></span>
                   </div>
                 )}
                 <div style={{ display:'flex', gap:10 }}>
-                  <button onClick={()=>setStep(1)} style={{ flex:1, padding:'13px', borderRadius:12, background:'#f5f4f2', border:'none', fontWeight:700, fontFamily:"'Nunito',sans-serif" }}>← Tilbage</button>
+                  <button onClick={()=>setStep(1)} style={{ flex:1, padding:'13px', borderRadius:99, background:PAPER3, border:'none', fontWeight:700, fontFamily:FONT, color:INK3 }}>← Tilbage</button>
                   <Btn variant="primary" color={PRIMARY} radius={22} onClick={handleCreate} disabled={saving || missingDesc || missingImg} style={{ flex:2, justifyContent:'center', padding:'13px', fontSize:14 }}>
-                    {saving ? <><Spinner/>{imgFiles.length>0?'Uploader…':'Publicerer…'}</> : '✓ Publicer opslag'}
+                    {saving ? <><Spinner/>{imgFiles.length>0?'Uploader…':'Publicerer…'}</> : 'Publicer opslag'}
                   </Btn>
                 </div>
               </>);

@@ -1,19 +1,56 @@
 'use client';
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { PRIMARY } from '@/lib/constants';
+import {
+  PRIMARY, GREEN_DEEP, GREEN_SOFT,
+  PAPER, PAPER2, PAPER3,
+  INK, INK2, INK3,
+} from '@/lib/constants';
+import { useWindowWidth } from '@/lib/hooks';
 import { Spinner } from '@/components/ui';
 import { db } from '@/lib/supabase';
 import { useApp } from '@/providers/AppProvider';
 import { ADMIN_EMAIL } from '@/lib/constants';
+import { LogoLockup } from '@/components/Logo';
+
+const FONT = "'Sora', sans-serif";
+
+function EyeIcon({ open }) {
+  if (open) {
+    return (
+      <svg width={18} height={18} viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth={1.6} strokeLinecap="round" strokeLinejoin="round">
+        <path d="M1 10s3.5-6 9-6 9 6 9 6-3.5 6-9 6-9-6-9-6z" />
+        <circle cx="10" cy="10" r="2.5" />
+        <line x1="3" y1="3" x2="17" y2="17" />
+      </svg>
+    );
+  }
+  return (
+    <svg width={18} height={18} viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth={1.6} strokeLinecap="round" strokeLinejoin="round">
+      <path d="M1 10s3.5-6 9-6 9 6 9 6-3.5 6-9 6-9-6-9-6z" />
+      <circle cx="10" cy="10" r="2.5" />
+    </svg>
+  );
+}
+
+const TRUST_POINTS = [
+  'CVR-verificerede institutioner',
+  'Sikker handel via platformen',
+  'Køb, byd eller byt frit',
+];
 
 export default function LoginPage() {
   const router = useRouter();
   const { setLoggedIn } = useApp();
-  const [email, setEmail] = useState('');
-  const [pass,  setPass]  = useState('');
+  const w = useWindowWidth();
+  const isDesktop = w >= 768;
+
+  const [email, setEmail]     = useState('');
+  const [pass, setPass]       = useState('');
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState(null);
+  const [error, setError]     = useState(null);
+  const [showPass, setShowPass] = useState(false);
+
   async function handleSubmit(e) {
     e.preventDefault(); setLoading(true); setError(null);
     const { error } = await db.auth.signInWithPassword({ email, password: pass });
@@ -22,33 +59,115 @@ export default function LoginPage() {
     setLoggedIn(true);
     router.push(email.trim().toLowerCase() === ADMIN_EMAIL.toLowerCase() ? '/admin' : '/dashboard');
   }
-  return (
-    <div style={{ minHeight:'100vh', display:'flex', alignItems:'center', justifyContent:'center', padding:'80px 24px', background:'linear-gradient(150deg,#fffcf8 0%,#f0f9f4 100%)' }} className="page-enter">
-      <div style={{ width:'100%', maxWidth:440 }}>
-        <div onClick={()=>router.push('/')} style={{ display:'flex', alignItems:'center', gap:10, cursor:'pointer', marginBottom:36, justifyContent:'center' }}>
-          <div style={{ width:40, height:40, borderRadius:12, background:PRIMARY, display:'flex', alignItems:'center', justifyContent:'center', fontSize:22 }}>♻️</div>
-          <span style={{ fontFamily:"'Nunito',sans-serif", fontWeight:900, fontSize:22 }}><span style={{ color:PRIMARY }}>Legetøjs</span>Byt</span>
+
+  const inputStyle = {
+    width: '100%',
+    padding: '11px 14px',
+    borderRadius: 12,
+    border: `1.5px solid ${PAPER3}`,
+    background: PAPER2,
+    fontSize: 14,
+    fontFamily: FONT,
+    color: INK,
+    outline: 'none',
+    boxSizing: 'border-box',
+  };
+
+  const labelStyle = {
+    display: 'block',
+    fontFamily: FONT,
+    fontWeight: 700,
+    fontSize: 13,
+    color: INK2,
+    marginBottom: 6,
+  };
+
+  const formContent = (
+    <div style={{ width: '100%', maxWidth: 380, ...(isDesktop ? { padding: '48px 40px' } : {}) }}>
+      <h1 style={{ fontFamily: FONT, fontWeight: 800, fontSize: 28, color: INK, letterSpacing: '-0.03em', marginBottom: 6, marginTop: 0 }}>
+        Velkommen tilbage
+      </h1>
+      <p style={{ fontFamily: FONT, fontSize: 14, color: INK3, marginBottom: 32, marginTop: 0 }}>
+        Log ind med jeres institutions-konto
+      </p>
+
+      <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 18 }}>
+        <div>
+          <label style={labelStyle}>E-mail</label>
+          <input type="email" value={email} onChange={e => setEmail(e.target.value)} placeholder="navn@institution.dk" style={inputStyle} />
         </div>
-        <div style={{ background:'#fff', borderRadius:24, padding:40, boxShadow:'0 8px 40px rgba(0,0,0,0.08)' }}>
-          <h1 style={{ fontFamily:"'Nunito',sans-serif", fontWeight:900, fontSize:28, marginBottom:8, textAlign:'center' }}>Velkommen tilbage</h1>
-          <p style={{ color:'#888', fontSize:14, textAlign:'center', marginBottom:28 }}>Log ind med jeres institutions-konto</p>
-          <form onSubmit={handleSubmit} style={{ display:'flex', flexDirection:'column', gap:16 }}>
-            {[{label:'E-mail',val:email,set:setEmail,type:'email',ph:'navn@institution.dk'},{label:'Kodeord',val:pass,set:setPass,type:'password',ph:'••••••••'}].map(f=>(
-              <div key={f.label}>
-                <label style={{ display:'block', fontSize:13, fontWeight:700, marginBottom:6 }}>{f.label}</label>
-                <input type={f.type} value={f.val} onChange={e=>f.set(e.target.value)} placeholder={f.ph} style={{ width:'100%', padding:'12px 14px', borderRadius:12, border:'1.5px solid #e5e5e5', fontSize:14, fontFamily:"'Nunito Sans',sans-serif", outline:'none' }} />
+
+        <div>
+          <label style={labelStyle}>Adgangskode</label>
+          <div style={{ position: 'relative' }}>
+            <input
+              type={showPass ? 'text' : 'password'}
+              value={pass}
+              onChange={e => setPass(e.target.value)}
+              placeholder="••••••••"
+              style={{ ...inputStyle, paddingRight: 42 }}
+            />
+            <button type="button" onClick={() => setShowPass(v => !v)} style={{ position: 'absolute', right: 12, top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', color: INK3, padding: 0, display: 'flex', alignItems: 'center' }} aria-label={showPass ? 'Skjul adgangskode' : 'Vis adgangskode'}>
+              <EyeIcon open={showPass} />
+            </button>
+          </div>
+          <div style={{ textAlign: 'right', marginTop: 6 }}>
+            <span onClick={() => router.push('/glemt-adgangskode')} style={{ fontFamily: FONT, fontWeight: 600, fontSize: 12, color: PRIMARY, cursor: 'pointer' }}>
+              Glemt adgangskode?
+            </span>
+          </div>
+        </div>
+
+        {error && (
+          <div style={{ background: '#FEF2F2', borderLeft: '3px solid #EF4444', borderRadius: 12, padding: '12px 16px', fontSize: 13, color: '#B91C1C', fontFamily: FONT }}>
+            {error}
+          </div>
+        )}
+
+        <button type="submit" disabled={loading} style={{ width: '100%', padding: '13px', borderRadius: 999, background: PRIMARY, color: '#fff', border: 'none', fontFamily: FONT, fontWeight: 700, fontSize: 15, cursor: loading ? 'not-allowed' : 'pointer', opacity: loading ? 0.6 : 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, transition: 'opacity 0.2s' }}>
+          {loading ? <><Spinner />Logger ind…</> : 'Log ind →'}
+        </button>
+      </form>
+
+      <div style={{ marginTop: 20, fontFamily: FONT, fontSize: 13, color: INK3 }}>
+        <span>Har I ikke en konto? </span>
+        <span onClick={() => router.push('/signup')} style={{ color: PRIMARY, fontWeight: 700, cursor: 'pointer' }}>Tilmeld institution</span>
+      </div>
+    </div>
+  );
+
+  if (isDesktop) {
+    return (
+      <div style={{ minHeight: '100vh', display: 'grid', gridTemplateColumns: '1fr 1fr' }}>
+        <div style={{ background: GREEN_DEEP, position: 'relative', overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center', flexDirection: 'column', padding: '60px 52px' }}>
+          <span style={{ position: 'absolute', fontFamily: FONT, fontWeight: 800, fontSize: 'clamp(120px, 18vw, 220px)', color: 'rgba(255,255,255,0.04)', letterSpacing: '-0.05em', top: '50%', left: '50%', transform: 'translate(-50%, -50%)', userSelect: 'none', whiteSpace: 'nowrap', pointerEvents: 'none' }}>byt</span>
+          <LogoLockup markBg="rgba(255,255,255,0.15)" color="#fff" accentColor={GREEN_SOFT} markSize={44} textSize={22} />
+          <p style={{ fontFamily: FONT, fontSize: 14, color: 'rgba(255,255,255,0.55)', marginTop: 12, marginBottom: 0, textAlign: 'center', maxWidth: 280 }}>
+            Danmarks markedsplads for institutionslegetøj
+          </p>
+          <div style={{ marginTop: 48 }}>
+            {TRUST_POINTS.map(pt => (
+              <div key={pt} style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 12, fontSize: 13, fontFamily: FONT, color: 'rgba(255,255,255,0.65)' }}>
+                <span style={{ width: 8, height: 8, borderRadius: '50%', background: GREEN_SOFT, flexShrink: 0 }} />
+                {pt}
               </div>
             ))}
-            {error && <div style={{ background:'#FEF2F2', border:'1.5px solid #fca5a5', borderRadius:10, padding:'12px 16px', fontSize:13, color:'#b91c1c' }}>❌ {error}</div>}
-            <button type="submit" disabled={loading} style={{ background:loading?'#aaa':PRIMARY, color:'#fff', border:'none', borderRadius:22, padding:'14px', fontSize:15, fontWeight:700, transition:'all 0.2s', display:'flex', alignItems:'center', justifyContent:'center', gap:8 }}>
-              {loading ? <><Spinner/>Logger ind…</> : 'Log ind →'}
-            </button>
-          </form>
-          <div style={{ textAlign:'center', marginTop:16, fontSize:13 }}>
-            <a onClick={()=>router.push('/glemt-adgangskode')} style={{ color:PRIMARY, fontWeight:600, cursor:'pointer' }}>Glemt kodeord?</a>
           </div>
-          <div style={{ textAlign:'center', marginTop:10, fontSize:13, color:'#888' }}>Ikke tilmeldt? <a onClick={()=>router.push('/signup')} style={{ color:PRIMARY, fontWeight:700, cursor:'pointer' }}>Opret institution</a></div>
         </div>
+        <div style={{ background: PAPER, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+          {formContent}
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div style={{ minHeight: '100vh', background: PAPER, padding: '80px 24px 48px', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+      <div onClick={() => router.push('/')} style={{ cursor: 'pointer', marginBottom: 36 }}>
+        <LogoLockup markBg={GREEN_DEEP} color={INK} accentColor={PRIMARY} markSize={40} textSize={20} />
+      </div>
+      <div style={{ width: '100%', maxWidth: 380 }}>
+        {formContent}
       </div>
     </div>
   );

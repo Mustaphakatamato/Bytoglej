@@ -4,6 +4,7 @@ import { useRouter } from 'next/navigation';
 import { PRIMARY } from '@/lib/constants';
 import { Spinner } from '@/components/ui';
 import { db } from '@/lib/supabase';
+import { LogoLockup } from '@/components/Logo';
 
 export default function ForgotPasswordPage() {
   const router = useRouter();
@@ -21,23 +22,20 @@ export default function ForgotPasswordPage() {
     setSent(true);
   }
   return (
-    <div style={{ minHeight:'100vh', display:'flex', alignItems:'center', justifyContent:'center', padding:'80px 24px', background:'linear-gradient(150deg,#fffcf8 0%,#f0f9f4 100%)' }} className="page-enter">
+    <div style={{ minHeight:'100vh', display:'flex', alignItems:'center', justifyContent:'center', padding:'80px 24px', background:'var(--paper)' }} className="page-enter">
       <div style={{ width:'100%', maxWidth:440 }}>
-        <div onClick={()=>router.push('/')} style={{ display:'flex', alignItems:'center', gap:10, cursor:'pointer', marginBottom:36, justifyContent:'center' }}>
-          <div style={{ width:40, height:40, borderRadius:12, background:PRIMARY, display:'flex', alignItems:'center', justifyContent:'center', fontSize:22 }}>♻️</div>
-          <span style={{ fontFamily:"'Nunito',sans-serif", fontWeight:900, fontSize:22 }}><span style={{ color:PRIMARY }}>Legetøjs</span>Byt</span>
-        </div>
-        <div style={{ background:'#fff', borderRadius:24, padding:40, boxShadow:'0 8px 40px rgba(0,0,0,0.08)' }}>
+        <div onClick={()=>router.push('/')} style={{ cursor:'pointer', marginBottom:36, display:'flex', justifyContent:'center' }}><LogoLockup markSize={40} textSize={20} /></div>
+        <div style={{ background:'var(--paper)', borderRadius:24, padding:40, boxShadow:'0 8px 40px rgba(0,0,0,0.08)' }}>
           {sent ? (
             <div style={{ textAlign:'center' }}>
               <div style={{ fontSize:48, marginBottom:16 }}>📬</div>
-              <h1 style={{ fontFamily:"'Nunito',sans-serif", fontWeight:900, fontSize:24, marginBottom:10 }}>Tjek din indbakke</h1>
+              <h1 style={{ fontFamily:"'Sora',sans-serif", fontWeight:900, fontSize:24, marginBottom:10 }}>Tjek din indbakke</h1>
               <p style={{ color:'#666', fontSize:14, lineHeight:1.7, marginBottom:24 }}>Vi har sendt et link til <strong>{email}</strong>. Klik på linket for at nulstille dit kodeord. Husk at tjekke spam-mappen.</p>
               <a onClick={()=>router.push('/login')} style={{ color:PRIMARY, fontWeight:700, cursor:'pointer', fontSize:14 }}>← Tilbage til login</a>
             </div>
           ) : (
             <>
-              <h1 style={{ fontFamily:"'Nunito',sans-serif", fontWeight:900, fontSize:28, marginBottom:8, textAlign:'center' }}>Glemt kodeord?</h1>
+              <h1 style={{ fontFamily:"'Sora',sans-serif", fontWeight:900, fontSize:28, marginBottom:8, textAlign:'center' }}>Glemt kodeord?</h1>
               <p style={{ color:'#888', fontSize:14, textAlign:'center', marginBottom:28 }}>Indtast jeres e-mail, så sender vi et nulstillingslink</p>
               <form onSubmit={handleSubmit} style={{ display:'flex', flexDirection:'column', gap:16 }}>
                 <div>
