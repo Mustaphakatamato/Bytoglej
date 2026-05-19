@@ -1,6 +1,6 @@
 'use client';
 import React, { useState, useEffect, useRef } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { db } from '@/lib/supabase';
 import { PRIMARY, ACCENT, ACCENT2 } from '@/lib/constants';
 import { useWindowWidth, relTime } from '@/lib/hooks';
@@ -9,6 +9,7 @@ import { Badge, Btn, Spinner } from '@/components/ui';
 
 export default function MessagesClient() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const { selectedConvId, setSelectedConvId, setActiveListing } = useApp();
   const { isAdminView: ctxIsAdmin, adminInstName, institution: ctxInstitution, institutionId: ctxInstId, realUserId, userId: ctxUserId } = useActiveUser();
 
@@ -69,11 +70,15 @@ export default function MessagesClient() {
     if (data && setActiveListing) { setActiveListing(data); router.push('/opslag/detail'); }
   }
 
+  // Åbn samtale fra URL-param (?conv=id) eller fra context (selectedConvId)
   useEffect(() => {
-    if (!selectedConvId || !convs.length) return;
-    const c = convs.find(x => x.id === selectedConvId);
-    if (c) openConv(c);
-  }, [selectedConvId, convs]);
+    if (!convs.length) return;
+    const urlConvId = searchParams.get('conv');
+    const targetId = urlConvId || selectedConvId;
+    if (!targetId) return;
+    const c = convs.find(x => x.id === targetId);
+    if (c && active?.id !== c.id) openConv(c, false);
+  }, [convs, searchParams]);
 
   useEffect(() => {
     if (!userId) return;
@@ -153,9 +158,12 @@ export default function MessagesClient() {
     loadConvs(effectiveUid);
   }
 
-  async function openConv(conv) {
+  async function openConv(conv, updateUrl = true) {
     setActive(conv);
     setSelectedConvId(conv.id);
+    if (updateUrl && searchParams.get('conv') !== conv.id) {
+      router.push('/beskeder?conv=' + conv.id);
+    }
     setMsgLoad(true);
     const { data } = await db.from('chat_messages').select('*').eq('conversation_id', conv.id).order('created_at', { ascending: true });
     if (data) setMessages(data);
@@ -169,6 +177,15 @@ export default function MessagesClient() {
       setConvs(cs => cs.map(c => c.id === conv.id ? { ...c, ...patch } : c));
     }
   }
+
+  // Synkroniser state med URL — back-knap lukker aktiv samtale
+  useEffect(() => {
+    const urlConvId = searchParams.get('conv');
+    if (!urlConvId && active) {
+      setActive(null);
+      setMessages([]);
+    }
+  }, [searchParams]);
 
   useEffect(() => {
     if (!active) return;
@@ -522,7 +539,7 @@ export default function MessagesClient() {
             <>
               <div style={{ padding:'12px 16px', borderBottom:'1.5px solid #f0eeeb', display:'flex', alignItems:'center', gap:12, background:'#fafaf8' }}>
                 {isMobile && (
-                  <button onClick={()=>setActive(null)} style={{ background:'none', border:'none', fontSize:22, color:'#555', cursor:'pointer', padding:'4px 6px 4px 0', lineHeight:1, flexShrink:0 }}>←</button>
+                  <button onClick={()=>router.back()} style={{ background:'none', border:'none', fontSize:22, color:'#555', cursor:'pointer', padding:'4px 6px 4px 0', lineHeight:1, flexShrink:0 }}>←</button>
                 )}
                 <div style={{ width:44, height:44, borderRadius:12, background:active.listing_image?'#e8e6e3':active.listing_color||'#FFD166', display:'flex', alignItems:'center', justifyContent:'center', fontSize:22, flexShrink:0, overflow:'hidden' }}>
                   {active.listing_image ? <img src={active.listing_image} style={{ width:'100%', height:'100%', objectFit:'cover' }} alt="" /> : active.listing_emoji||'🧸'}
