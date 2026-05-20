@@ -244,8 +244,7 @@ export default function InstitutionPage() {
             {listings.map(l => {
               const isSelected = selected.find(x => x.id === l.id);
               return (
-                <div key={l.id} style={{ position:'relative', cursor:selectMode?'pointer':'default' }}
-                  onClick={selectMode ? ()=>toggleSelect(l) : undefined}>
+                <div key={l.id} style={{ position:'relative', cursor:selectMode?'pointer':'default' }}>
                   <div style={{ transition:'transform 0.12s', transform: isSelected ? 'scale(0.97)' : 'scale(1)', outline: isSelected ? `3px solid ${PRIMARY}` : '3px solid transparent', borderRadius:16, overflow:'hidden' }}>
                     <ListingCard listing={l} favs={favs} toggleFav={selectMode ? ()=>{} : toggleFav}
                       onClick={selectMode ? ()=>toggleSelect(l) : ()=>{ setActiveListing(l); router.push('/opslag/detail'); }} />
