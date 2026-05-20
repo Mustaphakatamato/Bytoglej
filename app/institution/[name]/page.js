@@ -93,8 +93,8 @@ export default function InstitutionPage() {
     try {
       const { data: { user } } = await db.auth.getUser();
       if (!user) { router.push('/login'); setSendingBundle(false); return; }
-      const { data: ownerInst, error: ownerErr } = await db.from('institutions').select('id,user_id,email,name').eq('name', institutionName).maybeSingle();
-      if (ownerErr || !ownerInst) { showToast('Kunne ikke finde institutionen — prøv igen', 'error'); setSendingBundle(false); return; }
+      const ownerInst = inst;
+      if (!ownerInst) { showToast('Kunne ikke finde institutionen — prøv igen', 'error'); setSendingBundle(false); return; }
       const myInstId = myInst?.id || null;
       const userName = myInst?.name || user.email;
 
