@@ -89,6 +89,9 @@ export default function OpretOpslagPage() {
   const [step, setStep] = useState(1);
   const [saving, setSaving] = useState(false);
   const [aiAnalyzing, setAiAnalyzing] = useState(false);
+  const [aiImproving, setAiImproving] = useState(false);
+  const [aiSuggestion, setAiSuggestion] = useState(null);
+  const [aiApply, setAiApply] = useState({ title: true, description: true });
   const [institution, setInstitution] = useState(ctxInstitution || null);
   const [imgFiles, setImgFiles] = useState([]);
   const [imgPreviews, setImgPreviews] = useState([]);
@@ -141,6 +144,30 @@ export default function OpretOpslagPage() {
     URL.revokeObjectURL(imgPreviews[i]);
     setImgFiles(f => f.filter((_,j) => j!==i));
     setImgPreviews(p => p.filter((_,j) => j!==i));
+  }
+
+  async function handleImprove() {
+    setAiImproving(true);
+    try {
+      const res = await fetch('/api/improve-listing', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ title: form.title, description: form.description, type: form.type, condition: form.condition, age_group: form.age_group, tags: form.tags }),
+      });
+      const json = await res.json();
+      if (json.error) { showToast('AI-forbedring mislykkedes — prøv igen', 'error'); }
+      else { setAiSuggestion(json); setAiApply({ title: true, description: true }); }
+    } catch { showToast('AI-forbedring mislykkedes — prøv igen', 'error'); }
+    setAiImproving(false);
+  }
+
+  function applyAiSuggestion() {
+    setForm(f => ({
+      ...f,
+      title: aiApply.title ? aiSuggestion.title : f.title,
+      description: aiApply.description ? aiSuggestion.description : f.description,
+    }));
+    setAiSuggestion(null);
   }
 
   async function handleCreate() {
@@ -289,7 +316,14 @@ export default function OpretOpslagPage() {
             {step === 2 && (
               <div style={{ display:'flex', flexDirection:'column', gap:20 }}>
                 <div>
-                  <label style={labelStyle}>Beskrivelse <span style={{ color:'#e53e3e' }}>*</span></label>
+                  <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:7 }}>
+                    <label style={{ ...labelStyle, marginBottom:0 }}>Beskrivelse <span style={{ color:'#e53e3e' }}>*</span></label>
+                    {(form.title.trim() || form.description.trim()) && (
+                      <button type="button" onClick={handleImprove} disabled={aiImproving} style={{ display:'flex', alignItems:'center', gap:5, padding:'5px 12px', borderRadius:99, background: aiImproving ? PAPER2 : `linear-gradient(135deg, #7C3AED, ${PRIMARY})`, color: aiImproving ? INK3 : '#fff', border:'none', fontSize:12, fontWeight:700, cursor: aiImproving ? 'not-allowed' : 'pointer', fontFamily:FONT, transition:'all 0.2s', flexShrink:0 }}>
+                        {aiImproving ? <><Spinner /> Forbedrer…</> : <>✨ Forbedre med AI</>}
+                      </button>
+                    )}
+                  </div>
                   <textarea value={form.description} onChange={e=>setForm({...form,description:e.target.value})} placeholder="Beskriv legetøjets stand, hvad der medfølger, mål, begrundelse for salg osv." rows={4} style={{ ...inputStyle, resize:'vertical', minHeight:100 }} />
                 </div>
 
@@ -390,6 +424,66 @@ export default function OpretOpslagPage() {
           )}
         </div>
       </div>
+
+      {/* AI Comparison Modal */}
+      {aiSuggestion && (
+        <div style={{ position:'fixed', inset:0, background:'rgba(22,34,28,0.55)', zIndex:1000, display:'flex', alignItems:'center', justifyContent:'center', padding:20 }} onClick={()=>setAiSuggestion(null)}>
+          <div style={{ background:'#fff', borderRadius:24, padding:isMobile?'24px 20px':'32px 36px', maxWidth:700, width:'100%', maxHeight:'90vh', overflowY:'auto', boxShadow:'0 24px 64px rgba(22,34,28,0.22)' }} onClick={e=>e.stopPropagation()}>
+            <div style={{ display:'flex', alignItems:'center', gap:10, marginBottom:8 }}>
+              <div style={{ width:36, height:36, borderRadius:10, background:`linear-gradient(135deg, #7C3AED, ${PRIMARY})`, display:'flex', alignItems:'center', justifyContent:'center', fontSize:18, flexShrink:0 }}>✨</div>
+              <div>
+                <div style={{ fontFamily:FONT, fontWeight:800, fontSize:18, color:INK, letterSpacing:'-0.03em' }}>AI-forslag til dit opslag</div>
+                <div style={{ fontSize:12, color:INK3, fontFamily:FONT }}>Klik på den version du vil bruge for hvert felt</div>
+              </div>
+            </div>
+
+            <div style={{ height:1, background:PAPER2, margin:'16px 0' }} />
+
+            {/* Title comparison */}
+            <div style={{ marginBottom:20 }}>
+              <div style={{ fontSize:12, fontWeight:700, color:INK2, fontFamily:FONT, textTransform:'uppercase', letterSpacing:'0.07em', marginBottom:10 }}>Titel</div>
+              <div style={{ display:'grid', gridTemplateColumns:isMobile?'1fr':'1fr 1fr', gap:10 }}>
+                <div onClick={()=>setAiApply(a=>({...a,title:false}))} style={{ borderRadius:14, padding:'14px 16px', border:`2px solid ${!aiApply.title ? PRIMARY : PAPER2}`, background:!aiApply.title ? GREEN_TINT : PAPER, cursor:'pointer', transition:'all 0.15s', position:'relative' }}>
+                  {!aiApply.title && <div style={{ position:'absolute', top:10, right:10, width:18, height:18, borderRadius:'50%', background:PRIMARY, display:'flex', alignItems:'center', justifyContent:'center', fontSize:10, color:'#fff', fontWeight:800 }}>✓</div>}
+                  <div style={{ fontSize:10, fontWeight:700, color:INK3, fontFamily:FONT, marginBottom:6, textTransform:'uppercase', letterSpacing:'0.06em' }}>Dit eget</div>
+                  <div style={{ fontSize:14, fontWeight:600, color:INK, fontFamily:FONT, lineHeight:1.4 }}>{form.title || <span style={{ color:INK3, fontStyle:'italic' }}>Ingen titel</span>}</div>
+                </div>
+                <div onClick={()=>setAiApply(a=>({...a,title:true}))} style={{ borderRadius:14, padding:'14px 16px', border:`2px solid ${aiApply.title ? '#7C3AED' : PAPER2}`, background:aiApply.title ? '#F5F0FF' : PAPER, cursor:'pointer', transition:'all 0.15s', position:'relative' }}>
+                  {aiApply.title && <div style={{ position:'absolute', top:10, right:10, width:18, height:18, borderRadius:'50%', background:'#7C3AED', display:'flex', alignItems:'center', justifyContent:'center', fontSize:10, color:'#fff', fontWeight:800 }}>✓</div>}
+                  <div style={{ fontSize:10, fontWeight:700, color:'#7C3AED', fontFamily:FONT, marginBottom:6, textTransform:'uppercase', letterSpacing:'0.06em' }}>✨ AI-forslag</div>
+                  <div style={{ fontSize:14, fontWeight:600, color:INK, fontFamily:FONT, lineHeight:1.4 }}>{aiSuggestion.title}</div>
+                </div>
+              </div>
+            </div>
+
+            {/* Description comparison */}
+            <div style={{ marginBottom:24 }}>
+              <div style={{ fontSize:12, fontWeight:700, color:INK2, fontFamily:FONT, textTransform:'uppercase', letterSpacing:'0.07em', marginBottom:10 }}>Beskrivelse</div>
+              <div style={{ display:'grid', gridTemplateColumns:isMobile?'1fr':'1fr 1fr', gap:10 }}>
+                <div onClick={()=>setAiApply(a=>({...a,description:false}))} style={{ borderRadius:14, padding:'14px 16px', border:`2px solid ${!aiApply.description ? PRIMARY : PAPER2}`, background:!aiApply.description ? GREEN_TINT : PAPER, cursor:'pointer', transition:'all 0.15s', position:'relative' }}>
+                  {!aiApply.description && <div style={{ position:'absolute', top:10, right:10, width:18, height:18, borderRadius:'50%', background:PRIMARY, display:'flex', alignItems:'center', justifyContent:'center', fontSize:10, color:'#fff', fontWeight:800 }}>✓</div>}
+                  <div style={{ fontSize:10, fontWeight:700, color:INK3, fontFamily:FONT, marginBottom:6, textTransform:'uppercase', letterSpacing:'0.06em' }}>Dit eget</div>
+                  <div style={{ fontSize:13, color:INK2, fontFamily:FONT, lineHeight:1.6 }}>{form.description || <span style={{ fontStyle:'italic', color:INK3 }}>Ingen beskrivelse</span>}</div>
+                </div>
+                <div onClick={()=>setAiApply(a=>({...a,description:true}))} style={{ borderRadius:14, padding:'14px 16px', border:`2px solid ${aiApply.description ? '#7C3AED' : PAPER2}`, background:aiApply.description ? '#F5F0FF' : PAPER, cursor:'pointer', transition:'all 0.15s', position:'relative' }}>
+                  {aiApply.description && <div style={{ position:'absolute', top:10, right:10, width:18, height:18, borderRadius:'50%', background:'#7C3AED', display:'flex', alignItems:'center', justifyContent:'center', fontSize:10, color:'#fff', fontWeight:800 }}>✓</div>}
+                  <div style={{ fontSize:10, fontWeight:700, color:'#7C3AED', fontFamily:FONT, marginBottom:6, textTransform:'uppercase', letterSpacing:'0.06em' }}>✨ AI-forslag</div>
+                  <div style={{ fontSize:13, color:INK2, fontFamily:FONT, lineHeight:1.6 }}>{aiSuggestion.description}</div>
+                </div>
+              </div>
+            </div>
+
+            <div style={{ display:'flex', gap:10 }}>
+              <button onClick={()=>setAiSuggestion(null)} style={{ flex:1, padding:'13px', borderRadius:99, background:PAPER2, color:INK2, border:'none', fontFamily:FONT, fontWeight:700, fontSize:14, cursor:'pointer' }}>
+                Annuller
+              </button>
+              <button onClick={applyAiSuggestion} style={{ flex:2, padding:'13px', borderRadius:99, background:`linear-gradient(135deg, #7C3AED, ${PRIMARY})`, color:'#fff', border:'none', fontFamily:FONT, fontWeight:700, fontSize:15, cursor:'pointer' }}>
+                Anvend valgte →
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
