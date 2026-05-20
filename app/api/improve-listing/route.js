@@ -1,7 +1,7 @@
-import Anthropic from '@anthropic-ai/sdk';
+import { GoogleGenerativeAI } from '@google/generative-ai';
 import { NextResponse } from 'next/server';
 
-const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
+const genAI = new GoogleGenerativeAI(process.env.GOOGLE_AI_KEY);
 
 export async function POST(req) {
   try {
@@ -13,14 +13,11 @@ export async function POST(req) {
     const typeLabel = type === 'køb' ? 'til salg' : type === 'byd' ? 'til bud' : 'til bytte';
     const tagList = tags?.length ? tags.join(', ') : 'ingen';
 
-    const message = await client.messages.create({
-      model: 'claude-haiku-4-5-20251001',
-      max_tokens: 400,
-      messages: [{
-        role: 'user',
-        content: `Du er ekspert i at skrive korte, præcise opslag til en dansk B2B-markedsplads for institutionslegetøj (børnehaver, skoler, SFO'er).
+    const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
+    const result = await model.generateContent(
+      `Du er ekspert i at skrive korte, præcise opslag til en dansk B2B-markedsplads for institutionslegetøj (børnehaver, skoler, SFO'er).
 
-Forbedre dette opslag. Svar KUN med JSON — ingen forklaring.
+Forbedre dette opslag. Svar KUN med JSON — ingen forklaring, ingen markdown.
 
 Opslag:
 - Titel: "${title || ''}"
@@ -39,10 +36,9 @@ Regler:
 
 Svar med præcis dette JSON-format:
 {"title": "...", "description": "..."}`
-      }],
-    });
+    );
 
-    const raw = message.content[0].text.trim();
+    const raw = result.response.text().trim().replace(/^```json\s*/,'').replace(/\s*```$/,'');
     const json = JSON.parse(raw);
 
     return NextResponse.json({ title: json.title, description: json.description });
