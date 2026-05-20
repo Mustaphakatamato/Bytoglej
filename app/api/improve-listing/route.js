@@ -1,10 +1,9 @@
 import Groq from 'groq-sdk';
 import { NextResponse } from 'next/server';
 
-const groq = new Groq({ apiKey: process.env.GROQ_API_KEY });
-
 export async function POST(req) {
   try {
+    const groq = new Groq({ apiKey: process.env.GROQ_API_KEY });
     const { title, description, type, condition, age_group, tags } = await req.json();
     if (!title && !description) {
       return NextResponse.json({ error: 'Titel eller beskrivelse påkrævet' }, { status: 400 });
