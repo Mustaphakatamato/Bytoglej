@@ -47,6 +47,7 @@ Svar med præcis dette JSON-format:
 
     return NextResponse.json({ title: json.title, description: json.description });
   } catch (e) {
+    console.error('improve-listing error:', e.message);
     return NextResponse.json({ error: e.message }, { status: 500 });
   }
 }

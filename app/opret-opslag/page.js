@@ -155,9 +155,9 @@ export default function OpretOpslagPage() {
         body: JSON.stringify({ title: form.title, description: form.description, type: form.type, condition: form.condition, age_group: form.age_group, tags: form.tags }),
       });
       const json = await res.json();
-      if (json.error) { showToast('AI-forbedring mislykkedes — prøv igen', 'error'); }
+      if (json.error) { showToast(`AI fejl: ${json.error}`, 'error'); }
       else { setAiSuggestion(json); setAiApply({ title: true, description: true }); }
-    } catch { showToast('AI-forbedring mislykkedes — prøv igen', 'error'); }
+    } catch (err) { showToast(`AI fejl: ${err.message}`, 'error'); }
     setAiImproving(false);
   }
 
