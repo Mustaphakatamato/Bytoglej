@@ -649,9 +649,14 @@ export default function MessagesClient() {
                                 <div style={{ maxWidth:'82%' }}>
                                   {!mine && <div style={{ fontSize:11, fontWeight:700, color:INK3, marginBottom:3, marginLeft:2, fontFamily:FONT }}>{m.sender_name}</div>}
                                   <div style={{ background:mine?GREEN_TINT:PAPER3, border:`1.5px solid ${mine?PRIMARY:'rgba(22,34,28,0.12)'}`, borderRadius:16, padding:'14px 16px', minWidth:220 }}>
-                                    <div style={{ display:'flex', alignItems:'center', gap:6, marginBottom:12 }}>
-                                      <span style={{ fontSize:16 }}>📦</span>
-                                      <span style={{ fontSize:11, fontWeight:700, color:PRIMARY, textTransform:'uppercase', letterSpacing:0.6, fontFamily:FONT }}>Bundttilbud</span>
+                                    <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:12 }}>
+                                      <div style={{ display:'flex', alignItems:'center', gap:6 }}>
+                                        <span style={{ fontSize:16 }}>📦</span>
+                                        <span style={{ fontSize:11, fontWeight:700, color:PRIMARY, textTransform:'uppercase', letterSpacing:0.6, fontFamily:FONT }}>Bundttilbud</span>
+                                      </div>
+                                      {bundleData.price && (
+                                        <div style={{ fontFamily:FONT, fontWeight:800, fontSize:15, color:PRIMARY }}>{Number(bundleData.price).toLocaleString('da-DK')} kr.</div>
+                                      )}
                                     </div>
                                     {bundleData.bundle_items?.length > 0 && (
                                       <div style={{ marginBottom:10 }}>

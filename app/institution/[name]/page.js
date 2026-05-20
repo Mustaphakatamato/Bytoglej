@@ -41,6 +41,7 @@ export default function InstitutionPage() {
   const [myListings, setMyListings] = useState([]);
   const [offerSelected, setOfferSelected] = useState([]);
   const [bundleNote, setBundleNote] = useState('');
+  const [bundlePrice, setBundlePrice] = useState('');
   const [sendingBundle, setSendingBundle] = useState(false);
   const [myInst, setMyInst] = useState(null);
   const ww = useWindowWidth();
@@ -118,6 +119,7 @@ export default function InstitutionPage() {
       const bundleContent = JSON.stringify({
         bundle_items: selected.map(l => ({ id: l.id, title: l.title, emoji: l.emoji, color: l.color, image: l.images?.[0] || null })),
         offer_items: offerSelected.map(l => ({ id: l.id, title: l.title, emoji: l.emoji, color: l.color, image: l.images?.[0] || null })),
+        price: bundlePrice ? Number(bundlePrice) : null,
         note: bundleNote.trim(),
       });
 
@@ -264,12 +266,23 @@ export default function InstitutionPage() {
 
       {/* Floating bundle bar */}
       {selectMode && selected.length > 0 && (
-        <div style={{ position:'fixed', bottom:0, left:0, right:0, zIndex:200, background:GREEN_DEEP, padding:'16px 24px', display:'flex', alignItems:'center', justifyContent:'space-between', gap:12, boxShadow:'0 -4px 24px rgba(22,34,28,0.25)' }}>
-          <div style={{ fontFamily:FONT, fontWeight:700, fontSize:14, color:'#fff' }}>
+        <div style={{ position:'fixed', bottom:0, left:0, right:0, zIndex:200, background:GREEN_DEEP, padding:'14px 20px', display:'flex', alignItems:'center', gap:12, flexWrap:'wrap', boxShadow:'0 -4px 24px rgba(22,34,28,0.25)' }}>
+          <div style={{ fontFamily:FONT, fontWeight:700, fontSize:14, color:'#fff', flexShrink:0 }}>
             {selected.length} opslag valgt
           </div>
-          <button onClick={()=>setBundleModal(true)} style={{ padding:'12px 28px', borderRadius:99, background:'#fff', color:GREEN_DEEP, border:'none', fontFamily:FONT, fontWeight:800, fontSize:14, cursor:'pointer' }}>
-            Fortsæt med bundttilbud →
+          <div style={{ display:'flex', alignItems:'center', gap:6, background:'rgba(255,255,255,0.12)', borderRadius:10, padding:'6px 12px', flexShrink:0 }}>
+            <span style={{ fontSize:13, color:'rgba(255,255,255,0.7)', fontFamily:FONT }}>Samlet bud:</span>
+            <input
+              type="number"
+              value={bundlePrice}
+              onChange={e => setBundlePrice(e.target.value)}
+              placeholder="kr."
+              min="0"
+              style={{ width:90, background:'transparent', border:'none', outline:'none', color:'#fff', fontFamily:FONT, fontWeight:700, fontSize:15, padding:0 }}
+            />
+          </div>
+          <button onClick={()=>setBundleModal(true)} style={{ marginLeft:'auto', padding:'12px 24px', borderRadius:99, background:'#fff', color:GREEN_DEEP, border:'none', fontFamily:FONT, fontWeight:800, fontSize:14, cursor:'pointer', flexShrink:0 }}>
+            Fortsæt →
           </button>
         </div>
       )}
@@ -280,12 +293,20 @@ export default function InstitutionPage() {
           <div style={{ background:'#fff', borderRadius:24, padding:isMobile?'22px 18px':'32px 32px', maxWidth:680, width:'100%', maxHeight:'90vh', overflowY:'auto', boxShadow:'0 24px 64px rgba(22,34,28,0.22)' }} onClick={e=>e.stopPropagation()}>
 
             {/* Header */}
-            <div style={{ display:'flex', alignItems:'center', gap:10, marginBottom:20 }}>
-              <div style={{ width:40, height:40, borderRadius:12, background:GREEN_TINT, display:'flex', alignItems:'center', justifyContent:'center', fontSize:20 }}>📦</div>
-              <div>
-                <div style={{ fontFamily:FONT, fontWeight:800, fontSize:18, color:INK, letterSpacing:'-0.03em' }}>Bundttilbud</div>
-                <div style={{ fontSize:12, color:INK3, fontFamily:FONT }}>til {institutionName}</div>
+            <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:20, flexWrap:'wrap', gap:12 }}>
+              <div style={{ display:'flex', alignItems:'center', gap:10 }}>
+                <div style={{ width:40, height:40, borderRadius:12, background:GREEN_TINT, display:'flex', alignItems:'center', justifyContent:'center', fontSize:20 }}>📦</div>
+                <div>
+                  <div style={{ fontFamily:FONT, fontWeight:800, fontSize:18, color:INK, letterSpacing:'-0.03em' }}>Bundttilbud</div>
+                  <div style={{ fontSize:12, color:INK3, fontFamily:FONT }}>til {institutionName}</div>
+                </div>
               </div>
+              {bundlePrice && (
+                <div style={{ background:GREEN_TINT, borderRadius:12, padding:'8px 16px', display:'flex', flexDirection:'column', alignItems:'flex-end' }}>
+                  <div style={{ fontSize:10, fontWeight:700, color:INK3, fontFamily:FONT, textTransform:'uppercase', letterSpacing:'0.06em' }}>Samlet bud</div>
+                  <div style={{ fontFamily:FONT, fontWeight:800, fontSize:20, color:PRIMARY }}>{Number(bundlePrice).toLocaleString('da-DK')} kr.</div>
+                </div>
+              )}
             </div>
 
             {/* What they want */}
