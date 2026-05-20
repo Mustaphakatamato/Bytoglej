@@ -30,7 +30,7 @@ export default function InstitutionPage() {
   const params = useParams();
   const institutionName = decodeURIComponent(params.name);
   const router = useRouter();
-  const { favs, toggleFav, setActiveListing, setSelectedConvId } = useApp();
+  const { favs, toggleFav, setActiveListing, setSelectedConvId, showToast } = useApp();
   const [listings, setListings] = useState([]);
   const [loading, setLoading] = useState(true);
   const [inst, setInst] = useState(null);
@@ -93,13 +93,13 @@ export default function InstitutionPage() {
     try {
       const { data: { user } } = await db.auth.getUser();
       if (!user) { router.push('/login'); setSendingBundle(false); return; }
-      const { data: ownerInst } = await db.from('institutions').select('id,user_id,email,name').eq('name', institutionName).maybeSingle();
-      if (!ownerInst) { setSendingBundle(false); return; }
+      const { data: ownerInst, error: ownerErr } = await db.from('institutions').select('id,user_id,email,name').eq('name', institutionName).maybeSingle();
+      if (ownerErr || !ownerInst) { showToast('Kunne ikke finde institutionen — prøv igen', 'error'); setSendingBundle(false); return; }
       const myInstId = myInst?.id || null;
       const userName = myInst?.name || user.email;
 
       const bundleTitle = selected.length === 1 ? selected[0].title : `Bundttilbud — ${selected.length} opslag`;
-      const { data: conv } = await db.from('conversations').insert({
+      const { data: conv, error: convErr } = await db.from('conversations').insert({
         listing_id: null,
         listing_title: bundleTitle,
         listing_emoji: '📦',
@@ -113,7 +113,7 @@ export default function InstitutionPage() {
         owner_institution_id: ownerInst.id,
       }).select().single();
 
-      if (!conv?.id) { setSendingBundle(false); return; }
+      if (convErr || !conv?.id) { showToast(`Fejl: ${convErr?.message || 'Samtale kunne ikke oprettes'}`, 'error'); setSendingBundle(false); return; }
 
       const bundleContent = JSON.stringify({
         bundle_items: selected.map(l => ({ id: l.id, title: l.title, emoji: l.emoji, color: l.color, image: l.images?.[0] || null })),
@@ -138,9 +138,13 @@ export default function InstitutionPage() {
         }).catch(() => {});
       }
 
+      showToast('Bundttilbud sendt!');
       if (setSelectedConvId) setSelectedConvId(conv.id);
       router.push('/beskeder');
-    } catch (e) { console.error(e); }
+    } catch (e) {
+      console.error(e);
+      showToast(`Noget gik galt: ${e.message}`, 'error');
+    }
     setSendingBundle(false);
   }
 
