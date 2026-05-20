@@ -13,7 +13,7 @@ export async function POST(req) {
     const base64 = Buffer.from(bytes).toString('base64');
     const mimeType = file.type || 'image/jpeg';
 
-    const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
+    const model = genAI.getGenerativeModel({ model: 'gemini-2.0-flash' });
     const result = await model.generateContent([
       { inlineData: { mimeType, data: base64 } },
       'Does this image contain any people, faces, children, or human silhouettes? Answer with only "yes" or "no".',
