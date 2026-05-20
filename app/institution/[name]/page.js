@@ -311,45 +311,89 @@ export default function InstitutionPage() {
             </div>
 
             {/* What they want */}
-            <div style={{ marginBottom:20 }}>
-              <div style={{ fontSize:11, fontWeight:700, color:INK3, textTransform:'uppercase', letterSpacing:'0.07em', fontFamily:FONT, marginBottom:8 }}>Du vil have ({selected.length})</div>
-              <div style={{ display:'flex', flexDirection:'column', gap:6 }}>
-                {selected.map(l => (
-                  <ItemChip key={l.id} item={l} removable onRemove={id => setSelected(prev => prev.filter(x => x.id !== id))} />
-                ))}
-              </div>
-            </div>
+            {(() => {
+              const wantPriced = selected.filter(l => l.price > 0);
+              const wantTotal = wantPriced.reduce((s, l) => s + l.price, 0);
+              return (
+                <div style={{ marginBottom:20 }}>
+                  <div style={{ display:'flex', alignItems:'baseline', justifyContent:'space-between', marginBottom:8 }}>
+                    <div style={{ fontSize:11, fontWeight:700, color:INK3, textTransform:'uppercase', letterSpacing:'0.07em', fontFamily:FONT }}>Du vil have ({selected.length})</div>
+                    {wantTotal > 0
+                      ? <div style={{ fontFamily:FONT, fontWeight:800, fontSize:15, color:PRIMARY }}>{wantTotal.toLocaleString('da-DK')} kr.{wantPriced.length < selected.length ? <span style={{ fontSize:11, fontWeight:400, color:INK3 }}> + {selected.length - wantPriced.length} uden pris</span> : ''}</div>
+                      : <div style={{ fontSize:11, color:INK3, fontFamily:FONT }}>ingen priser angivet</div>
+                    }
+                  </div>
+                  <div style={{ display:'flex', flexDirection:'column', gap:6 }}>
+                    {selected.map(l => (
+                      <ItemChip key={l.id} item={l} removable onRemove={id => setSelected(prev => prev.filter(x => x.id !== id))} />
+                    ))}
+                  </div>
+                </div>
+              );
+            })()}
 
             <div style={{ height:1, background:PAPER2, margin:'16px 0' }} />
 
             {/* What they offer */}
-            <div style={{ marginBottom:20 }}>
-              <div style={{ fontSize:11, fontWeight:700, color:INK3, textTransform:'uppercase', letterSpacing:'0.07em', fontFamily:FONT, marginBottom:8 }}>
-                Du tilbyder <span style={{ fontWeight:400, color:INK3 }}>(vælg dine opslag — valgfri)</span>
-              </div>
-              {myListings.length === 0 ? (
-                <div style={{ padding:'16px', borderRadius:12, background:PAPER, border:`1.5px dashed ${PAPER3}`, fontSize:13, color:INK3, fontFamily:FONT, textAlign:'center' }}>
-                  Du har ingen aktive opslag at tilbyde
+            {(() => {
+              const offerPriced = offerSelected.filter(l => l.price > 0);
+              const offerTotal = offerPriced.reduce((s, l) => s + l.price, 0);
+              return (
+                <div style={{ marginBottom:20 }}>
+                  <div style={{ display:'flex', alignItems:'baseline', justifyContent:'space-between', marginBottom:8 }}>
+                    <div style={{ fontSize:11, fontWeight:700, color:INK3, textTransform:'uppercase', letterSpacing:'0.07em', fontFamily:FONT }}>
+                      Du tilbyder {offerSelected.length > 0 ? `(${offerSelected.length})` : ''} <span style={{ fontWeight:400, color:INK3, textTransform:'none', letterSpacing:0 }}>— valgfri</span>
+                    </div>
+                    {offerTotal > 0
+                      ? <div style={{ fontFamily:FONT, fontWeight:800, fontSize:15, color:CORAL }}>{offerTotal.toLocaleString('da-DK')} kr.{offerPriced.length < offerSelected.length ? <span style={{ fontSize:11, fontWeight:400, color:INK3 }}> + {offerSelected.length - offerPriced.length} uden pris</span> : ''}</div>
+                      : offerSelected.length > 0 ? <div style={{ fontSize:11, color:INK3, fontFamily:FONT }}>ingen priser angivet</div> : null
+                    }
+                  </div>
+                  {myListings.length === 0 ? (
+                    <div style={{ padding:'16px', borderRadius:12, background:PAPER, border:`1.5px dashed ${PAPER3}`, fontSize:13, color:INK3, fontFamily:FONT, textAlign:'center' }}>
+                      Du har ingen aktive opslag at tilbyde
+                    </div>
+                  ) : (
+                    <div style={{ display:'flex', flexDirection:'column', gap:6, maxHeight:220, overflowY:'auto' }}>
+                      {myListings.map(l => {
+                        const isOff = offerSelected.find(x => x.id === l.id);
+                        return (
+                          <div key={l.id} onClick={()=>toggleOffer(l)} style={{ cursor:'pointer', outline: isOff ? `2px solid ${PRIMARY}` : '2px solid transparent', borderRadius:12, transition:'all 0.12s', background: isOff ? GREEN_TINT : 'transparent' }}>
+                            <ItemChip item={l} removable={false} />
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
                 </div>
-              ) : (
-                <div style={{ display:'flex', flexDirection:'column', gap:6, maxHeight:220, overflowY:'auto' }}>
-                  {myListings.map(l => {
-                    const isOff = offerSelected.find(x => x.id === l.id);
-                    return (
-                      <div key={l.id} onClick={()=>toggleOffer(l)} style={{ cursor:'pointer', outline: isOff ? `2px solid ${PRIMARY}` : '2px solid transparent', borderRadius:12, transition:'all 0.12s', background: isOff ? GREEN_TINT : 'transparent' }}>
-                        <ItemChip item={l} removable={false} />
-                      </div>
-                    );
-                  })}
-                </div>
-              )}
-            </div>
+              );
+            })()}
 
             {/* Note */}
             <div style={{ marginBottom:22 }}>
               <div style={{ fontSize:11, fontWeight:700, color:INK3, textTransform:'uppercase', letterSpacing:'0.07em', fontFamily:FONT, marginBottom:8 }}>Tilføj en note <span style={{ fontWeight:400 }}>(valgfri)</span></div>
               <textarea value={bundleNote} onChange={e=>setBundleNote(e.target.value)} placeholder="Fx: Vi er meget interesserede i disse — kan vi aftale en pris?" rows={2} style={{ width:'100%', padding:'12px 14px', borderRadius:12, border:`1.5px solid ${PAPER3}`, fontSize:13, fontFamily:FONT, resize:'none', outline:'none', boxSizing:'border-box', color:INK }} />
             </div>
+
+            {/* Value summary */}
+            {(() => {
+              const wantTotal = selected.filter(l=>l.price>0).reduce((s,l)=>s+l.price,0);
+              const offerTotal = offerSelected.filter(l=>l.price>0).reduce((s,l)=>s+l.price,0);
+              if (!wantTotal && !offerTotal) return null;
+              return (
+                <div style={{ background:PAPER, borderRadius:14, padding:'12px 16px', marginBottom:16, display:'flex', alignItems:'center', gap:0 }}>
+                  <div style={{ flex:1, textAlign:'center' }}>
+                    <div style={{ fontSize:10, fontWeight:700, color:INK3, textTransform:'uppercase', letterSpacing:'0.06em', fontFamily:FONT, marginBottom:3 }}>Du vil have</div>
+                    <div style={{ fontFamily:FONT, fontWeight:800, fontSize:18, color:PRIMARY }}>{wantTotal > 0 ? `${wantTotal.toLocaleString('da-DK')} kr.` : '—'}</div>
+                  </div>
+                  <div style={{ fontSize:18, color:INK3, padding:'0 8px' }}>⇄</div>
+                  <div style={{ flex:1, textAlign:'center' }}>
+                    <div style={{ fontSize:10, fontWeight:700, color:INK3, textTransform:'uppercase', letterSpacing:'0.06em', fontFamily:FONT, marginBottom:3 }}>Du tilbyder</div>
+                    <div style={{ fontFamily:FONT, fontWeight:800, fontSize:18, color:CORAL }}>{offerTotal > 0 ? `${offerTotal.toLocaleString('da-DK')} kr.` : '—'}</div>
+                  </div>
+                </div>
+              );
+            })()}
 
             {/* Actions */}
             <div style={{ display:'flex', gap:10 }}>
