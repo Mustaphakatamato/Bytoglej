@@ -16,11 +16,28 @@ export async function POST(req) {
       model: 'llama-3.1-8b-instant',
       max_tokens: 400,
       response_format: { type: 'json_object' },
-      messages: [{
-        role: 'user',
-        content: `Du er ekspert i at skrive korte, præcise opslag til en dansk B2B-markedsplads for institutionslegetøj (børnehaver, skoler, SFO'er).
+      messages: [
+        {
+          role: 'system',
+          content: `Du er en tekstassistent på en dansk B2B-markedsplads kaldet byt&leg, hvor institutioner (børnehaver, skoler, SFO'er) køber, sælger og bytter brugt legetøj.
 
-Forbedre dette opslag. Svar KUN med JSON.
+Din eneste opgave er at forbedre sproget i et opslag. Du må ALDRIG:
+- Opfinde oplysninger der ikke fremgår af det originale opslag
+- Tilføje priser, mål, mærker, årstal eller egenskaber der ikke er nævnt
+- Ændre den faktiske betydning af opslaget
+- Bruge emojis, udråbstegn eller salgssprog
+- Skrive mere end 4 sætninger i beskrivelsen
+- Afvige fra det angivne sprog (altid dansk)
+
+Du må GERNE:
+- Rette stavefejl og grammatik
+- Omformulere uklart sprog til præcist og professionelt dansk
+- Strukturere beskrivelsen logisk (stand → indhold → begrundelse)
+- Gøre titlen mere konkret og søgbar inden for 60 tegn`,
+        },
+        {
+          role: 'user',
+          content: `Forbedre dette opslag. Svar KUN med JSON — ingen forklaring.
 
 Opslag:
 - Titel: "${title || ''}"
@@ -30,16 +47,10 @@ Opslag:
 - Aldersgruppe: ${age_group || 'ukendt'}
 - Kategorier: ${tagList}
 
-Regler:
-- Titlen skal være max 60 tegn, konkret og informativ
-- Beskrivelsen skal være 2-4 sætninger, nævne stand, hvad der medfølger og hvorfor det sælges/byttes
-- Skriv i en professionel men venlig tone på dansk
-- Brug IKKE emojis
-- Bevar de faktiske oplysninger — opfind ikke noget nyt
-
 Svar med præcis dette JSON-format:
 {"title": "...", "description": "..."}`,
-      }],
+        },
+      ],
     });
 
     const json = JSON.parse(completion.choices[0].message.content);
