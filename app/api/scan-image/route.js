@@ -1,7 +1,7 @@
-import { GoogleGenerativeAI } from '@google/generative-ai';
+import Groq from 'groq-sdk';
 import { NextResponse } from 'next/server';
 
-const genAI = new GoogleGenerativeAI(process.env.GOOGLE_AI_KEY);
+const groq = new Groq({ apiKey: process.env.GROQ_API_KEY });
 
 export async function POST(req) {
   try {
@@ -13,13 +13,19 @@ export async function POST(req) {
     const base64 = Buffer.from(bytes).toString('base64');
     const mimeType = file.type || 'image/jpeg';
 
-    const model = genAI.getGenerativeModel({ model: 'gemini-2.0-flash' });
-    const result = await model.generateContent([
-      { inlineData: { mimeType, data: base64 } },
-      'Does this image contain any people, faces, children, or human silhouettes? Answer with only "yes" or "no".',
-    ]);
+    const completion = await groq.chat.completions.create({
+      model: 'llama-3.2-11b-vision-preview',
+      max_tokens: 10,
+      messages: [{
+        role: 'user',
+        content: [
+          { type: 'image_url', image_url: { url: `data:${mimeType};base64,${base64}` } },
+          { type: 'text', text: 'Does this image contain any people, faces, children, or human silhouettes? Answer with only "yes" or "no".' },
+        ],
+      }],
+    });
 
-    const text = result.response.text().toLowerCase().trim();
+    const text = completion.choices[0].message.content.toLowerCase().trim();
     return NextResponse.json({ safe: !text.startsWith('yes') });
   } catch (e) {
     console.error('scan-image error:', e.message);

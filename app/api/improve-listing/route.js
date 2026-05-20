@@ -1,7 +1,7 @@
-import { GoogleGenerativeAI } from '@google/generative-ai';
+import Groq from 'groq-sdk';
 import { NextResponse } from 'next/server';
 
-const genAI = new GoogleGenerativeAI(process.env.GOOGLE_AI_KEY);
+const groq = new Groq({ apiKey: process.env.GROQ_API_KEY });
 
 export async function POST(req) {
   try {
@@ -13,11 +13,15 @@ export async function POST(req) {
     const typeLabel = type === 'køb' ? 'til salg' : type === 'byd' ? 'til bud' : 'til bytte';
     const tagList = tags?.length ? tags.join(', ') : 'ingen';
 
-    const model = genAI.getGenerativeModel({ model: 'gemini-2.0-flash' });
-    const result = await model.generateContent(
-      `Du er ekspert i at skrive korte, præcise opslag til en dansk B2B-markedsplads for institutionslegetøj (børnehaver, skoler, SFO'er).
+    const completion = await groq.chat.completions.create({
+      model: 'llama-3.1-8b-instant',
+      max_tokens: 400,
+      response_format: { type: 'json_object' },
+      messages: [{
+        role: 'user',
+        content: `Du er ekspert i at skrive korte, præcise opslag til en dansk B2B-markedsplads for institutionslegetøj (børnehaver, skoler, SFO'er).
 
-Forbedre dette opslag. Svar KUN med JSON — ingen forklaring, ingen markdown.
+Forbedre dette opslag. Svar KUN med JSON.
 
 Opslag:
 - Titel: "${title || ''}"
@@ -35,12 +39,11 @@ Regler:
 - Bevar de faktiske oplysninger — opfind ikke noget nyt
 
 Svar med præcis dette JSON-format:
-{"title": "...", "description": "..."}`
-    );
+{"title": "...", "description": "..."}`,
+      }],
+    });
 
-    const raw = result.response.text().trim().replace(/^```json\s*/,'').replace(/\s*```$/,'');
-    const json = JSON.parse(raw);
-
+    const json = JSON.parse(completion.choices[0].message.content);
     return NextResponse.json({ title: json.title, description: json.description });
   } catch (e) {
     console.error('improve-listing error:', e.message);
