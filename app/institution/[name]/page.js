@@ -358,8 +358,13 @@ export default function InstitutionPage() {
                       {myListings.map(l => {
                         const isOff = offerSelected.find(x => x.id === l.id);
                         return (
-                          <div key={l.id} onClick={()=>toggleOffer(l)} style={{ cursor:'pointer', outline: isOff ? `2px solid ${PRIMARY}` : '2px solid transparent', borderRadius:12, transition:'all 0.12s', background: isOff ? GREEN_TINT : 'transparent' }}>
+                          <div key={l.id} onClick={()=>toggleOffer(l)} style={{ cursor:'pointer', borderRadius:12, transition:'all 0.15s', border: isOff ? `2px solid ${PRIMARY}` : `2px solid ${PAPER3}`, background: isOff ? GREEN_TINT : PAPER, position:'relative' }}>
                             <ItemChip item={l} removable={false} />
+                            {isOff && (
+                              <div style={{ position:'absolute', top:8, right:10, width:22, height:22, borderRadius:'50%', background:PRIMARY, display:'flex', alignItems:'center', justifyContent:'center', pointerEvents:'none' }}>
+                                <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="3.5" strokeLinecap="round"><polyline points="20 6 9 17 4 12"/></svg>
+                              </div>
+                            )}
                           </div>
                         );
                       })}
