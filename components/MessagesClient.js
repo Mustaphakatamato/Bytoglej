@@ -605,9 +605,11 @@ export default function MessagesClient() {
                         const showDate = dateStr !== lastDate;
                         lastDate = dateStr;
                         const prevMine = i>0 && (ctxIsAdmin && adminInstName ? messages[i-1].sender_name === adminInstName : messages[i-1].sender_id === userId);
-                        const grouped = mine === prevMine && !showDate && m.message_type !== 'bid' && messages[i-1]?.message_type !== 'bid' && m.message_type !== 'swap' && messages[i-1]?.message_type !== 'swap';
+                        const grouped = mine === prevMine && !showDate && m.message_type !== 'bid' && messages[i-1]?.message_type !== 'bid' && m.message_type !== 'swap' && messages[i-1]?.message_type !== 'swap' && m.message_type !== 'bundle' && messages[i-1]?.message_type !== 'bundle';
                         const isBid = m.message_type === 'bid';
                         const isSwap = m.message_type === 'swap';
+                        const isBundle = m.message_type === 'bundle';
+                        const bundleData = isBundle ? (() => { try { return JSON.parse(m.content); } catch { return null; } })() : null;
                         const swapData = isSwap ? (() => { try { return JSON.parse(m.content); } catch { return null; } })() : null;
                         return (
                           <React.Fragment key={m.id}>
@@ -636,6 +638,53 @@ export default function MessagesClient() {
                                     ) : null}
                                     {swapData?.note && (
                                       <div style={{ fontSize:13, color:INK, marginTop: swapData?.swap_title ? 8 : 0, lineHeight:1.5, fontFamily:FONT }}>{swapData.note}</div>
+                                    )}
+                                  </div>
+                                  <div style={{ fontSize:10, color:INK3, marginTop:3, textAlign:mine?'right':'left', fontFamily:FONT }}>{d.toLocaleTimeString('da-DK',{hour:'2-digit',minute:'2-digit'})}</div>
+                                </div>
+                              </div>
+                            ) : isBundle && bundleData ? (
+                              <div style={{ display:'flex', justifyContent:mine?'flex-end':'flex-start', marginTop:10 }}>
+                                {!mine && <div style={{ width:30, height:30, borderRadius:'50%', background:GREEN_TINT, display:'flex', alignItems:'center', justifyContent:'center', fontSize:12, fontWeight:700, color:PRIMARY, flexShrink:0, marginRight:8, alignSelf:'flex-end', fontFamily:FONT }}>{m.sender_name.charAt(0).toUpperCase()}</div>}
+                                <div style={{ maxWidth:'82%' }}>
+                                  {!mine && <div style={{ fontSize:11, fontWeight:700, color:INK3, marginBottom:3, marginLeft:2, fontFamily:FONT }}>{m.sender_name}</div>}
+                                  <div style={{ background:mine?GREEN_TINT:PAPER3, border:`1.5px solid ${mine?PRIMARY:'rgba(22,34,28,0.12)'}`, borderRadius:16, padding:'14px 16px', minWidth:220 }}>
+                                    <div style={{ display:'flex', alignItems:'center', gap:6, marginBottom:12 }}>
+                                      <span style={{ fontSize:16 }}>📦</span>
+                                      <span style={{ fontSize:11, fontWeight:700, color:PRIMARY, textTransform:'uppercase', letterSpacing:0.6, fontFamily:FONT }}>Bundttilbud</span>
+                                    </div>
+                                    {bundleData.bundle_items?.length > 0 && (
+                                      <div style={{ marginBottom:10 }}>
+                                        <div style={{ fontSize:10, fontWeight:700, color:INK3, textTransform:'uppercase', letterSpacing:0.5, fontFamily:FONT, marginBottom:6 }}>Ønsker ({bundleData.bundle_items.length})</div>
+                                        <div style={{ display:'flex', flexDirection:'column', gap:5 }}>
+                                          {bundleData.bundle_items.map((item, idx) => (
+                                            <div key={idx} style={{ display:'flex', alignItems:'center', gap:8, background:PAPER2, borderRadius:8, padding:'6px 8px' }}>
+                                              <div style={{ width:28, height:28, borderRadius:6, background:item.image?PAPER3:(item.color||GREEN_TINT), flexShrink:0, overflow:'hidden', display:'flex', alignItems:'center', justifyContent:'center', fontSize:14 }}>
+                                                {item.image ? <img src={item.image} style={{ width:'100%', height:'100%', objectFit:'cover' }} alt="" /> : (item.emoji||'🧸')}
+                                              </div>
+                                              <div style={{ fontSize:12, fontWeight:600, color:INK, fontFamily:FONT, flex:1, minWidth:0, whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis' }}>{item.title}</div>
+                                            </div>
+                                          ))}
+                                        </div>
+                                      </div>
+                                    )}
+                                    {bundleData.offer_items?.length > 0 && (
+                                      <div style={{ marginBottom: bundleData.note ? 10 : 0 }}>
+                                        <div style={{ fontSize:10, fontWeight:700, color:CORAL, textTransform:'uppercase', letterSpacing:0.5, fontFamily:FONT, marginBottom:6 }}>Tilbyder ({bundleData.offer_items.length})</div>
+                                        <div style={{ display:'flex', flexDirection:'column', gap:5 }}>
+                                          {bundleData.offer_items.map((item, idx) => (
+                                            <div key={idx} style={{ display:'flex', alignItems:'center', gap:8, background:PAPER2, borderRadius:8, padding:'6px 8px' }}>
+                                              <div style={{ width:28, height:28, borderRadius:6, background:item.image?PAPER3:(item.color||GREEN_TINT), flexShrink:0, overflow:'hidden', display:'flex', alignItems:'center', justifyContent:'center', fontSize:14 }}>
+                                                {item.image ? <img src={item.image} style={{ width:'100%', height:'100%', objectFit:'cover' }} alt="" /> : (item.emoji||'🧸')}
+                                              </div>
+                                              <div style={{ fontSize:12, fontWeight:600, color:INK, fontFamily:FONT, flex:1, minWidth:0, whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis' }}>{item.title}</div>
+                                            </div>
+                                          ))}
+                                        </div>
+                                      </div>
+                                    )}
+                                    {bundleData.note && (
+                                      <div style={{ fontSize:13, color:INK, lineHeight:1.5, fontFamily:FONT, marginTop:8, paddingTop:8, borderTop:`1px solid rgba(22,34,28,0.08)` }}>{bundleData.note}</div>
                                     )}
                                   </div>
                                   <div style={{ fontSize:10, color:INK3, marginTop:3, textAlign:mine?'right':'left', fontFamily:FONT }}>{d.toLocaleTimeString('da-DK',{hour:'2-digit',minute:'2-digit'})}</div>
