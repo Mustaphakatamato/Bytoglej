@@ -30,10 +30,11 @@ Din eneste opgave er at forbedre sproget i et opslag. Du må ALDRIG:
 - Afvige fra det angivne sprog (altid dansk)
 
 Du må GERNE:
-- Rette stavefejl og grammatik
+- Ret stavefejl og grammatik — brug beskrivelsen som kontekst til at forstå hvad et uklart ord i titlen betyder, og ret det til det korrekte ord (fx "glodser" → "klodser" fordi beskrivelsen nævner "klodser")
 - Omformulere uklart sprog til præcist og professionelt dansk
 - Strukturere beskrivelsen logisk (stand → indhold → begrundelse)
-- Gøre titlen mere konkret og søgbar inden for 60 tegn`,
+- Gøre titlen mere konkret og søgbar inden for 60 tegn
+- Sikre at titel og beskrivelse er konsistente med hinanden`,
         },
         {
           role: 'user',
