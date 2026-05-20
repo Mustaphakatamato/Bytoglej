@@ -10,36 +10,6 @@ import { Spinner } from '@/components/ui';
 const FONT = "'Sora', sans-serif"; // ui
 
 
-const SCAN_MSGS = [
-  { icon:'🔍', text:'Scanner billedet for personer…' },
-  { icon:'🛡️', text:'Beskytter børns privatliv…' },
-  { icon:'🤖', text:'AI-model analyserer pixels…' },
-  { icon:'🔬', text:'Tjekker ansigter og silhuetter…' },
-  { icon:'✨', text:'Næsten der…' },
-];
-
-function ScanningLoader() {
-  const [idx, setIdx] = useState(0);
-  const [fade, setFade] = useState(true);
-  useEffect(() => {
-    const iv = setInterval(() => {
-      setFade(false);
-      setTimeout(() => { setIdx(i => (i + 1) % SCAN_MSGS.length); setFade(true); }, 300);
-    }, 1800);
-    return () => clearInterval(iv);
-  }, []);
-  const msg = SCAN_MSGS[idx];
-  return (
-    <div style={{ border:`2px dashed ${GREEN_SOFT}`, borderRadius:14, padding:'32px 20px', textAlign:'center', background:GREEN_TINT }}>
-      <div style={{ fontSize:38, marginBottom:10, transition:'opacity 0.3s', opacity:fade?1:0 }}>{msg.icon}</div>
-      <div style={{ fontSize:14, fontWeight:700, color:PRIMARY, marginBottom:6, transition:'opacity 0.3s', opacity:fade?1:0, fontFamily:FONT }}>{msg.text}</div>
-      <div style={{ margin:'12px auto 0', width:'80%', height:4, background:PAPER3, borderRadius:99, overflow:'hidden', position:'relative' }}>
-        <div style={{ position:'absolute', left:0, top:0, height:'100%', width:'40%', background:PRIMARY, borderRadius:99, animation:'scanBar 1.4s ease-in-out infinite' }} />
-      </div>
-      <div style={{ fontSize:11, color:INK3, marginTop:10, fontFamily:FONT }}>Dette tager typisk 2–5 sekunder</div>
-    </div>
-  );
-}
 
 function PreviewCard({ form, imgPreview }) {
   const tc = TYPE_CFG[form.type] || { label: form.type, color: INK3, bg: PAPER2 };
@@ -86,7 +56,6 @@ export default function OpretOpslagPage() {
 
   const [step, setStep] = useState(1);
   const [saving, setSaving] = useState(false);
-  const [aiAnalyzing, setAiAnalyzing] = useState(false);
   const [aiImproving, setAiImproving] = useState(false);
   const [aiSuggestion, setAiSuggestion] = useState(null);
   const [aiApply, setAiApply] = useState({ title: true, description: true });
@@ -116,25 +85,8 @@ export default function OpretOpslagPage() {
     if (!files.length) return;
     const remaining = 6 - imgFiles.length;
     const toAdd = files.slice(0, remaining);
-    setAiAnalyzing(true);
-    const allowed = [];
-    for (const file of toAdd) {
-      const formData = new FormData();
-      formData.append('image', file);
-      try {
-        const res = await fetch('/api/scan-image', { method:'POST', body:formData });
-        const json = await res.json();
-        if (json.safe) { allowed.push(file); }
-        else if (json.error) { showToast(`Scanning fejlede for "${file.name}" — prøv igen`, 'error'); }
-        else { showToast(`Billedet "${file.name}" blev afvist — indeholder personer`, 'error'); }
-      } catch {
-        showToast(`Billedet "${file.name}" kunne ikke scannes — prøv igen`, 'error');
-      }
-    }
-    setAiAnalyzing(false);
-    if (!allowed.length) return;
-    const newPreviews = allowed.map(f => URL.createObjectURL(f));
-    setImgFiles(prev => [...prev, ...allowed]);
+    const newPreviews = toAdd.map(f => URL.createObjectURL(f));
+    setImgFiles(prev => [...prev, ...toAdd]);
     setImgPreviews(prev => [...prev, ...newPreviews]);
     e.target.value = '';
   }
@@ -339,12 +291,12 @@ export default function OpretOpslagPage() {
                 <div>
                   <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:10 }}>
                     <label style={{ ...labelStyle, marginBottom:0 }}>Billeder <span style={{ fontWeight:400, color:INK3 }}>(op til 6)</span></label>
-                    {imgFiles.length > 0 && imgFiles.length < 6 && !aiAnalyzing && (
+                    {imgFiles.length > 0 && imgFiles.length < 6 && (
                       <button type="button" onClick={()=>fileRef.current?.click()} style={{ fontSize:12, fontWeight:700, color:PRIMARY, background:GREEN_TINT, border:'none', borderRadius:99, padding:'5px 12px', cursor:'pointer', fontFamily:FONT }}>+ Tilføj</button>
                     )}
                   </div>
-                  <input ref={fileRef} type="file" accept="image/*" multiple onChange={handleFileSelect} style={{ display:'none' }} disabled={aiAnalyzing} />
-                  {aiAnalyzing ? <ScanningLoader /> : imgPreviews.length === 0 ? (
+                  <input ref={fileRef} type="file" accept="image/*" multiple onChange={handleFileSelect} style={{ display:'none' }} />
+                  {imgPreviews.length === 0 ? (
                     <div onClick={()=>fileRef.current?.click()} style={{ border:`2px dashed ${PAPER3}`, borderRadius:16, padding:'36px 20px', textAlign:'center', cursor:'pointer', background:PAPER, transition:'border-color 0.15s' }}
                       onMouseEnter={e=>e.currentTarget.style.borderColor=PRIMARY}
                       onMouseLeave={e=>e.currentTarget.style.borderColor=PAPER3}>
