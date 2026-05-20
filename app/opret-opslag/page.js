@@ -7,7 +7,7 @@ import { useWindowWidth } from '@/lib/hooks';
 import { useApp, useActiveUser } from '@/providers/AppProvider';
 import { Spinner } from '@/components/ui';
 
-const FONT = "'Sora', sans-serif";
+const FONT = "'Sora', sans-serif"; // ui
 
 const EMOJIS = ['🧸','🎨','🎲','🚂','⚽','🎭','🎪','🎠','🏗️','🎡','🎯','🪁','🛝','🏖️','🎋','🪆','🎀','🪀','🎈','🪃'];
 const COLORS = ['#FFD166','#FF6B6B','#4ECDC4','#45B7D1','#96CEB4','#FFEAA7','#DDA0DD','#98D8C8','#F7DC6F','#BB8FCE'];
