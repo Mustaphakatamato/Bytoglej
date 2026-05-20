@@ -9,8 +9,6 @@ import { Spinner } from '@/components/ui';
 
 const FONT = "'Sora', sans-serif"; // ui
 
-const EMOJIS = ['🧸','🎨','🎲','🚂','⚽','🎭','🎪','🎠','🏗️','🎡','🎯','🪁','🛝','🏖️','🎋','🪆','🎀','🪀','🎈','🪃'];
-const COLORS = ['#FFD166','#FF6B6B','#4ECDC4','#45B7D1','#96CEB4','#FFEAA7','#DDA0DD','#98D8C8','#F7DC6F','#BB8FCE'];
 
 const SCAN_MSGS = [
   { icon:'🔍', text:'Scanner billedet for personer…' },
@@ -127,9 +125,10 @@ export default function OpretOpslagPage() {
         const res = await fetch('/api/scan-image', { method:'POST', body:formData });
         const json = await res.json();
         if (json.safe) { allowed.push(file); }
+        else if (json.error) { showToast(`Scanning fejlede for "${file.name}" — prøv igen`, 'error'); }
         else { showToast(`Billedet "${file.name}" blev afvist — indeholder personer`, 'error'); }
       } catch {
-        allowed.push(file);
+        showToast(`Billedet "${file.name}" kunne ikke scannes — prøv igen`, 'error');
       }
     }
     setAiAnalyzing(false);
@@ -370,26 +369,6 @@ export default function OpretOpslagPage() {
                       )}
                     </div>
                   )}
-                </div>
-
-                {/* Emoji + Color */}
-                <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:16 }}>
-                  <div>
-                    <label style={labelStyle}>Emoji</label>
-                    <div style={{ display:'flex', flexWrap:'wrap', gap:6 }}>
-                      {EMOJIS.map(e => (
-                        <button key={e} onClick={()=>setForm(f=>({...f,emoji:e}))} style={{ width:36, height:36, borderRadius:8, border: form.emoji===e ? `2px solid ${PRIMARY}` : '2px solid transparent', background: form.emoji===e ? GREEN_TINT : PAPER2, fontSize:18, cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center', transition:'all 0.1s' }}>{e}</button>
-                      ))}
-                    </div>
-                  </div>
-                  <div>
-                    <label style={labelStyle}>Kortfarve</label>
-                    <div style={{ display:'flex', flexWrap:'wrap', gap:6 }}>
-                      {COLORS.map(c => (
-                        <button key={c} onClick={()=>setForm(f=>({...f,color:c}))} style={{ width:32, height:32, borderRadius:'50%', border: form.color===c ? `3px solid ${PRIMARY}` : '3px solid transparent', background:c, cursor:'pointer', outline: form.color===c ? `2px solid ${PRIMARY}` : 'none', outlineOffset:2, transition:'all 0.1s' }} />
-                      ))}
-                    </div>
-                  </div>
                 </div>
 
                 <div style={{ display:'flex', gap:10, marginTop:4 }}>
