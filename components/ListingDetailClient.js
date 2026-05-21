@@ -58,7 +58,7 @@ function ImageGallery({ images, color, emoji }) {
 
 export default function ListingDetailClient() {
   const router = useRouter();
-  const { activeListing: listing, setActiveListing, favs, toggleFav, setSelectedConvId, showToast, loggedIn } = useApp();
+  const { activeListing: listing, setActiveListing, favs, toggleFav, setSelectedConvId, showToast, loggedIn, setQuickViewListing } = useApp();
   const { isAdminView: ctxIsAdmin, adminInstName, institution: ctxInstitution, institutionId: ctxInstId } = useActiveUser();
 
   const [buyModal,  setBuyModal]  = useState(false);
@@ -82,6 +82,19 @@ export default function ListingDetailClient() {
   const [shareSending, setShareSending] = useState(false);
   const [myInstName, setMyInstName] = useState(null);
   const [existingBid, setExistingBid] = useState(null);
+  const [instListings, setInstListings] = useState([]);
+
+  useEffect(() => {
+    if (!listing) return;
+    db.from('listings')
+      .select('id,title,description,type,condition,age_group,price,images,emoji,color,city,institution_name,fav_count,is_active,tags,created_at')
+      .eq('institution_name', listing.institution_name)
+      .eq('is_active', true)
+      .neq('id', listing.id)
+      .order('created_at', { ascending: false })
+      .limit(12)
+      .then(({ data }) => { if (data) setInstListings(data); });
+  }, [listing?.id]);
 
   useEffect(() => {
     if (!listing) return;
@@ -574,6 +587,63 @@ export default function ListingDetailClient() {
           <Btn variant="ghost" onClick={()=>{ setSwapModal(false); setSelectedSwapId(null); setSwapOffer(''); }} style={{ justifyContent:'center' }}>Annuller</Btn>
         </div>
       </Modal>
+
+      {/* Other listings from same institution */}
+      {instListings.length > 0 && (
+        <div style={{ maxWidth:1140, margin:'0 auto', padding:isMobile?'24px 16px 40px':'32px 24px 56px' }}>
+          <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:20 }}>
+            <div>
+              <h2 style={{ fontFamily:FONT, fontWeight:800, fontSize:isMobile?18:22, color:INK, marginBottom:4 }}>
+                Flere fra {listing.institution_name}
+              </h2>
+              <p style={{ fontSize:13, color:INK3, fontFamily:FONT }}>{instListings.length} {instListings.length === 1 ? 'opslag' : 'andre opslag'}</p>
+            </div>
+            <button onClick={()=>goToInstitution(listing.institution_name)}
+              style={{ background:'none', border:`1.5px solid ${PAPER3}`, borderRadius:99, padding:'7px 16px', fontSize:13, fontWeight:700, color:PRIMARY, cursor:'pointer', fontFamily:FONT, whiteSpace:'nowrap' }}>
+              Se alle →
+            </button>
+          </div>
+          <div style={{
+            display:'grid',
+            gridTemplateColumns: isMobile ? 'repeat(2, 1fr)' : 'repeat(4, 1fr)',
+            gap: isMobile ? 10 : 16,
+          }}>
+            {instListings.slice(0, isMobile ? 6 : 8).map(l => {
+              const typeColors = { køb: { bg:'#EEF4FF', text:'#2563EB' }, byt: { bg:'#FFF3E8', text:'#C2551E' }, byd: { bg:'#F5F0FF', text:'#7C3AED' }, gratis: { bg:'#F0FFF4', text:'#15803D' } };
+              const tc = typeColors[l.type] || { bg:PAPER3, text:INK3 };
+              return (
+                <div key={l.id} onClick={()=>setQuickViewListing?.(l)} style={{ cursor:'pointer', background:PAPER2, borderRadius:16, overflow:'hidden', border:`1px solid ${PAPER3}`, transition:'transform 0.15s, box-shadow 0.15s' }}
+                  onMouseEnter={e=>{ e.currentTarget.style.transform='translateY(-2px)'; e.currentTarget.style.boxShadow='0 6px 20px rgba(22,34,28,0.1)'; }}
+                  onMouseLeave={e=>{ e.currentTarget.style.transform=''; e.currentTarget.style.boxShadow=''; }}>
+                  <div style={{ height: isMobile ? 120 : 160, background: l.images?.[0] ? '#e8e6e3' : (l.color||'#FFD166'), display:'flex', alignItems:'center', justifyContent:'center', fontSize:isMobile?40:56, overflow:'hidden', position:'relative' }}>
+                    {l.images?.[0]
+                      ? <img src={l.images[0]} alt="" style={{ width:'100%', height:'100%', objectFit:'cover' }} />
+                      : (l.emoji || '🧸')}
+                    <div style={{ position:'absolute', top:8, left:8, background:tc.bg, color:tc.text, borderRadius:99, padding:'3px 9px', fontSize:10, fontWeight:700, fontFamily:FONT }}>
+                      {l.type}
+                    </div>
+                  </div>
+                  <div style={{ padding: isMobile ? '10px 10px 12px' : '12px 14px 16px' }}>
+                    <div style={{ fontFamily:FONT, fontWeight:700, fontSize:isMobile?12:13, color:INK, marginBottom:4, whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis' }}>{l.title}</div>
+                    <div style={{ fontSize:11, color:INK3, fontFamily:FONT, marginBottom:4 }}>{l.condition} · {l.age_group}</div>
+                    {l.price
+                      ? <div style={{ fontFamily:FONT, fontWeight:800, fontSize:isMobile?14:16, color:PRIMARY }}>{l.price} kr.</div>
+                      : <div style={{ fontFamily:FONT, fontWeight:700, fontSize:12, color:GREEN_DEEP }}>Gratis</div>}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+          {instListings.length > (isMobile ? 6 : 8) && (
+            <div style={{ textAlign:'center', marginTop:20 }}>
+              <button onClick={()=>goToInstitution(listing.institution_name)}
+                style={{ background:GREEN_TINT, border:`1.5px solid ${GREEN_SOFT}`, borderRadius:99, padding:'11px 28px', fontSize:14, fontWeight:700, color:PRIMARY, cursor:'pointer', fontFamily:FONT }}>
+                Se alle {instListings.length} opslag fra {listing.institution_name} →
+              </button>
+            </div>
+          )}
+        </div>
+      )}
 
       <Modal open={shareModal} onClose={()=>{ setShareModal(false); setSelectedEmails([]); setShareNote(''); }} title="Del med medarbejder">
         <div style={{ display:'flex', flexDirection:'column', gap:14 }}>

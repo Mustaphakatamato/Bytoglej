@@ -451,7 +451,10 @@ export default function MessagesClient() {
     <div style={{ height:'100vh', display:'flex', flexDirection:'column', paddingTop:68, background:PAPER }} className="page-enter">
       {/* Shared hidden file input for image attachments */}
       <input ref={fileInputRef} type="file" accept="image/*" multiple style={{ display:'none' }}
-        onChange={e=>{ if (e.target.files?.length) { setChatImages(imgs=>[...imgs,...Array.from(e.target.files)]); e.target.value=''; } }} />
+        onChange={e=>{
+          const files = Array.from(e.target.files || []);
+          if (files.length) { setChatImages(imgs=>[...imgs,...files]); e.target.value=''; }
+        }} />
       <div style={{ flex:1, display:'flex', overflow:'hidden', maxWidth:1200, width:'100%', margin:'0 auto', padding:isMobile?'8px 0 0':'16px 16px 0' }}>
 
         {/* ── Conversation list ── */}
