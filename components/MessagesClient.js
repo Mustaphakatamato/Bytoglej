@@ -413,6 +413,16 @@ export default function MessagesClient() {
     setCounterBidMsg(null); setCounterAmount('');
   }
 
+  async function toggleReadUnread(conv, e) {
+    e.stopPropagation();
+    const isInit = amInitiator(conv);
+    const field = isInit ? 'initiator_unread' : 'owner_unread';
+    const currentUnread = isInit ? (conv.initiator_unread || 0) : (conv.owner_unread || 0);
+    const newVal = currentUnread > 0 ? 0 : 1;
+    await db.from('conversations').update({ [field]: newVal }).eq('id', conv.id);
+    setConvs(cs => cs.map(c => c.id === conv.id ? { ...c, [field]: newVal } : c));
+  }
+
   function onKey(e) { if (e.key==='Enter' && !e.shiftKey) { e.preventDefault(); send(); } }
 
   function amInitiator(c) {
@@ -578,16 +588,24 @@ export default function MessagesClient() {
                       <div style={{ fontSize:12, color:unread>0?INK:INK3, fontWeight:unread>0?600:400, whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis', fontFamily:FONT }}>{c.last_message || 'Samtale startet'}</div>
                     </div>
                     {archived ? (
-                      <div style={{ display:'flex', gap:2 }}>
+                      <div style={{ display:'flex', gap:2, flexShrink:0, alignSelf:'center' }}>
                         <button onClick={e=>unarchiveConv(c,e)} title="Flyt til indbakke" style={{ background:'none', border:'none', fontSize:13, cursor:'pointer', padding:'4px', color:INK3, fontFamily:FONT }}>↑</button>
                         <button onClick={e=>deleteConv(c,e)} title="Slet permanent" style={{ background:'none', border:'none', fontSize:13, cursor:'pointer', padding:'4px', color:INK3 }}>
                           <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6M14 11v6"/></svg>
                         </button>
                       </div>
                     ) : (
-                      <button onClick={e=>archiveConv(c,e)} title="Arkiver" style={{ background:'none', border:'none', cursor:'pointer', padding:'4px', color:INK3, flexShrink:0, alignSelf:'center' }}>
-                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><polyline points="21 8 21 21 3 21 3 8"/><rect x="1" y="3" width="22" height="5"/><line x1="10" y1="12" x2="14" y2="12"/></svg>
-                      </button>
+                      <div style={{ display:'flex', gap:2, flexShrink:0, alignSelf:'center' }}>
+                        <button onClick={e=>toggleReadUnread(c,e)} title={unread > 0 ? 'Markér som læst' : 'Markér som ulæst'}
+                          style={{ background:'none', border:'none', cursor:'pointer', padding:'4px', color:unread>0?'#e11d48':INK3, display:'flex', alignItems:'center', justifyContent:'center' }}>
+                          {unread > 0
+                            ? <div style={{ width:8, height:8, borderRadius:'50%', background:'#e11d48' }} />
+                            : <div style={{ width:8, height:8, borderRadius:'50%', border:'1.5px solid', borderColor:INK3 }} />}
+                        </button>
+                        <button onClick={e=>archiveConv(c,e)} title="Arkiver" style={{ background:'none', border:'none', cursor:'pointer', padding:'4px', color:INK3 }}>
+                          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><polyline points="21 8 21 21 3 21 3 8"/><rect x="1" y="3" width="22" height="5"/><line x1="10" y1="12" x2="14" y2="12"/></svg>
+                        </button>
+                      </div>
                     )}
                   </div>
                 );
