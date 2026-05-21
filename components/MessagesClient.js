@@ -781,15 +781,20 @@ export default function MessagesClient() {
                                 {!mine && <div style={{ width:30, height:30, borderRadius:'50%', background:GREEN_TINT, display:'flex', alignItems:'center', justifyContent:'center', fontSize:12, fontWeight:700, color:PRIMARY, flexShrink:0, marginRight:8, alignSelf:'flex-end', fontFamily:FONT }}>{m.sender_name.charAt(0).toUpperCase()}</div>}
                                 <div style={{ maxWidth:'82%' }}>
                                   {!mine && <div style={{ fontSize:11, fontWeight:700, color:INK3, marginBottom:3, marginLeft:2, fontFamily:FONT }}>{m.sender_name}</div>}
-                                  <div style={{ background:mine?GREEN_TINT:PAPER3, border:`1.5px solid ${mine?PRIMARY:'rgba(22,34,28,0.12)'}`, borderRadius:16, padding:'14px 16px', minWidth:220 }}>
+                                  <div style={{
+                                    background: m.bid_status==='accepted' ? GREEN_TINT : m.bid_status==='rejected' ? '#FEF2F2' : mine ? GREEN_TINT : PAPER3,
+                                    border: `1.5px solid ${m.bid_status==='accepted' ? PRIMARY : m.bid_status==='rejected' ? '#FCA5A5' : mine ? PRIMARY : 'rgba(22,34,28,0.12)'}`,
+                                    borderRadius:16, padding:'14px 16px', minWidth:220
+                                  }}>
                                     <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:12 }}>
                                       <div style={{ display:'flex', alignItems:'center', gap:6 }}>
                                         <span style={{ fontSize:16 }}>📦</span>
-                                        <span style={{ fontSize:11, fontWeight:700, color:PRIMARY, textTransform:'uppercase', letterSpacing:0.6, fontFamily:FONT }}>Bundttilbud</span>
+                                        <span style={{ fontSize:11, fontWeight:700, color: m.bid_status==='accepted'?PRIMARY:m.bid_status==='rejected'?'#e11d48':PRIMARY, textTransform:'uppercase', letterSpacing:0.6, fontFamily:FONT }}>Bundttilbud</span>
                                       </div>
-                                      {bundleData.price && (
-                                        <div style={{ fontFamily:FONT, fontWeight:800, fontSize:15, color:PRIMARY }}>{Number(bundleData.price).toLocaleString('da-DK')} kr.</div>
-                                      )}
+                                      <div style={{ display:'flex', alignItems:'center', gap:6 }}>
+                                        {m.bid_status==='accepted' && <span style={{ fontSize:11, fontWeight:700, color:PRIMARY, background:'#D1FAE5', padding:'2px 8px', borderRadius:99, fontFamily:FONT }}>Accepteret</span>}
+                                        {m.bid_status==='rejected' && <span style={{ fontSize:11, fontWeight:700, color:'#e11d48', background:'#FEE2E2', padding:'2px 8px', borderRadius:99, fontFamily:FONT }}>Afvist</span>}
+                                      </div>
                                     </div>
                                     {bundleData.bundle_items?.length > 0 && (
                                       <div style={{ marginBottom:10 }}>
@@ -823,6 +828,47 @@ export default function MessagesClient() {
                                     )}
                                     {bundleData.note && (
                                       <div style={{ fontSize:13, color:INK, lineHeight:1.5, fontFamily:FONT, marginTop:8, paddingTop:8, borderTop:`1px solid rgba(22,34,28,0.08)` }}>{bundleData.note}</div>
+                                    )}
+                                    {/* Accept / Reject — only for owner, only when pending */}
+                                    {(!m.bid_status || m.bid_status === 'pending') && isOwnerInConv && !mine && (
+                                      <div style={{ display:'flex', gap:8, marginTop:12, paddingTop:12, borderTop:`1px solid rgba(22,34,28,0.08)` }}>
+                                        <button onClick={async () => {
+                                          const senderName = effectiveSenderName();
+                                          await db.from('chat_messages').update({ bid_status: 'accepted' }).eq('id', m.id);
+                                          const confirmMsg = `${senderName} har accepteret bundttilbuddet.`;
+                                          const effUid = realUserId || userId;
+                                          await db.from('chat_messages').insert({ conversation_id: active.id, sender_id: effUid, sender_name: senderName, content: confirmMsg });
+                                          const now = new Date().toISOString();
+                                          const upd = { last_message: confirmMsg, last_message_at: now, initiator_unread: (active.initiator_unread||0)+1, is_handled: true, handled_at: now, handled_action: 'accepted' };
+                                          await db.from('conversations').update(upd).eq('id', active.id);
+                                          setActive(a => ({ ...a, ...upd }));
+                                          setConvs(cs => cs.map(c => c.id === active.id ? { ...c, ...upd } : c));
+                                          setMessages(ms => ms.map(x => x.id === m.id ? { ...x, bid_status: 'accepted' } : x));
+                                        }} style={{ flex:1, padding:'8px 16px', borderRadius:99, background:PRIMARY, border:'none', color:'#fff', fontSize:12, fontWeight:700, cursor:'pointer', fontFamily:FONT }}>
+                                          Accepter
+                                        </button>
+                                        <button onClick={async () => {
+                                          const senderName = effectiveSenderName();
+                                          await db.from('chat_messages').update({ bid_status: 'rejected' }).eq('id', m.id);
+                                          const rejectMsg = `${senderName} har afvist bundttilbuddet.`;
+                                          const effUid = realUserId || userId;
+                                          await db.from('chat_messages').insert({ conversation_id: active.id, sender_id: effUid, sender_name: senderName, content: rejectMsg });
+                                          const now = new Date().toISOString();
+                                          const upd = { last_message: rejectMsg, last_message_at: now, initiator_unread: (active.initiator_unread||0)+1, is_handled: true, handled_at: now, handled_action: 'rejected' };
+                                          await db.from('conversations').update(upd).eq('id', active.id);
+                                          setActive(a => ({ ...a, ...upd }));
+                                          setConvs(cs => cs.map(c => c.id === active.id ? { ...c, ...upd } : c));
+                                          setMessages(ms => ms.map(x => x.id === m.id ? { ...x, bid_status: 'rejected' } : x));
+                                        }} style={{ flex:1, padding:'8px 16px', borderRadius:99, background:'#FEF2F2', border:'1.5px solid #FCA5A5', color:'#e11d48', fontSize:12, fontWeight:700, cursor:'pointer', fontFamily:FONT }}>
+                                          Afvis
+                                        </button>
+                                      </div>
+                                    )}
+                                    {(!m.bid_status || m.bid_status === 'pending') && !isOwnerInConv && !mine && (
+                                      <div style={{ fontSize:12, color:INK3, fontWeight:600, fontFamily:FONT, marginTop:8 }}>Afventer svar…</div>
+                                    )}
+                                    {(!m.bid_status || m.bid_status === 'pending') && mine && (
+                                      <div style={{ fontSize:12, color:INK3, fontWeight:600, fontFamily:FONT, marginTop:8 }}>Afventer svar…</div>
                                     )}
                                   </div>
                                   <div style={{ fontSize:10, color:INK3, marginTop:3, textAlign:mine?'right':'left', fontFamily:FONT }}>{d.toLocaleTimeString('da-DK',{hour:'2-digit',minute:'2-digit'})}</div>
