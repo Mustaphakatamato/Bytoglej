@@ -844,6 +844,24 @@ export default function MessagesClient() {
                                         </div>
                                       </div>
                                     )}
+                                    {(() => {
+                                      const bTotal = bundleData.bundle_items?.reduce((s,i)=>s+(Number(i.price)||0),0)||0;
+                                      const oTotal = bundleData.offer_items?.reduce((s,i)=>s+(Number(i.price)||0),0)||0;
+                                      if (bTotal === 0 && oTotal === 0) return null;
+                                      return (
+                                        <div style={{ display:'flex', alignItems:'center', gap:8, marginTop:10, background:mine?'rgba(42,125,79,0.07)':PAPER2, borderRadius:10, padding:'10px 12px' }}>
+                                          <div style={{ flex:1, textAlign:'center' }}>
+                                            <div style={{ fontSize:9, color:INK3, fontWeight:700, fontFamily:FONT, marginBottom:2, textTransform:'uppercase', letterSpacing:0.5 }}>Ønsker</div>
+                                            <div style={{ fontFamily:FONT, fontWeight:800, fontSize:14, color:INK }}>{bTotal > 0 ? `${bTotal.toLocaleString('da-DK')} kr.` : '—'}</div>
+                                          </div>
+                                          <div style={{ fontSize:15, color:INK3 }}>⇄</div>
+                                          <div style={{ flex:1, textAlign:'center' }}>
+                                            <div style={{ fontSize:9, color:CORAL, fontWeight:700, fontFamily:FONT, marginBottom:2, textTransform:'uppercase', letterSpacing:0.5 }}>Tilbyder</div>
+                                            <div style={{ fontFamily:FONT, fontWeight:800, fontSize:14, color:CORAL }}>{oTotal > 0 ? `${oTotal.toLocaleString('da-DK')} kr.` : '—'}</div>
+                                          </div>
+                                        </div>
+                                      );
+                                    })()}
                                     {bundleData.note && (
                                       <div style={{ fontSize:13, color:INK, lineHeight:1.5, fontFamily:FONT, marginTop:8, paddingTop:8, borderTop:`1px solid rgba(22,34,28,0.08)` }}>{bundleData.note}</div>
                                     )}
