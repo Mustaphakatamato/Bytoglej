@@ -1,6 +1,7 @@
 import './globals.css';
 import { AppProvider } from '@/providers/AppProvider';
 import NavWrapper from '@/components/NavWrapper';
+import Footer from '@/components/Footer';
 
 export const metadata = {
   title: 'byt&leg — Legetøjsmarkedsplads for institutioner',
@@ -20,6 +21,7 @@ export default function RootLayout({ children }) {
         <AppProvider>
           <NavWrapper />
           {children}
+          <Footer />
         </AppProvider>
       </body>
     </html>
