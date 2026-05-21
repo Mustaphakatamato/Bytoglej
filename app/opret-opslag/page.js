@@ -2,7 +2,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { db } from '@/lib/supabase';
-import { PRIMARY, GREEN_DEEP, GREEN_SOFT, GREEN_TINT, PAPER, PAPER2, PAPER3, INK, INK2, INK3, CORAL, TYPE_CFG, CONDITIONS, AGE_GROUPS, LISTING_TAGS } from '@/lib/constants';
+import { PRIMARY, GREEN_DEEP, GREEN_SOFT, GREEN_TINT, PAPER, PAPER2, PAPER3, INK, INK2, INK3, CORAL, TYPE_CFG, CONDITIONS, AGE_GROUPS } from '@/lib/constants';
 import { CATEGORIES } from '@/lib/categories';
 import { useWindowWidth } from '@/lib/hooks';
 import { useApp, useActiveUser } from '@/providers/AppProvider';
@@ -248,16 +248,6 @@ export default function OpretOpslagPage() {
                   <select value={form.age_group} onChange={e=>setForm({...form,age_group:e.target.value})} style={{ ...inputStyle, cursor:'pointer' }}>
                     {AGE_GROUPS.map(a => <option key={a}>{a}</option>)}
                   </select>
-                </div>
-
-                <div>
-                  <label style={labelStyle}>Kategorier <span style={{ fontWeight:400, color:INK3 }}>(vælg op til 5)</span></label>
-                  <div style={{ display:'flex', gap:6, flexWrap:'wrap' }}>
-                    {LISTING_TAGS.map(t => {
-                      const sel = (form.tags||[]).includes(t);
-                      return <button key={t} type="button" onClick={()=>setForm(f=>({ ...f, tags: sel ? (f.tags||[]).filter(x=>x!==t) : (f.tags||[]).length < 5 ? [...(f.tags||[]), t] : (f.tags||[]) }))} style={{ padding:'6px 14px', borderRadius:99, fontSize:12, fontWeight:700, border: sel ? `2px solid ${PRIMARY}` : '2px solid transparent', background: sel ? GREEN_TINT : PAPER2, color: sel ? PRIMARY : INK3, cursor:'pointer', fontFamily:FONT, transition:'all 0.12s' }}>{t}</button>;
-                    })}
-                  </div>
                 </div>
 
                 {/* Category picker */}
