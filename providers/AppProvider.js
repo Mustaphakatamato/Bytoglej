@@ -4,6 +4,7 @@ import { db } from '@/lib/supabase';
 import { ADMIN_EMAIL } from '@/lib/constants';
 import { useFavs } from '@/lib/hooks';
 import QuickViewModal from '@/components/QuickViewModal';
+import ChatBubble from '@/components/ChatBubble';
 
 // ─── Active User Context ──────────────────────────────────────────────────────
 export const ActiveUserContext = createContext({
@@ -160,6 +161,7 @@ export function AppProvider({ children }) {
       <AppContext.Provider value={appValue}>
         {children}
         {quickViewListing && <QuickViewModal listing={quickViewListing} onClose={()=>setQuickViewListing(null)} />}
+        <ChatBubble />
       </AppContext.Provider>
     </ActiveUserContext.Provider>
   );
