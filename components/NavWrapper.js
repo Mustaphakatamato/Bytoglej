@@ -1,12 +1,15 @@
 'use client';
-import { usePathname, useRouter } from 'next/navigation';
+import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { useApp, useActiveUser } from '@/providers/AppProvider';
 import { db } from '@/lib/supabase';
-import { PRIMARY, GREEN_TINT, INK, PAPER } from '@/lib/constants';
+import { PRIMARY, GREEN_TINT, INK, INK2, INK3, PAPER, PAPER2, PAPER3 } from '@/lib/constants';
+import { CATEGORIES } from '@/lib/categories';
 import { useWindowWidth } from '@/lib/hooks';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, Suspense } from 'react';
 import { Btn } from '@/components/ui';
+
+const FONT = "'Sora', sans-serif";
 
 function Mark09({ size = 36, bg = PRIMARY }) {
   const r = Math.round(size * 0.18);
@@ -29,15 +32,18 @@ export default function NavWrapper() {
 
   return (
     <>
-      <Nav
-        pathname={pathname}
-        navigate={p => { router.push(p); window.scrollTo({ top:0, behavior:'smooth' }); }}
-        loggedIn={loggedIn}
-        setLoggedIn={setLoggedIn}
-        unreadTotal={unreadTotal}
-        institution={institution}
-        isAdmin={isAdmin}
-      />
+      <Suspense fallback={null}>
+        <Nav
+          pathname={pathname}
+          navigate={p => { router.push(p); window.scrollTo({ top:0, behavior:'smooth' }); }}
+          loggedIn={loggedIn}
+          setLoggedIn={setLoggedIn}
+          unreadTotal={unreadTotal}
+          institution={institution}
+          isAdmin={isAdmin}
+          router={router}
+        />
+      </Suspense>
       {toast && <ToastDisplay msg={toast.msg} type={toast.type} onDone={()=>setToast(null)} />}
     </>
   );
@@ -53,7 +59,151 @@ function ToastDisplay({ msg, type='success', onDone }) {
   );
 }
 
-function Nav({ pathname, navigate, loggedIn, setLoggedIn, unreadTotal, institution, isAdmin }) {
+function CategoryStrip({ router }) {
+  const searchParams = useSearchParams();
+  const activeCategory = searchParams.get('category') || '';
+  const activeSubcategory = searchParams.get('subcategory') || '';
+  const [hoveredCat, setHoveredCat] = useState(null);
+  const w = useWindowWidth();
+  const isMobile = w < 768;
+
+  function goCategory(key) {
+    router.push('/opslag?category=' + key);
+  }
+
+  function goSubcategory(key, sub) {
+    router.push('/opslag?category=' + key + '&subcategory=' + encodeURIComponent(sub));
+  }
+
+  function clearCategory() {
+    router.push('/opslag');
+  }
+
+  const activeCatObj = CATEGORIES.find(c => c.key === activeCategory);
+
+  return (
+    <div style={{ position:'relative' }} onMouseLeave={() => setHoveredCat(null)}>
+      {/* Strip row */}
+      <div style={{
+        borderTop: `1px solid ${PAPER2}`,
+        overflowX: 'auto',
+        scrollbarWidth: 'none',
+        msOverflowStyle: 'none',
+      }}>
+        <div style={{
+          maxWidth: 1140,
+          margin: '0 auto',
+          padding: '0 16px',
+          display: 'flex',
+          alignItems: 'center',
+          gap: 2,
+          height: 44,
+          whiteSpace: 'nowrap',
+        }}>
+          {CATEGORIES.map(cat => {
+            const isActive = activeCategory === cat.key;
+            return (
+              <button
+                key={cat.key}
+                onClick={() => isActive ? clearCategory() : goCategory(cat.key)}
+                onMouseEnter={() => !isMobile && setHoveredCat(cat.key)}
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: 5,
+                  padding: '5px 13px',
+                  borderRadius: 99,
+                  border: 'none',
+                  background: isActive ? GREEN_TINT : 'transparent',
+                  color: isActive ? PRIMARY : INK2,
+                  fontFamily: FONT,
+                  fontWeight: isActive ? 700 : 500,
+                  fontSize: 13,
+                  cursor: 'pointer',
+                  whiteSpace: 'nowrap',
+                  flexShrink: 0,
+                  borderBottom: isActive ? `2px solid ${PRIMARY}` : '2px solid transparent',
+                  borderRadius: isActive ? '8px 8px 0 0' : 99,
+                  transition: 'all 0.12s',
+                  position: 'relative',
+                }}
+              >
+                <span style={{ fontSize: 14 }}>{cat.emoji}</span>
+                <span>{cat.label}</span>
+                {isActive && (
+                  <span
+                    onClick={e => { e.stopPropagation(); clearCategory(); }}
+                    style={{ marginLeft: 2, fontSize: 11, opacity: 0.6, cursor: 'pointer', fontWeight: 800 }}
+                  >×</span>
+                )}
+              </button>
+            );
+          })}
+        </div>
+      </div>
+
+      {/* Active subcategory breadcrumb (mobile) */}
+      {isMobile && activeSubcategory && activeCatObj && (
+        <div style={{ padding: '4px 16px 6px', background: GREEN_TINT, display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, color: PRIMARY, fontFamily: FONT, fontWeight: 600 }}>
+          <span>{activeCatObj.emoji} {activeCatObj.label}</span>
+          <span style={{ opacity: 0.5 }}>›</span>
+          <span>{activeSubcategory}</span>
+          <button onClick={clearCategory} style={{ marginLeft: 'auto', background: 'none', border: 'none', color: PRIMARY, cursor: 'pointer', fontSize: 14, fontWeight: 800 }}>×</button>
+        </div>
+      )}
+
+      {/* Hover dropdown (desktop only) */}
+      {!isMobile && hoveredCat && (
+        <div
+          onMouseEnter={() => setHoveredCat(hoveredCat)}
+          onMouseLeave={() => setHoveredCat(null)}
+          style={{
+            position: 'absolute',
+            top: '100%',
+            left: 0,
+            right: 0,
+            zIndex: 600,
+            background: 'rgba(246,242,234,0.98)',
+            backdropFilter: 'blur(16px)',
+            borderTop: `1px solid ${PAPER2}`,
+            borderBottom: `1px solid ${PAPER2}`,
+            boxShadow: '0 12px 32px rgba(22,34,28,0.1)',
+          }}
+        >
+          <div style={{ maxWidth: 1140, margin: '0 auto', padding: '16px 16px', display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+            {CATEGORIES.find(c => c.key === hoveredCat)?.sub.map(sub => {
+              const isActiveSub = activeSubcategory === sub && activeCategory === hoveredCat;
+              return (
+                <button
+                  key={sub}
+                  onClick={() => { goSubcategory(hoveredCat, sub); setHoveredCat(null); }}
+                  style={{
+                    padding: '6px 16px',
+                    borderRadius: 99,
+                    border: isActiveSub ? `2px solid ${PRIMARY}` : `1.5px solid ${PAPER3}`,
+                    background: isActiveSub ? GREEN_TINT : PAPER2,
+                    color: isActiveSub ? PRIMARY : INK2,
+                    fontFamily: FONT,
+                    fontWeight: isActiveSub ? 700 : 500,
+                    fontSize: 13,
+                    cursor: 'pointer',
+                    transition: 'all 0.12s',
+                  }}
+                  onMouseEnter={e => { if (!isActiveSub) { e.currentTarget.style.background = GREEN_TINT; e.currentTarget.style.color = PRIMARY; } }}
+                  onMouseLeave={e => { if (!isActiveSub) { e.currentTarget.style.background = PAPER2; e.currentTarget.style.color = INK2; } }}
+                >
+                  {sub}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function Nav({ pathname, navigate, loggedIn, setLoggedIn, unreadTotal, institution, isAdmin, router }) {
   const [scrolled, setScrolled] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
   const w = useWindowWidth();
@@ -69,6 +219,7 @@ function Nav({ pathname, navigate, loggedIn, setLoggedIn, unreadTotal, instituti
 
   const isHome = pathname === '/';
   const transparent = isHome && !scrolled && !menuOpen;
+  const showCategoryStrip = !transparent;
 
   function go(path) { navigate(path); }
 
@@ -137,6 +288,11 @@ function Nav({ pathname, navigate, loggedIn, setLoggedIn, unreadTotal, instituti
           </div>
         )}
       </div>
+
+      {/* Category strip — visible when not transparent (not on homepage) */}
+      {showCategoryStrip && (
+        <CategoryStrip router={router} />
+      )}
 
       {isMobile && menuOpen && (
         <div style={{ background:'rgba(246,242,234,0.99)', borderTop:`1px solid #ECE6DA`, padding:'8px 16px 20px', animation:'slideDown 0.2s ease' }}>
