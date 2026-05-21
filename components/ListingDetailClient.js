@@ -425,12 +425,33 @@ export default function ListingDetailClient() {
             <p style={{ color:INK3, fontSize:14, marginBottom:16, fontFamily:FONT }}>Opslået af <strong onClick={()=>goToInstitution(listing.institution_name)} style={{ color:PRIMARY, cursor:'pointer', textDecoration:'underline', textDecorationColor:GREEN_SOFT }}>{listing.institution_name}</strong></p>
             <p style={{ color:INK2, lineHeight:1.75, fontSize:15, marginBottom:isMobile?20:32, fontFamily:FONT }}>{listing.description}</p>
             {!isOwn && (
-              <div style={{ background:GREEN_TINT, borderRadius:20, padding:isMobile?18:24, borderLeft:`3px solid ${PRIMARY}` }}>
+              <div style={{ background:GREEN_TINT, borderRadius:20, padding:isMobile?18:24, borderLeft:`3px solid ${PRIMARY}`, marginBottom: 16 }}>
                 <h3 style={{ fontFamily:FONT, fontWeight:800, fontSize:18, marginBottom:8, color:INK }}>Kontakt institutionen</h3>
                 <p style={{ fontSize:13, color:INK3, marginBottom:16, lineHeight:1.55, fontFamily:FONT }}>Send en besked direkte til {listing.institution_name} for at aftale nærmere, byde en pris eller foreslå et bytte.</p>
                 <Btn variant="primary" color={PRIMARY} radius={22} onClick={()=>onStartConv && onStartConv(listing)} style={{ padding:'12px 24px', width:'100%', justifyContent:'center', fontSize:15 }}>
                   💬 Åbn besked
                 </Btn>
+              </div>
+            )}
+            {!isOwn && (
+              <div style={{ background:PAPER2, borderRadius:16, padding:'14px 18px', display:'flex', alignItems:'center', gap:14, border:`1px solid ${PAPER3}` }}>
+                <span style={{ fontSize:24, flexShrink:0 }}>📦</span>
+                <div style={{ flex:1 }}>
+                  <div style={{ fontFamily:FONT, fontWeight:700, fontSize:13, color:INK, marginBottom:3 }}>
+                    Vil du lave et bundttilbud?
+                  </div>
+                  <div style={{ fontSize:12, color:INK3, fontFamily:FONT, lineHeight:1.5 }}>
+                    Gå til{' '}
+                    <strong onClick={()=>goToInstitution(listing.institution_name)} style={{ color:PRIMARY, cursor:'pointer', textDecoration:'underline', textDecorationColor:GREEN_SOFT }}>
+                      {listing.institution_name}s side
+                    </strong>
+                    {' '}for at vælge flere ting på én gang og sende et samlet tilbud.
+                  </div>
+                </div>
+                <button onClick={()=>goToInstitution(listing.institution_name)}
+                  style={{ background:PRIMARY, border:'none', borderRadius:99, padding:'8px 14px', fontSize:12, fontWeight:700, color:'#fff', cursor:'pointer', fontFamily:FONT, whiteSpace:'nowrap', flexShrink:0 }}>
+                  Se side →
+                </button>
               </div>
             )}
             {isOwn && (

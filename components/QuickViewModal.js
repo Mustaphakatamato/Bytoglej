@@ -222,6 +222,18 @@ export default function QuickViewModal({ listing, onClose }) {
                   </button>
                 </div>
               )}
+              {!isOwn && (
+                <div style={{ display:'flex', alignItems:'center', gap:12, background:PAPER2, borderRadius:14, padding:'12px 14px', border:`1px solid ${PAPER3}` }}>
+                  <span style={{ fontSize:20, flexShrink:0 }}>📦</span>
+                  <div style={{ flex:1, fontSize:12, color:INK3, fontFamily:FONT, lineHeight:1.5 }}>
+                    Vil du lave et bundttilbud?{' '}
+                    <span onClick={()=>{ onClose(); router.push('/institution/'+encodeURIComponent(listing.institution_name)); }}
+                      style={{ color:PRIMARY, fontWeight:700, cursor:'pointer', textDecoration:'underline' }}>
+                      Gå til {listing.institution_name}s side →
+                    </span>
+                  </div>
+                </div>
+              )}
               {isOwn && (
                 <button onClick={openFullPage} style={{ width:'100%', padding:'13px', borderRadius:99, background:PAPER2, color:INK2, border:'none', fontFamily:FONT, fontWeight:600, fontSize:13, cursor:'pointer' }}>
                   Se fuld side →
