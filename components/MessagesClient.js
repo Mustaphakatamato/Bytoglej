@@ -12,7 +12,7 @@ const FONT = "'Sora', sans-serif";
 export default function MessagesClient() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const { selectedConvId, setSelectedConvId, setActiveListing } = useApp();
+  const { selectedConvId, setSelectedConvId, setActiveListing, fetchUnread } = useApp();
   const { isAdminView: ctxIsAdmin, adminInstName, institution: ctxInstitution, institutionId: ctxInstId, realUserId, userId: ctxUserId } = useActiveUser();
 
   const [userId,      setUserId]      = useState(null);
@@ -421,6 +421,7 @@ export default function MessagesClient() {
     const newVal = currentUnread > 0 ? 0 : 1;
     await db.from('conversations').update({ [field]: newVal }).eq('id', conv.id);
     setConvs(cs => cs.map(c => c.id === conv.id ? { ...c, [field]: newVal } : c));
+    if (userId) fetchUnread(userId);
   }
 
   function onKey(e) { if (e.key==='Enter' && !e.shiftKey) { e.preventDefault(); send(); } }
@@ -851,31 +852,33 @@ export default function MessagesClient() {
                                       <div style={{ display:'flex', gap:8, marginTop:12, paddingTop:12, borderTop:`1px solid rgba(22,34,28,0.08)` }}>
                                         <button onClick={async () => {
                                           const senderName = effectiveSenderName();
-                                          await db.from('chat_messages').update({ bid_status: 'accepted' }).eq('id', m.id);
-                                          const confirmMsg = `${senderName} har accepteret bundttilbuddet.`;
                                           const effUid = realUserId || userId;
-                                          await db.from('chat_messages').insert({ conversation_id: active.id, sender_id: effUid, sender_name: senderName, content: confirmMsg });
+                                          await db.from('chat_messages').update({ bid_status: 'accepted' }).eq('id', m.id);
+                                          const confirmMsg = `✅ ${senderName} har accepteret dit bundttilbud!`;
+                                          const { data: newMsg } = await db.from('chat_messages').insert({ conversation_id: active.id, sender_id: effUid, sender_name: senderName, content: confirmMsg }).select().single();
                                           const now = new Date().toISOString();
                                           const upd = { last_message: confirmMsg, last_message_at: now, initiator_unread: (active.initiator_unread||0)+1, is_handled: true, handled_at: now, handled_action: 'accepted' };
                                           await db.from('conversations').update(upd).eq('id', active.id);
                                           setActive(a => ({ ...a, ...upd }));
                                           setConvs(cs => cs.map(c => c.id === active.id ? { ...c, ...upd } : c));
-                                          setMessages(ms => ms.map(x => x.id === m.id ? { ...x, bid_status: 'accepted' } : x));
+                                          setMessages(ms => [...ms.map(x => x.id === m.id ? { ...x, bid_status: 'accepted' } : x), ...(newMsg ? [newMsg] : [])]);
+                                          setTimeout(() => bottomRef.current?.scrollIntoView({ behavior:'smooth' }), 60);
                                         }} style={{ flex:1, padding:'8px 16px', borderRadius:99, background:PRIMARY, border:'none', color:'#fff', fontSize:12, fontWeight:700, cursor:'pointer', fontFamily:FONT }}>
                                           Accepter
                                         </button>
                                         <button onClick={async () => {
                                           const senderName = effectiveSenderName();
-                                          await db.from('chat_messages').update({ bid_status: 'rejected' }).eq('id', m.id);
-                                          const rejectMsg = `${senderName} har afvist bundttilbuddet.`;
                                           const effUid = realUserId || userId;
-                                          await db.from('chat_messages').insert({ conversation_id: active.id, sender_id: effUid, sender_name: senderName, content: rejectMsg });
+                                          await db.from('chat_messages').update({ bid_status: 'rejected' }).eq('id', m.id);
+                                          const rejectMsg = `❌ ${senderName} har afvist dit bundttilbud.`;
+                                          const { data: newMsg } = await db.from('chat_messages').insert({ conversation_id: active.id, sender_id: effUid, sender_name: senderName, content: rejectMsg }).select().single();
                                           const now = new Date().toISOString();
                                           const upd = { last_message: rejectMsg, last_message_at: now, initiator_unread: (active.initiator_unread||0)+1, is_handled: true, handled_at: now, handled_action: 'rejected' };
                                           await db.from('conversations').update(upd).eq('id', active.id);
                                           setActive(a => ({ ...a, ...upd }));
                                           setConvs(cs => cs.map(c => c.id === active.id ? { ...c, ...upd } : c));
-                                          setMessages(ms => ms.map(x => x.id === m.id ? { ...x, bid_status: 'rejected' } : x));
+                                          setMessages(ms => [...ms.map(x => x.id === m.id ? { ...x, bid_status: 'rejected' } : x), ...(newMsg ? [newMsg] : [])]);
+                                          setTimeout(() => bottomRef.current?.scrollIntoView({ behavior:'smooth' }), 60);
                                         }} style={{ flex:1, padding:'8px 16px', borderRadius:99, background:'#FEF2F2', border:'1.5px solid #FCA5A5', color:'#e11d48', fontSize:12, fontWeight:700, cursor:'pointer', fontFamily:FONT }}>
                                           Afvis
                                         </button>
