@@ -1,6 +1,7 @@
 'use client';
 import { useState } from 'react';
 import { PRIMARY, GREEN_TINT, GREEN_SOFT, PAPER2, INK, INK3, CORAL, TYPE_CFG, CONDITION_COLORS } from '@/lib/constants';
+import { CATEGORIES } from '@/lib/categories';
 import { db } from '@/lib/supabase';
 
 const FONT = "'Sora', sans-serif";
@@ -77,11 +78,21 @@ export default function ListingCard({ listing, onClick, favs, toggleFav, onInsti
 
       {/* Body */}
       <div style={{ padding: '12px 14px 16px', flex: 1, display: 'flex', flexDirection: 'column' }}>
-        <div style={{ display: 'flex', gap: 6, marginBottom: 8, flexWrap: 'wrap' }}>
+        <div style={{ display: 'flex', gap: 6, marginBottom: 8, flexWrap: 'wrap', alignItems: 'center' }}>
           <span style={{ background: tc.bg, color: tc.color, borderRadius: 99, padding: '3px 10px', fontSize: 11, fontWeight: 700, fontFamily: FONT }}>{tc.label}</span>
           {listing.condition && (
             <span style={{ background: condStyle.bg, color: condStyle.color, borderRadius: 99, padding: '3px 10px', fontSize: 11, fontWeight: 700, fontFamily: FONT }}>{listing.condition}</span>
           )}
+          {listing.category && (() => {
+            const cat = CATEGORIES.find(c => c.key === listing.category);
+            if (!cat) return null;
+            return (
+              <span style={{ display:'inline-flex', alignItems:'center', gap:3, background: GREEN_TINT, color: PRIMARY, borderRadius: 99, padding: '3px 10px', fontSize: 11, fontWeight: 700, fontFamily: FONT }}>
+                <span>{cat.emoji}</span>
+                <span>{listing.subcategory || cat.label}</span>
+              </span>
+            );
+          })()}
         </div>
 
         <div style={{ fontFamily: FONT, fontWeight: 700, fontSize: 15, color: INK, marginBottom: 4, lineHeight: 1.3 }}>{listing.title}</div>
@@ -107,13 +118,6 @@ export default function ListingCard({ listing, onClick, favs, toggleFav, onInsti
             </div>
             {localFavCount > 0 && <div style={{ fontSize: 11, color: CORAL, fontWeight: 700 }}>♥ {localFavCount}</div>}
           </div>
-          {listing.tags?.length > 0 && (
-            <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', marginTop: 8 }}>
-              {listing.tags.map(t => (
-                <span key={t} style={{ background: GREEN_TINT, color: PRIMARY, borderRadius: 99, padding: '2px 8px', fontSize: 10, fontWeight: 700, fontFamily: FONT }}>{t}</span>
-              ))}
-            </div>
-          )}
         </div>
       </div>
     </div>

@@ -23,9 +23,19 @@ function PreviewCard({ form, imgPreview }) {
         }
       </div>
       <div style={{ padding:'14px 16px 18px' }}>
-        <div style={{ display:'flex', gap:6, marginBottom:10, flexWrap:'wrap' }}>
+        <div style={{ display:'flex', gap:6, marginBottom:10, flexWrap:'wrap', alignItems:'center' }}>
           <span style={{ background:tc.bg, color:tc.color, borderRadius:99, padding:'3px 10px', fontSize:11, fontWeight:700, fontFamily:FONT }}>{tc.label}</span>
           {form.condition && <span style={{ background:PAPER3, color:INK2, borderRadius:99, padding:'3px 10px', fontSize:11, fontWeight:700, fontFamily:FONT }}>{form.condition}</span>}
+          {form.category && (() => {
+            const cat = CATEGORIES.find(c => c.key === form.category);
+            if (!cat) return null;
+            return (
+              <span style={{ display:'inline-flex', alignItems:'center', gap:3, background:GREEN_TINT, color:PRIMARY, borderRadius:99, padding:'3px 10px', fontSize:11, fontWeight:700, fontFamily:FONT }}>
+                <span>{cat.emoji}</span>
+                <span>{form.subcategory || cat.label}</span>
+              </span>
+            );
+          })()}
         </div>
         <div style={{ fontFamily:FONT, fontWeight:700, fontSize:16, color:INK, marginBottom:6, lineHeight:1.3 }}>{form.title || 'Titel på opslag'}</div>
         {form.description && <div style={{ fontSize:12, color:INK3, lineHeight:1.5, marginBottom:8, display:'-webkit-box', WebkitLineClamp:2, WebkitBoxOrient:'vertical', overflow:'hidden' }}>{form.description}</div>}
@@ -37,11 +47,6 @@ function PreviewCard({ form, imgPreview }) {
             : null
           }
         </div>
-        {form.tags?.length > 0 && (
-          <div style={{ display:'flex', gap:4, flexWrap:'wrap', marginTop:10 }}>
-            {form.tags.map(t => <span key={t} style={{ background:GREEN_TINT, color:PRIMARY, borderRadius:99, padding:'2px 8px', fontSize:10, fontWeight:700, fontFamily:FONT }}>{t}</span>)}
-          </div>
-        )}
       </div>
     </div>
   );
