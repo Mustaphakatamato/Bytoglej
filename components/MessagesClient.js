@@ -39,9 +39,10 @@ export default function MessagesClient() {
   const [swapPreview,  setSwapPreview]  = useState(null);
   const [shares,      setShares]      = useState([]);
   const [activeShare, setActiveShare] = useState(null);
-  const [draftConv,    setDraftConv]    = useState(null);
-  const [chatImages,   setChatImages]   = useState([]);
-  const [fullsizeImage,setFullsizeImage]= useState(null);
+  const [draftConv,       setDraftConv]       = useState(null);
+  const [chatImages,      setChatImages]      = useState([]);
+  const [fullsizeImage,   setFullsizeImage]   = useState(null);
+  const [bundleAcceptedAt,setBundleAcceptedAt]= useState({});
   const ww = useWindowWidth();
   const isMobile = ww < 768;
 
@@ -204,6 +205,19 @@ export default function MessagesClient() {
       .subscribe();
     return () => db.removeChannel(ch);
   }, [active?.id]);
+
+  useEffect(() => {
+    const ids = Object.keys(bundleAcceptedAt);
+    if (ids.length === 0) return;
+    const earliest = Math.min(...Object.values(bundleAcceptedAt));
+    const msLeft = earliest + 5 * 60 * 1000 - Date.now();
+    if (msLeft <= 0) { setBundleAcceptedAt({}); return; }
+    const t = setTimeout(() => {
+      const now = Date.now();
+      setBundleAcceptedAt(prev => Object.fromEntries(Object.entries(prev).filter(([,ts]) => now - ts < 5*60*1000)));
+    }, msLeft);
+    return () => clearTimeout(t);
+  }, [bundleAcceptedAt]);
 
   async function uploadImages(files, convId) {
     const urls = [];
@@ -880,6 +894,7 @@ export default function MessagesClient() {
                                           setActive(a => ({ ...a, ...upd }));
                                           setConvs(cs => cs.map(c => c.id === active.id ? { ...c, ...upd } : c));
                                           setMessages(ms => [...ms.map(x => x.id === m.id ? { ...x, bid_status: 'accepted' } : x), ...(newMsg ? [newMsg] : [])]);
+                                          setBundleAcceptedAt(prev => ({ ...prev, [m.id]: Date.now() }));
                                           setTimeout(() => bottomRef.current?.scrollIntoView({ behavior:'smooth' }), 60);
                                         }} style={{ flex:1, padding:'8px 16px', borderRadius:99, background:PRIMARY, border:'none', color:'#fff', fontSize:12, fontWeight:700, cursor:'pointer', fontFamily:FONT }}>
                                           Accepter
@@ -900,6 +915,32 @@ export default function MessagesClient() {
                                         }} style={{ flex:1, padding:'8px 16px', borderRadius:99, background:'#FEF2F2', border:'1.5px solid #FCA5A5', color:'#e11d48', fontSize:12, fontWeight:700, cursor:'pointer', fontFamily:FONT }}>
                                           Afvis
                                         </button>
+                                      </div>
+                                    )}
+                                    {m.bid_status === 'accepted' && isOwnerInConv && bundleAcceptedAt[m.id] && (
+                                      <div style={{ marginTop:10, paddingTop:10, borderTop:`1px solid rgba(22,34,28,0.08)` }}>
+                                        <button onClick={async () => {
+                                          if (Date.now() - bundleAcceptedAt[m.id] >= 5 * 60 * 1000) {
+                                            setBundleAcceptedAt(prev => { const n={...prev}; delete n[m.id]; return n; });
+                                            return;
+                                          }
+                                          const senderName = effectiveSenderName();
+                                          const effUid = realUserId || userId;
+                                          await db.from('chat_messages').update({ bid_status: 'pending' }).eq('id', m.id);
+                                          const retractMsg = `↩️ ${senderName} har trukket sin accept af bundttilbuddet tilbage.`;
+                                          const { data: newMsg } = await db.from('chat_messages').insert({ conversation_id: active.id, sender_id: effUid, sender_name: senderName, content: retractMsg }).select().single();
+                                          const now = new Date().toISOString();
+                                          const upd = { last_message: retractMsg, last_message_at: now, initiator_unread: (active.initiator_unread||0)+1, is_handled: false, handled_at: null, handled_action: null };
+                                          await db.from('conversations').update(upd).eq('id', active.id);
+                                          setActive(a => ({ ...a, ...upd }));
+                                          setConvs(cs => cs.map(c => c.id === active.id ? { ...c, ...upd } : c));
+                                          setMessages(ms => [...ms.map(x => x.id === m.id ? { ...x, bid_status: 'pending' } : x), ...(newMsg ? [newMsg] : [])]);
+                                          setBundleAcceptedAt(prev => { const n={...prev}; delete n[m.id]; return n; });
+                                          setTimeout(() => bottomRef.current?.scrollIntoView({ behavior:'smooth' }), 60);
+                                        }} style={{ width:'100%', padding:'7px', borderRadius:99, background:'transparent', border:`1.5px solid ${PAPER3}`, color:INK3, fontSize:11, fontWeight:700, cursor:'pointer', fontFamily:FONT }}>
+                                          Fortryd accept
+                                        </button>
+                                        <div style={{ fontSize:10, color:INK3, textAlign:'center', marginTop:4, fontFamily:FONT }}>Kan trækkes tilbage i 5 min.</div>
                                       </div>
                                     )}
                                     {(!m.bid_status || m.bid_status === 'pending') && !isOwnerInConv && !mine && (
