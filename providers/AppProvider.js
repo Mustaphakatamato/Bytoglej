@@ -1,5 +1,5 @@
 'use client';
-import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react';
 import { db } from '@/lib/supabase';
 import { ADMIN_EMAIL } from '@/lib/constants';
 import { useFavs } from '@/lib/hooks';
@@ -86,6 +86,10 @@ export function AppProvider({ children }) {
     if (realUserId) fetchUnread(realUserId);
   }, [effectiveInstitution?.id]);
 
+  // Keep a ref so the always-on realtime subscription calls the latest fetchUnread (avoids stale closure)
+  const fetchUnreadRef = useRef(fetchUnread);
+  useEffect(() => { fetchUnreadRef.current = fetchUnread; });
+
   useEffect(() => {
     fetchListings();
     db.auth.getSession().then(({ data: { session } }) => {
@@ -117,7 +121,7 @@ export function AppProvider({ children }) {
     const ch1 = db.channel('rt-listings').on('postgres_changes', { event:'*', schema:'public', table:'listings' }, fetchListings).subscribe();
     const ch2 = db.channel('rt-convs-app').on('postgres_changes', { event:'*', schema:'public', table:'conversations' }, async () => {
       const { data:{ user } } = await db.auth.getUser();
-      if (user) fetchUnread(user.id);
+      if (user) fetchUnreadRef.current(user.id);
     }).subscribe();
     return () => { db.removeChannel(ch1); db.removeChannel(ch2); };
   }, []);

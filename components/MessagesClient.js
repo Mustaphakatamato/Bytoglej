@@ -572,9 +572,8 @@ export default function MessagesClient() {
                 return (
                   <div key={c.id} style={{ display:'flex', gap:12, padding:'13px 16px', cursor:'pointer', background:isAct?GREEN_TINT:PAPER2, borderLeft:isAct?`3px solid ${PRIMARY}`:'3px solid transparent', transition:'background 0.15s', position:'relative', borderBottom:`1px solid rgba(22,34,28,0.05)` }}
                     onClick={()=>openConv(c)}>
-                    <div style={{ width:46, height:46, borderRadius:12, background:c.listing_image?PAPER3:c.listing_color||'#FFD166', display:'flex', alignItems:'center', justifyContent:'center', fontSize:22, flexShrink:0, overflow:'hidden', position:'relative' }}>
+                    <div style={{ width:46, height:46, borderRadius:12, background:c.listing_image?PAPER3:c.listing_color||'#FFD166', display:'flex', alignItems:'center', justifyContent:'center', fontSize:22, flexShrink:0, overflow:'hidden' }}>
                       {c.listing_image ? <img src={c.listing_image} style={{ width:'100%', height:'100%', objectFit:'cover' }} alt="" /> : c.listing_emoji||'🧸'}
-                      {unread>0 && !archived && <div style={{ position:'absolute', top:-4, right:-4, width:18, height:18, background:'#e11d48', borderRadius:'50%', border:`2px solid ${PAPER2}`, display:'flex', alignItems:'center', justifyContent:'center', fontSize:9, fontWeight:800, color:'#fff' }}>{unread>9?'9+':unread}</div>}
                     </div>
                     <div style={{ flex:1, minWidth:0 }}>
                       <div style={{ display:'flex', justifyContent:'space-between', alignItems:'baseline', marginBottom:3 }}>
