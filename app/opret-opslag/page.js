@@ -3,6 +3,7 @@ import { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { db } from '@/lib/supabase';
 import { PRIMARY, GREEN_DEEP, GREEN_SOFT, GREEN_TINT, PAPER, PAPER2, PAPER3, INK, INK2, INK3, CORAL, TYPE_CFG, CONDITIONS, AGE_GROUPS, LISTING_TAGS } from '@/lib/constants';
+import { CATEGORIES } from '@/lib/categories';
 import { useWindowWidth } from '@/lib/hooks';
 import { useApp, useActiveUser } from '@/providers/AppProvider';
 import { Spinner } from '@/components/ui';
@@ -65,7 +66,7 @@ export default function OpretOpslagPage() {
   const [form, setForm] = useState({
     title:'', type:'køb', price:'', age_group:'3-6 år',
     description:'', condition:'God', emoji:'🧸', color:'#FFD166',
-    tags:[], min_bid:'',
+    tags:[], min_bid:'', category:'', subcategory:'',
   });
 
   useEffect(() => {
@@ -141,6 +142,7 @@ export default function OpretOpslagPage() {
       user_id: user?.id || null,
       emoji: form.emoji, color: form.color,
       tags: form.tags || [], images: [], bid_count: 0, is_active: true,
+      category: form.category || null, subcategory: form.subcategory || null,
     };
     if (form.type==='byd' && form.min_bid) insertData.min_bid = Number(form.min_bid);
     const { data: listing, error } = await db.from('listings').insert(insertData).select().single();
@@ -256,6 +258,44 @@ export default function OpretOpslagPage() {
                       return <button key={t} type="button" onClick={()=>setForm(f=>({ ...f, tags: sel ? (f.tags||[]).filter(x=>x!==t) : (f.tags||[]).length < 5 ? [...(f.tags||[]), t] : (f.tags||[]) }))} style={{ padding:'6px 14px', borderRadius:99, fontSize:12, fontWeight:700, border: sel ? `2px solid ${PRIMARY}` : '2px solid transparent', background: sel ? GREEN_TINT : PAPER2, color: sel ? PRIMARY : INK3, cursor:'pointer', fontFamily:FONT, transition:'all 0.12s' }}>{t}</button>;
                     })}
                   </div>
+                </div>
+
+                {/* Category picker */}
+                <div>
+                  <label style={labelStyle}>Kategori <span style={{ fontWeight:400, color:INK3 }}>(valgfri)</span></label>
+                  <div style={{ display:'flex', gap:6, flexWrap:'wrap', marginBottom: form.category ? 10 : 0 }}>
+                    {CATEGORIES.map(cat => {
+                      const sel = form.category === cat.key;
+                      return (
+                        <button key={cat.key} type="button"
+                          onClick={() => setForm(f => ({ ...f, category: sel ? '' : cat.key, subcategory: '' }))}
+                          style={{ padding:'6px 14px', borderRadius:99, fontSize:12, fontWeight:700, border: sel ? `2px solid ${PRIMARY}` : '2px solid transparent', background: sel ? GREEN_TINT : PAPER2, color: sel ? PRIMARY : INK3, cursor:'pointer', fontFamily:FONT, transition:'all 0.12s', display:'flex', alignItems:'center', gap:5 }}>
+                          <span>{cat.emoji}</span><span>{cat.label}</span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                  {form.category && (() => {
+                    const catObj = CATEGORIES.find(c => c.key === form.category);
+                    if (!catObj) return null;
+                    return (
+                      <div>
+                        <div style={{ fontSize:12, fontWeight:600, color:INK3, fontFamily:FONT, marginBottom:6 }}>Underkategori <span style={{ fontWeight:400 }}>(valgfri)</span></div>
+                        <div style={{ display:'flex', gap:6, flexWrap:'wrap' }}>
+                          {catObj.sub.map(sub => {
+                            const selSub = form.subcategory === sub;
+                            return (
+                              <button key={sub} type="button"
+                                onClick={() => setForm(f => ({ ...f, subcategory: selSub ? '' : sub }))}
+                                style={{ padding:'5px 12px', borderRadius:99, fontSize:12, fontWeight:700, border: selSub ? `2px solid ${PRIMARY}` : `1.5px solid ${PAPER3}`, background: selSub ? GREEN_TINT : PAPER2, color: selSub ? PRIMARY : INK3, cursor:'pointer', fontFamily:FONT, transition:'all 0.12s' }}>
+                                {sub}
+                              </button>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    );
+                  })()}
                 </div>
 
                 <button onClick={()=>{ if(step1Valid) setStep(2); }} disabled={!step1Valid} style={{ width:'100%', padding:'14px', borderRadius:99, background:step1Valid?PRIMARY:PAPER3, color:step1Valid?'#fff':INK3, border:'none', fontFamily:FONT, fontWeight:700, fontSize:15, cursor:step1Valid?'pointer':'not-allowed', marginTop:4, transition:'all 0.2s' }}>

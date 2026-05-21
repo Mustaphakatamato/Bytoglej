@@ -3,6 +3,7 @@ import { useState, useEffect, useRef, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import dynamic from 'next/dynamic';
 import { PRIMARY, GREEN_DEEP, GREEN_SOFT, GREEN_TINT, PAPER, PAPER2, PAPER3, INK, INK2, INK3, CORAL, TYPE_CFG, LISTING_TAGS } from '@/lib/constants';
+import { CATEGORIES } from '@/lib/categories';
 
 const CITIES = ['alle','Aarhus','København','Odense','Aalborg','Esbjerg','Randers','Vejle','Kolding'];
 import { useWindowWidth, useDebounce, haversine } from '@/lib/hooks';
@@ -37,6 +38,8 @@ export default function OpslagPage() {
   const [city, setCity] = useState('alle');
   const [sort, setSort] = useState('newest');
   const [maxDist, setMaxDist] = useState('alle');
+  const [category, setCategory] = useState('');
+  const [subcategory, setSubcategory] = useState('');
   const [activeTags, setActiveTags] = useState([]);
   const [tagDropOpen, setTagDropOpen] = useState(false);
   const [saveSearchModal, setSaveSearchModal] = useState(false);
@@ -69,6 +72,10 @@ export default function OpslagPage() {
     if (s) setSearch(s);
     if (tgs) { try { setActiveTags(JSON.parse(tgs)); } catch {} }
     if (md && md !== 'alle') setMaxDist(md);
+    const cat = params.get('category');
+    const sub = params.get('subcategory');
+    if (cat) setCategory(cat);
+    if (sub) setSubcategory(sub);
   }, []);
 
   useEffect(() => {
@@ -106,13 +113,15 @@ export default function OpslagPage() {
       const matchCity   = city === 'alle'   || l.city === city;
       const matchSearch = !dSearch || l.title.toLowerCase().includes(dSearch.toLowerCase()) || (l.institution_name||'').toLowerCase().includes(dSearch.toLowerCase()) || (l.tags||[]).some(t => t.toLowerCase().includes(dSearch.toLowerCase()));
       const matchTag = activeTags.length === 0 || activeTags.every(t => (l.tags||[]).includes(t));
+      const matchCategory = !category || l.category === category;
+      const matchSubcategory = !subcategory || l.subcategory === subcategory;
       let matchDist = true;
       if (maxDist !== 'alle' && userCoords && l.city) {
         const coords = listingCoords[l.city];
         if (coords) matchDist = haversine(userCoords.lat, userCoords.lon, coords.lat, coords.lon) <= Number(maxDist);
         else matchDist = true;
       }
-      return matchType && matchCity && matchSearch && matchDist && matchTag;
+      return matchType && matchCity && matchSearch && matchDist && matchTag && matchCategory && matchSubcategory;
     });
     if (sort === 'newest')     r = [...r].sort((a,b) => new Date(b.created_at) - new Date(a.created_at));
     if (sort === 'price-asc')  r = [...r].sort((a,b) => (a.price||0) - (b.price||0));
@@ -127,7 +136,7 @@ export default function OpslagPage() {
       });
     }
     return r;
-  }, [listings, filter, city, dSearch, sort, maxDist, userCoords, listingCoords, activeTags]);
+  }, [listings, filter, city, dSearch, sort, maxDist, userCoords, listingCoords, activeTags, category, subcategory]);
 
   async function handleSaveSearch() {
     if (!saveSearchName.trim()) return;
@@ -142,6 +151,8 @@ export default function OpslagPage() {
       if (activeTags.length) filters.tags = activeTags;
       if (dSearch) filters.search = dSearch;
       if (maxDist !== 'alle') filters.maxDist = maxDist;
+      if (category) filters.category = category;
+      if (subcategory) filters.subcategory = subcategory;
       const { error: insertErr } = await db.from('saved_searches').insert({
         institution_id: inst?.id || null,
         email: user.email,
@@ -177,7 +188,7 @@ export default function OpslagPage() {
       {/* ── Compact header ── */}
       <div style={{
         background: `linear-gradient(160deg, ${GREEN_DEEP} 0%, ${PRIMARY} 100%)`,
-        paddingTop: 108, paddingBottom: 48,
+        paddingTop: 152, paddingBottom: 48,
         textAlign: 'center',
         position: 'relative', overflow: 'hidden',
       }}>
@@ -202,7 +213,7 @@ export default function OpslagPage() {
 
       {/* ── Sticky filter bar ── */}
       <div style={{
-        position: 'sticky', top: 68, zIndex: 100,
+        position: 'sticky', top: 112, zIndex: 100,
         background: `rgba(246,242,234,0.97)`,
         borderBottom: `1px solid ${PAPER2}`,
         backdropFilter: 'blur(16px)',
@@ -246,6 +257,14 @@ export default function OpslagPage() {
               ))}
             </div>
           </div>
+
+          {/* Active category breadcrumb */}
+          {category && (
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, fontWeight: 600, color: PRIMARY, fontFamily: FONT }}>
+              {(() => { const catObj = CATEGORIES.find(c => c.key === category); return catObj ? <><span>{catObj.emoji} {catObj.label}</span>{subcategory && <><span style={{ opacity: 0.5 }}>›</span><span>{subcategory}</span></>}</> : null; })()}
+              <button onClick={() => { setCategory(''); setSubcategory(''); }} style={{ marginLeft: 4, background: 'none', border: 'none', color: PRIMARY, cursor: 'pointer', fontSize: 13, fontWeight: 800, lineHeight: 1, padding: '0 2px' }}>×</button>
+            </div>
+          )}
 
           {/* Filter pills row */}
           <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', alignItems: 'center' }}>
@@ -384,12 +403,12 @@ export default function OpslagPage() {
             {viewMode === 'map' && !loading && <span style={{ marginLeft: 8, fontSize: 12 }}>— pins baseret på by</span>}
           </p>
           <div style={{ display:'flex', gap:10, alignItems:'center' }}>
-            {(filter !== 'alle' || city !== 'alle' || activeTags.length || maxDist !== 'alle' || dSearch) && (
-              <button onClick={() => { setFilter('alle'); setSearch(''); setCity('alle'); setActiveTags([]); setMaxDist('alle'); }} style={{ fontSize: 12, fontWeight: 600, color: PRIMARY, background: 'none', border: 'none', cursor: 'pointer', fontFamily: FONT, padding: 0 }}>
+            {(filter !== 'alle' || city !== 'alle' || activeTags.length || maxDist !== 'alle' || dSearch || category || subcategory) && (
+              <button onClick={() => { setFilter('alle'); setSearch(''); setCity('alle'); setActiveTags([]); setMaxDist('alle'); setCategory(''); setSubcategory(''); }} style={{ fontSize: 12, fontWeight: 600, color: PRIMARY, background: 'none', border: 'none', cursor: 'pointer', fontFamily: FONT, padding: 0 }}>
                 Nulstil filtre
               </button>
             )}
-            {loggedIn && (filter !== 'alle' || city !== 'alle' || activeTags.length || maxDist !== 'alle' || dSearch) && (
+            {loggedIn && (filter !== 'alle' || city !== 'alle' || activeTags.length || maxDist !== 'alle' || dSearch || category || subcategory) && (
               <button onClick={() => setSaveSearchModal(true)} style={{ fontSize: 12, fontWeight: 700, color: '#fff', background: PRIMARY, border: 'none', borderRadius: 99, cursor: 'pointer', fontFamily: FONT, padding: '5px 14px', display:'flex', alignItems:'center', gap:5 }}>
                 🔔 Gem søgning
               </button>
@@ -414,7 +433,7 @@ export default function OpslagPage() {
             <div style={{ fontFamily: FONT, fontWeight: 800, fontSize: isMobile ? 60 : 96, color: GREEN_SOFT, lineHeight: 1, letterSpacing: '-0.05em', marginBottom: 12, userSelect: 'none' }}>0</div>
             <div style={{ fontFamily: FONT, fontWeight: 800, fontSize: isMobile ? 20 : 26, color: INK, marginBottom: 8, letterSpacing: '-0.03em' }}>Ingen opslag fundet</div>
             <p style={{ fontSize: 15, color: INK3, marginBottom: 28 }}>Prøv at ændre eller nulstille dine filtre</p>
-            <button onClick={() => { setFilter('alle'); setSearch(''); setCity('alle'); setActiveTags([]); setMaxDist('alle'); }} style={{
+            <button onClick={() => { setFilter('alle'); setSearch(''); setCity('alle'); setActiveTags([]); setMaxDist('alle'); setCategory(''); setSubcategory(''); }} style={{
               background: 'none', border: `1.5px solid ${PRIMARY}`, color: PRIMARY,
               borderRadius: 99, padding: '10px 24px', fontSize: 14, fontWeight: 700,
               fontFamily: FONT, cursor: 'pointer',
