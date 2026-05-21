@@ -197,7 +197,7 @@ export default function MessagesClient() {
     const ch = db.channel(`msgs-${active.id}`)
       .on('postgres_changes', { event:'INSERT', schema:'public', table:'chat_messages', filter:`conversation_id=eq.${active.id}` },
         ({ new: m }) => {
-          setMessages(prev => [...prev, m]);
+          setMessages(prev => prev.some(x => x.id === m.id) ? prev : [...prev, m]);
           setTimeout(() => bottomRef.current?.scrollIntoView({ behavior:'smooth' }), 60);
         })
       .on('postgres_changes', { event:'UPDATE', schema:'public', table:'chat_messages', filter:`conversation_id=eq.${active.id}` },
@@ -292,21 +292,29 @@ export default function MessagesClient() {
       const urls = await uploadImages(chatImages, active.id);
       const imageContent = JSON.stringify({ urls, caption: content });
       setChatImages([]);
-      await db.from('chat_messages').insert({ conversation_id: active.id, sender_id: effectiveUserId, sender_name: senderName, content: imageContent, message_type: 'image' });
+      const { data: imgMsg } = await db.from('chat_messages').insert({ conversation_id: active.id, sender_id: effectiveUserId, sender_name: senderName, content: imageContent, message_type: 'image' }).select().single();
       const unreadPatch = isInit ? { owner_unread: (active.owner_unread||0)+1 } : { initiator_unread: (active.initiator_unread||0)+1 };
       const updated = { last_message: '📷 Billede', last_message_at: new Date().toISOString(), ...unreadPatch };
       await db.from('conversations').update(updated).eq('id', active.id);
       setActive(a => ({ ...a, ...updated }));
       setConvs(cs => cs.map(c => c.id === active.id ? { ...c, ...updated } : c).sort((a,b) => new Date(b.last_message_at)-new Date(a.last_message_at)));
+      if (imgMsg) {
+        setMessages(ms => [...ms, imgMsg]);
+        setTimeout(() => bottomRef.current?.scrollIntoView({ behavior:'smooth' }), 60);
+      }
       setSending(false);
       return;
     }
-    await db.from('chat_messages').insert({ conversation_id: active.id, sender_id: effectiveUserId, sender_name: senderName, content });
+    const { data: txtMsg } = await db.from('chat_messages').insert({ conversation_id: active.id, sender_id: effectiveUserId, sender_name: senderName, content }).select().single();
     const unreadPatch = isInit ? { owner_unread: (active.owner_unread||0)+1 } : { initiator_unread: (active.initiator_unread||0)+1 };
     const updated = { last_message: content, last_message_at: new Date().toISOString(), ...unreadPatch };
     await db.from('conversations').update(updated).eq('id', active.id);
     setActive(a => ({ ...a, ...updated }));
     setConvs(cs => cs.map(c => c.id === active.id ? { ...c, ...updated } : c).sort((a,b) => new Date(b.last_message_at)-new Date(a.last_message_at)));
+    if (txtMsg) {
+      setMessages(ms => [...ms, txtMsg]);
+      setTimeout(() => bottomRef.current?.scrollIntoView({ behavior:'smooth' }), 60);
+    }
     setSending(false);
   }
 
