@@ -73,11 +73,18 @@ export function AppProvider({ children }) {
       .or(orParts.join(','));
     if (!data) return;
     const total = data.reduce((sum, c) => {
-      const amInit = c.initiator_institution_id ? c.initiator_institution_id === instId : c.initiator_id === userId;
+      const amInit = instId
+        ? (c.initiator_institution_id ? c.initiator_institution_id === instId : c.initiator_id === userId)
+        : c.initiator_id === userId;
       return sum + (amInit ? (c.initiator_unread || 0) : (c.owner_unread || 0));
     }, 0);
     setUnreadTotal(total);
   }
+
+  // Re-fetch when institution loads (fetchUnread may have run before institution was ready)
+  useEffect(() => {
+    if (realUserId) fetchUnread(realUserId);
+  }, [effectiveInstitution?.id]);
 
   useEffect(() => {
     fetchListings();
