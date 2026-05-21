@@ -19,6 +19,7 @@ export default function DashboardClient() {
     favs,
     toggleFav,
     setActiveListing,
+    setQuickViewListing,
     unreadTotal,
     institution: ctxAppInstitution,
     setInstitution: setAppInstitution,
@@ -384,7 +385,7 @@ export default function DashboardClient() {
               </div>
             ) : myListings.map(l=>(
               <div key={l.id} style={{ border:`1px solid ${l.is_sold?'#FECACA':'rgba(22,34,28,0.08)'}`, borderRadius:14, marginBottom:10, overflow:'hidden', opacity:l.is_sold?0.85:1, background:l.is_sold?'#FFF5F5':PAPER }}>
-                <div onClick={()=>{ setActiveListing(l); router.push('/opslag/detail'); }} style={{ display:'flex', alignItems:'center', gap:14, padding:'12px 14px', cursor:'pointer' }}>
+                <div onClick={()=>setQuickViewListing(l)} style={{ display:'flex', alignItems:'center', gap:14, padding:'12px 14px', cursor:'pointer' }}>
                   <div style={{ width:48, height:48, borderRadius:10, background:l.images?.[0]?PAPER3:l.color||'#FFD166', display:'flex', alignItems:'center', justifyContent:'center', fontSize:24, flexShrink:0, overflow:'hidden', position:'relative' }}>
                     {l.images?.[0] ? <img src={l.images[0]} style={{ width:'100%', height:'100%', objectFit:'cover' }} alt="" /> : l.emoji||'🧸'}
                     {l.is_sold && <div style={{ position:'absolute', inset:0, background:'rgba(22,34,28,0.45)', display:'flex', alignItems:'center', justifyContent:'center', borderRadius:10 }}><span style={{ fontSize:9, fontWeight:900, color:'#fff', letterSpacing:0.3, fontFamily:FONT }}>SOLGT</span></div>}
@@ -429,7 +430,7 @@ export default function DashboardClient() {
               </div>
             ) : favListings.map(l=>(
               <div key={l.id} style={{ display:'flex', alignItems:'center', gap:14, padding:'12px 14px', border:`1px solid rgba(22,34,28,0.08)`, borderRadius:14, marginBottom:10, cursor:'pointer', transition:'border-color 0.15s', background:PAPER }}
-                onClick={()=>{ setActiveListing(l); router.push('/opslag/detail'); }}
+                onClick={()=>setQuickViewListing(l)}
                 onMouseEnter={e=>e.currentTarget.style.borderColor=GREEN_SOFT}
                 onMouseLeave={e=>e.currentTarget.style.borderColor='rgba(22,34,28,0.08)'}>
                 <div style={{ width:48, height:48, borderRadius:10, background:l.images?.[0]?PAPER3:l.color||'#FFD166', display:'flex', alignItems:'center', justifyContent:'center', fontSize:24, flexShrink:0, overflow:'hidden' }}>

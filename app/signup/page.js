@@ -187,6 +187,7 @@ export default function SignupPage() {
   const [saving, setSaving]       = useState(false);
   const [authError, setAuthError] = useState(null);
   const [needsConfirm, setNeedsConfirm] = useState(false);
+  const [alreadyExists, setAlreadyExists] = useState(false);
 
   // Live CVR search
   const [cvrQuery, setCvrQuery]       = useState('');
@@ -327,11 +328,30 @@ export default function SignupPage() {
     const err = validateStep4();
     if (err) { setAuthError(err); return; }
     setSaving(true); setAuthError(null);
+
+    // Check if email already exists in institutions table
+    const { data: existingInst } = await db.from('institutions').select('email').ilike('email', form.email.trim()).maybeSingle();
+    if (existingInst) {
+      setAuthError(`Denne e-mail er allerede tilknyttet en konto — log ind i stedet.`);
+      setAlreadyExists(true);
+      setSaving(false);
+      return;
+    }
+
     const { data, error } = await db.auth.signUp({
       email: form.email, password: form.pass,
       options: { data: { full_name: form.contact_name } }
     });
-    if (error) { setAuthError(error.message); setSaving(false); return; }
+    if (error) {
+      if (error.message?.toLowerCase().includes('already registered') || error.message?.toLowerCase().includes('already exists')) {
+        setAuthError('Denne e-mail er allerede tilknyttet en konto — log ind i stedet.');
+        setAlreadyExists(true);
+      } else {
+        setAuthError(error.message);
+      }
+      setSaving(false);
+      return;
+    }
     await db.from('institutions').insert({
       cvr: cvr.length === 8 ? cvr : null,
       pnr: cvr.length === 10 ? cvr : null,
@@ -578,13 +598,20 @@ export default function SignupPage() {
                 Det er disse oplysninger I logger ind med. Det kan være den samme person som lederen, eller en administrator.
               </div>
               <SField label="Dit fulde navn"><SInput value={form.contact_name} onChange={e => set('contact_name', e.target.value)} placeholder="Fornavn Efternavn" /></SField>
-              <SField label="E-mail (bruges til login)"><SInput value={form.email} onChange={e => set('email', e.target.value)} type="email" placeholder="din@email.dk" /></SField>
+              <SField label="E-mail (bruges til login)"><SInput value={form.email} onChange={e => { set('email', e.target.value); setAlreadyExists(false); setAuthError(null); }} type="email" placeholder="din@email.dk" /></SField>
               <SField label="Adgangskode">
                 <PasswordField value={form.pass} onChange={e => set('pass', e.target.value)} placeholder="••••••••" />
               </SField>
               {authError && (
                 <div style={{ background: '#FEF2F2', borderLeft: '3px solid #EF4444', borderRadius: 12, padding: '12px 16px', fontSize: 13, color: '#B91C1C', fontFamily: FONT }}>
                   {authError}
+                  {alreadyExists && (
+                    <div style={{ marginTop: 8 }}>
+                      <a onClick={() => router.push(`/login?email=${encodeURIComponent(form.email.trim())}`)} style={{ color: PRIMARY, fontWeight: 700, cursor: 'pointer', textDecoration: 'underline' }}>
+                        Log ind her →
+                      </a>
+                    </div>
+                  )}
                 </div>
               )}
               <div style={{ display: 'flex', gap: 10, marginTop: 4 }}>

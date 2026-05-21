@@ -29,7 +29,7 @@ async function geocodeCity(city) {
 
 export default function OpslagPage() {
   const router = useRouter();
-  const { listings, loadingListings: loading, setActiveListing, favs, toggleFav, showToast, loggedIn } = useApp();
+  const { listings, loadingListings: loading, setActiveListing, favs, toggleFav, showToast, loggedIn, setQuickViewListing } = useApp();
   const ww = useWindowWidth();
   const isMobile = ww < 640;
   const [filter, setFilter] = useState('alle');
@@ -158,8 +158,7 @@ export default function OpslagPage() {
   }
 
   function handleListingClick(l) {
-    setActiveListing(l);
-    router.push('/opslag/detail');
+    setQuickViewListing(l);
   }
 
   function goToInstitution(name) {

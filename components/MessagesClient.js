@@ -39,12 +39,16 @@ export default function MessagesClient() {
   const [swapPreview,  setSwapPreview]  = useState(null);
   const [shares,      setShares]      = useState([]);
   const [activeShare, setActiveShare] = useState(null);
+  const [draftConv,    setDraftConv]    = useState(null);
+  const [chatImages,   setChatImages]   = useState([]);
+  const [fullsizeImage,setFullsizeImage]= useState(null);
   const ww = useWindowWidth();
   const isMobile = ww < 768;
 
   const EMOJI_LIST = ['😊','😄','😂','🥰','😍','👍','👏','🙌','❤️','🎉','✅','🤔','😅','🙏','🚀','💪','🌟','😮','🤝','📦','♻️','👶','🏫','🧸','🎠','⚽'];
   const bottomRef = useRef(null);
   const inputRef  = useRef(null);
+  const fileInputRef = useRef(null);
 
   useEffect(() => {
     db.auth.getUser().then(({ data: { user } }) => {
@@ -201,10 +205,64 @@ export default function MessagesClient() {
     return () => db.removeChannel(ch);
   }, [active?.id]);
 
+  async function uploadImages(files, convId) {
+    const urls = [];
+    for (const file of files) {
+      const ext = file.name.split('.').pop() || 'jpg';
+      const path = `${convId}/${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`;
+      const { error } = await db.storage.from('chat-images').upload(path, file, { upsert: false });
+      if (!error) {
+        const { data: { publicUrl } } = db.storage.from('chat-images').getPublicUrl(path);
+        urls.push(publicUrl);
+      }
+    }
+    return urls;
+  }
+
+  async function sendDraftFirstMessage() {
+    const content = newMsg.trim();
+    const effectiveUid = realUserId || userId;
+    if ((!content && chatImages.length === 0) || !effectiveUid) return;
+    setSending(true);
+    const { senderName, target } = draftConv;
+    const { data: existing } = await db.from('conversations').select('id')
+      .eq('owner_name', target.name).ilike('initiator_name', senderName).maybeSingle();
+    let convId = existing?.id;
+    if (!convId) {
+      const { data: conv } = await db.from('conversations').insert({
+        listing_id: null, listing_title: 'Direkte besked', listing_emoji: '💬', listing_color: '#e0e7ff',
+        initiator_id: effectiveUid, initiator_name: senderName,
+        initiator_institution_id: ctxInstId || null,
+        owner_id: null, owner_name: target.name,
+        owner_institution_id: target.id || null,
+      }).select().single();
+      convId = conv?.id;
+    }
+    if (!convId) { setSending(false); return; }
+    let msgContent = content;
+    let msgType = null;
+    if (chatImages.length > 0) {
+      const urls = await uploadImages(chatImages, convId);
+      msgType = 'image';
+      msgContent = JSON.stringify({ urls, caption: content });
+      setChatImages([]);
+    }
+    const insertData = { conversation_id: convId, sender_id: effectiveUid, sender_name: senderName, content: msgContent };
+    if (msgType) insertData.message_type = msgType;
+    await db.from('chat_messages').insert(insertData);
+    const lastMsg = msgType === 'image' ? '📷 Billede' : content;
+    await db.from('conversations').update({ last_message: lastMsg, last_message_at: new Date().toISOString(), owner_unread: 1 }).eq('id', convId);
+    setNewMsg('');
+    setDraftConv(null);
+    setSelectedConvId(convId);
+    setSending(false);
+    loadConvs(effectiveUid);
+  }
+
   async function send() {
     const content = newMsg.trim();
     const effectiveUserId = realUserId || userId;
-    if (!content || !active || !effectiveUserId) return;
+    if ((!content && chatImages.length === 0) || !active || !effectiveUserId) return;
     setSending(true);
     setNewMsg('');
     const instId = ctxInstId || ctxInstitution?.id;
@@ -216,6 +274,19 @@ export default function MessagesClient() {
     const senderName = ctxIsAdmin && adminInstName
       ? adminInstName
       : (isInit ? active.initiator_name : active.owner_name);
+    if (chatImages.length > 0) {
+      const urls = await uploadImages(chatImages, active.id);
+      const imageContent = JSON.stringify({ urls, caption: content });
+      setChatImages([]);
+      await db.from('chat_messages').insert({ conversation_id: active.id, sender_id: effectiveUserId, sender_name: senderName, content: imageContent, message_type: 'image' });
+      const unreadPatch = isInit ? { owner_unread: (active.owner_unread||0)+1 } : { initiator_unread: (active.initiator_unread||0)+1 };
+      const updated = { last_message: '📷 Billede', last_message_at: new Date().toISOString(), ...unreadPatch };
+      await db.from('conversations').update(updated).eq('id', active.id);
+      setActive(a => ({ ...a, ...updated }));
+      setConvs(cs => cs.map(c => c.id === active.id ? { ...c, ...updated } : c).sort((a,b) => new Date(b.last_message_at)-new Date(a.last_message_at)));
+      setSending(false);
+      return;
+    }
     await db.from('chat_messages').insert({ conversation_id: active.id, sender_id: effectiveUserId, sender_name: senderName, content });
     const unreadPatch = isInit ? { owner_unread: (active.owner_unread||0)+1 } : { initiator_unread: (active.initiator_unread||0)+1 };
     const updated = { last_message: content, last_message_at: new Date().toISOString(), ...unreadPatch };
@@ -373,11 +444,14 @@ export default function MessagesClient() {
   );
 
   const unreadShares = shares.filter(s => !s.read).length;
-  const showList = !isMobile || (!active && !activeShare);
-  const showChat = !isMobile || !!active || !!activeShare;
+  const showList = !isMobile || (!active && !activeShare && !draftConv);
+  const showChat = !isMobile || !!active || !!activeShare || !!draftConv;
 
   return (
     <div style={{ height:'100vh', display:'flex', flexDirection:'column', paddingTop:68, background:PAPER }} className="page-enter">
+      {/* Shared hidden file input for image attachments */}
+      <input ref={fileInputRef} type="file" accept="image/*" multiple style={{ display:'none' }}
+        onChange={e=>{ if (e.target.files?.length) { setChatImages(imgs=>[...imgs,...Array.from(e.target.files)]); e.target.value=''; } }} />
       <div style={{ flex:1, display:'flex', overflow:'hidden', maxWidth:1200, width:'100%', margin:'0 auto', padding:isMobile?'8px 0 0':'16px 16px 0' }}>
 
         {/* ── Conversation list ── */}
@@ -400,7 +474,12 @@ export default function MessagesClient() {
                 {composeResults.length > 0 && !composeTarget && (
                   <div style={{ background:PAPER2, borderRadius:10, border:`1.5px solid ${PAPER3}`, marginBottom:6, maxHeight:140, overflowY:'auto' }}>
                     {composeResults.map(r => (
-                      <div key={r.id} onClick={()=>{ setComposeTarget(r); setComposeSearch(r.name); setComposeResults([]); }} style={{ padding:'10px 12px', cursor:'pointer', borderBottom:`1px solid ${PAPER3}`, fontSize:13, fontFamily:FONT }}
+                      <div key={r.id} onClick={()=>{
+                        const senderName = ctxIsAdmin && adminInstName ? adminInstName : (userEmail || 'Ukendt');
+                        setDraftConv({ target: r, senderName });
+                        setComposeOpen(false); setComposeSearch(''); setComposeResults([]); setComposeTarget(null);
+                        setActive(null); setMessages([]);
+                      }} style={{ padding:'10px 12px', cursor:'pointer', borderBottom:`1px solid ${PAPER3}`, fontSize:13, fontFamily:FONT }}
                         onMouseEnter={e=>e.currentTarget.style.background=GREEN_TINT}
                         onMouseLeave={e=>e.currentTarget.style.background=''}>
                         <strong>{r.name}</strong>{r.city ? <span style={{ color:INK3, marginLeft:6 }}>· {r.city}</span> : ''}
@@ -515,7 +594,56 @@ export default function MessagesClient() {
 
         {/* ── Chat panel ── */}
         {showChat && <div style={{ flex:1, display:'flex', flexDirection:'column', background:PAPER2, borderRadius:isMobile?0:'18px 18px 0 0', border:'1px solid rgba(22,34,28,0.08)', boxShadow:'0 1px 6px rgba(22,34,28,0.06)', overflow:'hidden' }}>
-          {!active && !activeShare ? (
+          {!active && !activeShare && draftConv ? (
+            <>
+              <div style={{ padding:'12px 16px', borderBottom:`1px solid rgba(22,34,28,0.08)`, display:'flex', alignItems:'center', gap:12, background:PAPER2 }}>
+                {isMobile && <button onClick={()=>setDraftConv(null)} style={{ background:'none', border:'none', fontSize:20, color:INK3, cursor:'pointer', padding:'4px 6px 4px 0', lineHeight:1, flexShrink:0 }}>←</button>}
+                <div style={{ width:44, height:44, borderRadius:12, background:'#e0e7ff', display:'flex', alignItems:'center', justifyContent:'center', fontSize:22, flexShrink:0 }}>💬</div>
+                <div style={{ flex:1, minWidth:0 }}>
+                  <div style={{ fontSize:11, color:INK3, fontWeight:600, marginBottom:2, fontFamily:FONT }}>Ny samtale med</div>
+                  <div style={{ fontFamily:FONT, fontWeight:800, fontSize:15, whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis', color:INK }}>{draftConv.target.name}</div>
+                  {draftConv.target.city && <div style={{ fontSize:12, color:INK3, marginTop:1, fontFamily:FONT }}>{draftConv.target.city}</div>}
+                </div>
+                <button onClick={()=>setDraftConv(null)} style={{ background:PAPER3, border:'none', borderRadius:99, padding:'6px 12px', fontSize:12, fontWeight:700, cursor:'pointer', fontFamily:FONT, color:INK3 }}>Annuller</button>
+              </div>
+              <div style={{ flex:1, display:'flex', alignItems:'center', justifyContent:'center', flexDirection:'column', background:PAPER, padding:24 }}>
+                <div style={{ width:56, height:56, borderRadius:'50%', background:GREEN_TINT, display:'flex', alignItems:'center', justifyContent:'center', marginBottom:14 }}>
+                  <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke={PRIMARY} strokeWidth="1.8" strokeLinecap="round"><path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/></svg>
+                </div>
+                <div style={{ fontFamily:FONT, fontWeight:700, fontSize:16, color:INK, marginBottom:6 }}>Start samtalen</div>
+                <div style={{ fontSize:13, color:INK3, fontFamily:FONT, textAlign:'center', maxWidth:280 }}>Skriv din første besked til <strong>{draftConv.target.name}</strong> nedenfor. Samtalen oprettes, når du sender.</div>
+              </div>
+              <div style={{ borderTop:`1px solid rgba(22,34,28,0.08)`, background:PAPER2, position:'relative' }}>
+                {chatImages.length > 0 && (
+                  <div style={{ padding:'8px 16px 0', display:'flex', gap:6, flexWrap:'wrap' }}>
+                    {chatImages.map((file, idx) => (
+                      <div key={idx} style={{ position:'relative', width:52, height:52, borderRadius:8, overflow:'hidden', border:`1.5px solid ${PAPER3}` }}>
+                        <img src={URL.createObjectURL(file)} style={{ width:'100%', height:'100%', objectFit:'cover' }} alt="" />
+                        <button onClick={()=>setChatImages(imgs=>imgs.filter((_,i)=>i!==idx))}
+                          style={{ position:'absolute', top:2, right:2, width:16, height:16, borderRadius:'50%', background:'rgba(22,34,28,0.6)', border:'none', cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center', color:'#fff', fontSize:10, lineHeight:1, padding:0 }}>✕</button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+                <div style={{ padding:'12px 16px', display:'flex', gap:8, alignItems:'flex-end' }}>
+                  <button onClick={()=>fileInputRef.current?.click()} title="Vedhæft billede"
+                    style={{ background:'none', border:'none', cursor:'pointer', padding:'8px', borderRadius:10, flexShrink:0, color:chatImages.length>0?PRIMARY:INK3, lineHeight:1, height:44, display:'flex', alignItems:'center' }}>
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
+                  </button>
+                  <textarea ref={inputRef} value={newMsg} onChange={e=>setNewMsg(e.target.value)}
+                    onKeyDown={e=>{ if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();sendDraftFirstMessage();} }}
+                    placeholder={`Skriv besked til ${draftConv.target.name}… (Enter for at sende)`} rows={1}
+                    style={{ flex:1, padding:'11px 14px', borderRadius:14, border:`1.5px solid ${PAPER3}`, fontSize:14, resize:'none', fontFamily:FONT, outline:'none', lineHeight:1.5, maxHeight:120, overflowY:'auto', background:PAPER }}
+                    onInput={e=>{ e.target.style.height='auto'; e.target.style.height=Math.min(e.target.scrollHeight,120)+'px'; }}
+                  />
+                  <button onClick={sendDraftFirstMessage} disabled={(!newMsg.trim()&&chatImages.length===0)||sending}
+                    style={{ width:44, height:44, borderRadius:14, background:(newMsg.trim()||chatImages.length>0)?PRIMARY:PAPER3, border:'none', display:'flex', alignItems:'center', justifyContent:'center', cursor:(newMsg.trim()||chatImages.length>0)?'pointer':'default', transition:'background 0.2s', flexShrink:0 }}>
+                    {sending ? <Spinner /> : <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke={(newMsg.trim()||chatImages.length>0)?'#fff':INK3} strokeWidth="2.5" strokeLinecap="round"><line x1="12" y1="19" x2="12" y2="5"/><polyline points="5 12 12 5 19 12"/></svg>}
+                  </button>
+                </div>
+              </div>
+            </>
+          ) : !active && !activeShare ? (
             <div style={{ flex:1, display:'flex', alignItems:'center', justifyContent:'center', flexDirection:'column' }}>
               <div style={{ width:64, height:64, borderRadius:'50%', background:GREEN_TINT, display:'flex', alignItems:'center', justifyContent:'center', marginBottom:16 }}>
                 <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke={GREEN_SOFT} strokeWidth="1.8" strokeLinecap="round"><path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/></svg>
@@ -605,12 +733,14 @@ export default function MessagesClient() {
                         const showDate = dateStr !== lastDate;
                         lastDate = dateStr;
                         const prevMine = i>0 && (ctxIsAdmin && adminInstName ? messages[i-1].sender_name === adminInstName : messages[i-1].sender_id === userId);
-                        const grouped = mine === prevMine && !showDate && m.message_type !== 'bid' && messages[i-1]?.message_type !== 'bid' && m.message_type !== 'swap' && messages[i-1]?.message_type !== 'swap' && m.message_type !== 'bundle' && messages[i-1]?.message_type !== 'bundle';
+                        const grouped = mine === prevMine && !showDate && m.message_type !== 'bid' && messages[i-1]?.message_type !== 'bid' && m.message_type !== 'swap' && messages[i-1]?.message_type !== 'swap' && m.message_type !== 'bundle' && messages[i-1]?.message_type !== 'bundle' && m.message_type !== 'image' && messages[i-1]?.message_type !== 'image';
                         const isBid = m.message_type === 'bid';
                         const isSwap = m.message_type === 'swap';
                         const isBundle = m.message_type === 'bundle';
+                        const isImage = m.message_type === 'image';
                         const bundleData = isBundle ? (() => { try { return JSON.parse(m.content); } catch { return null; } })() : null;
                         const swapData = isSwap ? (() => { try { return JSON.parse(m.content); } catch { return null; } })() : null;
+                        const imageData = isImage ? (() => { try { return JSON.parse(m.content); } catch { return null; } })() : null;
                         return (
                           <React.Fragment key={m.id}>
                             {showDate && <div style={{ textAlign:'center', margin:'12px 0 4px', fontSize:11, fontWeight:600, color:INK3, letterSpacing:0.5, fontFamily:FONT }}>{dateStr}</div>}
@@ -732,6 +862,25 @@ export default function MessagesClient() {
                                   <div style={{ fontSize:10, color:INK3, marginTop:3, textAlign:mine?'right':'left', fontFamily:FONT }}>{d.toLocaleTimeString('da-DK',{hour:'2-digit',minute:'2-digit'})}</div>
                                 </div>
                               </div>
+                            ) : isImage && imageData ? (
+                              <div style={{ display:'flex', justifyContent:mine?'flex-end':'flex-start', marginTop:10 }}>
+                                {!mine && <div style={{ width:30, height:30, borderRadius:'50%', background:GREEN_TINT, display:'flex', alignItems:'center', justifyContent:'center', fontSize:12, fontWeight:700, color:PRIMARY, flexShrink:0, marginRight:8, alignSelf:'flex-end', fontFamily:FONT }}>{m.sender_name.charAt(0).toUpperCase()}</div>}
+                                <div style={{ maxWidth:'68%' }}>
+                                  {!mine && <div style={{ fontSize:11, fontWeight:700, color:INK3, marginBottom:3, marginLeft:2, fontFamily:FONT }}>{m.sender_name}</div>}
+                                  <div style={{ borderRadius:16, overflow:'hidden', border:`1px solid rgba(22,34,28,0.1)` }}>
+                                    <div style={{ display:'grid', gridTemplateColumns:imageData.urls?.length > 1 ? 'repeat(2, 1fr)' : '1fr', gap:2 }}>
+                                      {(imageData.urls || []).map((url, idx) => (
+                                        <img key={idx} src={url} onClick={()=>setFullsizeImage(url)}
+                                          style={{ width:'100%', aspectRatio:'1/1', objectFit:'cover', cursor:'pointer', display:'block', maxWidth:220 }} alt="" />
+                                      ))}
+                                    </div>
+                                    {imageData.caption && (
+                                      <div style={{ background:mine?PRIMARY:PAPER3, color:mine?'#fff':INK, padding:'8px 12px', fontSize:14, lineHeight:1.5, fontFamily:FONT }}>{imageData.caption}</div>
+                                    )}
+                                  </div>
+                                  <div style={{ fontSize:10, color:INK3, marginTop:3, textAlign:mine?'right':'left', fontFamily:FONT }}>{d.toLocaleTimeString('da-DK',{hour:'2-digit',minute:'2-digit'})}</div>
+                                </div>
+                              </div>
                             ) : (
                               <div style={{ display:'flex', justifyContent:mine?'flex-end':'flex-start', marginTop:grouped?2:10 }}>
                                 {!mine && !grouped && <div style={{ width:30, height:30, borderRadius:'50%', background:GREEN_TINT, display:'flex', alignItems:'center', justifyContent:'center', fontSize:12, fontWeight:700, color:PRIMARY, flexShrink:0, marginRight:8, alignSelf:'flex-end', fontFamily:FONT }}>{m.sender_name.charAt(0).toUpperCase()}</div>}
@@ -786,16 +935,31 @@ export default function MessagesClient() {
                     ))}
                   </div>
                 )}
+                {chatImages.length > 0 && (
+                  <div style={{ padding:'8px 16px 0', display:'flex', gap:6, flexWrap:'wrap' }}>
+                    {chatImages.map((file, idx) => (
+                      <div key={idx} style={{ position:'relative', width:52, height:52, borderRadius:8, overflow:'hidden', border:`1.5px solid ${PAPER3}` }}>
+                        <img src={URL.createObjectURL(file)} style={{ width:'100%', height:'100%', objectFit:'cover' }} alt="" />
+                        <button onClick={()=>setChatImages(imgs=>imgs.filter((_,i)=>i!==idx))}
+                          style={{ position:'absolute', top:2, right:2, width:16, height:16, borderRadius:'50%', background:'rgba(22,34,28,0.6)', border:'none', cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center', color:'#fff', fontSize:10, lineHeight:1, padding:0 }}>✕</button>
+                      </div>
+                    ))}
+                  </div>
+                )}
                 <div style={{ padding:'12px 16px', display:'flex', gap:8, alignItems:'flex-end' }}>
                   <button onClick={()=>setEmojiOpen(v=>!v)} style={{ background:'none', border:'none', fontSize:20, cursor:'pointer', padding:'8px', borderRadius:10, flexShrink:0, color:INK3, lineHeight:1, height:44, display:'flex', alignItems:'center' }}>😊</button>
+                  <button onClick={()=>fileInputRef.current?.click()} title="Vedhæft billede"
+                    style={{ background:'none', border:'none', cursor:'pointer', padding:'8px', borderRadius:10, flexShrink:0, color:chatImages.length>0?PRIMARY:INK3, lineHeight:1, height:44, display:'flex', alignItems:'center' }}>
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
+                  </button>
                   <textarea ref={inputRef} value={newMsg} onChange={e=>setNewMsg(e.target.value)} onKeyDown={onKey}
                     placeholder="Skriv en besked… (Enter for at sende)" rows={1}
                     style={{ flex:1, padding:'11px 14px', borderRadius:14, border:`1.5px solid ${PAPER3}`, fontSize:14, resize:'none', fontFamily:FONT, outline:'none', lineHeight:1.5, maxHeight:120, overflowY:'auto', background:PAPER }}
                     onInput={e=>{ e.target.style.height='auto'; e.target.style.height=Math.min(e.target.scrollHeight,120)+'px'; }}
                   />
-                  <button onClick={send} disabled={!newMsg.trim()||sending}
-                    style={{ width:44, height:44, borderRadius:14, background:newMsg.trim()?PRIMARY:PAPER3, border:'none', display:'flex', alignItems:'center', justifyContent:'center', cursor:newMsg.trim()?'pointer':'default', transition:'background 0.2s', flexShrink:0 }}>
-                    {sending ? <Spinner /> : <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke={newMsg.trim()?'#fff':INK3} strokeWidth="2.5" strokeLinecap="round"><line x1="12" y1="19" x2="12" y2="5"/><polyline points="5 12 12 5 19 12"/></svg>}
+                  <button onClick={send} disabled={(!newMsg.trim()&&chatImages.length===0)||sending}
+                    style={{ width:44, height:44, borderRadius:14, background:(newMsg.trim()||chatImages.length>0)?PRIMARY:PAPER3, border:'none', display:'flex', alignItems:'center', justifyContent:'center', cursor:(newMsg.trim()||chatImages.length>0)?'pointer':'default', transition:'background 0.2s', flexShrink:0 }}>
+                    {sending ? <Spinner /> : <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke={(newMsg.trim()||chatImages.length>0)?'#fff':INK3} strokeWidth="2.5" strokeLinecap="round"><line x1="12" y1="19" x2="12" y2="5"/><polyline points="5 12 12 5 19 12"/></svg>}
                   </button>
                 </div>
               </div>
@@ -826,6 +990,14 @@ export default function MessagesClient() {
               Se fuldt opslag →
             </button>
           </div>
+        </div>
+      )}
+
+      {/* Fullsize image modal */}
+      {fullsizeImage && (
+        <div onClick={()=>setFullsizeImage(null)} style={{ position:'fixed', inset:0, background:'rgba(22,34,28,0.88)', zIndex:3000, display:'flex', alignItems:'center', justifyContent:'center', padding:16 }}>
+          <button onClick={()=>setFullsizeImage(null)} style={{ position:'absolute', top:16, right:16, background:'rgba(255,255,255,0.15)', border:'none', borderRadius:99, width:36, height:36, fontSize:18, cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center', color:'#fff' }}>✕</button>
+          <img src={fullsizeImage} onClick={e=>e.stopPropagation()} style={{ maxWidth:'100%', maxHeight:'90vh', borderRadius:12, objectFit:'contain', boxShadow:'0 8px 40px rgba(0,0,0,0.5)' }} alt="" />
         </div>
       )}
     </div>

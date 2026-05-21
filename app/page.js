@@ -195,7 +195,7 @@ function TradeTypesStrip() {
 /* ── Listings preview ─────────────────────────────────────── */
 function ListingsPreview({ listings, loading, goToInstitution }) {
   const router = useRouter();
-  const { setActiveListing, favs, toggleFav } = useApp();
+  const { setActiveListing, favs, toggleFav, setQuickViewListing } = useApp();
   const [filter, setFilter] = useState('alle');
   const w = useWindowWidth();
   const isMobile = w < 640;
@@ -250,7 +250,7 @@ function ListingsPreview({ listings, loading, goToInstitution }) {
             ? [1,2,3,4].map(i => <SkeletonCard key={i} />)
             : shown.map(l => (
                 <ListingCard key={l.id} listing={l} favs={favs} toggleFav={toggleFav}
-                  onClick={() => { setActiveListing(l); router.push('/opslag/detail'); }}
+                  onClick={() => setQuickViewListing(l)}
                   onInstitutionClick={goToInstitution}
                 />
               ))

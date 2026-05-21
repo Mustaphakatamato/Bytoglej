@@ -3,6 +3,7 @@ import React, { createContext, useContext, useState, useEffect, useCallback } fr
 import { db } from '@/lib/supabase';
 import { ADMIN_EMAIL } from '@/lib/constants';
 import { useFavs } from '@/lib/hooks';
+import QuickViewModal from '@/components/QuickViewModal';
 
 // ─── Active User Context ──────────────────────────────────────────────────────
 export const ActiveUserContext = createContext({
@@ -27,6 +28,7 @@ export function AppProvider({ children }) {
   const [realEmail,       setRealEmail]       = useState(null);
   const [unreadTotal,     setUnreadTotal]     = useState(0);
   const [toast,           setToast]           = useState(null);
+  const [quickViewListing, setQuickViewListing] = useState(null);
   const [activeListing,   setActiveListing]   = useState(null);
   const [selectedConvId,  setSelectedConvId]  = useState(null);
   const [activeInstName,  setActiveInstName]  = useState(null);
@@ -139,12 +141,14 @@ export function AppProvider({ children }) {
     activeInstName, setActiveInstName,
     favs, toggleFav,
     effectiveInstitution,
+    quickViewListing, setQuickViewListing,
   };
 
   return (
     <ActiveUserContext.Provider value={activeUserValue}>
       <AppContext.Provider value={appValue}>
         {children}
+        {quickViewListing && <QuickViewModal listing={quickViewListing} onClose={()=>setQuickViewListing(null)} />}
       </AppContext.Provider>
     </ActiveUserContext.Provider>
   );
