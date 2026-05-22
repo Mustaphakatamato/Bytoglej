@@ -8,6 +8,108 @@ import { useApp, useActiveUser } from '@/providers/AppProvider';
 import { Badge, Btn, Spinner } from '@/components/ui';
 
 const FONT = "'Sora', sans-serif";
+const INK2 = '#3A473D';
+const ADMIN_EMAIL = 'mustaphakatamato@live.dk';
+
+function LoginInline({ onLogin }) {
+  const router = useRouter();
+  const { setLoggedIn } = useApp();
+  const [step,     setStep]     = useState('email');
+  const [email,    setEmail]    = useState('');
+  const [pass,     setPass]     = useState('');
+  const [checking, setChecking] = useState(false);
+  const [loading,  setLoading]  = useState(false);
+  const [error,    setError]    = useState(null);
+  const [showPass, setShowPass] = useState(false);
+  const passRef = useRef(null);
+
+  useEffect(() => {
+    if (step === 'password') setTimeout(() => passRef.current?.focus(), 80);
+  }, [step]);
+
+  async function handleEmail(e) {
+    e.preventDefault();
+    if (!email.trim()) return;
+    setChecking(true); setError(null);
+    const emailLower = email.trim().toLowerCase();
+    const [{ data: inst }, { data: member }] = await Promise.all([
+      db.from('institutions').select('email').ilike('email', emailLower).maybeSingle(),
+      db.from('institution_members').select('email').ilike('email', emailLower).maybeSingle(),
+    ]);
+    setChecking(false);
+    if (inst || member) { setStep('password'); }
+    else { router.push('/signup?email=' + encodeURIComponent(email.trim())); }
+  }
+
+  async function handleLogin(e) {
+    e.preventDefault();
+    setLoading(true); setError(null);
+    const { error } = await db.auth.signInWithPassword({ email, password: pass });
+    setLoading(false);
+    if (error) { setError('Forkert adgangskode — prøv igen'); return; }
+    setLoggedIn(true);
+    if (email.trim().toLowerCase() === ADMIN_EMAIL.toLowerCase()) { router.push('/admin'); return; }
+    onLogin?.();
+  }
+
+  const inp = { width:'100%', padding:'13px 14px', borderRadius:12, border:`1.5px solid ${PAPER3}`, background:PAPER2, fontSize:15, fontFamily:FONT, color:INK, outline:'none', boxSizing:'border-box' };
+
+  return (
+    <div style={{ width:'100%', maxWidth:380 }}>
+      <div style={{ width:64, height:64, borderRadius:'50%', background:GREEN_TINT, display:'flex', alignItems:'center', justifyContent:'center', margin:'0 auto 20px' }}>
+        <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke={PRIMARY} strokeWidth="1.8" strokeLinecap="round"><path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/></svg>
+      </div>
+
+      {step === 'email' && (
+        <>
+          <h2 style={{ fontFamily:FONT, fontWeight:800, fontSize:24, color:INK, letterSpacing:'-0.03em', marginBottom:6, textAlign:'center' }}>Log ind eller tilmeld dig</h2>
+          <p style={{ fontFamily:FONT, fontSize:14, color:INK3, marginBottom:28, textAlign:'center' }}>Skriv din e-mail for at komme i gang</p>
+          <form onSubmit={handleEmail} style={{ display:'flex', flexDirection:'column', gap:12 }}>
+            <div>
+              <label style={{ display:'block', fontFamily:FONT, fontWeight:700, fontSize:13, color:INK2, marginBottom:6 }}>E-mail</label>
+              <input type="email" value={email} onChange={e=>{setEmail(e.target.value);setError(null);}} placeholder="navn@institution.dk" autoFocus required style={inp} />
+            </div>
+            {error && <div style={{ background:'#FEF2F2', borderLeft:'3px solid #EF4444', borderRadius:12, padding:'12px 16px', fontSize:13, color:'#B91C1C', fontFamily:FONT }}>{error}</div>}
+            <button type="submit" disabled={checking||!email.trim()} style={{ width:'100%', padding:'14px', borderRadius:99, background:PRIMARY, color:'#fff', border:'none', fontFamily:FONT, fontWeight:700, fontSize:15, cursor:(checking||!email.trim())?'not-allowed':'pointer', opacity:(checking||!email.trim())?0.6:1, display:'flex', alignItems:'center', justifyContent:'center', gap:8 }}>
+              {checking ? <><Spinner />Tjekker…</> : 'Fortsæt →'}
+            </button>
+          </form>
+        </>
+      )}
+
+      {step === 'password' && (
+        <>
+          <button onClick={()=>{setStep('email');setPass('');setError(null);}} style={{ background:'none', border:'none', cursor:'pointer', color:INK3, fontFamily:FONT, fontSize:13, fontWeight:600, padding:'0 0 16px', display:'flex', alignItems:'center', gap:6 }}>
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><line x1="19" y1="12" x2="5" y2="12"/><polyline points="12 19 5 12 12 5"/></svg>
+            Skift e-mail
+          </button>
+          <h2 style={{ fontFamily:FONT, fontWeight:800, fontSize:24, color:INK, letterSpacing:'-0.03em', marginBottom:6 }}>Velkommen tilbage</h2>
+          <p style={{ fontFamily:FONT, fontSize:14, color:INK3, marginBottom:24 }}>Adgangskode til <strong style={{ color:INK }}>{email}</strong></p>
+          <form onSubmit={handleLogin} style={{ display:'flex', flexDirection:'column', gap:12 }}>
+            <div>
+              <label style={{ display:'block', fontFamily:FONT, fontWeight:700, fontSize:13, color:INK2, marginBottom:6 }}>Adgangskode</label>
+              <div style={{ position:'relative' }}>
+                <input ref={passRef} type={showPass?'text':'password'} value={pass} onChange={e=>{setPass(e.target.value);setError(null);}} placeholder="••••••••" required style={{ ...inp, paddingRight:46 }} />
+                <button type="button" onClick={()=>setShowPass(v=>!v)} style={{ position:'absolute', right:12, top:'50%', transform:'translateY(-50%)', background:'none', border:'none', cursor:'pointer', color:INK3, padding:0, display:'flex', alignItems:'center' }}>
+                  <svg width={18} height={18} viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth={1.6} strokeLinecap="round" strokeLinejoin="round">
+                    {showPass ? <><path d="M1 10s3.5-6 9-6 9 6 9 6-3.5 6-9 6-9-6-9-6z"/><circle cx="10" cy="10" r="2.5"/><line x1="3" y1="3" x2="17" y2="17"/></> : <><path d="M1 10s3.5-6 9-6 9 6 9 6-3.5 6-9 6-9-6-9-6z"/><circle cx="10" cy="10" r="2.5"/></>}
+                  </svg>
+                </button>
+              </div>
+              <div style={{ textAlign:'right', marginTop:8 }}>
+                <span onClick={()=>router.push('/glemt-adgangskode')} style={{ fontFamily:FONT, fontWeight:600, fontSize:12, color:PRIMARY, cursor:'pointer' }}>Glemt adgangskode?</span>
+              </div>
+            </div>
+            {error && <div style={{ background:'#FEF2F2', borderLeft:'3px solid #EF4444', borderRadius:12, padding:'12px 16px', fontSize:13, color:'#B91C1C', fontFamily:FONT }}>{error}</div>}
+            <button type="submit" disabled={loading||!pass} style={{ width:'100%', padding:'14px', borderRadius:99, background:PRIMARY, color:'#fff', border:'none', fontFamily:FONT, fontWeight:700, fontSize:15, cursor:(loading||!pass)?'not-allowed':'pointer', opacity:(loading||!pass)?0.6:1, display:'flex', alignItems:'center', justifyContent:'center', gap:8 }}>
+              {loading ? <><Spinner />Logger ind…</> : 'Log ind →'}
+            </button>
+          </form>
+        </>
+      )}
+    </div>
+  );
+}
 
 export default function MessagesClient() {
   const router = useRouter();
@@ -473,14 +575,8 @@ export default function MessagesClient() {
   const totalUnread = convs.filter(c => !isArchived(c)).reduce((s,c) => s + myUnread(c), 0);
 
   if (!userId) return (
-    <div style={{ minHeight:'100vh', display:'flex', alignItems:'center', justifyContent:'center', paddingTop:80, background:PAPER }} className="page-enter">
-      <div style={{ textAlign:'center' }}>
-        <div style={{ width:72, height:72, borderRadius:'50%', background:GREEN_TINT, display:'flex', alignItems:'center', justifyContent:'center', margin:'0 auto 20px' }}>
-          <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke={PRIMARY} strokeWidth="1.8" strokeLinecap="round"><path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/></svg>
-        </div>
-        <h2 style={{ fontFamily:FONT, fontWeight:800, fontSize:22, marginBottom:8, color:INK }}>Log ind for at se dine beskeder</h2>
-        <Btn variant="primary" color={PRIMARY} radius={22} onClick={()=>router.push('/login')} style={{ marginTop:16, padding:'13px 32px', fontSize:15 }}>Log ind</Btn>
-      </div>
+    <div style={{ minHeight:'100vh', display:'flex', alignItems:'center', justifyContent:'center', padding:'80px 24px 48px', background:PAPER }} className="page-enter">
+      <LoginInline onLogin={() => window.location.reload()} />
     </div>
   );
 
