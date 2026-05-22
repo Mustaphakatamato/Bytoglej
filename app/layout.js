@@ -15,6 +15,11 @@ export default function RootLayout({ children }) {
     <html lang="da">
       <head>
         <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover" />
+        {/* Inline splash CSS — must be here so it applies before any external stylesheet loads */}
+        <style dangerouslySetInnerHTML={{ __html: `
+          #__splash{position:fixed;inset:0;z-index:9999;background:#133F2B;display:flex;align-items:center;justify-content:center;flex-direction:column;gap:20px;animation:splashHide 0.35s ease-out 0.9s forwards}
+          @keyframes splashHide{from{opacity:1}to{opacity:0;visibility:hidden}}
+        `}} />
 
         {/* PWA manifest & theme */}
         <link rel="manifest" href="/manifest.json" />
