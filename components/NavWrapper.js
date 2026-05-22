@@ -371,6 +371,7 @@ function Nav({ pathname, navigate, loggedIn, setLoggedIn, unreadTotal, instituti
   const [scrolled,  setScrolled]  = useState(false);
   const [menuOpen,  setMenuOpen]  = useState(false);
   const [searchOpen,setSearchOpen]= useState(false);
+  const [profileOpen, setProfileOpen] = useState(false);
   const w = useWindowWidth();
   const isMobile = w < 768;
 
@@ -448,11 +449,39 @@ function Nav({ pathname, navigate, loggedIn, setLoggedIn, unreadTotal, instituti
                 <Link href="/opret-opslag" style={{ background:PRIMARY, color:'#fff', fontWeight:700, fontSize:13, padding:'8px 18px', borderRadius:22, textDecoration:'none', display:'inline-flex', alignItems:'center' }}>
                   + Opret opslag
                 </Link>
-                <button onClick={async()=>{ await db.auth.signOut(); setLoggedIn(false); go('/'); }} title="Log ud" style={{ width:36, height:36, borderRadius:'50%', background:PRIMARY, display:'flex', alignItems:'center', justifyContent:'center', color:'#fff', fontWeight:800, fontSize:13, cursor:'pointer', overflow:'hidden', flexShrink:0, border:`2px solid ${PRIMARY}` }}>
-                  {institution?.logo_url
-                    ? <img src={institution.logo_url} alt="logo" style={{ width:'100%', height:'100%', objectFit:'cover' }} />
-                    : <span>{institution?.name?.charAt(0)?.toUpperCase() || '?'}</span>}
-                </button>
+                <div style={{ position:'relative', flexShrink:0 }} onMouseEnter={()=>setProfileOpen(true)} onMouseLeave={()=>setProfileOpen(false)}>
+                  <button style={{ width:36, height:36, borderRadius:'50%', background:PRIMARY, display:'flex', alignItems:'center', justifyContent:'center', color:'#fff', fontWeight:800, fontSize:13, cursor:'pointer', overflow:'hidden', border:`2px solid ${profileOpen?'#fff':PRIMARY}`, outline:'none', transition:'border-color 0.15s', boxShadow: profileOpen?`0 0 0 3px ${PRIMARY}40`:'none' }}>
+                    {institution?.logo_url
+                      ? <img src={institution.logo_url} alt="logo" style={{ width:'100%', height:'100%', objectFit:'cover' }} />
+                      : <span>{institution?.name?.charAt(0)?.toUpperCase() || '?'}</span>}
+                  </button>
+                  {profileOpen && (
+                    <div style={{ position:'absolute', top:'calc(100% + 8px)', right:0, background:'#fff', borderRadius:14, boxShadow:'0 8px 32px rgba(22,34,28,0.14)', border:`1px solid ${PAPER2}`, minWidth:200, overflow:'hidden', zIndex:600 }}>
+                      {institution && (
+                        <div style={{ padding:'12px 14px', borderBottom:`1px solid ${PAPER2}` }}>
+                          <div style={{ fontFamily:FONT, fontWeight:700, fontSize:13, color:INK }}>{institution.name}</div>
+                          {institution.city && <div style={{ fontFamily:FONT, fontSize:11, color:INK3, marginTop:2 }}>{institution.city}</div>}
+                        </div>
+                      )}
+                      <Link href="/dashboard" style={{ display:'flex', alignItems:'center', gap:9, padding:'11px 14px', fontSize:13, fontWeight:600, color:INK2, textDecoration:'none', borderBottom:`1px solid ${PAPER2}`, fontFamily:FONT }}
+                        onMouseEnter={e=>e.currentTarget.style.background=GREEN_TINT} onMouseLeave={e=>e.currentTarget.style.background='transparent'}>
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/></svg>
+                        Mit dashboard
+                      </Link>
+                      <Link href="/profil" style={{ display:'flex', alignItems:'center', gap:9, padding:'11px 14px', fontSize:13, fontWeight:600, color:INK2, textDecoration:'none', borderBottom:`1px solid ${PAPER2}`, fontFamily:FONT }}
+                        onMouseEnter={e=>e.currentTarget.style.background=GREEN_TINT} onMouseLeave={e=>e.currentTarget.style.background='transparent'}>
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+                        Min profil
+                      </Link>
+                      <button onClick={async()=>{ await db.auth.signOut(); setLoggedIn(false); setProfileOpen(false); go('/'); }}
+                        style={{ width:'100%', display:'flex', alignItems:'center', gap:9, padding:'11px 14px', fontSize:13, fontWeight:700, color:'#DC2626', background:'transparent', border:'none', cursor:'pointer', fontFamily:FONT, textAlign:'left' }}
+                        onMouseEnter={e=>e.currentTarget.style.background='#FEF2F2'} onMouseLeave={e=>e.currentTarget.style.background='transparent'}>
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+                        Log ud
+                      </button>
+                    </div>
+                  )}
+                </div>
               </>
             ) : (
               <>
