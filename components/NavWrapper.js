@@ -50,11 +50,69 @@ export default function NavWrapper() {
 
 function ToastDisplay({ msg, type='success', onDone }) {
   useEffect(() => { const t = setTimeout(onDone, 3200); return () => clearTimeout(t); }, []);
+  const w = useWindowWidth();
+  const isMobile = w < 768;
   const icon = type==='success' ? '✅' : type==='error' ? '❌' : 'ℹ️';
+  const bottomOffset = isMobile ? 'calc(72px + max(16px, env(safe-area-inset-bottom, 16px)))' : 'max(32px, env(safe-area-inset-bottom, 32px))';
   return (
-    <div style={{ position:'fixed', bottom:'max(32px, env(safe-area-inset-bottom, 32px))', left:'50%', transform:'translateX(-50%)', background:'#1c1a17', color:'#fff', borderRadius:99, padding:'13px 26px', fontWeight:700, fontSize:14, fontFamily:FONT, zIndex:2000, boxShadow:'0 10px 40px rgba(0,0,0,0.35)', display:'flex', alignItems:'center', gap:10, whiteSpace:'nowrap', animation:'slideUp 0.3s ease', maxWidth:'calc(100vw - 32px)' }}>
+    <div style={{ position:'fixed', bottom:bottomOffset, left:'50%', transform:'translateX(-50%)', background:'#1c1a17', color:'#fff', borderRadius:99, padding:'13px 26px', fontWeight:700, fontSize:14, fontFamily:FONT, zIndex:2000, boxShadow:'0 10px 40px rgba(0,0,0,0.35)', display:'flex', alignItems:'center', gap:10, whiteSpace:'nowrap', animation:'slideUp 0.3s ease', maxWidth:'calc(100vw - 32px)' }}>
       <span style={{ fontSize:18 }}>{icon}</span> {msg}
     </div>
+  );
+}
+
+function BottomNav({ pathname, navigate, loggedIn, unreadTotal }) {
+  const isHome     = pathname === '/' || pathname?.startsWith('/opslag');
+  const isOpret    = pathname?.startsWith('/opret-opslag');
+  const isBeskeder = pathname?.startsWith('/beskeder');
+  const isProfile  = pathname?.startsWith('/dashboard') || pathname?.startsWith('/profil');
+
+  function tab(label, active, onClick, children) {
+    return (
+      <button onClick={onClick} style={{ flex:1, display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center', gap:3, padding:'8px 0 6px', background:'none', border:'none', cursor:'pointer', color: active ? PRIMARY : INK3, WebkitTapHighlightColor:'transparent' }}>
+        {children}
+        <span style={{ fontSize:10, fontWeight: active ? 700 : 500, fontFamily:FONT, lineHeight:1 }}>{label}</span>
+      </button>
+    );
+  }
+
+  return (
+    <nav style={{ position:'fixed', bottom:0, left:0, right:0, zIndex:900, background:PAPER, borderTop:`1px solid ${PAPER2}`, paddingBottom:'env(safe-area-inset-bottom, 0px)', display:'flex', alignItems:'stretch', boxShadow:'0 -2px 12px rgba(22,34,28,0.07)' }}>
+
+      {/* Hjem */}
+      {tab('Hjem', isHome, () => navigate('/opslag'),
+        <svg width="22" height="22" viewBox="0 0 24 24" fill={isHome ? PRIMARY : 'none'} stroke={isHome ? PRIMARY : INK3} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <path d="M3 9.5L12 3l9 6.5V20a1 1 0 01-1 1H4a1 1 0 01-1-1V9.5z"/>
+          <path d="M9 21V12h6v9"/>
+        </svg>
+      )}
+
+      {/* Opret — elevated green circle */}
+      <button onClick={() => navigate('/opret-opslag')} style={{ flex:1, display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'flex-end', paddingBottom:6, background:'none', border:'none', cursor:'pointer', WebkitTapHighlightColor:'transparent' }}>
+        <div style={{ width:52, height:52, borderRadius:'50%', background:PRIMARY, display:'flex', alignItems:'center', justifyContent:'center', marginBottom:2, marginTop:-20, boxShadow:`0 4px 18px rgba(42,125,79,0.45)`, border:`3px solid ${PAPER}`, transform: isOpret ? 'scale(0.93)' : 'scale(1)', transition:'transform 0.15s' }}>
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2.5" strokeLinecap="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+        </div>
+        <span style={{ fontSize:10, fontWeight:700, fontFamily:FONT, color: isOpret ? PRIMARY : INK3, lineHeight:1 }}>Opret</span>
+      </button>
+
+      {/* Beskeder */}
+      {tab('Beskeder', isBeskeder, () => navigate('/beskeder'),
+        <div style={{ position:'relative' }}>
+          <svg width="22" height="22" viewBox="0 0 24 24" fill={isBeskeder ? PRIMARY : 'none'} stroke={isBeskeder ? PRIMARY : INK3} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/>
+          </svg>
+          {unreadTotal > 0 && <span style={{ position:'absolute', top:-4, right:-6, background:'#EF476F', color:'#fff', borderRadius:99, fontSize:9, fontWeight:800, minWidth:15, height:15, display:'flex', alignItems:'center', justifyContent:'center', padding:'0 3px', lineHeight:1 }}>{unreadTotal > 9 ? '9+' : unreadTotal}</span>}
+        </div>
+      )}
+
+      {/* Profil */}
+      {tab('Profil', isProfile, () => navigate(loggedIn ? '/dashboard' : '/login'),
+        <svg width="22" height="22" viewBox="0 0 24 24" fill={isProfile ? PRIMARY : 'none'} stroke={isProfile ? PRIMARY : INK3} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2"/>
+          <circle cx="12" cy="7" r="4"/>
+        </svg>
+      )}
+    </nav>
   );
 }
 
@@ -495,21 +553,9 @@ function Nav({ pathname, navigate, loggedIn, setLoggedIn, unreadTotal, instituti
           </div>
         )}
 
-        {/* Mobile right: messages + hamburger */}
-        {isMobile && (
-          <div style={{ display:'flex', alignItems:'center', gap:6, flexShrink:0 }}>
-            {loggedIn && (
-              <Link href="/beskeder" style={{ position:'relative', display:'inline-flex', padding:6, textDecoration:'none', color:transparent?'#fff':INK2 }}>
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
-                {unreadTotal > 0 && <span style={{ position:'absolute', top:2, right:2, background:'#EF476F', color:'#fff', borderRadius:99, fontSize:10, fontWeight:800, minWidth:16, height:16, display:'flex', alignItems:'center', justifyContent:'center', padding:'0 3px', lineHeight:1 }}>{unreadTotal > 9 ? '9+' : unreadTotal}</span>}
-              </Link>
-            )}
-            <button onClick={()=>setMenuOpen(v=>!v)} style={{ background:'none', border:'none', cursor:'pointer', padding:'6px 4px', display:'flex', flexDirection:'column', gap:5, alignItems:'center', justifyContent:'center', width:36, height:36 }}>
-              <div style={{ width:22, height:2.5, background:transparent&&!menuOpen?'#fff':'#333', borderRadius:2, transition:'transform 0.2s, opacity 0.2s', transform:menuOpen?'rotate(45deg) translate(5px,5px)':'none' }} />
-              <div style={{ width:22, height:2.5, background:transparent&&!menuOpen?'#fff':'#333', borderRadius:2, opacity:menuOpen?0:1, transition:'opacity 0.2s' }} />
-              <div style={{ width:22, height:2.5, background:transparent&&!menuOpen?'#fff':'#333', borderRadius:2, transition:'transform 0.2s, opacity 0.2s', transform:menuOpen?'rotate(-45deg) translate(5px,-5px)':'none' }} />
-            </button>
-          </div>
+        {/* Mobile right: login button if not logged in */}
+        {isMobile && !loggedIn && (
+          <Link href="/login" style={{ background:PRIMARY, color:'#fff', fontWeight:700, fontSize:12, padding:'7px 14px', borderRadius:22, textDecoration:'none', flexShrink:0 }}>Log ind</Link>
         )}
       </div>
 
@@ -525,37 +571,8 @@ function Nav({ pathname, navigate, loggedIn, setLoggedIn, unreadTotal, instituti
       {/* Category strip */}
       {showCategoryStrip && <CategoryStrip router={router} />}
 
-      {/* Mobile menu */}
-      {isMobile && menuOpen && (
-        <div style={{ background:'rgba(246,242,234,0.99)', borderTop:`1px solid #ECE6DA`, padding:'8px 16px 20px', animation:'slideDown 0.2s ease' }}>
-          {/* Categories quick links */}
-          <div style={{ marginBottom:8 }}>
-            <div style={{ fontSize:11, fontWeight:700, color:INK3, letterSpacing:'0.06em', textTransform:'uppercase', padding:'10px 4px 8px', fontFamily:FONT }}>Kategorier</div>
-            <div style={{ display:'flex', flexWrap:'wrap', gap:6 }}>
-              {CATEGORIES.map(cat => (
-                <Link key={cat.key} href={`/opslag?category=${cat.key}`} style={{ display:'inline-flex', alignItems:'center', gap:4, padding:'5px 12px', borderRadius:99, background:PAPER2, color:INK2, fontSize:12, fontWeight:600, textDecoration:'none', fontFamily:FONT }}>
-                  {cat.emoji} {cat.label}
-                </Link>
-              ))}
-            </div>
-          </div>
-          <div style={{ borderTop:`1px solid ${PAPER2}`, marginTop:8 }}>
-            {loggedIn ? <>
-              <Link href="/dashboard" style={{ display:'block', borderBottom:`1px solid ${PAPER2}`, padding:'14px 4px', fontSize:15, fontWeight:600, color:INK, textDecoration:'none', fontFamily:FONT }}>🏢 Min institution</Link>
-              <Link href="/opret-opslag" style={{ display:'block', borderBottom:`1px solid ${PAPER2}`, padding:'14px 4px', fontSize:15, fontWeight:700, color:PRIMARY, textDecoration:'none', fontFamily:FONT }}>+ Opret opslag</Link>
-              {isAdmin && (
-                <Link href="/admin" style={{ display:'block', borderBottom:`1px solid ${PAPER2}`, padding:'14px 4px', fontSize:15, fontWeight:700, color:PRIMARY, textDecoration:'none', fontFamily:FONT }}>⚙️ Admin</Link>
-              )}
-              <button onClick={async()=>{ await db.auth.signOut(); setLoggedIn(false); go('/'); }} style={{ marginTop:12, width:'100%', background:PAPER2, border:'none', borderRadius:12, padding:'13px', fontSize:14, fontWeight:700, color:INK2, cursor:'pointer', fontFamily:FONT }}>Log ud</button>
-            </> : (
-              <div style={{ display:'flex', flexDirection:'column', gap:10, marginTop:12 }}>
-                <Link href="/login" style={{ display:'flex', justifyContent:'center', width:'100%', border:`1.5px solid ${PRIMARY}`, color:PRIMARY, fontWeight:700, fontSize:15, padding:'12px', borderRadius:22, textDecoration:'none', fontFamily:FONT }}>Log ind</Link>
-                <Link href="/signup" style={{ display:'flex', justifyContent:'center', width:'100%', background:PRIMARY, color:'#fff', fontWeight:700, fontSize:15, padding:'12px', borderRadius:22, textDecoration:'none', fontFamily:FONT }}>Tilmeld institution</Link>
-              </div>
-            )}
-          </div>
-        </div>
-      )}
+      {/* Bottom nav — mobile only */}
+      {isMobile && <BottomNav pathname={pathname} navigate={navigate} loggedIn={loggedIn} unreadTotal={unreadTotal} />}
     </nav>
   );
 }
