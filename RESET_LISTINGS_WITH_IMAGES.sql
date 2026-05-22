@@ -4,15 +4,14 @@
 -- ============================================================
 
 -- 1. Ryd eksisterende testdata
-DELETE FROM messages WHERE conversation_id IN (
+DELETE FROM chat_messages WHERE conversation_id IN (
   SELECT id FROM conversations WHERE listing_id IN (
-    SELECT id FROM listings WHERE institution_name ILIKE '%test%'
-      OR institution_name IN (
-        'Solsikken Børnehave','Regnbuen SFO','Egebjerget Børnehus',
-        'Skovstjernen Børnehave','Bølgebryderen SFO','Mariehønen Vuggestue',
-        'Lindegården Børnehave','Havbrisens SFO','Kærgårdens Børnehus',
-        'Stjernedrys Børnehave'
-      )
+    SELECT id FROM listings WHERE institution_name IN (
+      'Solsikken Børnehave','Regnbuen SFO','Egebjerget Børnehus',
+      'Skovstjernen Børnehave','Bølgebryderen SFO','Mariehønen Vuggestue',
+      'Lindegården Børnehave','Havbrisens SFO','Kærgårdens Børnehus',
+      'Stjernedrys Børnehave'
+    )
   )
 );
 DELETE FROM conversations WHERE listing_id IN (
