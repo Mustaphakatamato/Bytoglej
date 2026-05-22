@@ -42,6 +42,7 @@ export default function MessagesClient() {
   const [draftConv,       setDraftConv]       = useState(null);
   const [chatImages,      setChatImages]      = useState([]);
   const [fullsizeImage,   setFullsizeImage]   = useState(null);
+  const [uploadError,     setUploadError]     = useState(null);
   const [bundleAcceptedAt,setBundleAcceptedAt]= useState({});
   const ww = useWindowWidth();
   const isMobile = ww < 768;
@@ -224,15 +225,16 @@ export default function MessagesClient() {
     for (const file of files) {
       const ext = file.name.split('.').pop() || 'jpg';
       const path = `${convId}/${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`;
-      const { data: uploadData, error } = await db.storage.from('chat-images').upload(path, file, { upsert: false });
+      const { data: uploadData, error } = await db.storage.from('chat-images').upload(path, file, { upsert: true });
       if (!error && uploadData) {
-        const { data: { publicUrl } } = db.storage.from('chat-images').getPublicUrl(uploadData.path);
-        urls.push(publicUrl);
+        const { data: urlData } = db.storage.from('chat-images').getPublicUrl(uploadData.path ?? path);
+        if (urlData?.publicUrl) urls.push(urlData.publicUrl);
       } else if (error) {
-        console.error('Image upload failed:', error.message);
+        console.error('Image upload failed:', error.message, error);
+        return { urls: [], errorMsg: error.message };
       }
     }
-    return urls;
+    return { urls, errorMsg: null };
   }
 
   async function sendDraftFirstMessage() {
@@ -258,8 +260,9 @@ export default function MessagesClient() {
     let msgContent = content;
     let msgType = null;
     if (chatImages.length > 0) {
-      const urls = await uploadImages(chatImages, convId);
-      if (urls.length === 0) { console.error('Image upload failed — no URLs returned; check storage permissions'); setSending(false); return; }
+      const { urls, errorMsg } = await uploadImages(chatImages, convId);
+      if (urls.length === 0) { setUploadError(errorMsg || 'Billedet kunne ikke uploades. Prøv igen eller vælg et andet billede.'); setSending(false); return; }
+      setUploadError(null);
       msgType = 'image';
       msgContent = JSON.stringify({ urls, caption: content });
       setChatImages([]);
@@ -292,8 +295,9 @@ export default function MessagesClient() {
       ? adminInstName
       : (isInit ? active.initiator_name : active.owner_name);
     if (chatImages.length > 0) {
-      const urls = await uploadImages(chatImages, active.id);
-      if (urls.length === 0) { console.error('Image upload failed — no URLs returned; check storage permissions'); setSending(false); return; }
+      const { urls, errorMsg } = await uploadImages(chatImages, active.id);
+      if (urls.length === 0) { setUploadError(errorMsg || 'Billedet kunne ikke uploades. Prøv igen eller vælg et andet billede.'); setSending(false); return; }
+      setUploadError(null);
       const imageContent = JSON.stringify({ urls, caption: content });
       setChatImages([]);
       const { data: imgMsg } = await db.from('chat_messages').insert({ conversation_id: active.id, sender_id: effectiveUserId, sender_name: senderName, content: imageContent, message_type: 'image' }).select().single();
@@ -490,7 +494,7 @@ export default function MessagesClient() {
       <input ref={fileInputRef} type="file" accept="image/*" multiple style={{ display:'none' }}
         onChange={e=>{
           const files = Array.from(e.target.files || []);
-          if (files.length) { setChatImages(imgs=>[...imgs,...files]); e.target.value=''; }
+          if (files.length) { setChatImages(imgs=>[...imgs,...files]); setUploadError(null); e.target.value=''; }
         }} />
       <div style={{ flex:1, display:'flex', overflow:'hidden', maxWidth:1200, width:'100%', margin:'0 auto', padding:isMobile?'8px 0 0':'16px 16px 0' }}>
 
@@ -1067,6 +1071,12 @@ export default function MessagesClient() {
 
               {/* Input bar */}
               <div style={{ borderTop:`1px solid rgba(22,34,28,0.08)`, background:PAPER2, position:'relative' }}>
+                {uploadError && (
+                  <div style={{ background:'#FEF2F2', borderTop:'1px solid #FCA5A5', padding:'8px 16px', display:'flex', alignItems:'center', justifyContent:'space-between', gap:8 }}>
+                    <span style={{ fontSize:12, color:'#B91C1C', fontFamily:FONT, fontWeight:600 }}>⚠ {uploadError}</span>
+                    <button onClick={()=>setUploadError(null)} style={{ background:'none', border:'none', cursor:'pointer', color:'#B91C1C', fontSize:14, padding:0 }}>✕</button>
+                  </div>
+                )}
                 {emojiOpen && (
                   <div style={{ position:'absolute', bottom:'100%', left:0, right:0, background:PAPER2, borderTop:`1px solid rgba(22,34,28,0.08)`, padding:'10px 12px', display:'flex', flexWrap:'wrap', gap:4 }}>
                     {EMOJI_LIST.map(em => (
