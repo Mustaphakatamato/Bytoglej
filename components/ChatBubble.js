@@ -4,6 +4,7 @@ import { useRouter, usePathname } from 'next/navigation';
 import { db } from '@/lib/supabase';
 import { PRIMARY, GREEN_TINT, PAPER, PAPER2, PAPER3, INK, INK3, CORAL } from '@/lib/constants';
 import { useApp, useActiveUser } from '@/providers/AppProvider';
+import { useWindowWidth } from '@/lib/hooks';
 
 const FONT = "'Sora', sans-serif";
 const PANEL_W = 320;
@@ -24,6 +25,11 @@ export default function ChatBubble() {
   const bottomRef    = useRef(null);
   const inputRef     = useRef(null);
   const loadConvsRef = useRef(null);
+
+  const w = useWindowWidth();
+  const isMobile = w > 0 && w < 768;
+  const bubbleBottom = isMobile ? 'calc(84px + env(safe-area-inset-bottom, 0px) + 14px)' : '20px';
+  const panelBottom  = isMobile ? 'calc(84px + env(safe-area-inset-bottom, 0px) + 78px)' : '80px';
 
   const userId = realUserId || ctxUserId;
   const hidden = !userId || !!pathname?.startsWith('/beskeder');
@@ -188,7 +194,7 @@ export default function ChatBubble() {
       {/* ── Panel ─────────────────────────────────────────────────────────── */}
       {open && (
         <div style={{
-          position: 'fixed', bottom: 80, right: 20, width: PANEL_W, maxHeight: 500,
+          position: 'fixed', bottom: panelBottom, right: 20, width: PANEL_W, maxHeight: 500,
           background: PAPER, borderRadius: 20, zIndex: 9998,
           boxShadow: '0 8px 48px rgba(22,34,28,0.18)', border: `1px solid ${PAPER3}`,
           display: 'flex', flexDirection: 'column', overflow: 'hidden', fontFamily: FONT,
@@ -318,7 +324,7 @@ export default function ChatBubble() {
       <button
         onClick={() => setOpen(o => !o)}
         style={{
-          position: 'fixed', bottom: 20, right: 20, width: 54, height: 54, borderRadius: '50%',
+          position: 'fixed', bottom: bubbleBottom, right: 20, width: 54, height: 54, borderRadius: '50%',
           background: PRIMARY, border: 'none', cursor: 'pointer', zIndex: 9999,
           boxShadow: '0 4px 20px rgba(42,125,79,0.35)',
           display: 'flex', alignItems: 'center', justifyContent: 'center',

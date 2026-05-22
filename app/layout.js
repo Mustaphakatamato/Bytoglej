@@ -2,6 +2,7 @@ import './globals.css';
 import { AppProvider } from '@/providers/AppProvider';
 import NavWrapper from '@/components/NavWrapper';
 import Footer from '@/components/Footer';
+import FooterWrapper from '@/components/FooterWrapper';
 import PwaInit from '@/components/PwaInit';
 import PwaInstallPrompt from '@/components/PwaInstallPrompt';
 
@@ -63,7 +64,7 @@ export default function RootLayout({ children }) {
         <AppProvider>
           <NavWrapper />
           {children}
-          <Footer />
+          <FooterWrapper />
           <PwaInstallPrompt />
         </AppProvider>
         <PwaInit />
