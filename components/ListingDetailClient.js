@@ -410,6 +410,7 @@ export default function ListingDetailClient() {
   const isMobile = ww < 768;
 
   return (
+    <>
     <div style={{ minHeight:'100vh', paddingTop:80, background:PAPER }} className="page-enter">
       <div style={{ maxWidth:1140, margin:'0 auto', padding:'24px 16px 0' }}>
         <button onClick={()=>router.push('/opslag')} style={{ background:'none', border:'none', fontSize:14, fontWeight:600, color:INK3, cursor:'pointer', display:'flex', alignItems:'center', gap:6, padding:'8px 0', fontFamily:FONT }}>← Tilbage til markedsplads</button>
@@ -760,6 +761,6 @@ export default function ListingDetailClient() {
         </div>
       </div>
     )}
-
+    </>
   );
 }
