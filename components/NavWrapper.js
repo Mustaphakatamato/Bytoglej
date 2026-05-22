@@ -384,7 +384,7 @@ function Nav({ pathname, navigate, loggedIn, setLoggedIn, unreadTotal, instituti
 
   const isHome = pathname === '/';
   const transparent = isHome && !scrolled && !menuOpen && !searchOpen;
-  const showCategoryStrip = !transparent && !scrolled;
+  const showCategoryStrip = !transparent && !scrolled && (pathname === '/' || pathname?.startsWith('/opslag'));
 
   function go(p) { navigate(p); }
 
