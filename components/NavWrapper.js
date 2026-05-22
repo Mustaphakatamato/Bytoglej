@@ -456,7 +456,8 @@ function Nav({ pathname, navigate, loggedIn, setLoggedIn, unreadTotal, instituti
                       : <span>{institution?.name?.charAt(0)?.toUpperCase() || '?'}</span>}
                   </button>
                   {profileOpen && (
-                    <div style={{ position:'absolute', top:'calc(100% + 8px)', right:0, background:'#fff', borderRadius:14, boxShadow:'0 8px 32px rgba(22,34,28,0.14)', border:`1px solid ${PAPER2}`, minWidth:200, overflow:'hidden', zIndex:600 }}>
+                    <div style={{ position:'absolute', top:'100%', right:0, paddingTop:8, zIndex:600 }}>
+                    <div style={{ background:'#fff', borderRadius:14, boxShadow:'0 8px 32px rgba(22,34,28,0.14)', border:`1px solid ${PAPER2}`, minWidth:200, overflow:'hidden' }}>
                       {institution && (
                         <div style={{ padding:'12px 14px', borderBottom:`1px solid ${PAPER2}` }}>
                           <div style={{ fontFamily:FONT, fontWeight:700, fontSize:13, color:INK }}>{institution.name}</div>
@@ -479,6 +480,7 @@ function Nav({ pathname, navigate, loggedIn, setLoggedIn, unreadTotal, instituti
                         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
                         Log ud
                       </button>
+                    </div>
                     </div>
                   )}
                 </div>
