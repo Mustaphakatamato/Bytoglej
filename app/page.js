@@ -19,8 +19,8 @@ function HeroSection() {
   return (
     <section style={{
       background: `linear-gradient(160deg, ${GREEN_DEEP} 0%, ${PRIMARY} 100%)`,
-      paddingTop: isMobile ? 120 : 148,
-      paddingBottom: isMobile ? 100 : 140,
+      paddingTop: isMobile ? 100 : 120,
+      paddingBottom: isMobile ? 60 : 80,
       position: 'relative', overflow: 'hidden',
     }}>
       {/* Background watermark */}
@@ -202,11 +202,11 @@ function ListingsPreview({ listings, loading, goToInstitution }) {
 
   const shown = useMemo(() => {
     let r = filter === 'alle' ? listings : listings.filter(l => l.type === filter);
-    return r.slice(0, 4);
+    return r.slice(0, 8);
   }, [listings, filter]);
 
   return (
-    <section style={{ background: PAPER2, padding: isMobile ? '64px 16px 80px' : '96px 24px 112px' }}>
+    <section style={{ background: PAPER2, padding: isMobile ? '48px 16px 72px' : '64px 24px 96px' }}>
       <div style={{ maxWidth: 1140, margin: '0 auto' }}>
 
         {/* Header row */}
@@ -419,9 +419,9 @@ export default function HomePage() {
   return (
     <>
       <HeroSection />
+      <ListingsPreview listings={listings} loading={loadingListings} goToInstitution={goToInstitution} />
       <HowSection />
       <TradeTypesStrip />
-      <ListingsPreview listings={listings} loading={loadingListings} goToInstitution={goToInstitution} />
       <MissionSection />
       <CtaBanner />
       <Footer />
