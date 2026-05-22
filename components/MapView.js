@@ -1,20 +1,28 @@
 'use client';
 import { useEffect, useRef, useState } from 'react';
-import { PRIMARY, CORAL, INK, INK3, PAPER, PAPER2, PAPER3, GREEN_TINT, TYPE_CFG } from '@/lib/constants';
+import { PRIMARY, INK, INK3, PAPER, PAPER2, PAPER3, GREEN_TINT, GREEN_DEEP, TYPE_CFG } from '@/lib/constants';
 
 const FONT = "'Sora', sans-serif";
+const MARKER_COLOR = PRIMARY;
 
-const TYPE_COLOR = { køb: PRIMARY, byd: '#7C3AED', byt: CORAL };
+const TILES = {
+  map: {
+    url: 'https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png',
+    attribution: '© OpenStreetMap © CARTO',
+  },
+  satellite: {
+    url: 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
+    attribution: '© Esri',
+  },
+};
 
 function PopupCard({ listing, onOpen, onClose }) {
   const imgs = listing.images?.length ? listing.images : [];
   const tc = TYPE_CFG[listing.type] || { label: listing.type, color: INK3, bg: PAPER2 };
   return (
     <div style={{
-      position: 'absolute', bottom: 60, left: '50%', transform: 'translateX(-50%)',
       background: '#fff', borderRadius: 16, boxShadow: '0 8px 40px rgba(22,34,28,0.18)',
-      width: 240, zIndex: 1000, overflow: 'hidden', border: `1px solid ${PAPER2}`,
-      fontFamily: FONT,
+      width: 240, overflow: 'hidden', border: `1px solid ${PAPER2}`, fontFamily: FONT,
     }}>
       <div style={{ height: 120, background: imgs.length ? '#ddd' : GREEN_TINT, position: 'relative', overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
         {imgs.length
@@ -30,14 +38,10 @@ function PopupCard({ listing, onOpen, onClose }) {
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
           {listing.price
             ? <span style={{ fontWeight: 800, fontSize: 15, color: PRIMARY }}>{listing.price} kr.</span>
-            : <span style={{ fontWeight: 700, fontSize: 12, color: CORAL }}>{listing.type === 'byt' ? 'Byttes kun' : 'Afgiv bud'}</span>
+            : <span style={{ fontWeight: 700, fontSize: 12, color: INK3 }}>{listing.type === 'byt' ? 'Byttes kun' : 'Afgiv bud'}</span>
           }
           <button onClick={onOpen} style={{ background: PRIMARY, color: '#fff', border: 'none', borderRadius: 99, padding: '6px 14px', fontSize: 12, fontWeight: 700, cursor: 'pointer', fontFamily: FONT }}>Åbn →</button>
         </div>
-      </div>
-      {/* Arrow */}
-      <div style={{ position: 'absolute', bottom: -8, left: '50%', transform: 'translateX(-50%)', width: 16, height: 8, overflow: 'hidden' }}>
-        <div style={{ width: 16, height: 16, background: '#fff', transform: 'rotate(45deg)', marginTop: -8, boxShadow: '2px 2px 4px rgba(22,34,28,0.1)', border: `1px solid ${PAPER2}` }} />
       </div>
     </div>
   );
@@ -46,12 +50,11 @@ function PopupCard({ listing, onOpen, onClose }) {
 function CityPopup({ listings, onOpen, onClose }) {
   return (
     <div style={{
-      position: 'absolute', bottom: 60, left: '50%', transform: 'translateX(-50%)',
       background: '#fff', borderRadius: 16, boxShadow: '0 8px 40px rgba(22,34,28,0.18)',
-      width: 260, zIndex: 1000, border: `1px solid ${PAPER2}`, fontFamily: FONT,
-      maxHeight: 280, overflow: 'hidden', display: 'flex', flexDirection: 'column',
+      width: 260, border: `1px solid ${PAPER2}`, fontFamily: FONT,
+      maxHeight: 300, overflow: 'hidden', display: 'flex', flexDirection: 'column',
     }}>
-      <div style={{ padding: '10px 12px 8px', borderBottom: `1px solid ${PAPER2}`, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+      <div style={{ padding: '10px 12px 8px', borderBottom: `1px solid ${PAPER2}`, display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexShrink: 0 }}>
         <span style={{ fontWeight: 700, fontSize: 13, color: INK }}>{listings[0].city} · {listings.length} opslag</span>
         <button onClick={onClose} style={{ border: 'none', background: 'none', color: INK3, fontSize: 16, cursor: 'pointer', lineHeight: 1, padding: 0 }}>✕</button>
       </div>
@@ -59,7 +62,8 @@ function CityPopup({ listings, onOpen, onClose }) {
         {listings.map(l => {
           const tc = TYPE_CFG[l.type] || { label: l.type, color: INK3, bg: PAPER2 };
           return (
-            <div key={l.id} onClick={() => onOpen(l)} style={{ padding: '10px 12px', borderBottom: `1px solid ${PAPER3}`, cursor: 'pointer', display: 'flex', gap: 10, alignItems: 'center' }}
+            <div key={l.id} onClick={() => onOpen(l)}
+              style={{ padding: '10px 12px', borderBottom: `1px solid ${PAPER3}`, cursor: 'pointer', display: 'flex', gap: 10, alignItems: 'center', transition: 'background 0.1s' }}
               onMouseEnter={e => e.currentTarget.style.background = GREEN_TINT}
               onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
               <div style={{ width: 38, height: 38, borderRadius: 10, background: l.images?.[0] ? '#ddd' : GREEN_TINT, flexShrink: 0, overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
@@ -87,12 +91,25 @@ export default function MapView({ listings, onListingClick, listingCoords, userC
   const mapRef = useRef(null);
   const mapInstanceRef = useRef(null);
   const markersRef = useRef(null);
-  const [selected, setSelected] = useState(null); // { type:'single'|'city', listing?, listings?, el }
+  const tileLayerRef = useRef(null);
+  const [selected, setSelected] = useState(null);
+  const [satellite, setSatellite] = useState(false);
+
+  // Swap tile layer when satellite toggles
+  useEffect(() => {
+    if (!mapInstanceRef.current) return;
+    const L = require('leaflet');
+    if (tileLayerRef.current) {
+      mapInstanceRef.current.removeLayer(tileLayerRef.current);
+    }
+    const t = satellite ? TILES.satellite : TILES.map;
+    tileLayerRef.current = L.tileLayer(t.url, { attribution: t.attribution, maxZoom: 19 });
+    tileLayerRef.current.addTo(mapInstanceRef.current);
+  }, [satellite]);
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
 
-    // Load CSS once
     if (!document.getElementById('leaflet-css')) {
       const link = document.createElement('link');
       link.id = 'leaflet-css';
@@ -109,10 +126,9 @@ export default function MapView({ listings, onListingClick, listingCoords, userC
         zoomControl: true,
         scrollWheelZoom: true,
       });
-      L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', {
-        attribution: '© OpenStreetMap © CARTO',
-        maxZoom: 19,
-      }).addTo(mapInstanceRef.current);
+      const t = TILES.map;
+      tileLayerRef.current = L.tileLayer(t.url, { attribution: t.attribution, maxZoom: 19 });
+      tileLayerRef.current.addTo(mapInstanceRef.current);
       markersRef.current = L.layerGroup().addTo(mapInstanceRef.current);
     }
 
@@ -123,7 +139,7 @@ export default function MapView({ listings, onListingClick, listingCoords, userC
     layer.clearLayers();
     setSelected(null);
 
-    // Group listings by city
+    // Group by city
     const byCity = {};
     listings.forEach(l => {
       if (!l.city || !listingCoords[l.city]) return;
@@ -134,24 +150,10 @@ export default function MapView({ listings, onListingClick, listingCoords, userC
     Object.entries(byCity).forEach(([city, cityListings]) => {
       const coords = listingCoords[city];
       const count = cityListings.length;
-      const color = TYPE_COLOR[cityListings[0].type] || PRIMARY;
-
-      // For clusters: build colored type dots showing type mix
-      const typeCounts = { køb: 0, byd: 0, byt: 0 };
-      cityListings.forEach(l => { if (typeCounts[l.type] !== undefined) typeCounts[l.type]++; });
-      const typeDots = Object.entries(typeCounts)
-        .filter(([, n]) => n > 0)
-        .map(([t, n]) => `<span style="display:inline-flex;align-items:center;gap:3px;background:rgba(255,255,255,0.22);border-radius:99px;padding:1px 7px;font-size:10px;font-weight:700">
-          <span style="width:6px;height:6px;border-radius:50%;background:${TYPE_COLOR[t]};display:inline-block;flex-shrink:0"></span>${n}
-        </span>`).join('');
-
-      // Dominant type color for cluster background (most common type)
-      const dominantType = Object.entries(typeCounts).sort((a,b) => b[1]-a[1])[0][0];
-      const clusterColor = TYPE_COLOR[dominantType] || PRIMARY;
 
       const markerHtml = count === 1
         ? `<div style="
-            background:${color};color:#fff;
+            background:${MARKER_COLOR};color:#fff;
             border-radius:999px;padding:5px 11px;
             font-size:11px;font-weight:700;white-space:nowrap;
             box-shadow:0 2px 10px rgba(0,0,0,0.22);
@@ -162,11 +164,11 @@ export default function MapView({ listings, onListingClick, listingCoords, userC
           ">
             <span>${cityListings[0].emoji || '🧸'}</span>
             <span>${cityListings[0].title.slice(0, 16)}${cityListings[0].title.length > 16 ? '…' : ''}</span>
-            ${cityListings[0].price ? `<span style="opacity:0.85">· ${cityListings[0].price} kr.</span>` : ''}
+            ${cityListings[0].price ? `<span style="opacity:0.8">· ${cityListings[0].price} kr.</span>` : ''}
           </div>`
         : `<div style="
-            background:${clusterColor};color:#fff;
-            border-radius:999px;padding:6px 12px;
+            background:${MARKER_COLOR};color:#fff;
+            border-radius:999px;padding:6px 13px;
             font-size:12px;font-weight:800;white-space:nowrap;
             box-shadow:0 3px 12px rgba(0,0,0,0.25);
             font-family:'Sora',sans-serif;
@@ -174,8 +176,9 @@ export default function MapView({ listings, onListingClick, listingCoords, userC
             cursor:pointer;
             display:flex;align-items:center;gap:6px;
           ">
-            <span>${count} opslag · ${city}</span>
-            <span style="display:flex;gap:3px;align-items:center">${typeDots}</span>
+            <span>${count}</span>
+            <span style="width:1px;height:12px;background:rgba(255,255,255,0.35);display:inline-block"></span>
+            <span>${city}</span>
           </div>`;
 
       const icon = L.divIcon({ className: '', html: markerHtml, iconAnchor: [0, 0] });
@@ -193,19 +196,14 @@ export default function MapView({ listings, onListingClick, listingCoords, userC
 
     // User location marker
     if (userCoords) {
-      const userHtml = `<div style="
-        width:16px;height:16px;border-radius:50%;
-        background:#3B82F6;border:3px solid #fff;
-        box-shadow:0 0 0 3px rgba(59,130,246,0.35),0 2px 8px rgba(0,0,0,0.2);
-      "></div>`;
+      const userHtml = `<div style="width:16px;height:16px;border-radius:50%;background:#3B82F6;border:3px solid #fff;box-shadow:0 0 0 3px rgba(59,130,246,0.35),0 2px 8px rgba(0,0,0,0.2)"></div>`;
       const userIcon = L.divIcon({ className: '', html: userHtml, iconAnchor: [8, 8] });
       L.marker([userCoords.lat, userCoords.lon], { icon: userIcon })
         .addTo(layer)
-        .bindTooltip('Din institution', { permanent: false, direction: 'top', className: '' });
+        .bindTooltip('Din institution', { permanent: false, direction: 'top' });
     }
 
     map.on('click', () => setSelected(null));
-
     return () => { map.off('click'); };
   }, [listings, listingCoords, userCoords]);
 
@@ -214,6 +212,7 @@ export default function MapView({ listings, onListingClick, listingCoords, userC
       if (mapInstanceRef.current) {
         mapInstanceRef.current.remove();
         mapInstanceRef.current = null;
+        tileLayerRef.current = null;
       }
     };
   }, []);
@@ -224,10 +223,33 @@ export default function MapView({ listings, onListingClick, listingCoords, userC
     <div style={{ position: 'relative', height: isMobile ? 500 : 620, borderRadius: 20, overflow: 'hidden', boxShadow: '0 4px 24px rgba(22,34,28,0.10)', border: `1px solid ${PAPER2}`, isolation: 'isolate' }}>
       <div ref={mapRef} style={{ width: '100%', height: '100%' }} />
 
+      {/* Satellite toggle */}
+      <div style={{ position: 'absolute', top: 16, right: 16, zIndex: 600 }}>
+        <button
+          onClick={() => setSatellite(s => !s)}
+          style={{
+            display: 'flex', alignItems: 'center', gap: 7,
+            background: satellite ? GREEN_DEEP : 'rgba(246,242,234,0.95)',
+            color: satellite ? '#fff' : INK,
+            border: `1.5px solid ${satellite ? 'transparent' : PAPER3}`,
+            borderRadius: 99, padding: '7px 14px',
+            fontSize: 12, fontWeight: 700, fontFamily: FONT,
+            cursor: 'pointer', backdropFilter: 'blur(8px)',
+            boxShadow: '0 2px 8px rgba(22,34,28,0.12)',
+            transition: 'all 0.2s',
+          }}
+        >
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/>
+          </svg>
+          {satellite ? 'Kortvisning' : 'Satellit'}
+        </button>
+      </div>
+
       {/* Popup overlay */}
       {selected && (
         <div style={{ position: 'absolute', inset: 0, zIndex: 999, pointerEvents: 'none', display: 'flex', alignItems: 'flex-end', justifyContent: 'center', paddingBottom: 24 }}>
-          <div style={{ pointerEvents: 'auto', position: 'relative' }}>
+          <div style={{ pointerEvents: 'auto' }}>
             {selected.type === 'single' && (
               <PopupCard
                 listing={selected.listing}
@@ -246,32 +268,14 @@ export default function MapView({ listings, onListingClick, listingCoords, userC
         </div>
       )}
 
-      {/* Empty state overlay */}
+      {/* Empty state */}
       {!hasListingsOnMap && (
         <div style={{ position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', background: 'rgba(246,242,234,0.7)', backdropFilter: 'blur(2px)', zIndex: 500, pointerEvents: 'none' }}>
           <span style={{ fontSize: 40, marginBottom: 10 }}>📍</span>
           <div style={{ fontFamily: FONT, fontWeight: 700, fontSize: 16, color: INK }}>Ingen opslag med placering</div>
-          <div style={{ fontFamily: FONT, fontSize: 13, color: INK3, marginTop: 4 }}>Koordinater hentes stadig eller ingen opslag matcher filtre</div>
+          <div style={{ fontFamily: FONT, fontSize: 13, color: INK3, marginTop: 4 }}>Koordinater hentes — prøv igen om lidt</div>
         </div>
       )}
-
-      {/* Legend */}
-      <div style={{ position: 'absolute', bottom: 16, right: 16, zIndex: 600, background: 'rgba(246,242,234,0.95)', borderRadius: 12, padding: '8px 12px', backdropFilter: 'blur(8px)', border: `1px solid ${PAPER2}`, fontFamily: FONT }}>
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
-          {[['køb', 'Til salg'], ['byd', 'Afgiv bud'], ['byt', 'Byttes']].map(([type, label]) => (
-            <div key={type} style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 11, color: INK3 }}>
-              <div style={{ width: 10, height: 10, borderRadius: '50%', background: TYPE_COLOR[type], flexShrink: 0 }} />
-              <span>{label}</span>
-            </div>
-          ))}
-          {userCoords && (
-            <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 11, color: INK3 }}>
-              <div style={{ width: 10, height: 10, borderRadius: '50%', background: '#3B82F6', flexShrink: 0 }} />
-              <span>Din institution</span>
-            </div>
-          )}
-        </div>
-      </div>
     </div>
   );
 }
