@@ -58,7 +58,7 @@ function ImageGallery({ images, color, emoji }) {
 
 export default function ListingDetailClient() {
   const router = useRouter();
-  const { activeListing: listing, setActiveListing, favs, toggleFav, setSelectedConvId, showToast, loggedIn, setQuickViewListing } = useApp();
+  const { activeListing: listing, setActiveListing, favs, toggleFav, setSelectedConvId, showToast, loggedIn, setQuickViewListing, isAdmin } = useApp();
   const { isAdminView: ctxIsAdmin, adminInstName, institution: ctxInstitution, institutionId: ctxInstId } = useActiveUser();
 
   const [buyModal,  setBuyModal]  = useState(false);
@@ -76,6 +76,9 @@ export default function ListingDetailClient() {
   const [isFav, setIsFav] = useState(favs?.includes(listing?.id) || false);
   const [localFavCount, setLocalFavCount] = useState(listing?.fav_count || 0);
   const [shareModal, setShareModal] = useState(false);
+  const [adminEditModal, setAdminEditModal] = useState(false);
+  const [adminEditForm, setAdminEditForm] = useState(null);
+  const [adminEditSaving, setAdminEditSaving] = useState(false);
   const [teamMembers, setTeamMembers] = useState([]);
   const [selectedEmails, setSelectedEmails] = useState([]);
   const [shareNote, setShareNote] = useState('');
@@ -460,6 +463,15 @@ export default function ListingDetailClient() {
                 <div style={{ fontSize:13, color:INK3, fontFamily:FONT }}>Rediger det fra din dashboard</div>
               </div>
             )}
+            {isAdmin && (
+              <div style={{ background:'#FFF7ED', borderRadius:20, padding:20, border:`1.5px solid #FDBA74` }}>
+                <div style={{ fontFamily:FONT, fontWeight:800, fontSize:13, color:'#B45309', marginBottom:12 }}>⚙ Admin</div>
+                <button onClick={() => { setAdminEditForm({ title: listing.title||'', description: listing.description||'', price: listing.price||'', condition: listing.condition||'', is_active: listing.is_active }); setAdminEditModal(true); }}
+                  style={{ width:'100%', padding:'11px', borderRadius:14, background:'#B45309', border:'none', color:'#fff', fontFamily:FONT, fontWeight:700, fontSize:14, cursor:'pointer' }}>
+                  Rediger opslag
+                </button>
+              </div>
+            )}
           </div>
 
           <div style={{ position:isMobile?'static':'sticky', top:96 }}>
@@ -712,5 +724,42 @@ export default function ListingDetailClient() {
       </Modal>
 
     </div>
+
+    {/* Admin edit modal */}
+    {adminEditModal && adminEditForm && (
+      <div onClick={() => setAdminEditModal(false)} style={{ position:'fixed', inset:0, background:'rgba(22,34,28,0.45)', zIndex:9000, display:'flex', alignItems:'center', justifyContent:'center', padding:20 }}>
+        <div onClick={e => e.stopPropagation()} style={{ background:'#fff', borderRadius:20, padding:32, maxWidth:520, width:'100%', boxShadow:'0 20px 60px rgba(22,34,28,0.2)' }}>
+          <div style={{ fontFamily:FONT, fontWeight:800, fontSize:20, color:INK, marginBottom:20 }}>Rediger opslag <span style={{ fontSize:14, color:'#B45309', fontWeight:600 }}>(admin)</span></div>
+          <div style={{ display:'flex', flexDirection:'column', gap:14 }}>
+            {[['TITEL','title','text'],['BESKRIVELSE','description','textarea'],['PRIS (KR.) — TOM = INGEN PRIS','price','number'],['STAND','condition','text']].map(([label, field, type]) => (
+              <div key={field}>
+                <label style={{ display:'block', fontFamily:FONT, fontWeight:700, fontSize:12, color:'#6B7570', marginBottom:6 }}>{label}</label>
+                {type === 'textarea'
+                  ? <textarea value={adminEditForm[field]} onChange={e => setAdminEditForm(f => ({...f,[field]:e.target.value}))} rows={4} style={{ width:'100%', padding:'10px 14px', borderRadius:10, border:'1.5px solid #DAD3C4', fontSize:14, fontFamily:FONT, outline:'none', boxSizing:'border-box', background:'#fff', resize:'vertical' }} />
+                  : <input type={type} value={adminEditForm[field]} onChange={e => setAdminEditForm(f => ({...f,[field]:e.target.value}))} style={{ width:'100%', padding:'10px 14px', borderRadius:10, border:'1.5px solid #DAD3C4', fontSize:14, fontFamily:FONT, outline:'none', boxSizing:'border-box', background:'#fff' }} />
+                }
+              </div>
+            ))}
+            <div style={{ display:'flex', alignItems:'center', gap:10 }}>
+              <input type="checkbox" id="admin-active" checked={adminEditForm.is_active} onChange={e => setAdminEditForm(f => ({...f, is_active:e.target.checked}))} style={{ width:18, height:18, cursor:'pointer', accentColor:PRIMARY }} />
+              <label htmlFor="admin-active" style={{ fontFamily:FONT, fontWeight:600, fontSize:14, color:INK, cursor:'pointer' }}>Opslag er aktivt</label>
+            </div>
+          </div>
+          <div style={{ display:'flex', gap:10, marginTop:24 }}>
+            <button onClick={() => setAdminEditModal(false)} style={{ flex:1, padding:'12px', borderRadius:99, background:'#ECE6DA', border:'none', fontFamily:FONT, fontWeight:700, fontSize:14, color:'#3A473D', cursor:'pointer' }}>Annuller</button>
+            <button disabled={adminEditSaving} onClick={async () => {
+              setAdminEditSaving(true);
+              const update = { title: adminEditForm.title, description: adminEditForm.description, price: adminEditForm.price ? Number(adminEditForm.price) : null, condition: adminEditForm.condition, is_active: adminEditForm.is_active };
+              const { error } = await db.from('listings').update(update).eq('id', listing.id);
+              if (!error) { setActiveListing({ ...listing, ...update }); setAdminEditModal(false); showToast?.('Opslag opdateret'); }
+              setAdminEditSaving(false);
+            }} style={{ flex:2, padding:'12px', borderRadius:99, background:'#B45309', border:'none', fontFamily:FONT, fontWeight:700, fontSize:15, color:'#fff', cursor: adminEditSaving ? 'not-allowed' : 'pointer' }}>
+              {adminEditSaving ? 'Gemmer…' : 'Gem ændringer'}
+            </button>
+          </div>
+        </div>
+      </div>
+    )}
+
   );
 }

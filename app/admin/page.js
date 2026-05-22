@@ -116,7 +116,7 @@ export default function AdminPage() {
       <div style={{ maxWidth: 1200, margin: '0 auto', padding: '0 20px 64px' }}>
         {tab === 'overview'      && <OverviewTab institutions={allInstitutions} setAdminInst={setAdminInst} adminInst={adminInst} />}
         {tab === 'institutions'  && <InstitutionsTab institutions={allInstitutions} setAdminInst={setAdminInst} adminInst={adminInst} />}
-        {tab === 'listings'      && <ListingsTab />}
+        {tab === 'listings'      && <ListingsTab allInstitutions={allInstitutions} />}
       </div>
     </div>
   );
@@ -420,7 +420,7 @@ function EditListingModal({ listing, onClose, onSave }) {
   );
 }
 
-function ListingsTab() {
+function ListingsTab({ allInstitutions = [] }) {
   const [listings, setListings] = useState([]);
   const [loading, setLoading] = useState(true);
   const [query, setQuery] = useState('');
@@ -429,11 +429,14 @@ function ListingsTab() {
   const [confirm, setConfirm] = useState(null); // id to delete
   const [editing, setEditing] = useState(null);
 
+  const instMap = Object.fromEntries(allInstitutions.map(i => [i.id, i.name]));
+
   const fetchAll = useCallback(async () => {
     setLoading(true);
-    const { data } = await db.from('listings')
-      .select('id,title,type,is_active,created_at,institution_id,institutions(name)')
+    const { data, error } = await db.from('listings')
+      .select('id,title,type,is_active,created_at,institution_id')
       .order('created_at', { ascending: false });
+    if (error) console.error('ListingsTab fetch error:', error.message);
     setListings(data || []);
     setLoading(false);
   }, []);
@@ -455,7 +458,7 @@ function ListingsTab() {
     if (filterType && l.type !== filterType) return false;
     if (filterActive === 'active' && !l.is_active) return false;
     if (filterActive === 'inactive' && l.is_active) return false;
-    if (query && !l.title?.toLowerCase().includes(query.toLowerCase()) && !l.institutions?.name?.toLowerCase().includes(query.toLowerCase())) return false;
+    if (query && !l.title?.toLowerCase().includes(query.toLowerCase()) && !(instMap[l.institution_id]||'').toLowerCase().includes(query.toLowerCase())) return false;
     return true;
   });
 
@@ -502,7 +505,7 @@ function ListingsTab() {
                       <td style={{ padding: '12px 16px', fontWeight: 600, color: INK, maxWidth: 220 }}>
                         <span style={{ display: 'block', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{l.title}</span>
                       </td>
-                      <td style={{ padding: '12px 16px', color: INK2 }}>{l.institutions?.name || '—'}</td>
+                      <td style={{ padding: '12px 16px', color: INK2 }}>{instMap[l.institution_id] || '—'}</td>
                       <td style={{ padding: '12px 16px' }}>
                         <TypeBadge type={l.type} />
                       </td>
