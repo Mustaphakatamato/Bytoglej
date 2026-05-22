@@ -65,6 +65,7 @@ export default function OpretOpslagPage() {
   const [aiImproving, setAiImproving] = useState(false);
   const [aiSuggestion, setAiSuggestion] = useState(null);
   const [aiApply, setAiApply] = useState({ title: true, description: true });
+  const [aiRegenerating, setAiRegenerating] = useState({ title: false, description: false });
   const [institution, setInstitution] = useState(ctxInstitution || null);
   const [imgFiles, setImgFiles] = useState([]);
   const [imgPreviews, setImgPreviews] = useState([]);
@@ -116,6 +117,20 @@ export default function OpretOpslagPage() {
       else { setAiSuggestion(json); setAiApply({ title: true, description: true }); }
     } catch { showToast('AI-forbedring mislykkedes — prøv igen', 'error'); }
     setAiImproving(false);
+  }
+
+  async function handleRegenerate(field) {
+    setAiRegenerating(r => ({ ...r, [field]: true }));
+    try {
+      const res = await fetch('/api/improve-listing', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ title: form.title, description: form.description, type: form.type, condition: form.condition, age_group: form.age_group, tags: form.tags }),
+      });
+      const json = await res.json();
+      if (!json.error) setAiSuggestion(prev => ({ ...prev, [field]: json[field] }));
+    } catch {}
+    setAiRegenerating(r => ({ ...r, [field]: false }));
   }
 
   function applyAiSuggestion() {
@@ -417,7 +432,11 @@ export default function OpretOpslagPage() {
                 <div onClick={()=>setAiApply(a=>({...a,title:true}))} style={{ borderRadius:14, padding:'14px 16px', border:`2px solid ${aiApply.title ? '#7C3AED' : PAPER2}`, background:aiApply.title ? '#F5F0FF' : PAPER, cursor:'pointer', transition:'all 0.15s', position:'relative' }}>
                   {aiApply.title && <div style={{ position:'absolute', top:10, right:10, width:18, height:18, borderRadius:'50%', background:'#7C3AED', display:'flex', alignItems:'center', justifyContent:'center', fontSize:10, color:'#fff', fontWeight:800 }}>✓</div>}
                   <div style={{ fontSize:10, fontWeight:700, color:'#7C3AED', fontFamily:FONT, marginBottom:6, textTransform:'uppercase', letterSpacing:'0.06em' }}>✨ AI-forslag</div>
-                  <div style={{ fontSize:14, fontWeight:600, color:INK, fontFamily:FONT, lineHeight:1.4 }}>{aiSuggestion.title}</div>
+                  <div style={{ fontSize:14, fontWeight:600, color:INK, fontFamily:FONT, lineHeight:1.4 }}>{aiRegenerating.title ? <span style={{ color:INK3, fontStyle:'italic' }}>Genererer nyt forslag…</span> : aiSuggestion.title}</div>
+                  <button type="button" onClick={e=>{ e.stopPropagation(); handleRegenerate('title'); }} disabled={aiRegenerating.title} style={{ marginTop:10, display:'flex', alignItems:'center', gap:4, fontSize:11, fontWeight:700, color:'#7C3AED', background:'rgba(124,58,237,0.08)', border:'none', borderRadius:99, padding:'4px 10px', cursor: aiRegenerating.title ? 'not-allowed' : 'pointer', fontFamily:FONT, opacity: aiRegenerating.title ? 0.5 : 1 }}>
+                    <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 .49-3.5"/></svg>
+                    Nyt forslag
+                  </button>
                 </div>
               </div>
             </div>
@@ -434,7 +453,11 @@ export default function OpretOpslagPage() {
                 <div onClick={()=>setAiApply(a=>({...a,description:true}))} style={{ borderRadius:14, padding:'14px 16px', border:`2px solid ${aiApply.description ? '#7C3AED' : PAPER2}`, background:aiApply.description ? '#F5F0FF' : PAPER, cursor:'pointer', transition:'all 0.15s', position:'relative' }}>
                   {aiApply.description && <div style={{ position:'absolute', top:10, right:10, width:18, height:18, borderRadius:'50%', background:'#7C3AED', display:'flex', alignItems:'center', justifyContent:'center', fontSize:10, color:'#fff', fontWeight:800 }}>✓</div>}
                   <div style={{ fontSize:10, fontWeight:700, color:'#7C3AED', fontFamily:FONT, marginBottom:6, textTransform:'uppercase', letterSpacing:'0.06em' }}>✨ AI-forslag</div>
-                  <div style={{ fontSize:13, color:INK2, fontFamily:FONT, lineHeight:1.6 }}>{aiSuggestion.description}</div>
+                  <div style={{ fontSize:13, color:INK2, fontFamily:FONT, lineHeight:1.6 }}>{aiRegenerating.description ? <span style={{ color:INK3, fontStyle:'italic' }}>Genererer nyt forslag…</span> : aiSuggestion.description}</div>
+                  <button type="button" onClick={e=>{ e.stopPropagation(); handleRegenerate('description'); }} disabled={aiRegenerating.description} style={{ marginTop:10, display:'flex', alignItems:'center', gap:4, fontSize:11, fontWeight:700, color:'#7C3AED', background:'rgba(124,58,237,0.08)', border:'none', borderRadius:99, padding:'4px 10px', cursor: aiRegenerating.description ? 'not-allowed' : 'pointer', fontFamily:FONT, opacity: aiRegenerating.description ? 0.5 : 1 }}>
+                    <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 .49-3.5"/></svg>
+                    Nyt forslag
+                  </button>
                 </div>
               </div>
             </div>
