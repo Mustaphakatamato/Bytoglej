@@ -86,6 +86,7 @@ export default function ListingDetailClient() {
   const [myInstName, setMyInstName] = useState(null);
   const [existingBid, setExistingBid] = useState(null);
   const [instListings, setInstListings] = useState([]);
+  const [favoriters, setFavoriters] = useState([]);
 
   useEffect(() => {
     if (!listing) return;
@@ -132,6 +133,12 @@ export default function ListingDetailClient() {
   }, []);
 
   useEffect(() => { if (listing) setIsFav(favs?.includes(listing.id) || false); }, [favs, listing?.id]);
+
+  useEffect(() => {
+    if (!listing || !isOwn) return;
+    db.from('listing_favorites').select('institution_name,created_at').eq('listing_id', listing.id).order('created_at', { ascending: false })
+      .then(({ data }) => { if (data) setFavoriters(data); });
+  }, [listing?.id, isOwn]);
 
   if (!listing) {
     return (
@@ -459,9 +466,27 @@ export default function ListingDetailClient() {
               </div>
             )}
             {isOwn && (
-              <div style={{ background:GREEN_TINT, borderRadius:20, padding:20, border:`1.5px solid ${GREEN_SOFT}`, textAlign:'center' }}>
-                <div style={{ fontFamily:FONT, fontWeight:800, fontSize:14, color:PRIMARY, marginBottom:4 }}>Dit eget opslag</div>
-                <div style={{ fontSize:13, color:INK3, fontFamily:FONT }}>Rediger det fra din dashboard</div>
+              <div style={{ background:GREEN_TINT, borderRadius:20, padding:20, border:`1.5px solid ${GREEN_SOFT}` }}>
+                <div style={{ fontFamily:FONT, fontWeight:800, fontSize:14, color:PRIMARY, marginBottom:4, textAlign:'center' }}>Dit eget opslag</div>
+                <div style={{ fontSize:13, color:INK3, fontFamily:FONT, textAlign:'center', marginBottom: favoriters.length ? 16 : 0 }}>Rediger det fra din dashboard</div>
+                {favoriters.length > 0 && (
+                  <div style={{ borderTop:`1px solid ${GREEN_SOFT}`, paddingTop:14, marginTop:4 }}>
+                    <div style={{ fontFamily:FONT, fontWeight:700, fontSize:12, color:PRIMARY, marginBottom:10, display:'flex', alignItems:'center', gap:6 }}>
+                      <span>❤️</span>
+                      <span>{favoriters.length} {favoriters.length === 1 ? 'institution har gemt' : 'institutioner har gemt'} dit opslag</span>
+                    </div>
+                    <div style={{ display:'flex', flexDirection:'column', gap:6 }}>
+                      {favoriters.map((f, i) => (
+                        <div key={i} style={{ display:'flex', alignItems:'center', gap:8 }}>
+                          <div style={{ width:28, height:28, borderRadius:8, background:PRIMARY, display:'flex', alignItems:'center', justifyContent:'center', color:'#fff', fontFamily:FONT, fontWeight:800, fontSize:11, flexShrink:0 }}>
+                            {(f.institution_name||'?').charAt(0).toUpperCase()}
+                          </div>
+                          <span style={{ fontFamily:FONT, fontSize:13, fontWeight:600, color:INK }}>{f.institution_name || 'Ukendt institution'}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
               </div>
             )}
             {isAdmin && (

@@ -14,7 +14,7 @@ export default function ListingCard({ listing, onClick, favs, toggleFav, onInsti
   const [localFavCount, setLocalFavCount] = useState(listing.fav_count || 0);
   const imgs = listing.images?.length ? listing.images : [];
 
-  function handleFav(e) {
+  async function handleFav(e) {
     e.stopPropagation();
     const adding = !isFav;
     toggleFav(listing.id);
@@ -23,6 +23,20 @@ export default function ListingCard({ listing, onClick, favs, toggleFav, onInsti
     const newCount = Math.max(0, localFavCount + (adding ? 1 : -1));
     setLocalFavCount(newCount);
     db.from('listings').update({ fav_count: newCount }).eq('id', listing.id);
+
+    const { data: { user } } = await db.auth.getUser();
+    if (user) {
+      if (adding) {
+        const { data: inst } = await db.from('institutions').select('id,name').ilike('email', user.email).maybeSingle();
+        db.from('listing_favorites').upsert({
+          listing_id: listing.id, user_id: user.id,
+          institution_id: inst?.id || null,
+          institution_name: inst?.name || null,
+        }, { onConflict: 'listing_id,user_id' });
+      } else {
+        db.from('listing_favorites').delete().eq('listing_id', listing.id).eq('user_id', user.id);
+      }
+    }
   }
 
   function prevImg(e) { e.stopPropagation(); setImgIdx(i => (i - 1 + imgs.length) % imgs.length); }

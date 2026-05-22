@@ -272,6 +272,12 @@ export default function SignupPage() {
   });
   const set = (k, v) => setForm(f => ({ ...f, [k]: v }));
 
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const e = params.get('email');
+    if (e) setForm(f => ({ ...f, email: e }));
+  }, []);
+
   async function checkCvr() {
     if (cvr.length !== 8 && cvr.length !== 10) return;
     setCvrStatus('checking');

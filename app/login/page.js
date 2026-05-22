@@ -1,5 +1,5 @@
 'use client';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import {
   PRIMARY, GREEN_DEEP, GREEN_SOFT,
@@ -50,6 +50,12 @@ export default function LoginPage() {
   const [loading, setLoading] = useState(false);
   const [error, setError]     = useState(null);
   const [showPass, setShowPass] = useState(false);
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const e = params.get('email');
+    if (e) setEmail(e);
+  }, []);
 
   async function handleSubmit(e) {
     e.preventDefault(); setLoading(true); setError(null);
@@ -131,7 +137,7 @@ export default function LoginPage() {
 
       <div style={{ marginTop: 20, fontFamily: FONT, fontSize: 13, color: INK3 }}>
         <span>Har I ikke en konto? </span>
-        <span onClick={() => router.push('/signup')} style={{ color: PRIMARY, fontWeight: 700, cursor: 'pointer' }}>Tilmeld institution</span>
+        <span onClick={() => router.push('/signup' + (email.trim() ? `?email=${encodeURIComponent(email.trim())}` : ''))} style={{ color: PRIMARY, fontWeight: 700, cursor: 'pointer' }}>Tilmeld institution</span>
       </div>
     </div>
   );
