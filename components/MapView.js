@@ -134,7 +134,20 @@ export default function MapView({ listings, onListingClick, listingCoords, userC
     Object.entries(byCity).forEach(([city, cityListings]) => {
       const coords = listingCoords[city];
       const count = cityListings.length;
-      const color = count === 1 ? (TYPE_COLOR[cityListings[0].type] || PRIMARY) : PRIMARY;
+      const color = TYPE_COLOR[cityListings[0].type] || PRIMARY;
+
+      // For clusters: build colored type dots showing type mix
+      const typeCounts = { køb: 0, byd: 0, byt: 0 };
+      cityListings.forEach(l => { if (typeCounts[l.type] !== undefined) typeCounts[l.type]++; });
+      const typeDots = Object.entries(typeCounts)
+        .filter(([, n]) => n > 0)
+        .map(([t, n]) => `<span style="display:inline-flex;align-items:center;gap:3px;background:rgba(255,255,255,0.22);border-radius:99px;padding:1px 7px;font-size:10px;font-weight:700">
+          <span style="width:6px;height:6px;border-radius:50%;background:${TYPE_COLOR[t]};display:inline-block;flex-shrink:0"></span>${n}
+        </span>`).join('');
+
+      // Dominant type color for cluster background (most common type)
+      const dominantType = Object.entries(typeCounts).sort((a,b) => b[1]-a[1])[0][0];
+      const clusterColor = TYPE_COLOR[dominantType] || PRIMARY;
 
       const markerHtml = count === 1
         ? `<div style="
@@ -152,8 +165,8 @@ export default function MapView({ listings, onListingClick, listingCoords, userC
             ${cityListings[0].price ? `<span style="opacity:0.85">· ${cityListings[0].price} kr.</span>` : ''}
           </div>`
         : `<div style="
-            background:${color};color:#fff;
-            border-radius:999px;padding:6px 14px;
+            background:${clusterColor};color:#fff;
+            border-radius:999px;padding:6px 12px;
             font-size:12px;font-weight:800;white-space:nowrap;
             box-shadow:0 3px 12px rgba(0,0,0,0.25);
             font-family:'Sora',sans-serif;
@@ -161,8 +174,8 @@ export default function MapView({ listings, onListingClick, listingCoords, userC
             cursor:pointer;
             display:flex;align-items:center;gap:6px;
           ">
-            <span>${count} opslag</span>
-            <span style="background:rgba(255,255,255,0.25);border-radius:99px;padding:1px 7px;font-size:10px">${city}</span>
+            <span>${count} opslag · ${city}</span>
+            <span style="display:flex;gap:3px;align-items:center">${typeDots}</span>
           </div>`;
 
       const icon = L.divIcon({ className: '', html: markerHtml, iconAnchor: [0, 0] });
