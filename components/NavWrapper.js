@@ -82,7 +82,7 @@ function BottomNav({ pathname, navigate, loggedIn, unreadTotal }) {
 
   function tab(label, active, onClick, icon) {
     return (
-      <button onClick={onClick} style={{ flex:1, display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center', gap:4, padding:'10px 0 calc(10px + env(safe-area-inset-bottom, 0px))', background:'none', border:'none', cursor:'pointer', color: active ? PRIMARY : INK3, WebkitTapHighlightColor:'transparent' }}>
+      <button onClick={onClick} style={{ flex:1, display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center', gap:4, padding:`10px 0 calc(18px + env(safe-area-inset-bottom, 0px))`, background:'none', border:'none', cursor:'pointer', color: active ? PRIMARY : INK3, WebkitTapHighlightColor:'transparent' }}>
         {icon}
         <span style={{ fontSize:10, fontWeight: active ? 700 : 500, fontFamily:FONT, lineHeight:1 }}>{label}</span>
       </button>
@@ -109,7 +109,7 @@ function BottomNav({ pathname, navigate, loggedIn, unreadTotal }) {
       )}
 
       {/* Opret — elevated green circle in center */}
-      <button onClick={() => navigate('/opret-opslag')} style={{ flex:1, display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'flex-end', paddingBottom:'calc(8px + env(safe-area-inset-bottom, 0px))', background:'none', border:'none', cursor:'pointer', WebkitTapHighlightColor:'transparent' }}>
+      <button onClick={() => navigate('/opret-opslag')} style={{ flex:1, display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'flex-end', paddingBottom:'calc(18px + env(safe-area-inset-bottom, 0px))', background:'none', border:'none', cursor:'pointer', WebkitTapHighlightColor:'transparent' }}>
         <div style={{ width:54, height:54, borderRadius:'50%', background:PRIMARY, display:'flex', alignItems:'center', justifyContent:'center', marginBottom:4, marginTop:-22, boxShadow:`0 4px 18px rgba(42,125,79,0.45)`, border:`3px solid ${PAPER}`, transform: isOpret ? 'scale(0.92)' : 'scale(1)', transition:'transform 0.15s' }}>
           <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2.5" strokeLinecap="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
         </div>
