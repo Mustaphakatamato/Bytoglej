@@ -31,7 +31,14 @@ export default function NavWrapper() {
   const w = useWindowWidth();
   const isMobile = w < 768;
 
-  const navigate = p => { router.push(p); window.scrollTo({ top:0, behavior:'smooth' }); };
+  const navigate = p => {
+    window.scrollTo({ top: 0, behavior: 'instant' });
+    if (typeof document !== 'undefined' && document.startViewTransition) {
+      document.startViewTransition(() => router.push(p));
+    } else {
+      router.push(p);
+    }
+  };
 
   return (
     <>

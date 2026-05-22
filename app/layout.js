@@ -4,7 +4,6 @@ import NavWrapper from '@/components/NavWrapper';
 import Footer from '@/components/Footer';
 import PwaInit from '@/components/PwaInit';
 import PwaInstallPrompt from '@/components/PwaInstallPrompt';
-import PageTransition from '@/components/PageTransition';
 
 export const metadata = {
   title: 'byt&leg — Legetøjsmarkedsplads for institutioner',
@@ -63,7 +62,7 @@ export default function RootLayout({ children }) {
         </div>
         <AppProvider>
           <NavWrapper />
-          <PageTransition>{children}</PageTransition>
+          {children}
           <Footer />
           <PwaInstallPrompt />
         </AppProvider>
