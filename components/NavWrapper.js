@@ -384,7 +384,7 @@ function Nav({ pathname, navigate, loggedIn, setLoggedIn, unreadTotal, instituti
 
   const isHome = pathname === '/';
   const transparent = isHome && !scrolled && !menuOpen && !searchOpen;
-  const showCategoryStrip = !transparent;
+  const showCategoryStrip = !transparent && !scrolled;
 
   function go(p) { navigate(p); }
 

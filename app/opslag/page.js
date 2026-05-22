@@ -213,7 +213,7 @@ export default function OpslagPage() {
 
       {/* ── Sticky filter bar ── */}
       <div style={{
-        position: 'sticky', top: 112, zIndex: 100,
+        position: 'sticky', top: 68, zIndex: 100,
         background: `rgba(246,242,234,0.97)`,
         borderBottom: `1px solid ${PAPER2}`,
         backdropFilter: 'blur(16px)',
