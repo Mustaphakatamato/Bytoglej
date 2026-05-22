@@ -12,7 +12,7 @@ export const metadata = {
 
 export default function RootLayout({ children }) {
   return (
-    <html lang="da">
+    <html lang="da" style={{ background: '#133F2B' }}>
       <head>
         <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover" />
         {/* Inline splash CSS — must be here so it applies before any external stylesheet loads */}
