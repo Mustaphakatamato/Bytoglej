@@ -27,9 +27,12 @@ function LoginInline({ onLogin }) {
     if (step === 'password') setTimeout(() => passRef.current?.focus(), 80);
   }, [step]);
 
+  function isValidEmail(v) { return /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(v.trim()); }
+
   async function handleEmail(e) {
     e.preventDefault();
     if (!email.trim()) return;
+    if (!isValidEmail(email)) { setError('Skriv en gyldig e-mail (fx navn@institution.dk)'); return; }
     setChecking(true); setError(null);
     const emailLower = email.trim().toLowerCase();
     const [{ data: inst }, { data: member }] = await Promise.all([

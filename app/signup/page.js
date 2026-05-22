@@ -75,6 +75,10 @@ function SChoiceGroup({ value, onChange, options, primary }) {
   );
 }
 
+function isValidEmail(e) {
+  return /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(e.trim());
+}
+
 function pwStrength(p) {
   return {
     length:  p.length >= 8,
@@ -319,12 +323,12 @@ export default function SignupPage() {
   function validateStep3() {
     if (!form.leader_name.trim()) return 'Udfyld institutionslederens navn';
     if (!form.leader_phone.trim()) return 'Udfyld telefonnummer';
-    if (!form.leader_email.trim() || !form.leader_email.includes('@')) return 'Udfyld gyldig e-mail';
+    if (!isValidEmail(form.leader_email)) return 'Udfyld en gyldig e-mail (fx navn@institution.dk)';
     return null;
   }
   function validateStep4() {
     if (!form.contact_name.trim()) return 'Udfyld dit navn';
-    if (!form.email.trim() || !form.email.includes('@')) return 'Udfyld gyldig e-mail';
+    if (!isValidEmail(form.email)) return 'Udfyld en gyldig e-mail (fx navn@institution.dk)';
     const s = pwStrength(form.pass);
     if (!s.length || !s.upper || !s.number || !s.special) return 'Adgangskoden opfylder ikke kravene';
     return null;

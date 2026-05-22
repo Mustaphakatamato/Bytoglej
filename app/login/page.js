@@ -43,9 +43,12 @@ export default function LoginPage() {
     if (step === 'password') setTimeout(() => passRef.current?.focus(), 80);
   }, [step]);
 
+  function isValidEmail(v) { return /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(v.trim()); }
+
   async function handleEmailSubmit(e) {
     e.preventDefault();
     if (!email.trim()) return;
+    if (!isValidEmail(email)) { setError('Skriv en gyldig e-mail (fx navn@institution.dk)'); return; }
     setChecking(true);
     setError(null);
     const emailLower = email.trim().toLowerCase();
