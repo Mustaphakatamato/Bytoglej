@@ -421,6 +421,7 @@ function EditListingModal({ listing, onClose, onSave }) {
 }
 
 function ListingsTab({ allInstitutions = [] }) {
+  const { listings: activeListings } = useApp();
   const [listings, setListings] = useState([]);
   const [loading, setLoading] = useState(true);
   const [query, setQuery] = useState('');
@@ -433,13 +434,23 @@ function ListingsTab({ allInstitutions = [] }) {
 
   const fetchAll = useCallback(async () => {
     setLoading(true);
+    // Try fetching all listings (may be blocked by RLS for authenticated admin).
+    // If blocked, fall back to the globally cached active listings from AppProvider.
     const { data, error } = await db.from('listings')
       .select('id,title,type,is_active,created_at,institution_id')
       .order('created_at', { ascending: false });
     if (error) console.error('ListingsTab fetch error:', error.message);
-    setListings(data || []);
+    if (data && data.length > 0) {
+      setListings(data);
+    } else {
+      // RLS is likely blocking the authenticated admin — fall back to globally cached active listings
+      setListings(activeListings.map(l => ({
+        id: l.id, title: l.title, type: l.type,
+        is_active: l.is_active, created_at: l.created_at, institution_id: l.institution_id,
+      })));
+    }
     setLoading(false);
-  }, []);
+  }, [activeListings]);
 
   useEffect(() => { fetchAll(); }, [fetchAll]);
 
