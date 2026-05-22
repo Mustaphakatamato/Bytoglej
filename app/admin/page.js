@@ -216,7 +216,7 @@ function InstitutionsTab({ institutions, setAdminInst, adminInst }) {
     const [{ data: members }, { data: invitations }, { data: listings }] = await Promise.all([
       db.from('institution_members').select('*').eq('institution_id', inst.id),
       db.from('institution_invitations').select('*').eq('institution_id', inst.id).order('created_at', { ascending: false }),
-      db.from('listings').select('id,title,is_active,listing_type,created_at').eq('institution_id', inst.id).order('created_at', { ascending: false }),
+      db.from('listings').select('id,title,is_active,type,created_at').eq('institution_id', inst.id).order('created_at', { ascending: false }),
     ]);
     setDetail({ inst, members: members || [], invitations: invitations || [], listings: listings || [] });
     setLoadingDetail(false);
@@ -361,6 +361,65 @@ function InfoItem({ label, value }) {
 
 // ── Listings tab ─────────────────────────────────────────────────────────────
 
+function EditListingModal({ listing, onClose, onSave }) {
+  const [form, setForm] = useState({
+    title: listing.title || '',
+    description: listing.description || '',
+    price: listing.price || '',
+    condition: listing.condition || '',
+    is_active: listing.is_active,
+  });
+  const [saving, setSaving] = useState(false);
+
+  async function handleSave() {
+    setSaving(true);
+    const update = {
+      title: form.title,
+      description: form.description,
+      price: form.price ? Number(form.price) : null,
+      condition: form.condition,
+      is_active: form.is_active,
+    };
+    await db.from('listings').update(update).eq('id', listing.id);
+    setSaving(false);
+    onSave({ id: listing.id, ...update });
+  }
+
+  const inputStyle = { width:'100%', padding:'10px 14px', borderRadius:10, border:'1.5px solid #DAD3C4', fontSize:14, fontFamily:FONT, outline:'none', boxSizing:'border-box', background:'#fff' };
+
+  return (
+    <div onClick={onClose} style={{ position:'fixed', inset:0, background:'rgba(22,34,28,0.45)', zIndex:9000, display:'flex', alignItems:'center', justifyContent:'center', padding:20 }}>
+      <div onClick={e=>e.stopPropagation()} style={{ background:'#fff', borderRadius:20, padding:32, maxWidth:520, width:'100%', boxShadow:'0 20px 60px rgba(22,34,28,0.2)' }}>
+        <div style={{ fontFamily:FONT, fontWeight:800, fontSize:20, color:'#16221C', marginBottom:20 }}>Rediger opslag</div>
+        <div style={{ display:'flex', flexDirection:'column', gap:14 }}>
+          <div>
+            <label style={{ display:'block', fontFamily:FONT, fontWeight:700, fontSize:12, color:'#6B7570', marginBottom:6 }}>TITEL</label>
+            <input value={form.title} onChange={e=>setForm(f=>({...f,title:e.target.value}))} style={inputStyle} />
+          </div>
+          <div>
+            <label style={{ display:'block', fontFamily:FONT, fontWeight:700, fontSize:12, color:'#6B7570', marginBottom:6 }}>BESKRIVELSE</label>
+            <textarea value={form.description} onChange={e=>setForm(f=>({...f,description:e.target.value}))} rows={4} style={{ ...inputStyle, resize:'vertical' }} />
+          </div>
+          <div>
+            <label style={{ display:'block', fontFamily:FONT, fontWeight:700, fontSize:12, color:'#6B7570', marginBottom:6 }}>PRIS (KR.) — TOM = INGEN PRIS</label>
+            <input type="number" value={form.price} onChange={e=>setForm(f=>({...f,price:e.target.value}))} style={inputStyle} />
+          </div>
+          <div style={{ display:'flex', alignItems:'center', gap:10 }}>
+            <input type="checkbox" id="active-toggle" checked={form.is_active} onChange={e=>setForm(f=>({...f,is_active:e.target.checked}))} style={{ width:18, height:18, cursor:'pointer', accentColor:'#2A7D4F' }} />
+            <label htmlFor="active-toggle" style={{ fontFamily:FONT, fontWeight:600, fontSize:14, color:'#16221C', cursor:'pointer' }}>Opslag er aktivt</label>
+          </div>
+        </div>
+        <div style={{ display:'flex', gap:10, marginTop:24 }}>
+          <button onClick={onClose} style={{ flex:1, padding:'12px', borderRadius:99, background:'#ECE6DA', border:'none', fontFamily:FONT, fontWeight:700, fontSize:14, color:'#3A473D', cursor:'pointer' }}>Annuller</button>
+          <button onClick={handleSave} disabled={saving} style={{ flex:2, padding:'12px', borderRadius:99, background:'#2A7D4F', border:'none', fontFamily:FONT, fontWeight:700, fontSize:15, color:'#fff', cursor:saving?'not-allowed':'pointer' }}>
+            {saving ? 'Gemmer…' : 'Gem ændringer'}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function ListingsTab() {
   const [listings, setListings] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -368,11 +427,12 @@ function ListingsTab() {
   const [filterType, setFilterType] = useState('');
   const [filterActive, setFilterActive] = useState('');
   const [confirm, setConfirm] = useState(null); // id to delete
+  const [editing, setEditing] = useState(null);
 
   const fetchAll = useCallback(async () => {
     setLoading(true);
     const { data } = await db.from('listings')
-      .select('id,title,listing_type,is_active,created_at,institution_id,institutions(name)')
+      .select('id,title,type,is_active,created_at,institution_id,institutions(name)')
       .order('created_at', { ascending: false });
     setListings(data || []);
     setLoading(false);
@@ -392,7 +452,7 @@ function ListingsTab() {
   }
 
   const filtered = listings.filter(l => {
-    if (filterType && l.listing_type !== filterType) return false;
+    if (filterType && l.type !== filterType) return false;
     if (filterActive === 'active' && !l.is_active) return false;
     if (filterActive === 'inactive' && l.is_active) return false;
     if (query && !l.title?.toLowerCase().includes(query.toLowerCase()) && !l.institutions?.name?.toLowerCase().includes(query.toLowerCase())) return false;
@@ -444,7 +504,7 @@ function ListingsTab() {
                       </td>
                       <td style={{ padding: '12px 16px', color: INK2 }}>{l.institutions?.name || '—'}</td>
                       <td style={{ padding: '12px 16px' }}>
-                        <TypeBadge type={l.listing_type} />
+                        <TypeBadge type={l.type} />
                       </td>
                       <td style={{ padding: '12px 16px' }}>
                         <span style={{ background: l.is_active ? GREEN_TINT : PAPER3, color: l.is_active ? PRIMARY : INK3, fontWeight: 700, fontSize: 12, padding: '3px 10px', borderRadius: 99 }}>
@@ -458,6 +518,9 @@ function ListingsTab() {
                         <div style={{ display: 'flex', gap: 6 }}>
                           <button onClick={() => toggleActive(l.id, l.is_active)} title={l.is_active ? 'Deaktiver' : 'Aktiver'} style={{ background: l.is_active ? PAPER3 : GREEN_TINT, border: 'none', color: l.is_active ? INK3 : PRIMARY, borderRadius: 7, padding: '5px 8px', cursor: 'pointer', display: 'flex', alignItems: 'center' }}>
                             <IconToggle on={!l.is_active} />
+                          </button>
+                          <button onClick={() => setEditing(l)} title="Rediger" style={{ background: GREEN_TINT, border:'none', color:PRIMARY, borderRadius:7, padding:'5px 8px', cursor:'pointer', display:'flex', alignItems:'center' }}>
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
                           </button>
                           <button onClick={() => setConfirm(l.id)} title="Slet" style={{ background: '#FEF2F2', border: 'none', color: '#EF4444', borderRadius: 7, padding: '5px 8px', cursor: 'pointer', display: 'flex', alignItems: 'center' }}>
                             <IconTrash />
@@ -485,6 +548,13 @@ function ListingsTab() {
             </div>
           </div>
         </div>
+      )}
+
+      {editing && (
+        <EditListingModal listing={editing} onClose={() => setEditing(null)} onSave={(updated) => {
+          setListings(prev => prev.map(l => l.id === updated.id ? { ...l, ...updated } : l));
+          setEditing(null);
+        }} />
       )}
     </div>
   );

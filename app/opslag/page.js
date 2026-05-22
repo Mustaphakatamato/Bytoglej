@@ -404,7 +404,7 @@ export default function OpslagPage() {
           </p>
           <div style={{ display:'flex', gap:10, alignItems:'center' }}>
             {(filter !== 'alle' || city !== 'alle' || activeTags.length || maxDist !== 'alle' || dSearch || category || subcategory) && (
-              <button onClick={() => { setFilter('alle'); setSearch(''); setCity('alle'); setActiveTags([]); setMaxDist('alle'); setCategory(''); setSubcategory(''); }} style={{ fontSize: 12, fontWeight: 600, color: PRIMARY, background: 'none', border: 'none', cursor: 'pointer', fontFamily: FONT, padding: 0 }}>
+              <button onClick={() => { setFilter('alle'); setSearch(''); setCity('alle'); setActiveTags([]); setMaxDist('alle'); setCategory(''); setSubcategory(''); window.history.replaceState({}, '', '/opslag'); }} style={{ fontSize: 12, fontWeight: 600, color: PRIMARY, background: 'none', border: 'none', cursor: 'pointer', fontFamily: FONT, padding: 0 }}>
                 Nulstil filtre
               </button>
             )}
@@ -433,7 +433,7 @@ export default function OpslagPage() {
             <div style={{ fontFamily: FONT, fontWeight: 800, fontSize: isMobile ? 60 : 96, color: GREEN_SOFT, lineHeight: 1, letterSpacing: '-0.05em', marginBottom: 12, userSelect: 'none' }}>0</div>
             <div style={{ fontFamily: FONT, fontWeight: 800, fontSize: isMobile ? 20 : 26, color: INK, marginBottom: 8, letterSpacing: '-0.03em' }}>Ingen opslag fundet</div>
             <p style={{ fontSize: 15, color: INK3, marginBottom: 28 }}>Prøv at ændre eller nulstille dine filtre</p>
-            <button onClick={() => { setFilter('alle'); setSearch(''); setCity('alle'); setActiveTags([]); setMaxDist('alle'); setCategory(''); setSubcategory(''); }} style={{
+            <button onClick={() => { setFilter('alle'); setSearch(''); setCity('alle'); setActiveTags([]); setMaxDist('alle'); setCategory(''); setSubcategory(''); window.history.replaceState({}, '', '/opslag'); }} style={{
               background: 'none', border: `1.5px solid ${PRIMARY}`, color: PRIMARY,
               borderRadius: 99, padding: '10px 24px', fontSize: 14, fontWeight: 700,
               fontFamily: FONT, cursor: 'pointer',

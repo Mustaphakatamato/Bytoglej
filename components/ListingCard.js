@@ -10,6 +10,7 @@ export default function ListingCard({ listing, onClick, favs, toggleFav, onInsti
   const isFav = favs.includes(listing.id);
   const [popping, setPopping] = useState(false);
   const [imgIdx, setImgIdx] = useState(0);
+  const [hovered, setHovered] = useState(false);
   const [localFavCount, setLocalFavCount] = useState(listing.fav_count || 0);
   const imgs = listing.images?.length ? listing.images : [];
 
@@ -31,7 +32,7 @@ export default function ListingCard({ listing, onClick, favs, toggleFav, onInsti
   const condStyle = CONDITION_COLORS[listing.condition] || { bg: PAPER2, color: INK3 };
 
   return (
-    <div className="card" onClick={onClick} style={{
+    <div className="card" onClick={onClick} onMouseEnter={() => setHovered(true)} onMouseLeave={() => setHovered(false)} style={{
       background: PAPER2,
       borderRadius: 20,
       overflow: 'hidden',
@@ -49,10 +50,16 @@ export default function ListingCard({ listing, onClick, favs, toggleFav, onInsti
         display: 'flex', alignItems: 'center', justifyContent: 'center',
         position: 'relative', overflow: 'hidden', flexShrink: 0,
       }}>
-        {imgs.length
-          ? <img src={imgs[imgIdx]} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
-          : <span style={{ fontSize: 52, opacity: 0.45 }}>{listing.emoji || '🧸'}</span>
-        }
+        {imgs.length > 1 ? (
+          <>
+            <img src={imgs[imgIdx]} alt="" style={{ width:'100%', height:'100%', objectFit:'cover', display:'block', position:'absolute', inset:0, opacity: hovered ? 0 : 1, transition:'opacity 0.3s ease' }} />
+            <img src={imgs[(imgIdx + 1) % imgs.length]} alt="" style={{ width:'100%', height:'100%', objectFit:'cover', display:'block', position:'absolute', inset:0, opacity: hovered ? 1 : 0, transition:'opacity 0.3s ease' }} />
+          </>
+        ) : imgs.length === 1 ? (
+          <img src={imgs[0]} alt="" style={{ width:'100%', height:'100%', objectFit:'cover', display:'block' }} />
+        ) : (
+          <span style={{ fontSize:52, opacity:0.45 }}>{listing.emoji || '🧸'}</span>
+        )}
         {imgs.length > 1 && <>
           <button onClick={prevImg} style={{ position: 'absolute', left: 8, top: '50%', transform: 'translateY(-50%)', background: 'rgba(22,34,28,0.52)', border: 'none', borderRadius: '50%', width: 32, height: 32, color: '#fff', fontSize: 18, fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>‹</button>
           <button onClick={nextImg} style={{ position: 'absolute', right: 8, top: '50%', transform: 'translateY(-50%)', background: 'rgba(22,34,28,0.52)', border: 'none', borderRadius: '50%', width: 32, height: 32, color: '#fff', fontSize: 18, fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>›</button>

@@ -224,10 +224,12 @@ export default function MessagesClient() {
     for (const file of files) {
       const ext = file.name.split('.').pop() || 'jpg';
       const path = `${convId}/${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`;
-      const { error } = await db.storage.from('chat-images').upload(path, file, { upsert: false });
-      if (!error) {
-        const { data: { publicUrl } } = db.storage.from('chat-images').getPublicUrl(path);
+      const { data: uploadData, error } = await db.storage.from('chat-images').upload(path, file, { upsert: false });
+      if (!error && uploadData) {
+        const { data: { publicUrl } } = db.storage.from('chat-images').getPublicUrl(uploadData.path);
         urls.push(publicUrl);
+      } else if (error) {
+        console.error('Image upload failed:', error.message);
       }
     }
     return urls;
@@ -257,6 +259,7 @@ export default function MessagesClient() {
     let msgType = null;
     if (chatImages.length > 0) {
       const urls = await uploadImages(chatImages, convId);
+      if (urls.length === 0) { console.error('Image upload failed — no URLs returned; check storage permissions'); setSending(false); return; }
       msgType = 'image';
       msgContent = JSON.stringify({ urls, caption: content });
       setChatImages([]);
@@ -290,6 +293,7 @@ export default function MessagesClient() {
       : (isInit ? active.initiator_name : active.owner_name);
     if (chatImages.length > 0) {
       const urls = await uploadImages(chatImages, active.id);
+      if (urls.length === 0) { console.error('Image upload failed — no URLs returned; check storage permissions'); setSending(false); return; }
       const imageContent = JSON.stringify({ urls, caption: content });
       setChatImages([]);
       const { data: imgMsg } = await db.from('chat_messages').insert({ conversation_id: active.id, sender_id: effectiveUserId, sender_name: senderName, content: imageContent, message_type: 'image' }).select().single();
