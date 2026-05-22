@@ -2,6 +2,7 @@ const zlib = require('zlib');
 const fs   = require('fs');
 const path = require('path');
 
+// ── PNG encoder ───────────────────────────────────────────────
 function crc32(buf) {
   const t = [];
   for (let n = 0; n < 256; n++) {
@@ -13,25 +14,23 @@ function crc32(buf) {
   for (let i = 0; i < buf.length; i++) crc = t[(crc ^ buf[i]) & 0xFF] ^ (crc >>> 8);
   return (crc ^ 0xFFFFFFFF) >>> 0;
 }
-
 function pngChunk(type, data) {
   const len = Buffer.alloc(4); len.writeUInt32BE(data.length);
   const tb  = Buffer.from(type, 'ascii');
   const crc = Buffer.alloc(4); crc.writeUInt32BE(crc32(Buffer.concat([tb, data])));
   return Buffer.concat([len, tb, data, crc]);
 }
-
-function makePng(size, pixelFn) {
+function makePng(width, height, pixelFn) {
   const sig  = Buffer.from([0x89,0x50,0x4e,0x47,0x0d,0x0a,0x1a,0x0a]);
   const ihdr = Buffer.alloc(13);
-  ihdr.writeUInt32BE(size, 0); ihdr.writeUInt32BE(size, 4);
+  ihdr.writeUInt32BE(width, 0); ihdr.writeUInt32BE(height, 4);
   ihdr[8] = 8; ihdr[9] = 6; // 8-bit RGBA
-  const rowLen = size * 4 + 1;
-  const raw    = Buffer.alloc(size * rowLen);
-  for (let y = 0; y < size; y++) {
+  const rowLen = width * 4 + 1;
+  const raw    = Buffer.alloc(height * rowLen);
+  for (let y = 0; y < height; y++) {
     raw[y * rowLen] = 0;
-    for (let x = 0; x < size; x++) {
-      const [r, g, b, a] = pixelFn(x, y, size);
+    for (let x = 0; x < width; x++) {
+      const [r, g, b, a] = pixelFn(x, y, width, height);
       const off = y * rowLen + 1 + x * 4;
       raw[off] = r; raw[off+1] = g; raw[off+2] = b; raw[off+3] = a;
     }
@@ -40,93 +39,184 @@ function makePng(size, pixelFn) {
   return Buffer.concat([sig, pngChunk('IHDR', ihdr), pngChunk('IDAT', idat), pngChunk('IEND', Buffer.alloc(0))]);
 }
 
-// Brand colours
-const GREEN  = [42, 125, 79];
-const WHITE  = [255, 255, 255];
+// ── Colours ───────────────────────────────────────────────────
+const PAPER = [246, 242, 234, 255]; // #F6F2EA
+const INK   = [ 22,  34,  28, 255]; // #16221C
+const GREEN = [ 42, 125,  79, 255]; // #2A7D4F
 const TRANSP = [0, 0, 0, 0];
 
-// Bitmap glyphs 5-wide × 7-tall for "B", "&", "L"
-const GLYPHS = {
-  B: [
-    [1,1,1,1,0],
-    [1,0,0,0,1],
-    [1,0,0,0,1],
-    [1,1,1,1,0],
-    [1,0,0,0,1],
-    [1,0,0,0,1],
-    [1,1,1,1,0],
+// ── Bitmap glyphs  (8 wide × 11 tall, bold style) ─────────────
+// Each row: left→right, 1 = filled pixel
+const G = {
+  b: [
+    [1,0,0,0,0,0,0,0],
+    [1,0,0,0,0,0,0,0],
+    [1,1,1,1,0,0,0,0],
+    [1,0,0,0,1,0,0,0],
+    [1,0,0,0,1,0,0,0],
+    [1,0,0,0,1,0,0,0],
+    [1,0,0,0,1,0,0,0],
+    [1,0,0,0,1,0,0,0],
+    [1,1,1,1,0,0,0,0],
+    [0,0,0,0,0,0,0,0],
+    [0,0,0,0,0,0,0,0],
+  ],
+  y: [
+    [0,0,0,0,0,0,0,0],
+    [0,0,0,0,0,0,0,0],
+    [1,0,0,0,0,1,0,0],
+    [1,0,0,0,0,1,0,0],
+    [1,0,0,0,0,1,0,0],
+    [0,1,0,0,1,0,0,0],
+    [0,0,1,1,0,0,0,0],
+    [0,0,0,1,0,0,0,0],
+    [0,0,1,0,0,0,0,0],
+    [0,1,0,0,0,0,0,0],
+    [0,0,0,0,0,0,0,0],
+  ],
+  t: [
+    [0,0,1,0,0,0,0,0],
+    [0,0,1,0,0,0,0,0],
+    [1,1,1,1,1,0,0,0],
+    [0,0,1,0,0,0,0,0],
+    [0,0,1,0,0,0,0,0],
+    [0,0,1,0,0,0,0,0],
+    [0,0,1,0,0,0,0,0],
+    [0,0,1,0,0,0,0,0],
+    [0,0,0,1,1,0,0,0],
+    [0,0,0,0,0,0,0,0],
+    [0,0,0,0,0,0,0,0],
   ],
   '&': [
-    [0,1,1,0,0],
-    [1,0,0,1,0],
-    [1,0,0,1,0],
-    [0,1,1,0,0],
-    [1,0,0,1,1],
-    [1,0,0,0,1],
-    [0,1,1,1,0],
+    [0,0,1,1,1,0,0,0],
+    [0,1,0,0,0,1,0,0],
+    [0,1,0,0,0,1,0,0],
+    [0,0,1,1,0,0,0,0],
+    [0,1,0,0,1,0,1,0],
+    [1,0,0,0,0,1,1,0],
+    [1,0,0,0,0,1,0,0],
+    [0,1,0,0,1,0,0,0],
+    [0,0,1,1,0,0,1,0],
+    [0,0,0,0,0,0,0,0],
+    [0,0,0,0,0,0,0,0],
   ],
-  L: [
-    [1,0,0,0,0],
-    [1,0,0,0,0],
-    [1,0,0,0,0],
-    [1,0,0,0,0],
-    [1,0,0,0,0],
-    [1,0,0,0,0],
-    [1,1,1,1,1],
+  l: [
+    [1,1,0,0,0,0,0,0],
+    [0,1,0,0,0,0,0,0],
+    [0,1,0,0,0,0,0,0],
+    [0,1,0,0,0,0,0,0],
+    [0,1,0,0,0,0,0,0],
+    [0,1,0,0,0,0,0,0],
+    [0,1,0,0,0,0,0,0],
+    [0,1,0,0,0,0,0,0],
+    [0,1,1,1,0,0,0,0],
+    [0,0,0,0,0,0,0,0],
+    [0,0,0,0,0,0,0,0],
+  ],
+  e: [
+    [0,0,0,0,0,0,0,0],
+    [0,0,0,0,0,0,0,0],
+    [0,1,1,1,0,0,0,0],
+    [1,0,0,0,1,0,0,0],
+    [1,0,0,0,1,0,0,0],
+    [1,1,1,1,1,0,0,0],
+    [1,0,0,0,0,0,0,0],
+    [1,0,0,0,1,0,0,0],
+    [0,1,1,1,0,0,0,0],
+    [0,0,0,0,0,0,0,0],
+    [0,0,0,0,0,0,0,0],
+  ],
+  g: [
+    [0,0,0,0,0,0,0,0],
+    [0,0,0,0,0,0,0,0],
+    [0,1,1,1,1,0,0,0],
+    [1,0,0,0,0,1,0,0],
+    [1,0,0,0,0,1,0,0],
+    [1,0,0,0,0,1,0,0],
+    [0,1,1,1,1,1,0,0],
+    [0,0,0,0,0,1,0,0],
+    [1,0,0,0,0,1,0,0],
+    [0,1,1,1,1,0,0,0],
+    [0,0,0,0,0,0,0,0],
+  ],
+  '.': [
+    [0,0,0,0,0,0,0,0],
+    [0,0,0,0,0,0,0,0],
+    [0,0,0,0,0,0,0,0],
+    [0,0,0,0,0,0,0,0],
+    [0,0,0,0,0,0,0,0],
+    [0,0,0,0,0,0,0,0],
+    [0,0,0,0,0,0,0,0],
+    [0,1,1,0,0,0,0,0],
+    [0,1,1,0,0,0,0,0],
+    [0,0,0,0,0,0,0,0],
+    [0,0,0,0,0,0,0,0],
   ],
 };
 
-// Draw "B&L" centred inside a circle on a green background
-function iconPixel(x, y, size, maskable = false) {
-  const cx = size / 2, cy = size / 2;
-  const dx = x - cx, dy = y - cy;
-  const dist = Math.sqrt(dx * dx + dy * dy);
+// Widths (how many columns each glyph actually uses)
+const GW = { b:5, y:6, t:5, '&':7, l:4, e:5, g:6, '.':3 };
+const GH = 11;
+const GLYPH_GAP = 1; // columns between glyphs
 
-  if (!maskable) {
-    // Rounded square: clip corners
-    const r = size * 0.18;
-    const inset = size * 0.06;
-    const rx = Math.abs(x - cx) - (size/2 - inset - r);
-    const ry = Math.abs(y - cy) - (size/2 - inset - r);
-    const inCorner = rx > 0 && ry > 0;
-    if (inCorner && Math.sqrt(rx*rx + ry*ry) > r) return TRANSP;
+// ── Draw "byt &leg." layout onto pixel buffer ─────────────────
+// Returns colour [r,g,b,a] for pixel (x,y) inside a `size` × `size` canvas
+function logoPixel(px, py, size) {
+  // Scale: fit two lines of text with margins
+  const margin  = Math.round(size * 0.08);
+  const scale   = Math.max(1, Math.floor((size - margin * 2) / 52)); // 52 ≈ max line width in glyph units
+
+  const lineH   = GH * scale;
+  const lineGap = Math.round(scale * 2.5);
+  const totalH  = lineH * 2 + lineGap;
+  const topY    = Math.round((size - totalH) / 2);
+
+  // Line 1: "byt"
+  const line1 = ['b','y','t'];
+  // Line 2: "&leg."
+  const line2 = ['&','l','e','g','.'];
+
+  function lineWidth(chars) {
+    return chars.reduce((s,c,i) => s + GW[c] * scale + (i < chars.length-1 ? GLYPH_GAP * scale : 0), 0);
   }
 
-  // White inner circle
-  const circleR = size * 0.36;
-  if (dist < circleR) {
-    // Draw "B&L" text inside the white circle using bitmap font
-    const scale  = Math.floor(size / 64); // pixel size of each font pixel
-    const gw     = 5, gh = 7;
-    const chars  = ['B', '&', 'L'];
-    const gap    = 1;
-    const totalW = chars.length * gw * scale + (chars.length - 1) * gap * scale;
-    const totalH = gh * scale;
-    const textX  = Math.round(cx - totalW / 2);
-    const textY  = Math.round(cy - totalH / 2);
+  const l1w   = lineWidth(line1);
+  const l2w   = lineWidth(line2);
+  const startX = margin;
 
-    for (let ci = 0; ci < chars.length; ci++) {
-      const glyph  = GLYPHS[chars[ci]];
-      const charX  = textX + ci * (gw + gap) * scale;
-      for (let gy = 0; gy < gh; gy++) {
+  function hitTest(chars, lineStartY, colourFn) {
+    let cx = startX;
+    for (const ch of chars) {
+      const glyph = G[ch];
+      const gw    = GW[ch];
+      for (let gy = 0; gy < GH; gy++) {
         for (let gx = 0; gx < gw; gx++) {
           if (!glyph[gy][gx]) continue;
-          const px0 = charX + gx * scale;
-          const py0 = textY + gy * scale;
-          if (x >= px0 && x < px0 + scale && y >= py0 && y < py0 + scale) {
-            return [...GREEN, 255];
+          const x0 = cx + gx * scale;
+          const y0 = lineStartY + gy * scale;
+          if (px >= x0 && px < x0 + scale && py >= y0 && py < y0 + scale) {
+            return colourFn(ch);
           }
         }
       }
+      cx += (gw + GLYPH_GAP) * scale;
     }
-    return [...WHITE, 255];
+    return null;
   }
 
-  // Green background
-  return [...GREEN, 255];
+  // Line 1 colour: all INK
+  let hit = hitTest(line1, topY, () => INK);
+  if (hit) return hit;
+
+  // Line 2: '&' → GREEN, rest → INK
+  hit = hitTest(line2, topY + lineH + lineGap, ch => ch === '&' ? GREEN : INK);
+  if (hit) return hit;
+
+  return PAPER;
 }
 
-const out = path.join(__dirname, '..', 'public', 'icons');
+// ── Generate icons ────────────────────────────────────────────
+const outDir = path.join(__dirname, '..', 'public', 'icons');
 
 const configs = [
   { name: 'icon-192.png',          size: 192, maskable: false },
@@ -137,8 +227,18 @@ const configs = [
 ];
 
 for (const { name, size, maskable } of configs) {
-  const buf = makePng(size, (x, y, s) => iconPixel(x, y, s, maskable));
-  fs.writeFileSync(path.join(out, name), buf);
-  console.log(`✓ ${name} (${size}×${size})`);
+  const buf = makePng(size, size, (x, y, w, h) => {
+    if (!maskable) {
+      // Rounded corners: clip to rounded square
+      const r  = size * 0.18;
+      const cx = size / 2, cy = size / 2;
+      const rx = Math.abs(x - cx) - (size/2 - r);
+      const ry = Math.abs(y - cy) - (size/2 - r);
+      if (rx > 0 && ry > 0 && Math.sqrt(rx*rx + ry*ry) > r) return TRANSP;
+    }
+    return logoPixel(x, y, size);
+  });
+  fs.writeFileSync(path.join(outDir, name), buf);
+  console.log(`✓  ${name}  (${size}×${size})`);
 }
-console.log('Icons generated successfully.');
+console.log('Done.');

@@ -1,14 +1,29 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
-  <rect width="512" height="512" rx="96" fill="#2A7D4F"/>
-  <circle cx="256" cy="256" r="188" fill="white" opacity="0.12"/>
-  <circle cx="256" cy="256" r="160" fill="white"/>
-  <!-- B -->
-  <rect x="148" y="168" width="14" height="80" fill="#2A7D4F"/>
-  <path d="M148 168 h38 a22 22 0 0 1 0 44 h-38 z" fill="#2A7D4F"/>
-  <path d="M148 212 h42 a26 26 0 0 1 0 36 h-42 z" fill="#2A7D4F"/>
-  <!-- & -->
-  <path d="M222 204 a20 20 0 1 1 30 26 l-34 18 a24 24 0 1 0 38 18" fill="none" stroke="#2A7D4F" stroke-width="13" stroke-linecap="round"/>
-  <!-- L -->
-  <rect x="298" y="168" width="14" height="80" fill="#2A7D4F"/>
-  <rect x="298" y="234" width="46" height="14" fill="#2A7D4F"/>
+  <rect width="512" height="512" fill="#F6F2EA"/>
+
+  <!-- "byt" – top line, dark ink -->
+  <text
+    x="40" y="248"
+    font-family="'Arial Black', 'Helvetica Neue', Arial, sans-serif"
+    font-weight="900"
+    font-size="190"
+    letter-spacing="-6"
+    fill="#16221C">byt</text>
+
+  <!-- "&" – bottom line, primary green -->
+  <text
+    x="40" y="462"
+    font-family="'Arial Black', 'Helvetica Neue', Arial, sans-serif"
+    font-weight="900"
+    font-size="190"
+    fill="#2A7D4F">&amp;</text>
+
+  <!-- "leg." – bottom line, dark ink -->
+  <text
+    x="155" y="462"
+    font-family="'Arial Black', 'Helvetica Neue', Arial, sans-serif"
+    font-weight="900"
+    font-size="190"
+    letter-spacing="-4"
+    fill="#16221C">leg.</text>
 </svg>
