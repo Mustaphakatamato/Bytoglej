@@ -396,16 +396,13 @@ function Nav({ pathname, navigate, loggedIn, setLoggedIn, unreadTotal, instituti
       <div style={{ maxWidth:1140, margin:'0 auto', display:'flex', alignItems:'center', height:68, gap:isMobile?10:20, padding:'0 16px' }}>
 
         {/* Logo */}
-        <Link href="/" style={{ display:'flex', alignItems:'center', gap:10, cursor:'pointer', flexShrink:0, textDecoration:'none' }}>
-          <Mark09 size={34} bg={transparent ? 'rgba(255,255,255,0.15)' : PRIMARY} />
-          {!isMobile && (
-            <span style={{ fontFamily:FONT, fontWeight:800, fontSize:18, letterSpacing:'-0.04em', lineHeight:1.05 }}>
-              <span style={{ display:'block', color:transparent?'#fff':INK }}>byt</span>
-              <span style={{ display:'block', color:transparent?'rgba(255,255,255,0.9)':INK }}>
-                <span style={{ color:transparent?'#fff':PRIMARY }}>&amp;</span>leg<span style={{ color:transparent?'#fff':PRIMARY }}>.</span>
-              </span>
+        <Link href="/" style={{ display:'flex', alignItems:'center', cursor:'pointer', flexShrink:0, textDecoration:'none' }}>
+          <span style={{ fontFamily:FONT, fontWeight:800, fontSize:18, letterSpacing:'-0.04em', lineHeight:1.05 }}>
+            <span style={{ display:'block', color:transparent?'#fff':INK }}>byt</span>
+            <span style={{ display:'block', color:transparent?'rgba(255,255,255,0.9)':INK }}>
+              <span style={{ color:transparent?'#fff':PRIMARY }}>&amp;</span>leg<span style={{ color:transparent?'#fff':PRIMARY }}>.</span>
             </span>
-          )}
+          </span>
         </Link>
 
         {/* Search bar — desktop */}
