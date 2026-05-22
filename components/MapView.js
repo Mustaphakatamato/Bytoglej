@@ -208,7 +208,7 @@ export default function MapView({ listings, onListingClick, listingCoords, userC
   const hasListingsOnMap = listings.some(l => l.city && listingCoords[l.city]);
 
   return (
-    <div style={{ position: 'relative', height: isMobile ? 500 : 620, borderRadius: 20, overflow: 'hidden', boxShadow: '0 4px 24px rgba(22,34,28,0.10)', border: `1px solid ${PAPER2}` }}>
+    <div style={{ position: 'relative', height: isMobile ? 500 : 620, borderRadius: 20, overflow: 'hidden', boxShadow: '0 4px 24px rgba(22,34,28,0.10)', border: `1px solid ${PAPER2}`, isolation: 'isolate' }}>
       <div ref={mapRef} style={{ width: '100%', height: '100%' }} />
 
       {/* Popup overlay */}
