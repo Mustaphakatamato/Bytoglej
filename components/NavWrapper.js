@@ -28,13 +28,17 @@ export default function NavWrapper() {
   const { institution } = useActiveUser();
   const pathname = usePathname();
   const router = useRouter();
+  const w = useWindowWidth();
+  const isMobile = w < 768;
+
+  const navigate = p => { router.push(p); window.scrollTo({ top:0, behavior:'smooth' }); };
 
   return (
     <>
       <Suspense fallback={null}>
         <Nav
           pathname={pathname}
-          navigate={p => { router.push(p); window.scrollTo({ top:0, behavior:'smooth' }); }}
+          navigate={navigate}
           loggedIn={loggedIn}
           setLoggedIn={setLoggedIn}
           unreadTotal={unreadTotal}
@@ -43,6 +47,14 @@ export default function NavWrapper() {
           router={router}
         />
       </Suspense>
+      {isMobile && (
+        <BottomNav
+          pathname={pathname}
+          navigate={navigate}
+          loggedIn={loggedIn}
+          unreadTotal={unreadTotal}
+        />
+      )}
       {toast && <ToastDisplay msg={toast.msg} type={toast.type} onDone={()=>setToast(null)} />}
     </>
   );
@@ -62,35 +74,44 @@ function ToastDisplay({ msg, type='success', onDone }) {
 }
 
 function BottomNav({ pathname, navigate, loggedIn, unreadTotal }) {
-  const isHome     = pathname === '/' || pathname?.startsWith('/opslag');
+  const isHome     = pathname === '/';
+  const isOpslag   = pathname?.startsWith('/opslag');
   const isOpret    = pathname?.startsWith('/opret-opslag');
   const isBeskeder = pathname?.startsWith('/beskeder');
   const isProfile  = pathname?.startsWith('/dashboard') || pathname?.startsWith('/profil');
 
-  function tab(label, active, onClick, children) {
+  function tab(label, active, onClick, icon) {
     return (
-      <button onClick={onClick} style={{ flex:1, display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center', gap:3, padding:'8px 0 6px', background:'none', border:'none', cursor:'pointer', color: active ? PRIMARY : INK3, WebkitTapHighlightColor:'transparent' }}>
-        {children}
+      <button onClick={onClick} style={{ flex:1, display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center', gap:4, padding:'10px 0 calc(10px + env(safe-area-inset-bottom, 0px))', background:'none', border:'none', cursor:'pointer', color: active ? PRIMARY : INK3, WebkitTapHighlightColor:'transparent' }}>
+        {icon}
         <span style={{ fontSize:10, fontWeight: active ? 700 : 500, fontFamily:FONT, lineHeight:1 }}>{label}</span>
       </button>
     );
   }
 
   return (
-    <nav style={{ position:'fixed', bottom:0, left:0, right:0, zIndex:900, background:PAPER, borderTop:`1px solid ${PAPER2}`, paddingBottom:'env(safe-area-inset-bottom, 0px)', display:'flex', alignItems:'stretch', boxShadow:'0 -2px 12px rgba(22,34,28,0.07)' }}>
+    <nav style={{ position:'fixed', bottom:0, left:0, right:0, zIndex:900, background:PAPER, borderTop:`1px solid ${PAPER2}`, display:'flex', alignItems:'stretch', boxShadow:'0 -2px 16px rgba(22,34,28,0.08)' }}>
 
       {/* Hjem */}
-      {tab('Hjem', isHome, () => navigate('/opslag'),
+      {tab('Hjem', isHome, () => navigate('/'),
         <svg width="22" height="22" viewBox="0 0 24 24" fill={isHome ? PRIMARY : 'none'} stroke={isHome ? PRIMARY : INK3} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
           <path d="M3 9.5L12 3l9 6.5V20a1 1 0 01-1 1H4a1 1 0 01-1-1V9.5z"/>
           <path d="M9 21V12h6v9"/>
         </svg>
       )}
 
-      {/* Opret — elevated green circle */}
-      <button onClick={() => navigate('/opret-opslag')} style={{ flex:1, display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'flex-end', paddingBottom:6, background:'none', border:'none', cursor:'pointer', WebkitTapHighlightColor:'transparent' }}>
-        <div style={{ width:52, height:52, borderRadius:'50%', background:PRIMARY, display:'flex', alignItems:'center', justifyContent:'center', marginBottom:2, marginTop:-20, boxShadow:`0 4px 18px rgba(42,125,79,0.45)`, border:`3px solid ${PAPER}`, transform: isOpret ? 'scale(0.93)' : 'scale(1)', transition:'transform 0.15s' }}>
-          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2.5" strokeLinecap="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+      {/* Opslag */}
+      {tab('Opslag', isOpslag, () => navigate('/opslag'),
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke={isOpslag ? PRIMARY : INK3} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <circle cx="11" cy="11" r="8"/>
+          <line x1="21" y1="21" x2="16.65" y2="16.65"/>
+        </svg>
+      )}
+
+      {/* Opret — elevated green circle in center */}
+      <button onClick={() => navigate('/opret-opslag')} style={{ flex:1, display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'flex-end', paddingBottom:'calc(8px + env(safe-area-inset-bottom, 0px))', background:'none', border:'none', cursor:'pointer', WebkitTapHighlightColor:'transparent' }}>
+        <div style={{ width:54, height:54, borderRadius:'50%', background:PRIMARY, display:'flex', alignItems:'center', justifyContent:'center', marginBottom:4, marginTop:-22, boxShadow:`0 4px 18px rgba(42,125,79,0.45)`, border:`3px solid ${PAPER}`, transform: isOpret ? 'scale(0.92)' : 'scale(1)', transition:'transform 0.15s' }}>
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2.5" strokeLinecap="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
         </div>
         <span style={{ fontSize:10, fontWeight:700, fontFamily:FONT, color: isOpret ? PRIMARY : INK3, lineHeight:1 }}>Opret</span>
       </button>
@@ -571,8 +592,6 @@ function Nav({ pathname, navigate, loggedIn, setLoggedIn, unreadTotal, instituti
       {/* Category strip */}
       {showCategoryStrip && <CategoryStrip router={router} />}
 
-      {/* Bottom nav — mobile only */}
-      {isMobile && <BottomNav pathname={pathname} navigate={navigate} loggedIn={loggedIn} unreadTotal={unreadTotal} />}
     </nav>
   );
 }
