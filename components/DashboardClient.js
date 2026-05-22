@@ -62,6 +62,8 @@ export default function DashboardClient() {
   const [savedSearches, setSavedSearches] = useState([]);
 
   const isAdmin = !!institution && !institution._memberRole;
+  const [listingsView, setListingsView] = useState('list');
+  const [tradesTab, setTradesTab] = useState('all');
 
   function onInstitutionChange(updated) {
     if (adminInst) { setAdminInst(updated); }
@@ -129,7 +131,7 @@ export default function DashboardClient() {
   }, [allListings]);
 
   async function fetchMyListings(userId, instName) {
-    let q = db.from('listings').select('*').or('is_active.eq.true,is_sold.eq.true').order('created_at', { ascending: false });
+    let q = db.from('listings').select('*').order('created_at', { ascending: false });
     if (userId && instName) { q = q.or(`user_id.eq.${userId},institution_name.eq.${instName}`); }
     else if (userId) { q = q.eq('user_id', userId); }
     else if (instName) { q = q.eq('institution_name', instName); }
@@ -169,6 +171,17 @@ export default function DashboardClient() {
     showToast('Opslag slettet');
     fetchMyListings(ctxIsAdmin ? null : authUserId, institution?.name);
     onListingCreated();
+  }
+
+  async function toggleActive(id, currentActive) {
+    await db.from('listings').update({ is_active: !currentActive }).eq('id', id);
+    fetchMyListings(ctxIsAdmin ? null : authUserId, institution?.name);
+    onListingCreated();
+  }
+
+  async function toggleReserved(id, currentReserved) {
+    await db.from('listings').update({ is_reserved: !currentReserved }).eq('id', id);
+    fetchMyListings(ctxIsAdmin ? null : authUserId, institution?.name);
   }
 
   async function handleLogoUpload(e) {
@@ -280,6 +293,9 @@ export default function DashboardClient() {
 
   const favListings = allListings ? allListings.filter(l=>favs?.includes(l.id)) : [];
 
+  const soldTrades = trades.filter(t => t.owner_institution_id === institution?.id || t.owner_name === institution?.name);
+  const boughtTrades = trades.filter(t => !(t.owner_institution_id === institution?.id || t.owner_name === institution?.name));
+
   async function toggleSearchNotify(id, currentValue) {
     const newVal = !currentValue;
     await db.from('saved_searches').update({ notify: newVal }).eq('id', id);
@@ -353,10 +369,11 @@ export default function DashboardClient() {
         </div>
 
         {/* Stats */}
-        <div style={{ display:'grid', gridTemplateColumns:isMobile?'repeat(2,1fr)':'repeat(4,1fr)', gap:isMobile?12:16, marginBottom:isMobile?24:32 }}>
+        <div style={{ display:'grid', gridTemplateColumns:isMobile?'repeat(2,1fr)':'repeat(5,1fr)', gap:isMobile?12:16, marginBottom:isMobile?24:32 }}>
           {[
             { n:myListings.filter(l=>l.is_active&&!l.is_sold).length, label:'Aktive opslag', color:PRIMARY, onClick:()=>listingsRef.current?.scrollIntoView({behavior:'smooth',block:'start'}) },
-            { n:trades.length||0, label:'Handler', color:PRIMARY, onClick:()=>{ setTradesOpen(true); fetchTrades(); } },
+            { n:soldTrades.length||0, label:'Solgt', color:PRIMARY, onClick:()=>{ setTradesTab('sold'); setTradesOpen(true); fetchTrades(); } },
+            { n:boughtTrades.length||0, label:'Købt', color:PRIMARY, onClick:()=>{ setTradesTab('bought'); setTradesOpen(true); fetchTrades(); } },
             { n:activity.length||0, label:'Sendte tilbud', color:PRIMARY, onClick:()=>{ setActivityOpen(true); fetchActivity(); } },
             { n:incomingConvs.filter(c=>!c.is_handled&&c.owner_unread>0).length||0, label:'Ulæste anmodninger', color:CORAL, onClick:()=>{ const el=document.getElementById('incoming-section'); if(el) el.scrollIntoView({behavior:'smooth'}); } },
           ].map((s,i)=>(
@@ -377,29 +394,80 @@ export default function DashboardClient() {
 
           {/* Mine opslag */}
           <div ref={listingsRef} style={{ background:PAPER2, borderRadius:22, padding:isMobile?20:28, border:'1px solid rgba(22,34,28,0.07)', boxShadow:'0 1px 4px rgba(22,34,28,0.06)' }}>
-            <h2 style={{ fontFamily:FONT, fontWeight:800, fontSize:18, marginBottom:20, color:INK }}>Mine opslag</h2>
+            <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:20 }}>
+              <h2 style={{ fontFamily:FONT, fontWeight:800, fontSize:18, color:INK, margin:0 }}>Mine opslag</h2>
+              <div style={{ display:'flex', gap:4 }}>
+                <button onClick={()=>setListingsView('list')} title="Listevisning" style={{ width:32, height:32, borderRadius:8, border:`1.5px solid ${listingsView==='list'?PRIMARY:PAPER3}`, background:listingsView==='list'?GREEN_TINT:'transparent', color:listingsView==='list'?PRIMARY:INK3, cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center' }}>
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
+                </button>
+                <button onClick={()=>setListingsView('grid')} title="Gittervisning" style={{ width:32, height:32, borderRadius:8, border:`1.5px solid ${listingsView==='grid'?PRIMARY:PAPER3}`, background:listingsView==='grid'?GREEN_TINT:'transparent', color:listingsView==='grid'?PRIMARY:INK3, cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center' }}>
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/></svg>
+                </button>
+              </div>
+            </div>
             {myListings.length===0 ? (
               <div style={{ textAlign:'center', padding:'40px 0' }}>
                 <div style={{ fontFamily:FONT, fontWeight:800, fontSize:48, color:GREEN_SOFT, lineHeight:1, marginBottom:12 }}>0</div>
                 <p style={{ fontSize:14, color:INK3, fontFamily:FONT }}>Ingen opslag endnu — opret dit første!</p>
               </div>
+            ) : listingsView === 'grid' ? (
+              <div style={{ display:'grid', gridTemplateColumns:'repeat(2,1fr)', gap:10 }}>
+                {myListings.map(l=>(
+                  <div key={l.id} style={{ border:`1px solid ${l.is_sold?'#FECACA':l.is_active?'rgba(22,34,28,0.08)':'rgba(22,34,28,0.04)'}`, borderRadius:14, overflow:'hidden', background:l.is_sold?'#FFF5F5':l.is_active?PAPER:'rgba(22,34,28,0.03)', opacity:l.is_active||l.is_sold?1:0.7 }}>
+                    <div onClick={()=>setQuickViewListing(l)} style={{ cursor:'pointer' }}>
+                      <div style={{ height:90, background:l.images?.[0]?PAPER3:l.color||'#FFD166', position:'relative', overflow:'hidden', display:'flex', alignItems:'center', justifyContent:'center' }}>
+                        {l.images?.[0] ? <img src={l.images[0]} style={{ width:'100%', height:'100%', objectFit:'cover' }} alt="" /> : <span style={{ fontSize:32 }}>{l.emoji||'🧸'}</span>}
+                        {l.is_sold && <div style={{ position:'absolute', inset:0, background:'rgba(22,34,28,0.5)', display:'flex', alignItems:'center', justifyContent:'center' }}><span style={{ fontSize:10, fontWeight:900, color:'#fff', letterSpacing:0.5, fontFamily:FONT }}>SOLGT</span></div>}
+                        {!l.is_sold && !l.is_active && <div style={{ position:'absolute', inset:0, background:'rgba(22,34,28,0.35)', display:'flex', alignItems:'center', justifyContent:'center' }}><span style={{ fontSize:10, fontWeight:900, color:'#fff', letterSpacing:0.5, fontFamily:FONT }}>INAKTIV</span></div>}
+                        {l.is_reserved && !l.is_sold && <div style={{ position:'absolute', top:6, left:6, background:'#F59E0B', borderRadius:99, padding:'2px 7px', fontSize:9, fontWeight:800, color:'#fff', fontFamily:FONT }}>RESERV.</div>}
+                      </div>
+                      <div style={{ padding:'8px 10px 4px' }}>
+                        <div style={{ fontFamily:FONT, fontWeight:700, fontSize:12, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap', color:INK }}>{l.title}</div>
+                        <Badge type={l.type} />
+                      </div>
+                    </div>
+                    {!l.is_sold && <div style={{ display:'flex', gap:4, padding:'6px 10px 10px', flexWrap:'wrap' }} onClick={e=>e.stopPropagation()}>
+                      <button onClick={()=>openEdit(l)} style={{ flex:1, background:GREEN_TINT, border:'none', borderRadius:99, padding:'5px 0', fontSize:11, fontWeight:700, color:PRIMARY, cursor:'pointer', fontFamily:FONT }}>Rediger</button>
+                      <button onClick={()=>toggleActive(l.id, l.is_active)} style={{ flex:1, background:l.is_active?'#FEF9C3':'#F0FDF4', border:'none', borderRadius:99, padding:'5px 0', fontSize:11, fontWeight:700, color:l.is_active?'#B45309':'#15803D', cursor:'pointer', fontFamily:FONT }}>{l.is_active?'Deaktivér':'Aktivér'}</button>
+                      <button onClick={()=>toggleReserved(l.id, l.is_reserved)} style={{ flex:1, background:l.is_reserved?'#FEF3C7':'#FAFAF9', border:'none', borderRadius:99, padding:'5px 0', fontSize:11, fontWeight:700, color:l.is_reserved?'#B45309':INK3, cursor:'pointer', fontFamily:FONT }}>{l.is_reserved?'Frigiv':'Reserver'}</button>
+                    </div>}
+                    {confirmDelete===l.id && (
+                      <div style={{ background:'#FFF5F5', borderTop:`1px solid #FECACA`, padding:'8px 10px', display:'flex', alignItems:'center', justifyContent:'space-between' }}>
+                        <span style={{ fontSize:11, color:'#B91C1C', fontWeight:600, fontFamily:FONT }}>Slet?</span>
+                        <div style={{ display:'flex', gap:6 }}>
+                          <button onClick={()=>setConfirmDelete(null)} style={{ background:PAPER3, border:'none', borderRadius:99, padding:'4px 10px', fontSize:11, fontWeight:600, cursor:'pointer', fontFamily:FONT }}>Nej</button>
+                          <button onClick={()=>handleDelete(l.id)} style={{ background:'#e11d48', border:'none', borderRadius:99, padding:'4px 10px', fontSize:11, fontWeight:700, color:'#fff', cursor:'pointer', fontFamily:FONT }}>Ja</button>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
             ) : myListings.map(l=>(
-              <div key={l.id} style={{ border:`1px solid ${l.is_sold?'#FECACA':'rgba(22,34,28,0.08)'}`, borderRadius:14, marginBottom:10, overflow:'hidden', opacity:l.is_sold?0.85:1, background:l.is_sold?'#FFF5F5':PAPER }}>
+              <div key={l.id} style={{ border:`1px solid ${l.is_sold?'#FECACA':l.is_active?'rgba(22,34,28,0.08)':'rgba(22,34,28,0.04)'}`, borderRadius:14, marginBottom:10, overflow:'hidden', opacity:l.is_active||l.is_sold?1:0.7, background:l.is_sold?'#FFF5F5':l.is_active?PAPER:'rgba(22,34,28,0.02)' }}>
                 <div onClick={()=>setQuickViewListing(l)} style={{ display:'flex', alignItems:'center', gap:14, padding:'12px 14px', cursor:'pointer' }}>
                   <div style={{ width:48, height:48, borderRadius:10, background:l.images?.[0]?PAPER3:l.color||'#FFD166', display:'flex', alignItems:'center', justifyContent:'center', fontSize:24, flexShrink:0, overflow:'hidden', position:'relative' }}>
                     {l.images?.[0] ? <img src={l.images[0]} style={{ width:'100%', height:'100%', objectFit:'cover' }} alt="" /> : l.emoji||'🧸'}
                     {l.is_sold && <div style={{ position:'absolute', inset:0, background:'rgba(22,34,28,0.45)', display:'flex', alignItems:'center', justifyContent:'center', borderRadius:10 }}><span style={{ fontSize:9, fontWeight:900, color:'#fff', letterSpacing:0.3, fontFamily:FONT }}>SOLGT</span></div>}
+                    {!l.is_sold && !l.is_active && <div style={{ position:'absolute', inset:0, background:'rgba(22,34,28,0.35)', display:'flex', alignItems:'center', justifyContent:'center', borderRadius:10 }}><span style={{ fontSize:9, fontWeight:900, color:'#fff', letterSpacing:0.3, fontFamily:FONT }}>INAKTIV</span></div>}
                   </div>
                   <div style={{ flex:1, minWidth:0 }}>
                     <div style={{ fontFamily:FONT, fontWeight:700, fontSize:14, whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis', color:INK }}>{l.title}</div>
-                    <div style={{ fontSize:12, color:INK3, marginTop:2, fontFamily:FONT }}>{l.city} · {l.age_group}</div>
+                    <div style={{ display:'flex', alignItems:'center', gap:6, marginTop:2, flexWrap:'wrap' }}>
+                      <span style={{ fontSize:12, color:INK3, fontFamily:FONT }}>{l.city} · {l.age_group}</span>
+                      {l.is_reserved && !l.is_sold && <span style={{ background:'#FEF3C7', color:'#B45309', borderRadius:99, padding:'1px 8px', fontSize:10, fontWeight:800, fontFamily:FONT }}>Reserveret</span>}
+                    </div>
                     {l.is_sold && l.sold_to && <div style={{ fontSize:11, color:'#e11d48', fontWeight:700, marginTop:2, fontFamily:FONT }}>Solgt til {l.sold_to} · {new Date(l.sold_at).toLocaleDateString('da-DK',{day:'numeric',month:'short',year:'numeric'})}</div>}
                   </div>
                   {l.is_sold
                     ? <span style={{ background:'#FEE2E2', color:'#e11d48', borderRadius:99, padding:'3px 10px', fontSize:11, fontWeight:800, flexShrink:0, fontFamily:FONT }}>SOLGT</span>
-                    : <Badge type={l.type} />}
+                    : !l.is_active
+                      ? <span style={{ background:PAPER3, color:INK3, borderRadius:99, padding:'3px 10px', fontSize:11, fontWeight:700, flexShrink:0, fontFamily:FONT }}>Inaktiv</span>
+                      : <Badge type={l.type} />}
                   {!l.is_sold && <div style={{ display:'flex', gap:6, flexShrink:0 }} onClick={e=>e.stopPropagation()}>
                     <button onClick={()=>openEdit(l)} style={{ background:GREEN_TINT, border:'none', borderRadius:99, padding:'6px 12px', fontSize:12, fontWeight:700, color:PRIMARY, cursor:'pointer', fontFamily:FONT }}>Rediger</button>
+                    <button onClick={()=>toggleActive(l.id, l.is_active)} title={l.is_active?'Deaktivér opslag':'Aktivér opslag'} style={{ background:l.is_active?'#FEF9C3':'#F0FDF4', border:'none', borderRadius:99, padding:'6px 12px', fontSize:12, fontWeight:700, color:l.is_active?'#B45309':'#15803D', cursor:'pointer', fontFamily:FONT }}>{l.is_active?'Deaktivér':'Aktivér'}</button>
+                    <button onClick={()=>toggleReserved(l.id, l.is_reserved)} title={l.is_reserved?'Fjern reservation':'Markér som reserveret'} style={{ background:l.is_reserved?'#FEF3C7':PAPER3, border:'none', borderRadius:99, padding:'6px 12px', fontSize:12, fontWeight:700, color:l.is_reserved?'#B45309':INK3, cursor:'pointer', fontFamily:FONT }}>{l.is_reserved?'Frigiv':'Reserver'}</button>
                     <button onClick={()=>setConfirmDelete(l.id)} style={{ background:'#FEF2F2', border:'none', borderRadius:99, padding:'6px 12px', fontSize:12, fontWeight:700, color:'#e11d48', cursor:'pointer', fontFamily:FONT }}>Slet</button>
                   </div>}
                 </div>
@@ -610,39 +678,49 @@ export default function DashboardClient() {
       {/* Trades modal */}
       <Modal open={tradesOpen} onClose={()=>setTradesOpen(false)} title="Gennemførte handler">
         <div>
+          <div style={{ display:'flex', gap:8, marginBottom:16 }}>
+            {[['all','Alle'], ['sold','Solgt'], ['bought','Købt']].map(([key, label]) => (
+              <button key={key} onClick={()=>setTradesTab(key)}
+                style={{ flex:1, padding:'8px', borderRadius:99, border:`1.5px solid ${tradesTab===key?PRIMARY:PAPER3}`, background:tradesTab===key?GREEN_TINT:'transparent', color:tradesTab===key?PRIMARY:INK3, fontFamily:FONT, fontWeight:700, fontSize:13, cursor:'pointer', transition:'all 0.15s' }}>
+                {label}
+              </button>
+            ))}
+          </div>
           {tradesLoading
             ? <div style={{ textAlign:'center', padding:'32px 0', color:INK3, fontFamily:FONT }}>Indlæser…</div>
-            : trades.length === 0
-              ? (
-                <div style={{ textAlign:'center', padding:'40px 0' }}>
-                  <div style={{ fontFamily:FONT, fontWeight:800, fontSize:48, color:GREEN_SOFT, lineHeight:1, marginBottom:12 }}>0</div>
-                  <p style={{ fontSize:14, color:INK3, fontFamily:FONT }}>Ingen gennemførte handler endnu</p>
-                  <p style={{ fontSize:12, color:INK3, marginTop:6, fontFamily:FONT }}>Handler optræder her når et bud accepteres</p>
-                </div>
-              )
-              : trades.map(t => {
-                const isSeller = t.owner_institution_id === institution?.id || t.owner_name === institution?.name;
-                const otherParty = isSeller ? t.initiator_name : t.owner_name;
-                const dealDate = t.deal_completed_at || t.handled_at;
-                return (
-                  <div key={t.id} style={{ border:`1px solid ${GREEN_SOFT}`, borderRadius:14, padding:'14px 16px', marginBottom:10, background:GREEN_TINT }}>
-                    <div style={{ display:'flex', justifyContent:'space-between', alignItems:'flex-start', marginBottom:8 }}>
-                      <div style={{ flex:1, minWidth:0, marginRight:12 }}>
-                        <div style={{ fontFamily:FONT, fontWeight:800, fontSize:14, marginBottom:2, color:INK }}>{t.listing_title || 'Direkte besked'}</div>
-                        <div style={{ fontSize:12, color:INK3, fontFamily:FONT }}>
-                          {isSeller ? 'Solgt til' : 'Købt fra'} <strong style={{ color:INK }}>{otherParty}</strong>
-                        </div>
-                      </div>
-                      <span style={{ background:PRIMARY, color:'#fff', borderRadius:99, padding:'3px 10px', fontSize:11, fontWeight:800, flexShrink:0, fontFamily:FONT }}>Gennemført</span>
-                    </div>
-                    <div style={{ display:'flex', gap:12, flexWrap:'wrap', fontSize:11, color:INK3, fontFamily:FONT }}>
-                      <span>{dealDate ? new Date(dealDate).toLocaleDateString('da-DK',{day:'numeric',month:'long',year:'numeric'}) : '—'}</span>
-                      {t.deal_type && <span>{t.deal_type === 'byd' ? 'Bud accepteret' : t.deal_type === 'byt' ? 'Bytte' : 'Køb'}</span>}
-                    </div>
-                    <button onClick={()=>router.push('/beskeder')} style={{ marginTop:10, background:'none', border:`1.5px solid ${PRIMARY}`, color:PRIMARY, borderRadius:99, padding:'5px 12px', fontSize:12, fontWeight:700, cursor:'pointer', fontFamily:FONT }}>Se samtale →</button>
+            : (() => {
+                const filtered = tradesTab === 'sold' ? soldTrades : tradesTab === 'bought' ? boughtTrades : trades;
+                if (filtered.length === 0) return (
+                  <div style={{ textAlign:'center', padding:'40px 0' }}>
+                    <div style={{ fontFamily:FONT, fontWeight:800, fontSize:48, color:GREEN_SOFT, lineHeight:1, marginBottom:12 }}>0</div>
+                    <p style={{ fontSize:14, color:INK3, fontFamily:FONT }}>Ingen gennemførte handler endnu</p>
+                    <p style={{ fontSize:12, color:INK3, marginTop:6, fontFamily:FONT }}>Handler optræder her når et bud accepteres</p>
                   </div>
                 );
-              })}
+                return filtered.map(t => {
+                  const isSeller = t.owner_institution_id === institution?.id || t.owner_name === institution?.name;
+                  const otherParty = isSeller ? t.initiator_name : t.owner_name;
+                  const dealDate = t.deal_completed_at || t.handled_at;
+                  return (
+                    <div key={t.id} style={{ border:`1px solid ${isSeller?GREEN_SOFT:'#BFDBFE'}`, borderRadius:14, padding:'14px 16px', marginBottom:10, background:isSeller?GREEN_TINT:'#EFF6FF' }}>
+                      <div style={{ display:'flex', justifyContent:'space-between', alignItems:'flex-start', marginBottom:8 }}>
+                        <div style={{ flex:1, minWidth:0, marginRight:12 }}>
+                          <div style={{ fontFamily:FONT, fontWeight:800, fontSize:14, marginBottom:2, color:INK }}>{t.listing_title || 'Direkte besked'}</div>
+                          <div style={{ fontSize:12, color:INK3, fontFamily:FONT }}>
+                            {isSeller ? 'Solgt til' : 'Købt fra'} <strong style={{ color:INK }}>{otherParty}</strong>
+                          </div>
+                        </div>
+                        <span style={{ background:isSeller?PRIMARY:'#3B82F6', color:'#fff', borderRadius:99, padding:'3px 10px', fontSize:11, fontWeight:800, flexShrink:0, fontFamily:FONT }}>{isSeller?'Solgt':'Købt'}</span>
+                      </div>
+                      <div style={{ display:'flex', gap:12, flexWrap:'wrap', fontSize:11, color:INK3, fontFamily:FONT }}>
+                        <span>{dealDate ? new Date(dealDate).toLocaleDateString('da-DK',{day:'numeric',month:'long',year:'numeric'}) : '—'}</span>
+                        {t.deal_type && <span>{t.deal_type === 'byd' ? 'Bud accepteret' : t.deal_type === 'byt' ? 'Bytte' : 'Køb'}</span>}
+                      </div>
+                      <button onClick={()=>router.push('/beskeder')} style={{ marginTop:10, background:'none', border:`1.5px solid ${PRIMARY}`, color:PRIMARY, borderRadius:99, padding:'5px 12px', fontSize:12, fontWeight:700, cursor:'pointer', fontFamily:FONT }}>Se samtale →</button>
+                    </div>
+                  );
+                });
+              })()}
         </div>
       </Modal>
 

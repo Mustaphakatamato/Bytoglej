@@ -464,7 +464,7 @@ function Nav({ pathname, navigate, loggedIn, setLoggedIn, unreadTotal, instituti
                       <Link href="/dashboard" style={{ display:'flex', alignItems:'center', gap:9, padding:'11px 14px', fontSize:13, fontWeight:600, color:INK2, textDecoration:'none', borderBottom:`1px solid ${PAPER2}`, fontFamily:FONT }}
                         onMouseEnter={e=>e.currentTarget.style.background=GREEN_TINT} onMouseLeave={e=>e.currentTarget.style.background='transparent'}>
                         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/></svg>
-                        Mit dashboard
+                        Min institution
                       </Link>
                       <Link href="/profil" style={{ display:'flex', alignItems:'center', gap:9, padding:'11px 14px', fontSize:13, fontWeight:600, color:INK2, textDecoration:'none', borderBottom:`1px solid ${PAPER2}`, fontFamily:FONT }}
                         onMouseEnter={e=>e.currentTarget.style.background=GREEN_TINT} onMouseLeave={e=>e.currentTarget.style.background='transparent'}>

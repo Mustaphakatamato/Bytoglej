@@ -99,7 +99,7 @@ function HowSection() {
   const steps = [
     { n: '01', title: 'Tilmeld din institution', desc: 'Opret en verificeret profil med CVR-nummer. Godkendt på 1–2 hverdage.' },
     { n: '02', title: 'Opret dine annoncer', desc: 'Upload billeder og beskriv legetøjet. Sæt en pris eller bytteønske.' },
-    { n: '03', title: 'Køb, byd eller byt', desc: 'Find det I mangler og gennemfør sikre handler direkte via platformen.' },
+    { n: '03', title: 'Køb, byt eller byd', desc: 'Find det I mangler og gennemfør sikre handler direkte via platformen.' },
   ];
 
   return (
@@ -164,8 +164,8 @@ function TradeTypesStrip() {
       <div style={{ maxWidth: 900, margin: '0 auto', display: 'grid', gridTemplateColumns: isMobile ? '1fr' : 'repeat(3,1fr)', gap: isMobile ? 16 : 0 }}>
         {[
           { key: 'køb', title: 'Køb', sub: 'Fastpris', desc: 'Se prisen og køb med det samme.' },
-          { key: 'byd', title: 'Byd', sub: 'Forhandl', desc: 'Send et bud og aftal en pris der passer begge.' },
           { key: 'byt', title: 'Byt', sub: 'Bytehandel', desc: 'Tilbyd et af jeres egne opslag i bytte.' },
+          { key: 'byd', title: 'Byd', sub: 'Forhandl', desc: 'Send et bud og aftal en pris der passer begge.' },
         ].map((t, i) => {
           const tc = TYPE_CFG[t.key];
           return (
@@ -362,52 +362,6 @@ function CtaBanner() {
   );
 }
 
-/* ── Footer ───────────────────────────────────────────────── */
-function Footer() {
-  const router = useRouter();
-  const w = useWindowWidth();
-  const isMobile = w < 640;
-
-  return (
-    <footer style={{ background: GREEN_DEEP, padding: isMobile ? '56px 20px 32px' : '72px 24px 40px' }}>
-      <div style={{ maxWidth: 1140, margin: '0 auto' }}>
-        <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr 1fr' : '2fr 1fr 1fr 1fr', gap: isMobile ? '32px 16px' : 48, marginBottom: 48 }}>
-          <div style={{ gridColumn: isMobile ? '1 / -1' : 'auto' }}>
-            <div style={{ marginBottom: 16 }}>
-              <LogoLockup markSize={28} textSize={15} color="#fff" accentColor={GREEN_SOFT} markBg="rgba(255,255,255,0.12)" />
-            </div>
-            <p style={{ fontSize: 13, lineHeight: 1.65, color: 'rgba(255,255,255,0.4)', maxWidth: 240, fontFamily: FONT }}>
-              Danmarks markedsplads for brugt institutionslegetøj. CVR-verificeret og bæredygtigt.
-            </p>
-          </div>
-          {[
-            { title: 'Platform', links: [['opslag','Markedsplads'], ['hvordan','Sådan virker det']] },
-            { title: 'Support',  links: [['kontakt','Kontakt os'], ['kontakt','FAQ']] },
-            { title: 'Om os',    links: [['om-os','Om byt&leg'], ['om-os','Vores værdier']] },
-          ].map((col, i) => (
-            <div key={i}>
-              <div style={{ color: 'rgba(255,255,255,0.65)', fontWeight: 700, fontSize: 12, letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: 16, fontFamily: FONT }}>{col.title}</div>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-                {col.links.map(([p, l]) => (
-                  <span key={l} onClick={() => router.push('/' + p)} style={{ color: 'rgba(255,255,255,0.35)', fontSize: 14, cursor: 'pointer', fontFamily: FONT, transition: 'color 0.15s' }}
-                    onMouseEnter={e => e.currentTarget.style.color = 'rgba(255,255,255,0.75)'}
-                    onMouseLeave={e => e.currentTarget.style.color = 'rgba(255,255,255,0.35)'}>
-                    {l}
-                  </span>
-                ))}
-              </div>
-            </div>
-          ))}
-        </div>
-        <div style={{ borderTop: '1px solid rgba(255,255,255,0.08)', paddingTop: 24, display: 'flex', justifyContent: 'space-between', fontSize: 12, color: 'rgba(255,255,255,0.25)', flexWrap: 'wrap', gap: 12, fontFamily: FONT }}>
-          <span>© 2025 byt&amp;leg</span>
-          <span>Lavet i Danmark</span>
-        </div>
-      </div>
-    </footer>
-  );
-}
-
 /* ── Page ─────────────────────────────────────────────────── */
 export default function HomePage() {
   const router = useRouter();
@@ -425,7 +379,6 @@ export default function HomePage() {
       <TradeTypesStrip />
       <MissionSection />
       <CtaBanner />
-      <Footer />
     </>
   );
 }

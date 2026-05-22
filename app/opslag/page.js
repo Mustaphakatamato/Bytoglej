@@ -203,7 +203,7 @@ export default function OpslagPage() {
             Find legetøj til jeres institution
           </h1>
           <p style={{ fontSize: 15, color: 'rgba(255,255,255,0.65)', lineHeight: 1.6 }}>
-            Køb, byd eller byt direkte med andre verificerede institutioner
+            Køb, byt eller byd direkte med andre verificerede institutioner
           </p>
         </div>
         <svg viewBox="0 0 1440 48" style={{ position: 'absolute', bottom: -1, left: 0, right: 0, width: '100%', display: 'block' }} preserveAspectRatio="none">

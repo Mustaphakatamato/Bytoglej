@@ -36,7 +36,7 @@ function EyeIcon({ open }) {
 const TRUST_POINTS = [
   'CVR-verificerede institutioner',
   'Sikker handel via platformen',
-  'Køb, byd eller byt frit',
+  'Køb, byt eller byd frit',
 ];
 
 export default function LoginPage() {

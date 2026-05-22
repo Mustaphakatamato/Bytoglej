@@ -205,16 +205,28 @@ export default function QuickViewModal({ listing, onClose }) {
                     </button>
                   )}
                   {listing.type === 'byd' && (
-                    <button onClick={()=>setMode('bid')}
-                      style={{ flex:2, padding:'14px', borderRadius:99, background:ACCENT2, color:'#fff', border:'none', fontFamily:FONT, fontWeight:700, fontSize:15, cursor:'pointer' }}>
-                      Afgiv bud
-                    </button>
+                    <>
+                      <button onClick={()=>setMode('bid')}
+                        style={{ flex:2, padding:'14px', borderRadius:99, background:ACCENT2, color:'#fff', border:'none', fontFamily:FONT, fontWeight:700, fontSize:15, cursor:'pointer' }}>
+                        Afgiv bud
+                      </button>
+                      <button onClick={handleContact} disabled={saving}
+                        style={{ flex:1, padding:'14px', borderRadius:99, background:saving?PAPER3:GREEN_TINT, color:saving?INK3:PRIMARY, border:`1.5px solid ${PRIMARY}`, fontFamily:FONT, fontWeight:600, fontSize:13, cursor:saving?'not-allowed':'pointer', transition:'all 0.2s' }}>
+                        {saving ? '…' : 'Skriv til sælger'}
+                      </button>
+                    </>
                   )}
                   {listing.type === 'byt' && (
-                    <button onClick={()=>setMode('swap')}
-                      style={{ flex:2, padding:'14px', borderRadius:99, background:CORAL, color:'#fff', border:'none', fontFamily:FONT, fontWeight:700, fontSize:15, cursor:'pointer' }}>
-                      Foreslå bytte
-                    </button>
+                    <>
+                      <button onClick={()=>setMode('swap')}
+                        style={{ flex:2, padding:'14px', borderRadius:99, background:CORAL, color:'#fff', border:'none', fontFamily:FONT, fontWeight:700, fontSize:15, cursor:'pointer' }}>
+                        Foreslå bytte
+                      </button>
+                      <button onClick={handleContact} disabled={saving}
+                        style={{ flex:1, padding:'14px', borderRadius:99, background:saving?PAPER3:GREEN_TINT, color:saving?INK3:PRIMARY, border:`1.5px solid ${PRIMARY}`, fontFamily:FONT, fontWeight:600, fontSize:13, cursor:saving?'not-allowed':'pointer', transition:'all 0.2s' }}>
+                        {saving ? '…' : 'Skriv til sælger'}
+                      </button>
+                    </>
                   )}
                   <button onClick={openFullPage}
                     style={{ flex:1, padding:'14px', borderRadius:99, background:PAPER2, color:INK2, border:'none', fontFamily:FONT, fontWeight:600, fontSize:13, cursor:'pointer' }}>

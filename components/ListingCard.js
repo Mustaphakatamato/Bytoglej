@@ -71,7 +71,7 @@ export default function ListingCard({ listing, onClick, favs, toggleFav, onInsti
           className={`fav-btn${popping ? ' fav-pop' : ''}`}
           onClick={handleFav}
           style={{
-            position: 'absolute', top: 10, left: 10,
+            position: 'absolute', bottom: 10, right: 10,
             background: isFav ? 'rgba(22,34,28,0.72)' : 'rgba(246,242,234,0.88)',
             border: 'none', borderRadius: '50%', width: 34, height: 34,
             fontSize: 15, display: 'flex', alignItems: 'center', justifyContent: 'center',
