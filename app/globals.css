@@ -1,5 +1,14 @@
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 html { scroll-behavior: smooth; }
+
+/* PWA splash — rendered from raw HTML, no JS needed, auto-fades via CSS */
+#__splash {
+  position: fixed; inset: 0; z-index: 9999;
+  background: #133F2B;
+  display: flex; align-items: center; justify-content: center; flex-direction: column; gap: 20px;
+  animation: splashHide 0.35s ease-out 0.9s forwards;
+}
+@keyframes splashHide { from { opacity: 1; } to { opacity: 0; visibility: hidden; } }
 :root {
   --green:       #2A7D4F;
   --green-deep:  #133F2B;

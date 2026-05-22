@@ -39,6 +39,18 @@ export default function RootLayout({ children }) {
         <link href="https://fonts.googleapis.com/css2?family=Sora:wght@400;500;600;700;800&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet" />
       </head>
       <body>
+        {/* PWA splash screen — visible from first HTML byte, CSS auto-hides it */}
+        <div id="__splash" aria-hidden="true">
+          <svg width="90" height="90" viewBox="0 0 64 64">
+            <rect width="64" height="64" rx="11" fill="rgba(255,255,255,0.13)" />
+            <text x="32" y="27" textAnchor="middle" fontFamily="'Sora',Arial,sans-serif" fontWeight="800" fontSize="21" letterSpacing="-0.06em" fill="#F6F2EA">byt</text>
+            <text x="32" y="49" textAnchor="middle" fontFamily="'Sora',Arial,sans-serif" fontWeight="800" fontSize="21" letterSpacing="-0.06em" fill="#F6F2EA">&amp;leg.</text>
+          </svg>
+          <div style={{ fontFamily: "'Sora',Arial,sans-serif", fontWeight: 800, fontSize: 26, letterSpacing: '-0.04em', color: 'rgba(255,255,255,0.85)', lineHeight: 1.15, textAlign: 'center' }}>
+            byt<br />
+            <span style={{ color: '#CFE3D8' }}>&amp;</span>leg<span style={{ color: '#CFE3D8' }}>.</span>
+          </div>
+        </div>
         <AppProvider>
           <NavWrapper />
           {children}
