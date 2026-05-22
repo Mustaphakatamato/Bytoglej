@@ -6,7 +6,7 @@ import { db } from '@/lib/supabase';
 import { PRIMARY, GREEN_TINT, INK, INK2, INK3, PAPER, PAPER2, PAPER3 } from '@/lib/constants';
 import { CATEGORIES } from '@/lib/categories';
 import { useWindowWidth } from '@/lib/hooks';
-import { useState, useEffect, useRef, Suspense } from 'react';
+import { useState, useEffect, useRef, useMemo, Suspense } from 'react';
 
 const FONT = "'Sora', sans-serif";
 
@@ -62,59 +62,206 @@ function ToastDisplay({ msg, type='success', onDone }) {
 function SearchBar({ transparent, router }) {
   const searchParams = useSearchParams();
   const pathname = usePathname();
+  const { listings } = useApp();
   const [q, setQ] = useState('');
+  const [open, setOpen] = useState(false);
+  const [focused, setFocused] = useState(false);
+  const [cursor, setCursor] = useState(-1);
+  const wrapRef = useRef(null);
 
   // Sync from URL when already on /opslag
   useEffect(() => {
     if (pathname === '/opslag') setQ(searchParams.get('search') || '');
   }, [pathname, searchParams]);
 
+  // Close on outside click
+  useEffect(() => {
+    function handle(e) { if (wrapRef.current && !wrapRef.current.contains(e.target)) setOpen(false); }
+    document.addEventListener('mousedown', handle);
+    return () => document.removeEventListener('mousedown', handle);
+  }, []);
+
+  // Build suggestions whenever q changes
+  const suggestions = useMemo(() => {
+    const term = q.trim().toLowerCase();
+    if (term.length < 2) return [];
+    const results = [];
+    const seen = new Set();
+
+    function add(label, type, href) {
+      const key = label.toLowerCase();
+      if (seen.has(key)) return;
+      seen.add(key);
+      results.push({ label, type, href });
+    }
+
+    // Category + subcategory matches
+    for (const cat of CATEGORIES) {
+      if (cat.label.toLowerCase().includes(term))
+        add(`${cat.emoji} ${cat.label}`, 'kategori', `/opslag?category=${cat.key}`);
+      for (const sub of cat.sub) {
+        if (sub.toLowerCase().includes(term))
+          add(`${cat.emoji} ${sub}`, 'kategori', `/opslag?category=${cat.key}&subcategory=${encodeURIComponent(sub)}`);
+      }
+    }
+
+    // Listing title matches
+    for (const l of listings) {
+      if (l.title?.toLowerCase().includes(term))
+        add(l.title, 'opslag', `/opslag?search=${encodeURIComponent(l.title)}`);
+      if (results.length >= 8) break;
+    }
+
+    // Institution matches
+    for (const l of listings) {
+      if (l.institution_name?.toLowerCase().includes(term))
+        add(l.institution_name, 'institution', `/institution/${encodeURIComponent(l.institution_name)}`);
+      if (results.length >= 9) break;
+    }
+
+    return results.slice(0, 8);
+  }, [q, listings]);
+
+  const showDrop = open && focused && q.trim().length >= 2;
+
+  function go(href) {
+    router.push(href);
+    setOpen(false);
+    setCursor(-1);
+  }
+
   function submit(e) {
     e.preventDefault();
+    if (cursor >= 0 && suggestions[cursor]) { go(suggestions[cursor].href); return; }
     const params = new URLSearchParams();
     if (q.trim()) params.set('search', q.trim());
     router.push('/opslag' + (params.toString() ? '?' + params : ''));
+    setOpen(false);
   }
 
+  function onKeyDown(e) {
+    if (!showDrop) return;
+    if (e.key === 'ArrowDown') { e.preventDefault(); setCursor(c => Math.min(c + 1, suggestions.length)); }
+    if (e.key === 'ArrowUp')   { e.preventDefault(); setCursor(c => Math.max(c - 1, -1)); }
+    if (e.key === 'Escape')    { setOpen(false); setCursor(-1); }
+  }
+
+  // Total items = suggestions + "Søg efter X" row
+  const totalItems = suggestions.length + 1;
+  const searchRowIdx = suggestions.length;
+
   return (
-    <form onSubmit={submit} style={{ flex:1, maxWidth:560 }}>
-      <div style={{
-        display:'flex', alignItems:'center', gap:8,
-        background: transparent ? 'rgba(255,255,255,0.15)' : PAPER2,
-        borderRadius:99,
-        border: `1.5px solid ${transparent ? 'rgba(255,255,255,0.3)' : PAPER3}`,
-        padding:'0 6px 0 16px',
-        transition:'all 0.2s',
-      }}>
-        <svg width="14" height="14" viewBox="0 0 14 14" fill="none" style={{ flexShrink:0, opacity: transparent ? 0.7 : 0.4 }}>
-          <circle cx="6" cy="6" r="5" stroke={transparent ? '#fff' : INK} strokeWidth="1.5"/>
-          <path d="M10 10L13 13" stroke={transparent ? '#fff' : INK} strokeWidth="1.5" strokeLinecap="round"/>
-        </svg>
-        <input
-          value={q}
-          onChange={e => setQ(e.target.value)}
-          placeholder="Søg efter legetøj, institution..."
-          style={{
-            flex:1, border:'none', background:'transparent', outline:'none',
-            fontSize:14, fontFamily:FONT, color: transparent ? '#fff' : INK,
-            padding:'10px 0',
-            '::placeholder': { color: transparent ? 'rgba(255,255,255,0.6)' : INK3 },
-          }}
-        />
-        {q && (
-          <button type="button" onClick={() => setQ('')} style={{ background:'none', border:'none', color: transparent ? 'rgba(255,255,255,0.7)' : INK3, fontSize:14, cursor:'pointer', padding:'4px', lineHeight:1, flexShrink:0 }}>✕</button>
-        )}
-        <button type="submit" style={{
-          background: transparent ? 'rgba(255,255,255,0.25)' : PRIMARY,
-          color: '#fff', border:'none', borderRadius:99,
-          padding:'7px 18px', fontSize:13, fontWeight:700, fontFamily:FONT,
-          cursor:'pointer', flexShrink:0, whiteSpace:'nowrap',
-          transition:'background 0.15s',
+    <div ref={wrapRef} style={{ flex:1, maxWidth:560, position:'relative' }}>
+      <form onSubmit={submit}>
+        <div style={{
+          display:'flex', alignItems:'center', gap:8,
+          background: transparent ? 'rgba(255,255,255,0.15)' : (showDrop ? PAPER : PAPER2),
+          borderRadius: showDrop ? '16px 16px 0 0' : 99,
+          border: `1.5px solid ${transparent ? 'rgba(255,255,255,0.3)' : (showDrop ? PAPER3 : PAPER3)}`,
+          borderBottom: showDrop ? 'none' : undefined,
+          padding:'0 6px 0 16px',
+          transition:'border-radius 0.15s, background 0.15s',
         }}>
-          Søg
-        </button>
-      </div>
-    </form>
+          <svg width="14" height="14" viewBox="0 0 14 14" fill="none" style={{ flexShrink:0, opacity: transparent ? 0.7 : 0.4 }}>
+            <circle cx="6" cy="6" r="5" stroke={transparent ? '#fff' : INK} strokeWidth="1.5"/>
+            <path d="M10 10L13 13" stroke={transparent ? '#fff' : INK} strokeWidth="1.5" strokeLinecap="round"/>
+          </svg>
+          <input
+            value={q}
+            onChange={e => { setQ(e.target.value); setOpen(true); setCursor(-1); }}
+            onFocus={() => { setFocused(true); setOpen(true); }}
+            onBlur={() => setFocused(false)}
+            onKeyDown={onKeyDown}
+            placeholder="Søg efter legetøj, institution..."
+            autoComplete="off"
+            style={{
+              flex:1, border:'none', background:'transparent', outline:'none',
+              fontSize:14, fontFamily:FONT, color: transparent ? '#fff' : INK,
+              padding:'10px 0',
+            }}
+          />
+          {q && (
+            <button type="button" onClick={() => { setQ(''); setOpen(false); }} style={{ background:'none', border:'none', color: transparent ? 'rgba(255,255,255,0.7)' : INK3, fontSize:14, cursor:'pointer', padding:'4px', lineHeight:1, flexShrink:0 }}>✕</button>
+          )}
+          <button type="submit" style={{
+            background: transparent ? 'rgba(255,255,255,0.25)' : PRIMARY,
+            color:'#fff', border:'none', borderRadius:99,
+            padding:'7px 18px', fontSize:13, fontWeight:700, fontFamily:FONT,
+            cursor:'pointer', flexShrink:0, whiteSpace:'nowrap',
+          }}>
+            Søg
+          </button>
+        </div>
+      </form>
+
+      {/* Dropdown */}
+      {showDrop && (
+        <div style={{
+          position:'absolute', top:'100%', left:0, right:0, zIndex:700,
+          background: PAPER,
+          border: `1.5px solid ${PAPER3}`,
+          borderTop: 'none',
+          borderRadius: '0 0 16px 16px',
+          overflow:'hidden',
+          boxShadow: '0 12px 32px rgba(22,34,28,0.12)',
+        }}>
+          {suggestions.map((s, i) => (
+            <div
+              key={i}
+              onMouseDown={() => go(s.href)}
+              onMouseEnter={() => setCursor(i)}
+              style={{
+                display:'flex', alignItems:'center', gap:10,
+                padding:'11px 16px', cursor:'pointer',
+                background: cursor === i ? PAPER2 : 'transparent',
+                transition:'background 0.1s',
+              }}
+            >
+              <svg width="13" height="13" viewBox="0 0 14 14" fill="none" style={{ flexShrink:0, opacity:0.3 }}>
+                <circle cx="6" cy="6" r="5" stroke={INK} strokeWidth="1.5"/>
+                <path d="M10 10L13 13" stroke={INK} strokeWidth="1.5" strokeLinecap="round"/>
+              </svg>
+              <span style={{ flex:1, fontSize:14, color:INK, fontFamily:FONT }}>
+                {highlightMatch(s.label, q)}
+              </span>
+              <span style={{ fontSize:11, color:INK3, fontFamily:FONT, flexShrink:0 }}>{s.type}</span>
+            </div>
+          ))}
+          {/* "Søg efter X" row */}
+          <div
+            onMouseDown={submit}
+            onMouseEnter={() => setCursor(searchRowIdx)}
+            style={{
+              display:'flex', alignItems:'center', gap:10,
+              padding:'11px 16px', cursor:'pointer',
+              background: cursor === searchRowIdx ? PAPER2 : 'transparent',
+              borderTop: suggestions.length ? `1px solid ${PAPER2}` : 'none',
+              transition:'background 0.1s',
+            }}
+          >
+            <svg width="13" height="13" viewBox="0 0 14 14" fill="none" style={{ flexShrink:0, opacity:0.5 }}>
+              <circle cx="6" cy="6" r="5" stroke={PRIMARY} strokeWidth="1.5"/>
+              <path d="M10 10L13 13" stroke={PRIMARY} strokeWidth="1.5" strokeLinecap="round"/>
+            </svg>
+            <span style={{ fontSize:14, color:PRIMARY, fontFamily:FONT, fontWeight:600 }}>
+              Søg efter &ldquo;{q.trim()}&rdquo;
+            </span>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function highlightMatch(text, query) {
+  const idx = text.toLowerCase().indexOf(query.trim().toLowerCase());
+  if (idx === -1 || !query.trim()) return text;
+  return (
+    <>
+      {text.slice(0, idx)}
+      <strong style={{ color: PRIMARY, fontWeight: 700 }}>{text.slice(idx, idx + query.trim().length)}</strong>
+      {text.slice(idx + query.trim().length)}
+    </>
   );
 }
 
