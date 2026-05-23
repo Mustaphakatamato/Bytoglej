@@ -39,6 +39,7 @@ export default function NavWrapper() {
   useEffect(() => { setNavigating(false); }, [pathname]);
 
   const navigate = p => {
+    if (p === pathname) return; // already here, don't trigger overlay
     window.scrollTo({ top: 0, behavior: 'instant' });
     setNavigating(true);
     router.push(p);
@@ -477,7 +478,7 @@ function Nav({ pathname, navigate, loggedIn, setLoggedIn, unreadTotal, instituti
   useEffect(() => { setMenuOpen(false); setSearchOpen(false); }, [pathname]);
 
   const isHome = pathname === '/';
-  const transparent = isHome && !scrolled && !menuOpen && !searchOpen;
+  const transparent = isHome && !isMobile && !scrolled && !menuOpen && !searchOpen;
   const showCategoryStrip = !transparent && !scrolled && (pathname === '/' || pathname?.startsWith('/opslag'));
 
   function go(p) { navigate(p); }
