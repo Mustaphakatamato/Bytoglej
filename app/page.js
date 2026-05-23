@@ -8,8 +8,77 @@ import { SkeletonCard } from '@/components/ui';
 import ListingCard from '@/components/ListingCard';
 import { useApp } from '@/providers/AppProvider';
 import { LogoLockup } from '@/components/Logo';
+import { db } from '@/lib/supabase';
 
 const FONT = "'Sora', sans-serif";
+
+/* ── Compact mobile listing card (Vinted-style) ───────────── */
+function MobileCard({ listing, onClick, favs, toggleFav }) {
+  const isFav = favs.includes(listing.id);
+  const [popping, setPopping] = useState(false);
+  const imgs = listing.images?.length ? listing.images : [];
+
+  async function handleFav(e) {
+    e.stopPropagation();
+    toggleFav(listing.id);
+    setPopping(true);
+    setTimeout(() => setPopping(false), 350);
+    const adding = !isFav;
+    const { data: { user } } = await db.auth.getUser();
+    if (user) {
+      if (adding) db.from('listing_favorites').upsert({ listing_id: listing.id, user_id: user.id }, { onConflict: 'listing_id,user_id' });
+      else db.from('listing_favorites').delete().eq('listing_id', listing.id).eq('user_id', user.id);
+    }
+  }
+
+  return (
+    <div onClick={onClick} style={{ borderRadius: 12, overflow: 'hidden', background: '#fff', cursor: 'pointer', border: '1px solid rgba(22,34,28,0.07)', boxShadow: '0 1px 4px rgba(22,34,28,0.05)' }}>
+      <div style={{ aspectRatio: '3/4', background: GREEN_TINT, position: 'relative', overflow: 'hidden' }}>
+        {imgs.length > 0
+          ? <img src={imgs[0]} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
+          : <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 44, opacity: 0.6 }}>{listing.emoji || '🧸'}</div>}
+        <button
+          className={`fav-btn${popping ? ' fav-pop' : ''}`}
+          onClick={handleFav}
+          style={{ position: 'absolute', top: 7, right: 7, background: 'rgba(255,255,255,0.9)', border: 'none', borderRadius: '50%', width: 30, height: 30, display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 1px 4px rgba(0,0,0,0.1)' }}>
+          <svg width="14" height="14" viewBox="0 0 24 24" fill={isFav ? '#e11d48' : 'none'} stroke={isFav ? '#e11d48' : '#888'} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/>
+          </svg>
+        </button>
+      </div>
+      <div style={{ padding: '8px 10px 10px' }}>
+        <div style={{ fontFamily: FONT, fontWeight: 700, fontSize: 13, color: INK, lineHeight: 1.3, marginBottom: 4, overflow: 'hidden', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical' }}>{listing.title}</div>
+        {listing.price
+          ? <div style={{ fontFamily: FONT, fontWeight: 800, fontSize: 15, color: INK }}>{listing.price} kr.</div>
+          : <div style={{ fontFamily: FONT, fontWeight: 700, fontSize: 12, color: CORAL }}>Byttes kun</div>}
+        {listing.condition && <div style={{ fontSize: 11, color: INK3, marginTop: 2 }}>{listing.condition}</div>}
+      </div>
+    </div>
+  );
+}
+
+/* ── Mobile home feed (Vinted-style) ──────────────────────── */
+function MobileHomeFeed({ listings, loading }) {
+  const router = useRouter();
+  const { setQuickViewListing, favs, toggleFav } = useApp();
+  const newest = useMemo(() => [...listings].sort((a, b) => new Date(b.created_at) - new Date(a.created_at)).slice(0, 40), [listings]);
+
+  return (
+    <div style={{ background: PAPER, minHeight: '100vh', paddingTop: 68 }}>
+      <div style={{ padding: '14px 14px 6px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+        <div style={{ fontFamily: FONT, fontWeight: 800, fontSize: 19, color: INK, letterSpacing: '-0.03em' }}>Nyeste opslag</div>
+        <button onClick={() => router.push('/opslag')} style={{ background: 'none', border: 'none', fontSize: 13, fontWeight: 700, color: PRIMARY, fontFamily: FONT, cursor: 'pointer' }}>Se alle →</button>
+      </div>
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, padding: '6px 8px 16px' }}>
+        {loading
+          ? [1,2,3,4,5,6,7,8].map(i => <div key={i} className="skeleton" style={{ aspectRatio: '3/4', borderRadius: 12 }} />)
+          : newest.map(l => (
+              <MobileCard key={l.id} listing={l} favs={favs} toggleFav={toggleFav} onClick={() => setQuickViewListing(l)} />
+            ))}
+      </div>
+    </div>
+  );
+}
 
 /* ── Hero ─────────────────────────────────────────────────── */
 function HeroSection() {
@@ -366,6 +435,12 @@ function CtaBanner() {
 export default function HomePage() {
   const router = useRouter();
   const { listings, loadingListings } = useApp();
+  const w = useWindowWidth();
+  const isMobile = w !== null && w < 768;
+
+  if (isMobile) {
+    return <MobileHomeFeed listings={listings} loading={loadingListings} />;
+  }
 
   function goToInstitution(name) {
     router.push('/institution/' + encodeURIComponent(name));

@@ -14,6 +14,28 @@ import { db } from '@/lib/supabase';
 
 const MapContainer = dynamic(() => import('@/components/MapView'), { ssr: false });
 
+/* ── Mobile category browser (Vinted-style) ────────────────── */
+function CategoryBrowser({ onSelect }) {
+  return (
+    <div style={{ padding: '8px 8px 24px' }}>
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+        {CATEGORIES.map(cat => (
+          <button key={cat.key} onClick={() => onSelect(cat.key)} style={{
+            background: '#fff', border: '1px solid rgba(22,34,28,0.07)',
+            borderRadius: 16, padding: '18px 16px',
+            display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+            cursor: 'pointer', boxShadow: '0 1px 4px rgba(22,34,28,0.05)',
+            fontFamily: FONT, textAlign: 'left',
+          }}>
+            <span style={{ fontWeight: 700, fontSize: 14, color: INK, lineHeight: 1.2, flex: 1 }}>{cat.label}</span>
+            <span style={{ fontSize: 30, lineHeight: 1, flexShrink: 0, marginLeft: 8 }}>{cat.emoji}</span>
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 const FONT = "'Sora', sans-serif";
 
 const geoCache = {};
@@ -182,10 +204,13 @@ export default function OpslagPage() {
     color: INK2, cursor: 'pointer', appearance: 'none', WebkitAppearance: 'none',
   };
 
+  const showCategoryBrowser = isMobile && !category && !dSearch && filter === 'alle' && city === 'alle' && !activeTags.length && maxDist === 'alle';
+
   return (
     <div style={{ minHeight: '100vh', background: PAPER }}>
 
-      {/* ── Compact header ── */}
+      {/* ── Desktop header only ── */}
+      {!isMobile && (
       <div style={{
         background: `linear-gradient(160deg, ${GREEN_DEEP} 0%, ${PRIMARY} 100%)`,
         paddingTop: 152, paddingBottom: 48,
@@ -193,13 +218,13 @@ export default function OpslagPage() {
         position: 'relative', overflow: 'hidden',
       }}>
         <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', pointerEvents: 'none' }}>
-          <span style={{ fontFamily: FONT, fontWeight: 800, fontSize: isMobile ? 160 : 260, color: 'rgba(255,255,255,0.04)', lineHeight: 1, letterSpacing: '-0.05em', userSelect: 'none' }}>byt</span>
+          <span style={{ fontFamily: FONT, fontWeight: 800, fontSize: 260, color: 'rgba(255,255,255,0.04)', lineHeight: 1, letterSpacing: '-0.05em', userSelect: 'none' }}>byt</span>
         </div>
         <div style={{ position: 'relative', maxWidth: 600, margin: '0 auto', padding: '0 24px' }}>
           <div style={{ display: 'inline-block', background: 'rgba(255,255,255,0.12)', borderRadius: 999, padding: '5px 16px', fontSize: 11, fontWeight: 600, color: 'rgba(255,255,255,0.75)', letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: 16 }}>
             Markedsplads
           </div>
-          <h1 style={{ fontFamily: FONT, fontWeight: 800, fontSize: isMobile ? 28 : 40, letterSpacing: '-0.04em', color: '#fff', marginBottom: 10, lineHeight: 1.1 }}>
+          <h1 style={{ fontFamily: FONT, fontWeight: 800, fontSize: 40, letterSpacing: '-0.04em', color: '#fff', marginBottom: 10, lineHeight: 1.1 }}>
             Find legetøj til jeres institution
           </h1>
           <p style={{ fontSize: 15, color: 'rgba(255,255,255,0.65)', lineHeight: 1.6 }}>
@@ -210,6 +235,7 @@ export default function OpslagPage() {
           <path d="M0,24 C360,48 1080,0 1440,24 L1440,48 L0,48 Z" fill={PAPER} />
         </svg>
       </div>
+      )}
 
       {/* ── Sticky filter bar ── */}
       <div style={{
@@ -218,8 +244,14 @@ export default function OpslagPage() {
         borderBottom: `1px solid ${PAPER2}`,
         backdropFilter: 'blur(16px)',
         padding: isMobile ? '10px 14px' : '12px 24px',
+        marginTop: isMobile ? 68 : 0,
       }}>
         <div style={{ maxWidth: 1140, margin: '0 auto', display: 'flex', flexDirection: 'column', gap: 8 }}>
+
+          {/* Title row on mobile */}
+          {isMobile && showCategoryBrowser && (
+            <div style={{ fontFamily: FONT, fontWeight: 800, fontSize: 18, color: INK, letterSpacing: '-0.03em', marginBottom: 2 }}>Søg</div>
+          )}
 
           {/* Search + view toggle row */}
           <div style={{ display: 'flex', gap: 8 }}>
@@ -235,17 +267,18 @@ export default function OpslagPage() {
               <input
                 value={search}
                 onChange={e => setSearch(e.target.value)}
-                placeholder="Søg opslag, institution eller kategori..."
+                placeholder={isMobile ? 'Søg opslag eller institution...' : 'Søg opslag, institution eller kategori...'}
                 style={{ border: 'none', background: 'transparent', outline: 'none', fontSize: 13, fontFamily: FONT, flex: 1, minWidth: 0, color: INK }}
               />
               {search && (
                 <button onClick={() => setSearch('')} style={{ border: 'none', background: 'none', color: INK3, fontSize: 14, cursor: 'pointer', padding: 0, lineHeight: 1 }}>✕</button>
               )}
             </div>
+            {!isMobile && (
             <div style={{ display: 'flex', borderRadius: 99, overflow: 'hidden', border: `1.5px solid ${PAPER3}`, flexShrink: 0 }}>
               {[['list', 'Liste'], ['map', 'Kort']].map(([mode, label]) => (
                 <button key={mode} onClick={() => setViewMode(mode)} style={{
-                  padding: isMobile ? '8px 12px' : '8px 18px',
+                  padding: '8px 18px',
                   border: 'none',
                   background: viewMode === mode ? PRIMARY : PAPER2,
                   color: viewMode === mode ? '#fff' : INK3,
@@ -256,6 +289,7 @@ export default function OpslagPage() {
                 </button>
               ))}
             </div>
+            )}
           </div>
 
           {/* Active category breadcrumb */}
@@ -266,8 +300,8 @@ export default function OpslagPage() {
             </div>
           )}
 
-          {/* Filter pills row */}
-          <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', alignItems: 'center' }}>
+          {/* Filter pills row — hidden on mobile category browser */}
+          <div style={{ display: showCategoryBrowser ? 'none' : 'flex', gap: 6, flexWrap: 'wrap', alignItems: 'center' }}>
             {/* Type filter */}
             <div style={{ display: 'flex', gap: 4 }}>
               {[
@@ -392,11 +426,17 @@ export default function OpslagPage() {
         </div>
       </div>
 
+      {/* ── Category browser (mobile, no filters active) ── */}
+      {showCategoryBrowser && (
+        <CategoryBrowser onSelect={cat => { setCategory(cat); window.scrollTo({ top: 0, behavior: 'instant' }); }} />
+      )}
+
       {/* ── Listings ── */}
-      <div style={{ maxWidth: 1140, margin: '0 auto', padding: isMobile ? '20px 14px 40px' : '28px 24px 60px' }}>
+      {!showCategoryBrowser && (
+      <div style={{ maxWidth: 1140, margin: '0 auto', padding: isMobile ? '16px 8px 40px' : '28px 24px 60px' }}>
 
         {/* Result count */}
-        <div style={{ marginBottom: 18, display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 8 }}>
+        <div style={{ marginBottom: 14, display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 8, padding: isMobile ? '0 6px' : 0 }}>
           <p style={{ color: INK3, fontSize: 13, margin: 0, fontFamily: FONT }}>
             {loading ? 'Henter opslag…' : `${filtered.length} opslag`}
             {dSearch && <span> for "<strong style={{ color: INK2 }}>{dSearch}</strong>"</span>}
@@ -425,8 +465,10 @@ export default function OpslagPage() {
             isMobile={isMobile}
           />
         ) : loading ? (
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(240px,1fr))', gap: 18 }}>
-            {[1,2,3,4,5,6].map(i => <SkeletonCard key={i} />)}
+          <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr 1fr' : 'repeat(auto-fill,minmax(240px,1fr))', gap: isMobile ? 8 : 18 }}>
+            {[1,2,3,4,5,6].map(i => isMobile
+              ? <div key={i} className="skeleton" style={{ aspectRatio: '3/4', borderRadius: 12 }} />
+              : <SkeletonCard key={i} />)}
           </div>
         ) : filtered.length === 0 ? (
           <div style={{ textAlign: 'center', padding: '80px 0 120px' }}>
@@ -441,6 +483,28 @@ export default function OpslagPage() {
               Nulstil filtre
             </button>
           </div>
+        ) : isMobile ? (
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+            {filtered.map(l => {
+              const imgs = l.images?.length ? l.images : [];
+              return (
+                <div key={l.id} onClick={() => handleListingClick(l)} style={{ borderRadius: 12, overflow: 'hidden', background: '#fff', cursor: 'pointer', border: '1px solid rgba(22,34,28,0.07)', boxShadow: '0 1px 4px rgba(22,34,28,0.05)' }}>
+                  <div style={{ aspectRatio: '3/4', background: GREEN_TINT, position: 'relative', overflow: 'hidden' }}>
+                    {imgs.length > 0
+                      ? <img src={imgs[0]} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
+                      : <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 44, opacity: 0.6 }}>{l.emoji || '🧸'}</div>}
+                  </div>
+                  <div style={{ padding: '8px 10px 10px' }}>
+                    <div style={{ fontFamily: FONT, fontWeight: 700, fontSize: 13, color: INK, lineHeight: 1.3, marginBottom: 4, overflow: 'hidden', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical' }}>{l.title}</div>
+                    {l.price
+                      ? <div style={{ fontFamily: FONT, fontWeight: 800, fontSize: 15, color: INK }}>{l.price} kr.</div>
+                      : <div style={{ fontFamily: FONT, fontWeight: 700, fontSize: 12, color: CORAL }}>Byttes kun</div>}
+                    {l.condition && <div style={{ fontSize: 11, color: INK3, marginTop: 2 }}>{l.condition}</div>}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
         ) : (
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(240px,1fr))', gap: 18 }}>
             {filtered.map(l => (
@@ -449,6 +513,7 @@ export default function OpslagPage() {
           </div>
         )}
       </div>
+      )}
 
       {saveSearchModal && (
         <div onClick={()=>setSaveSearchModal(false)} style={{ position:'fixed', inset:0, background:'rgba(22,34,28,0.5)', zIndex:2000, display:'flex', alignItems:'center', justifyContent:'center', padding:24 }}>
