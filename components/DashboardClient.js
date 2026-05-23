@@ -414,13 +414,12 @@ export default function DashboardClient() {
         </div>
 
         {/* Stats */}
-        <div style={{ display:'grid', gridTemplateColumns:isMobile?'repeat(2,1fr)':'repeat(5,1fr)', gap:isMobile?12:16, marginBottom:isMobile?24:32 }}>
+        <div style={{ display:'grid', gridTemplateColumns:isMobile?'repeat(2,1fr)':'repeat(4,1fr)', gap:isMobile?12:16, marginBottom:isMobile?24:32 }}>
           {[
             { n:myListings.filter(l=>l.is_active&&!l.is_sold).length, label:'Aktive opslag', color:PRIMARY, onClick:()=>listingsRef.current?.scrollIntoView({behavior:'smooth',block:'start'}) },
             { n:soldTrades.length||0, label:'Solgt', color:PRIMARY, onClick:()=>{ setTradesTab('sold'); setTradesOpen(true); fetchTrades(); } },
             { n:boughtTrades.length||0, label:'Købt', color:PRIMARY, onClick:()=>{ setTradesTab('bought'); setTradesOpen(true); fetchTrades(); } },
             { n:activity.length||0, label:'Sendte tilbud', color:PRIMARY, onClick:()=>{ setActivityOpen(true); fetchActivity(); } },
-            { n:incomingConvs.filter(c=>!c.is_handled&&c.owner_unread>0).length||0, label:'Ulæste anmodninger', color:CORAL, onClick:()=>{ const el=document.getElementById('incoming-section'); if(el) el.scrollIntoView({behavior:'smooth'}); } },
           ].map((s,i)=>(
             <div key={i} onClick={s.onClick} style={{ background:PAPER2, borderRadius:20, padding:'20px 22px', border:'1px solid rgba(22,34,28,0.07)', boxShadow:'0 1px 4px rgba(22,34,28,0.06)', animation:`slideUp 0.4s ease ${i*0.08}s both`, cursor:'pointer', transition:'transform 0.15s, box-shadow 0.15s' }}
               onMouseEnter={e=>{ e.currentTarget.style.transform='translateY(-2px)'; e.currentTarget.style.boxShadow='0 4px 16px rgba(22,34,28,0.10)'; }}
@@ -614,47 +613,6 @@ export default function DashboardClient() {
               ))}
             </div>
           )}
-        </div>
-
-        {/* Indkommende anmodninger */}
-        <div id="incoming-section" style={{ background:PAPER2, borderRadius:22, padding:isMobile?20:28, border:'1px solid rgba(22,34,28,0.07)', boxShadow:'0 1px 4px rgba(22,34,28,0.06)', marginTop:isMobile?16:24 }}>
-          <div style={{ display:'flex', alignItems:'center', gap:10, marginBottom:20 }}>
-            <h2 style={{ fontFamily:FONT, fontWeight:800, fontSize:18, color:INK }}>Indkommende anmodninger</h2>
-            {incomingConvs.filter(c=>!c.is_handled&&c.owner_unread>0).length > 0 && <div style={{ background:CORAL, color:'#fff', borderRadius:99, padding:'2px 10px', fontSize:12, fontWeight:800, fontFamily:FONT }}>{incomingConvs.filter(c=>!c.is_handled&&c.owner_unread>0).length} ny</div>}
-          </div>
-          {(() => {
-            const pending = incomingConvs.filter(c=>!c.is_handled);
-            if (pending.length === 0) return (
-              <div style={{ textAlign:'center', padding:'40px 0' }}>
-                <div style={{ fontFamily:FONT, fontWeight:800, fontSize:48, color:GREEN_SOFT, lineHeight:1, marginBottom:12 }}>—</div>
-                <p style={{ fontSize:14, color:INK3, fontFamily:FONT }}>Ingen ubehandlede anmodninger på dine opslag</p>
-              </div>
-            );
-            return (
-              <div style={{ display:'flex', flexDirection:'column', gap:10 }}>
-                {pending.slice(0,10).map(c => (
-                  <div key={c.id} onClick={()=>router.push('/beskeder')} style={{ display:'flex', alignItems:'center', gap:14, padding:'12px 16px', border:`1px solid ${c.owner_unread>0?GREEN_SOFT:'rgba(22,34,28,0.08)'}`, borderRadius:14, cursor:'pointer', background:c.owner_unread>0?GREEN_TINT:PAPER, transition:'all 0.15s' }}
-                    onMouseEnter={e=>e.currentTarget.style.borderColor=PRIMARY}
-                    onMouseLeave={e=>e.currentTarget.style.borderColor=c.owner_unread>0?GREEN_SOFT:'rgba(22,34,28,0.08)'}>
-                    <div style={{ width:44, height:44, borderRadius:12, background:c.listing_image?PAPER3:c.listing_color||'#FFD166', display:'flex', alignItems:'center', justifyContent:'center', fontSize:22, flexShrink:0, overflow:'hidden', position:'relative' }}>
-                      {c.listing_image ? <img src={c.listing_image} style={{ width:'100%', height:'100%', objectFit:'cover' }} alt="" /> : c.listing_emoji||'🧸'}
-                      {c.owner_unread>0 && <div style={{ position:'absolute', top:-4, right:-4, width:16, height:16, background:CORAL, borderRadius:'50%', border:`2px solid ${PAPER2}`, display:'flex', alignItems:'center', justifyContent:'center', fontSize:8, fontWeight:800, color:'#fff' }}>{c.owner_unread>9?'9+':c.owner_unread}</div>}
-                    </div>
-                    <div style={{ flex:1, minWidth:0 }}>
-                      <div style={{ fontFamily:FONT, fontWeight:c.owner_unread>0?700:600, fontSize:14, whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis', color:INK }}>{c.initiator_name}</div>
-                      <div style={{ fontSize:12, color:INK3, marginTop:2, whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis', fontFamily:FONT }}>{c.listing_title}</div>
-                      <div style={{ fontSize:12, color:c.owner_unread>0?INK:INK3, fontWeight:c.owner_unread>0?600:400, whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis', fontFamily:FONT }}>{c.last_message || 'Samtale startet'}</div>
-                    </div>
-                    <div style={{ display:'flex', flexDirection:'column', alignItems:'flex-end', gap:4, flexShrink:0 }}>
-                      <div style={{ fontSize:11, color:INK3, fontFamily:FONT }}>{relTime(c.last_message_at)}</div>
-                      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke={PRIMARY} strokeWidth="2.5" strokeLinecap="round"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg>
-                    </div>
-                  </div>
-                ))}
-                {pending.length > 10 && <button onClick={()=>router.push('/beskeder')} style={{ background:'none', border:`1.5px solid ${PRIMARY}`, color:PRIMARY, borderRadius:99, padding:'8px 18px', fontSize:13, fontWeight:700, cursor:'pointer', alignSelf:'center', marginTop:4, fontFamily:FONT }}>Se alle {pending.length} →</button>}
-              </div>
-            );
-          })()}
         </div>
 
         {/* Gemte søgninger */}
