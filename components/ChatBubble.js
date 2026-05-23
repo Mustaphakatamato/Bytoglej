@@ -31,8 +31,11 @@ export default function ChatBubble() {
   const bubbleBottom = isMobile ? 'calc(84px + env(safe-area-inset-bottom, 0px) + 14px)' : '20px';
   const panelBottom  = isMobile ? 'calc(84px + env(safe-area-inset-bottom, 0px) + 78px)' : '80px';
 
+  const [splashDone, setSplashDone] = useState(false);
+  useEffect(() => { const t = setTimeout(() => setSplashDone(true), 1400); return () => clearTimeout(t); }, []);
+
   const userId = realUserId || ctxUserId;
-  const hidden = !userId || !!pathname?.startsWith('/beskeder');
+  const hidden = !splashDone || !userId || !!pathname?.startsWith('/beskeder');
 
   // ── helpers ─────────────────────────────────────────────────────────────────
   const amInit = useCallback((conv) => {
