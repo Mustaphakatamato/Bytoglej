@@ -134,6 +134,8 @@ export default function ListingDetailClient() {
     });
   }, []);
 
+  const isOwn = !!(ctxInstitution && listing?.institution_name === ctxInstitution.name);
+
   useEffect(() => { if (listing) setIsFav(favs?.includes(listing.id) || false); }, [favs, listing?.id]);
 
   useEffect(() => {
@@ -153,8 +155,6 @@ export default function ListingDetailClient() {
       </div>
     );
   }
-
-  const isOwn = !!(ctxInstitution && listing.institution_name === ctxInstitution.name);
 
   function handleToggleFav() {
     const adding = !isFav;
