@@ -201,6 +201,12 @@ export default function SignupPage() {
   const dropRef = useRef(null);
   const debouncedQuery = useDebounce(cvrQuery, 380);
 
+  useEffect(() => {
+    db.auth.getSession().then(({ data: { session } }) => {
+      if (session) router.replace('/dashboard');
+    });
+  }, []);
+
   // Close dropdown on outside click
   useEffect(() => {
     if (!showDrop) return;

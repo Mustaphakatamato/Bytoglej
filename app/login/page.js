@@ -33,6 +33,12 @@ export default function LoginPage() {
   const passRef = useRef(null);
 
   useEffect(() => {
+    db.auth.getSession().then(({ data: { session } }) => {
+      if (session) router.replace('/dashboard');
+    });
+  }, []);
+
+  useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const e = params.get('email');
     if (e) setEmail(e);
