@@ -199,90 +199,52 @@ function OpslagInner() {
       </div>
       )}
 
-      {/* ── Sticky filter bar ── */}
+      {/* ── Sticky filter bar — desktop only ── */}
+      {!isMobile && (
       <div style={{
         position: 'sticky', top: 68, zIndex: 100,
         background: `rgba(246,242,234,0.97)`,
         borderBottom: `1px solid ${PAPER2}`,
         backdropFilter: 'blur(16px)',
-        padding: isMobile ? '10px 14px' : '12px 24px',
-        marginTop: isMobile ? 68 : 0,
+        padding: '12px 24px',
       }}>
         <div style={{ maxWidth: 1140, margin: '0 auto', display: 'flex', flexDirection: 'column', gap: 8 }}>
-
-          {/* Desktop: search + view toggle row */}
-          {!isMobile && (
           <div style={{ display: 'flex', gap: 8 }}>
-            <div style={{
-              flex: 1, background: PAPER2, borderRadius: 99,
-              display: 'flex', alignItems: 'center', padding: '9px 16px', gap: 10,
-              border: `1.5px solid ${PAPER3}`,
-            }}>
+            <div style={{ flex: 1, background: PAPER2, borderRadius: 99, display: 'flex', alignItems: 'center', padding: '9px 16px', gap: 10, border: `1.5px solid ${PAPER3}` }}>
               <svg width="14" height="14" viewBox="0 0 14 14" fill="none" style={{ flexShrink: 0, opacity: 0.4 }}>
                 <circle cx="6" cy="6" r="5" stroke={INK} strokeWidth="1.5"/>
                 <path d="M10 10L13 13" stroke={INK} strokeWidth="1.5" strokeLinecap="round"/>
               </svg>
-              <input
-                value={search}
-                readOnly
-                placeholder="Brug søgefeltet ovenfor..."
-                style={{ border: 'none', background: 'transparent', outline: 'none', fontSize: 13, fontFamily: FONT, flex: 1, minWidth: 0, color: INK }}
-              />
+              <input value={search} readOnly placeholder="Brug søgefeltet ovenfor..."
+                style={{ border: 'none', background: 'transparent', outline: 'none', fontSize: 13, fontFamily: FONT, flex: 1, minWidth: 0, color: INK }} />
               {search && <span style={{ fontSize: 13, color: INK2, fontFamily: FONT, fontWeight: 600 }}>"{search}"</span>}
             </div>
             <div style={{ display: 'flex', borderRadius: 99, overflow: 'hidden', border: `1.5px solid ${PAPER3}`, flexShrink: 0 }}>
               {[['list', 'Liste'], ['map', 'Kort']].map(([mode, label]) => (
-                <button key={mode} onClick={() => setViewMode(mode)} style={{
-                  padding: '8px 18px', border: 'none',
-                  background: viewMode === mode ? PRIMARY : PAPER2,
-                  color: viewMode === mode ? '#fff' : INK3,
-                  fontWeight: 700, fontSize: 13, fontFamily: FONT,
-                  cursor: 'pointer', transition: 'all 0.15s', whiteSpace: 'nowrap',
-                }}>
+                <button key={mode} onClick={() => setViewMode(mode)} style={{ padding: '8px 18px', border: 'none', background: viewMode === mode ? PRIMARY : PAPER2, color: viewMode === mode ? '#fff' : INK3, fontWeight: 700, fontSize: 13, fontFamily: FONT, cursor: 'pointer', transition: 'all 0.15s', whiteSpace: 'nowrap' }}>
                   {label}
                 </button>
               ))}
             </div>
           </div>
-          )}
-
-          {/* Active category breadcrumb */}
           {category && (
             <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, fontWeight: 600, color: PRIMARY, fontFamily: FONT }}>
               {(() => { const catObj = CATEGORIES.find(c => c.key === category); return catObj ? <><span>{catObj.emoji} {catObj.label}</span>{subcategory && <><span style={{ opacity: 0.5 }}>›</span><span>{subcategory}</span></>}</> : null; })()}
               <button onClick={() => { setCategory(''); setSubcategory(''); }} style={{ marginLeft: 4, background: 'none', border: 'none', color: PRIMARY, cursor: 'pointer', fontSize: 13, fontWeight: 800, lineHeight: 1, padding: '0 2px' }}>×</button>
             </div>
           )}
-
-          {/* Filter pills row — hidden on mobile category/subcategory browser */}
-          <div style={{ display: (showCategoryBrowser || showSubcategoryBrowser) ? 'none' : 'flex', gap: 6, flexWrap: 'wrap', alignItems: 'center' }}>
-            {/* Type filter */}
+          <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', alignItems: 'center' }}>
             <div style={{ display: 'flex', gap: 4 }}>
-              {[
-                { key: 'alle', label: 'Alle' },
-                { key: 'køb',  label: TYPE_CFG.køb.label },
-                { key: 'byd',  label: TYPE_CFG.byd.label },
-                { key: 'byt',  label: TYPE_CFG.byt.label },
-              ].map(({ key, label }) => {
+              {[{ key: 'alle', label: 'Alle' }, { key: 'køb', label: TYPE_CFG.køb.label }, { key: 'byd', label: TYPE_CFG.byd.label }, { key: 'byt', label: TYPE_CFG.byt.label }].map(({ key, label }) => {
                 const active = filter === key;
                 const tc = key !== 'alle' ? TYPE_CFG[key] : null;
                 return (
-                  <button key={key} onClick={() => setFilter(key)} style={{
-                    padding: isMobile ? '6px 14px' : '7px 16px',
-                    borderRadius: 99,
-                    border: active ? 'none' : `1.5px solid ${PAPER3}`,
-                    background: active ? (tc ? tc.color : PRIMARY) : PAPER2,
-                    color: active ? (key === 'køb' ? '#fff' : key === 'byd' ? '#fff' : '#fff') : INK2,
-                    fontSize: 13, fontWeight: 700, fontFamily: FONT,
-                    transition: 'all 0.15s', cursor: 'pointer', whiteSpace: 'nowrap',
-                  }}>
+                  <button key={key} onClick={() => setFilter(key)} style={{ padding: '7px 16px', borderRadius: 99, border: active ? 'none' : `1.5px solid ${PAPER3}`, background: active ? (tc ? tc.color : PRIMARY) : PAPER2, color: active ? '#fff' : INK2, fontSize: 13, fontWeight: 700, fontFamily: FONT, transition: 'all 0.15s', cursor: 'pointer', whiteSpace: 'nowrap' }}>
                     {label}
                   </button>
                 );
               })}
             </div>
-
-            {/* Sort */}
             <div style={{ position: 'relative' }}>
               <select value={sort} onChange={e => setSort(e.target.value)} style={selectStyle}>
                 <option value="newest">Nyeste</option>
@@ -295,6 +257,10 @@ function OpslagInner() {
           </div>
         </div>
       </div>
+      )}
+
+      {/* ── Mobile: top spacer (replaces sticky filter bar) ── */}
+      {isMobile && <div style={{ height: 68 }} />}
 
       {/* ── Category browser (mobile, no filters active) ── */}
       {showCategoryBrowser && (
@@ -313,14 +279,31 @@ function OpslagInner() {
 
       {/* ── Listings ── */}
       {!showCategoryBrowser && !showSubcategoryBrowser && (
-      <div style={{ maxWidth: 1140, margin: '0 auto', padding: isMobile ? '16px 8px 40px' : '28px 24px 60px' }}>
+      <div style={{ maxWidth: 1140, margin: '0 auto', padding: isMobile ? '12px 8px 40px' : '28px 24px 60px' }}>
 
-        {/* Result count */}
-        <div style={{ marginBottom: 14, display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 8, padding: isMobile ? '0 6px' : 0 }}>
+        {/* Mobile: back button + breadcrumb */}
+        {isMobile && (
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '0 6px 10px', borderBottom: `1px solid ${PAPER2}`, marginBottom: 12 }}>
+            <button onClick={() => { setCategory(''); setSubcategory(''); setPendingCategory(''); router.push('/opslag'); }} style={{ background: 'none', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6, color: PRIMARY, fontFamily: FONT, fontWeight: 700, fontSize: 14, padding: 0 }}>
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke={PRIMARY} strokeWidth="2.5" strokeLinecap="round"><path d="M15 18l-6-6 6-6"/></svg>
+              {(() => {
+                const catObj = CATEGORIES.find(c => c.key === category);
+                if (search) return `"${search}"`;
+                if (catObj && subcategory) return `${catObj.emoji} ${catObj.label} › ${subcategory}`;
+                if (catObj) return `${catObj.emoji} ${catObj.label}`;
+                return 'Alle opslag';
+              })()}
+            </button>
+            <span style={{ marginLeft: 'auto', fontSize: 12, color: INK3, fontFamily: FONT }}>{loading ? '' : `${filtered.length} opslag`}</span>
+          </div>
+        )}
+
+        {/* Desktop: Result count row */}
+        {!isMobile && (
+        <div style={{ marginBottom: 14, display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 8 }}>
           <p style={{ color: INK3, fontSize: 13, margin: 0, fontFamily: FONT }}>
             {loading ? 'Henter opslag…' : `${filtered.length} opslag`}
             {search && <span> for "<strong style={{ color: INK2 }}>{search}</strong>"</span>}
-            {viewMode === 'map' && !loading && <span style={{ marginLeft: 8, fontSize: 12 }}>— pins baseret på by</span>}
           </p>
           <div style={{ display:'flex', gap:10, alignItems:'center' }}>
             {(filter !== 'alle' || search || category || subcategory) && (
@@ -335,8 +318,9 @@ function OpslagInner() {
             )}
           </div>
         </div>
+        )}
 
-        {viewMode === 'map' ? (
+        {viewMode === 'map' && !isMobile ? (
           <MapContainer
             listings={filtered}
             listingCoords={{}}
