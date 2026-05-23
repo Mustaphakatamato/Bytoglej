@@ -60,6 +60,8 @@ export default function ListingDetailClient() {
   const router = useRouter();
   const { activeListing: listing, setActiveListing, favs, toggleFav, setSelectedConvId, showToast, loggedIn, setQuickViewListing, isAdmin } = useApp();
   const { isAdminView: ctxIsAdmin, adminInstName, institution: ctxInstitution, institutionId: ctxInstId } = useActiveUser();
+  const ww = useWindowWidth();
+  const isMobile = ww < 768;
 
   const [buyModal,  setBuyModal]  = useState(false);
   const [buyStep,   setBuyStep]   = useState(1);
@@ -412,9 +414,6 @@ export default function ListingDetailClient() {
     setSaving(false); setSwapModal(false); setSelectedSwapId(null); setSwapOffer('');
     showToast('Bytteforslag sendt!');
   }
-
-  const ww = useWindowWidth();
-  const isMobile = ww < 768;
 
   return (
     <>
