@@ -30,9 +30,17 @@ export default function NavWrapper() {
   const router = useRouter();
   const w = useWindowWidth();
   const isMobile = w < 768;
+  const [navigating, setNavigating] = useState(false);
+
+  useEffect(() => {
+    ['/', '/opslag', '/dashboard', '/beskeder', '/opret-opslag', '/profil'].forEach(p => router.prefetch(p));
+  }, []);
+
+  useEffect(() => { setNavigating(false); }, [pathname]);
 
   const navigate = p => {
     window.scrollTo({ top: 0, behavior: 'instant' });
+    setNavigating(true);
     router.push(p);
   };
 
@@ -57,6 +65,9 @@ export default function NavWrapper() {
           loggedIn={loggedIn}
           unreadTotal={unreadTotal}
         />
+      )}
+      {navigating && (
+        <div style={{ position:'fixed', inset:0, zIndex:9999, pointerEvents:'none', background:'rgba(246,242,234,0.45)', animation:'fadeIn 0.08s ease both' }} />
       )}
       {toast && <ToastDisplay msg={toast.msg} type={toast.type} onDone={()=>setToast(null)} />}
     </>
