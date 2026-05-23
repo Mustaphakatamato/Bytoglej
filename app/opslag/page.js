@@ -1,16 +1,16 @@
 'use client';
 import { useState, useEffect, useMemo } from 'react';
-import { useRouter } from 'next/navigation';
-import dynamic from 'next/dynamic';
+import { useRouter, useSearchParams } from 'next/navigation';
+import nextDynamic from 'next/dynamic';
 import { PRIMARY, GREEN_DEEP, GREEN_SOFT, GREEN_TINT, PAPER, PAPER2, PAPER3, INK, INK2, INK3, CORAL, TYPE_CFG } from '@/lib/constants';
 import { CATEGORIES } from '@/lib/categories';
-import { useWindowWidth, useDebounce } from '@/lib/hooks';
+import { useWindowWidth } from '@/lib/hooks';
 import { Btn, SkeletonCard } from '@/components/ui';
 import ListingCard from '@/components/ListingCard';
 import { useApp } from '@/providers/AppProvider';
 import { db } from '@/lib/supabase';
 
-const MapContainer = dynamic(() => import('@/components/MapView'), { ssr: false });
+const MapContainer = nextDynamic(() => import('@/components/MapView'), { ssr: false });
 
 const FONT = "'Sora', sans-serif";
 
@@ -79,13 +79,13 @@ function SubcategoryBrowser({ categoryKey, onBack, onSelectAll, onSelectSub }) {
   );
 }
 
-export default function OpslagPage() {
+function OpslagInner() {
   const router = useRouter();
+  const urlParams = useSearchParams();
   const { listings, loadingListings: loading, setActiveListing, favs, toggleFav, showToast, loggedIn, setQuickViewListing } = useApp();
   const ww = useWindowWidth();
   const isMobile = ww < 640;
   const [filter, setFilter] = useState('alle');
-  const [search, setSearch] = useState('');
   const [sort, setSort] = useState('newest');
   const [category, setCategory] = useState('');
   const [subcategory, setSubcategory] = useState('');
@@ -94,25 +94,24 @@ export default function OpslagPage() {
   const [saveSearchModal, setSaveSearchModal] = useState(false);
   const [saveSearchName, setSaveSearchName] = useState('');
   const [savingSearch, setSavingSearch] = useState(false);
-  const dSearch = useDebounce(search, 180);
 
+  // Reactive sync from URL (handles nav SearchBar navigation)
   useEffect(() => {
-    if (typeof window === 'undefined') return;
-    const params = new URLSearchParams(window.location.search);
-    const t = params.get('type');
-    const s = params.get('search');
-    if (t && t !== 'alle') setFilter(t);
-    if (s) setSearch(s);
-    const cat = params.get('category');
-    const sub = params.get('subcategory');
-    if (cat) setCategory(cat);
-    if (sub) setSubcategory(sub);
-  }, []);
+    const t = urlParams.get('type');
+    const cat = urlParams.get('category');
+    const sub = urlParams.get('subcategory');
+    setFilter(t && t !== 'alle' ? t : 'alle');
+    setCategory(cat || '');
+    setSubcategory(sub || '');
+    setPendingCategory('');
+  }, [urlParams]);
+
+  const search = urlParams.get('search') || '';
 
   const filtered = useMemo(() => {
     let r = listings.filter(l => {
       const matchType   = filter === 'alle' || l.type === filter;
-      const matchSearch = !dSearch || l.title.toLowerCase().includes(dSearch.toLowerCase()) || (l.institution_name||'').toLowerCase().includes(dSearch.toLowerCase());
+      const matchSearch = !search || l.title.toLowerCase().includes(search.toLowerCase()) || (l.institution_name||'').toLowerCase().includes(search.toLowerCase());
       const matchCategory = !category || l.category === category;
       const matchSubcategory = !subcategory || l.subcategory === subcategory;
       return matchType && matchSearch && matchCategory && matchSubcategory;
@@ -122,7 +121,7 @@ export default function OpslagPage() {
     if (sort === 'price-desc') r = [...r].sort((a,b) => (b.price||0) - (a.price||0));
     if (sort === 'bids')       r = [...r].sort((a,b) => (b.bid_count||0) - (a.bid_count||0));
     return r;
-  }, [listings, filter, dSearch, sort, category, subcategory]);
+  }, [listings, filter, search, sort, category, subcategory]);
 
   async function handleSaveSearch() {
     if (!saveSearchName.trim()) return;
@@ -133,7 +132,7 @@ export default function OpslagPage() {
       const { data: inst } = await db.from('institutions').select('id,name,email').ilike('email', user.email).maybeSingle();
       const filters = {};
       if (filter !== 'alle') filters.type = filter;
-      if (dSearch) filters.search = dSearch;
+      if (search) filters.search = search;
       if (category) filters.category = category;
       if (subcategory) filters.subcategory = subcategory;
       const { error: insertErr } = await db.from('saved_searches').insert({
@@ -165,7 +164,7 @@ export default function OpslagPage() {
     color: INK2, cursor: 'pointer', appearance: 'none', WebkitAppearance: 'none',
   };
 
-  const noFilters = !category && !dSearch && filter === 'alle';
+  const noFilters = !category && !search && filter === 'alle';
   const showCategoryBrowser    = isMobile && noFilters && !pendingCategory;
   const showSubcategoryBrowser = isMobile && noFilters && !!pendingCategory;
 
@@ -211,12 +210,8 @@ export default function OpslagPage() {
       }}>
         <div style={{ maxWidth: 1140, margin: '0 auto', display: 'flex', flexDirection: 'column', gap: 8 }}>
 
-          {/* Title row on mobile category screen */}
-          {isMobile && (showCategoryBrowser || showSubcategoryBrowser) && (
-            <div style={{ fontFamily: FONT, fontWeight: 800, fontSize: 18, color: INK, letterSpacing: '-0.03em', marginBottom: 2 }}>Søg</div>
-          )}
-
-          {/* Search + view toggle row */}
+          {/* Desktop: search + view toggle row */}
+          {!isMobile && (
           <div style={{ display: 'flex', gap: 8 }}>
             <div style={{
               flex: 1, background: PAPER2, borderRadius: 99,
@@ -229,20 +224,16 @@ export default function OpslagPage() {
               </svg>
               <input
                 value={search}
-                onChange={e => setSearch(e.target.value)}
-                placeholder={isMobile ? 'Søg opslag eller institution...' : 'Søg opslag, institution eller kategori...'}
+                readOnly
+                placeholder="Brug søgefeltet ovenfor..."
                 style={{ border: 'none', background: 'transparent', outline: 'none', fontSize: 13, fontFamily: FONT, flex: 1, minWidth: 0, color: INK }}
               />
-              {search && (
-                <button onClick={() => setSearch('')} style={{ border: 'none', background: 'none', color: INK3, fontSize: 14, cursor: 'pointer', padding: 0, lineHeight: 1 }}>✕</button>
-              )}
+              {search && <span style={{ fontSize: 13, color: INK2, fontFamily: FONT, fontWeight: 600 }}>"{search}"</span>}
             </div>
-            {!isMobile && (
             <div style={{ display: 'flex', borderRadius: 99, overflow: 'hidden', border: `1.5px solid ${PAPER3}`, flexShrink: 0 }}>
               {[['list', 'Liste'], ['map', 'Kort']].map(([mode, label]) => (
                 <button key={mode} onClick={() => setViewMode(mode)} style={{
-                  padding: '8px 18px',
-                  border: 'none',
+                  padding: '8px 18px', border: 'none',
                   background: viewMode === mode ? PRIMARY : PAPER2,
                   color: viewMode === mode ? '#fff' : INK3,
                   fontWeight: 700, fontSize: 13, fontFamily: FONT,
@@ -252,8 +243,8 @@ export default function OpslagPage() {
                 </button>
               ))}
             </div>
-            )}
           </div>
+          )}
 
           {/* Active category breadcrumb */}
           {category && (
@@ -328,16 +319,16 @@ export default function OpslagPage() {
         <div style={{ marginBottom: 14, display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 8, padding: isMobile ? '0 6px' : 0 }}>
           <p style={{ color: INK3, fontSize: 13, margin: 0, fontFamily: FONT }}>
             {loading ? 'Henter opslag…' : `${filtered.length} opslag`}
-            {dSearch && <span> for "<strong style={{ color: INK2 }}>{dSearch}</strong>"</span>}
+            {search && <span> for "<strong style={{ color: INK2 }}>{search}</strong>"</span>}
             {viewMode === 'map' && !loading && <span style={{ marginLeft: 8, fontSize: 12 }}>— pins baseret på by</span>}
           </p>
           <div style={{ display:'flex', gap:10, alignItems:'center' }}>
-            {(filter !== 'alle' || dSearch || category || subcategory) && (
-              <button onClick={() => { setFilter('alle'); setSearch(''); setCategory(''); setSubcategory(''); setPendingCategory(''); window.history.replaceState({}, '', '/opslag'); }} style={{ fontSize: 12, fontWeight: 600, color: PRIMARY, background: 'none', border: 'none', cursor: 'pointer', fontFamily: FONT, padding: 0 }}>
+            {(filter !== 'alle' || search || category || subcategory) && (
+              <button onClick={() => { setFilter('alle'); setCategory(''); setSubcategory(''); setPendingCategory(''); router.push('/opslag'); }} style={{ fontSize: 12, fontWeight: 600, color: PRIMARY, background: 'none', border: 'none', cursor: 'pointer', fontFamily: FONT, padding: 0 }}>
                 Nulstil filtre
               </button>
             )}
-            {loggedIn && (filter !== 'alle' || dSearch || category || subcategory) && (
+            {loggedIn && (filter !== 'alle' || search || category || subcategory) && (
               <button onClick={() => setSaveSearchModal(true)} style={{ fontSize: 12, fontWeight: 700, color: '#fff', background: PRIMARY, border: 'none', borderRadius: 99, cursor: 'pointer', fontFamily: FONT, padding: '5px 14px', display:'flex', alignItems:'center', gap:5 }}>
                 🔔 Gem søgning
               </button>
@@ -364,7 +355,7 @@ export default function OpslagPage() {
             <div style={{ fontFamily: FONT, fontWeight: 800, fontSize: isMobile ? 60 : 96, color: GREEN_SOFT, lineHeight: 1, letterSpacing: '-0.05em', marginBottom: 12, userSelect: 'none' }}>0</div>
             <div style={{ fontFamily: FONT, fontWeight: 800, fontSize: isMobile ? 20 : 26, color: INK, marginBottom: 8, letterSpacing: '-0.03em' }}>Ingen opslag fundet</div>
             <p style={{ fontSize: 15, color: INK3, marginBottom: 28 }}>Prøv at ændre eller nulstille dine filtre</p>
-            <button onClick={() => { setFilter('alle'); setSearch(''); setCategory(''); setSubcategory(''); setPendingCategory(''); window.history.replaceState({}, '', '/opslag'); }} style={{
+            <button onClick={() => { setFilter('alle'); setCategory(''); setSubcategory(''); setPendingCategory(''); router.push('/opslag'); }} style={{
               background: 'none', border: `1.5px solid ${PRIMARY}`, color: PRIMARY,
               borderRadius: 99, padding: '10px 24px', fontSize: 14, fontWeight: 700,
               fontFamily: FONT, cursor: 'pointer',
@@ -426,5 +417,14 @@ export default function OpslagPage() {
         </div>
       )}
     </div>
+  );
+}
+
+import { Suspense } from 'react';
+export default function OpslagPage() {
+  return (
+    <Suspense fallback={<div style={{ minHeight: '100vh', background: PAPER }} />}>
+      <OpslagInner />
+    </Suspense>
   );
 }

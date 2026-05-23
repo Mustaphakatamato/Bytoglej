@@ -162,6 +162,8 @@ function SearchBar({ transparent, router }) {
   const [focused, setFocused] = useState(false);
   const [cursor, setCursor] = useState(-1);
   const wrapRef = useRef(null);
+  const w = useWindowWidth();
+  const isMobile = w < 768;
 
   // Sync from URL when already on /opslag
   useEffect(() => {
@@ -266,12 +268,12 @@ function SearchBar({ transparent, router }) {
             onFocus={() => { setFocused(true); setOpen(true); }}
             onBlur={() => setFocused(false)}
             onKeyDown={onKeyDown}
-            placeholder="Søg efter legetøj, institution..."
+            placeholder={isMobile ? 'Søg...' : 'Søg efter legetøj, institution...'}
             autoComplete="off"
             style={{
               flex:1, border:'none', background:'transparent', outline:'none',
               fontSize:14, fontFamily:FONT, color: transparent ? '#fff' : INK,
-              padding:'10px 0',
+              padding:'10px 0', minWidth:0,
             }}
           />
           {q && (
@@ -280,10 +282,14 @@ function SearchBar({ transparent, router }) {
           <button type="submit" style={{
             background: transparent ? 'rgba(255,255,255,0.25)' : PRIMARY,
             color:'#fff', border:'none', borderRadius:99,
-            padding:'7px 18px', fontSize:13, fontWeight:700, fontFamily:FONT,
+            padding: isMobile ? '7px 10px' : '7px 18px',
+            fontSize:13, fontWeight:700, fontFamily:FONT,
             cursor:'pointer', flexShrink:0, whiteSpace:'nowrap',
+            display:'flex', alignItems:'center', justifyContent:'center',
           }}>
-            Søg
+            {isMobile
+              ? <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><circle cx="6" cy="6" r="5" stroke="#fff" strokeWidth="1.5"/><path d="M10 10L13 13" stroke="#fff" strokeWidth="1.5" strokeLinecap="round"/></svg>
+              : 'Søg'}
           </button>
         </div>
       </form>
@@ -464,7 +470,6 @@ function CategoryStrip({ router }) {
 function Nav({ pathname, navigate, loggedIn, setLoggedIn, unreadTotal, institution, isAdmin, router }) {
   const [scrolled,  setScrolled]  = useState(false);
   const [menuOpen,  setMenuOpen]  = useState(false);
-  const [searchOpen,setSearchOpen]= useState(false);
   const [profileOpen, setProfileOpen] = useState(false);
   const w = useWindowWidth();
   const isMobile = w < 768;
@@ -475,10 +480,10 @@ function Nav({ pathname, navigate, loggedIn, setLoggedIn, unreadTotal, instituti
     return () => window.removeEventListener('scroll', fn);
   }, []);
 
-  useEffect(() => { setMenuOpen(false); setSearchOpen(false); }, [pathname]);
+  useEffect(() => { setMenuOpen(false); }, [pathname]);
 
   const isHome = pathname === '/';
-  const transparent = isHome && !isMobile && !scrolled && !menuOpen && !searchOpen;
+  const transparent = isHome && !isMobile && !scrolled && !menuOpen;
   const showCategoryStrip = !transparent && !scrolled && (pathname === '/' || pathname?.startsWith('/opslag'));
 
   function go(p) { navigate(p); }
@@ -499,24 +504,12 @@ function Nav({ pathname, navigate, loggedIn, setLoggedIn, unreadTotal, instituti
           </span>
         </Link>
 
-        {/* Search bar — desktop */}
-        {!isMobile && (
-          <Suspense fallback={null}>
-            <SearchBar transparent={transparent} router={router} />
-          </Suspense>
-        )}
+        {/* Search bar — always shown (desktop + mobile) */}
+        <Suspense fallback={null}>
+          <SearchBar transparent={transparent} router={router} />
+        </Suspense>
 
-        {/* Mobile: search icon */}
-        {isMobile && (
-          <button onClick={() => setSearchOpen(v => !v)} style={{ background:'none', border:'none', cursor:'pointer', padding:8, color:transparent?'#fff':INK2, display:'flex', alignItems:'center' }}>
-            <svg width="19" height="19" viewBox="0 0 14 14" fill="none">
-              <circle cx="6" cy="6" r="5" stroke="currentColor" strokeWidth="1.5"/>
-              <path d="M10 10L13 13" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
-            </svg>
-          </button>
-        )}
-
-        <div style={{ flex: isMobile ? 1 : 0 }} />
+        <div style={{ flex: isMobile ? 0 : 0 }} />
 
         {/* Right actions — desktop */}
         {!isMobile && (
@@ -594,15 +587,6 @@ function Nav({ pathname, navigate, loggedIn, setLoggedIn, unreadTotal, instituti
           <Link href="/login" style={{ background:PRIMARY, color:'#fff', fontWeight:700, fontSize:12, padding:'7px 14px', borderRadius:22, textDecoration:'none', flexShrink:0 }}>Log ind</Link>
         )}
       </div>
-
-      {/* Mobile search bar (expandable) */}
-      {isMobile && searchOpen && (
-        <div style={{ padding:'0 14px 12px', background:'rgba(246,242,234,0.99)' }}>
-          <Suspense fallback={null}>
-            <SearchBar transparent={false} router={router} />
-          </Suspense>
-        </div>
-      )}
 
       {/* Category strip */}
       {showCategoryStrip && <CategoryStrip router={router} />}
