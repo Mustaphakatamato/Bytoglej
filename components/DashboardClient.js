@@ -563,14 +563,21 @@ export default function DashboardClient() {
         </div>
 
         {/* Interesserede i dine opslag */}
-        {favoritersGrouped.length > 0 && (
-          <div style={{ background:PAPER2, borderRadius:22, padding:isMobile?20:28, border:'1px solid rgba(22,34,28,0.07)', boxShadow:'0 1px 4px rgba(22,34,28,0.06)', marginTop:isMobile?16:24 }}>
-            <div style={{ display:'flex', alignItems:'center', gap:10, marginBottom:20 }}>
-              <h2 style={{ fontFamily:FONT, fontWeight:800, fontSize:18, color:INK, margin:0 }}>Interesserede i dine opslag</h2>
+        <div style={{ background:PAPER2, borderRadius:22, padding:isMobile?20:28, border:'1px solid rgba(22,34,28,0.07)', boxShadow:'0 1px 4px rgba(22,34,28,0.06)', marginTop:isMobile?16:24 }}>
+          <div style={{ display:'flex', alignItems:'center', gap:10, marginBottom:20 }}>
+            <h2 style={{ fontFamily:FONT, fontWeight:800, fontSize:18, color:INK, margin:0 }}>Interesserede i dine opslag</h2>
+            {listingFavoriters.length > 0 && (
               <div style={{ background:'#FEF2F2', border:'1px solid #FECACA', borderRadius:99, padding:'2px 10px', fontSize:12, fontWeight:700, color:'#e11d48', fontFamily:FONT }}>
                 ♥ {listingFavoriters.length}
               </div>
+            )}
+          </div>
+          {favoritersGrouped.length === 0 ? (
+            <div style={{ textAlign:'center', padding:'40px 0' }}>
+              <div style={{ fontFamily:FONT, fontWeight:800, fontSize:48, color:GREEN_SOFT, lineHeight:1, marginBottom:12 }}>♡</div>
+              <p style={{ fontSize:14, color:INK3, fontFamily:FONT }}>Ingen har favoriseret dine opslag endnu</p>
             </div>
+          ) : (
             <div style={{ display:'flex', flexDirection:'column', gap:12 }}>
               {favoritersGrouped.map(({ listing, favoriters }) => (
                 <div key={listing.id} style={{ border:`1px solid rgba(22,34,28,0.08)`, borderRadius:16, overflow:'hidden', background:PAPER }}>
@@ -606,8 +613,8 @@ export default function DashboardClient() {
                 </div>
               ))}
             </div>
-          </div>
-        )}
+          )}
+        </div>
 
         {/* Indkommende anmodninger */}
         <div id="incoming-section" style={{ background:PAPER2, borderRadius:22, padding:isMobile?20:28, border:'1px solid rgba(22,34,28,0.07)', boxShadow:'0 1px 4px rgba(22,34,28,0.06)', marginTop:isMobile?16:24 }}>
