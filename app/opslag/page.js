@@ -351,12 +351,33 @@ function OpslagInner() {
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
             {filtered.map(l => {
               const imgs = l.images?.length ? l.images : [];
+              const isFav = favs.includes(l.id);
               return (
                 <div key={l.id} onClick={() => handleListingClick(l)} style={{ borderRadius: 12, overflow: 'hidden', background: '#fff', cursor: 'pointer', border: '1px solid rgba(22,34,28,0.07)', boxShadow: '0 1px 4px rgba(22,34,28,0.05)' }}>
                   <div style={{ aspectRatio: '3/4', background: GREEN_TINT, position: 'relative', overflow: 'hidden' }}>
                     {imgs.length > 0
                       ? <img src={imgs[0]} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
                       : <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 44, opacity: 0.6 }}>{l.emoji || '🧸'}</div>}
+                    <button
+                      onClick={async e => {
+                        e.stopPropagation();
+                        const adding = !isFav;
+                        toggleFav(l.id);
+                        const { data: { user } } = await db.auth.getUser();
+                        if (user) {
+                          if (adding) {
+                            const { data: inst } = await db.from('institutions').select('id,name').ilike('email', user.email).maybeSingle();
+                            db.from('listing_favorites').upsert({ listing_id: l.id, user_id: user.id, institution_id: inst?.id || null, institution_name: inst?.name || null }, { onConflict: 'listing_id,user_id' });
+                          } else {
+                            db.from('listing_favorites').delete().eq('listing_id', l.id).eq('user_id', user.id);
+                          }
+                        }
+                      }}
+                      style={{ position: 'absolute', bottom: 8, right: 8, background: 'rgba(255,255,255,0.9)', border: 'none', borderRadius: '50%', width: 30, height: 30, display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 1px 4px rgba(0,0,0,0.15)', cursor: 'pointer' }}>
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill={isFav ? '#e11d48' : 'none'} stroke={isFav ? '#e11d48' : '#888'} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                        <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/>
+                      </svg>
+                    </button>
                   </div>
                   <div style={{ padding: '8px 10px 10px' }}>
                     <div style={{ fontFamily: FONT, fontWeight: 700, fontSize: 13, color: INK, lineHeight: 1.3, marginBottom: 4, overflow: 'hidden', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical' }}>{l.title}</div>
