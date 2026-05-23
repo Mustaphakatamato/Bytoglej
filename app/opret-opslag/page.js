@@ -71,6 +71,7 @@ export default function OpretOpslagPage() {
   const [imgPreviews, setImgPreviews] = useState([]);
   const [draggingIdx, setDraggingIdx] = useState(null);
   const [overIdx, setOverIdx] = useState(null);
+  const [ghost, setGhost] = useState(null); // { src, x, y, size }
   const dragState = useRef({ dragging: null, over: null });
   const [form, setForm] = useState({
     title:'', type:'køb', price:'', age_group:'3-6 år',
@@ -113,13 +114,18 @@ export default function OpretOpslagPage() {
     setImgPreviews(prev => { const a=[...prev]; const [x]=a.splice(from,1); a.splice(to,0,x); return a; });
   }
 
-  // Touch drag (mobile hold & drag)
-  function startTouchDrag(i) {
+  // Touch drag (mobile hold & drag) — ghost follows finger
+  function startTouchDrag(i, e) {
+    const touch = e.touches[0];
+    const rect = e.currentTarget.getBoundingClientRect();
     dragState.current = { dragging: i, over: null };
     setDraggingIdx(i); setOverIdx(null);
-    const onMove = (e) => {
-      e.preventDefault();
-      const t = e.touches[0];
+    setGhost({ src: imgPreviews[i], x: touch.clientX, y: touch.clientY, size: rect.width });
+
+    const onMove = (ev) => {
+      ev.preventDefault();
+      const t = ev.touches[0];
+      setGhost(g => g ? { ...g, x: t.clientX, y: t.clientY } : null);
       const el = document.elementFromPoint(t.clientX, t.clientY);
       const item = el?.closest('[data-img-idx]');
       if (item) {
@@ -131,6 +137,7 @@ export default function OpretOpslagPage() {
     };
     const onEnd = () => {
       document.removeEventListener('touchmove', onMove);
+      setGhost(null);
       reorderImgs(dragState.current.dragging, dragState.current.over);
       dragState.current = { dragging: null, over: null };
       setDraggingIdx(null); setOverIdx(null);
@@ -253,6 +260,13 @@ export default function OpretOpslagPage() {
 
   return (
     <div style={{ minHeight:'100vh', background:PAPER }} className="page-enter">
+
+      {/* Drag ghost — follows finger */}
+      {ghost && (
+        <div style={{ position:'fixed', left: ghost.x - ghost.size/2, top: ghost.y - ghost.size/2, width: ghost.size, height: ghost.size, borderRadius:12, overflow:'hidden', pointerEvents:'none', zIndex:9999, transform:'scale(1.1)', boxShadow:'0 12px 32px rgba(22,34,28,0.28)', opacity:0.95, border:`2px solid ${PRIMARY}` }}>
+          <img src={ghost.src} style={{ width:'100%', height:'100%', objectFit:'cover' }} alt="" draggable={false} />
+        </div>
+      )}
 
       {/* Header */}
       <div style={{ background:`linear-gradient(160deg, ${GREEN_DEEP} 0%, ${PRIMARY} 100%)`, paddingTop:90, paddingBottom:36, position:'relative', overflow:'hidden' }}>
@@ -426,9 +440,9 @@ export default function OpretOpslagPage() {
                           onDragOver={e=>onDragOver(e,i)}
                           onDrop={e=>onDrop(e,i)}
                           onDragEnd={onDragEnd}
-                          onTouchStart={e=>{ e.preventDefault(); startTouchDrag(i); }}
+                          onTouchStart={e=>{ e.preventDefault(); startTouchDrag(i, e); }}
                           onContextMenu={e=>e.preventDefault()}
-                          style={{ position:'relative', aspectRatio:'1', borderRadius:12, overflow:'hidden', border: overIdx===i ? `2px solid ${PRIMARY}` : i===0 ? `2px solid ${PRIMARY}` : '2px solid transparent', opacity: draggingIdx===i ? 0.9 : 1, transform: draggingIdx===i ? 'scale(1.07)' : 'scale(1)', boxShadow: draggingIdx===i ? '0 8px 24px rgba(22,34,28,0.22)' : 'none', cursor:'grab', transition:'transform 0.15s ease, box-shadow 0.15s ease, opacity 0.15s, border-color 0.15s', userSelect:'none', WebkitUserSelect:'none', WebkitTouchCallout:'none', touchAction:'none', zIndex: draggingIdx===i ? 2 : 1 }}>
+                          style={{ position:'relative', aspectRatio:'1', borderRadius:12, overflow:'hidden', border: overIdx===i ? `2px solid ${PRIMARY}` : i===0 ? `2px solid ${PRIMARY}` : '2px solid transparent', opacity: draggingIdx===i ? 0.25 : 1, transform: draggingIdx===i ? 'scale(0.95)' : 'scale(1)', boxShadow: 'none', cursor:'grab', transition:'transform 0.15s ease, opacity 0.15s, border-color 0.15s', userSelect:'none', WebkitUserSelect:'none', WebkitTouchCallout:'none', touchAction:'none', zIndex: 1 }}>
                           <img src={src} alt="" draggable={false} style={{ width:'100%', height:'100%', objectFit:'cover', pointerEvents:'none', userSelect:'none', WebkitUserSelect:'none', WebkitTouchCallout:'none' }} />
                           <button onClick={e=>{e.stopPropagation();removeImg(i);}} style={{ position:'absolute', top:5, right:5, width:22, height:22, borderRadius:'50%', background:'rgba(22,34,28,0.7)', border:'none', color:'#fff', fontSize:11, cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center', lineHeight:1, touchAction:'auto' }}>✕</button>
                           {i===0 && <div style={{ position:'absolute', bottom:5, left:0, right:0, display:'flex', justifyContent:'center', pointerEvents:'none' }}><div style={{ background:PRIMARY, borderRadius:6, padding:'2px 8px', fontSize:9, color:'#fff', fontWeight:700, fontFamily:FONT }}>Forside</div></div>}
