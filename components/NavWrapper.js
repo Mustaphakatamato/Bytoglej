@@ -33,11 +33,7 @@ export default function NavWrapper() {
 
   const navigate = p => {
     window.scrollTo({ top: 0, behavior: 'instant' });
-    if (typeof document !== 'undefined' && document.startViewTransition) {
-      document.startViewTransition(() => router.push(p));
-    } else {
-      router.push(p);
-    }
+    router.push(p);
   };
 
   return (

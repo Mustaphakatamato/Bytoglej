@@ -22,11 +22,6 @@ html, body { max-width: 100vw; }
 @keyframes fadeSlideIn { from { opacity:0; transform:translateY(18px); } to { opacity:1; transform:translateY(0); } }
 @keyframes pageIn      { from { opacity:0; transform:translateY(12px); } to { opacity:1; transform:translateY(0); } }
 
-/* View Transitions — exit old page, enter new page */
-@keyframes vt-out { to   { opacity: 0; } }
-@keyframes vt-in  { from { opacity: 0; } }
-::view-transition-old(root) { animation: 0.22s ease both vt-out; }
-::view-transition-new(root) { animation: 0.32s ease both vt-in; }
 @keyframes fadeIn      { from { opacity:0; } to { opacity:1; } }
 @keyframes slideUp     { from { opacity:0; transform:translateY(28px); } to { opacity:1; transform:translateY(0); } }
 @keyframes float       { 0%,100%{ transform:translateY(0); } 50%{ transform:translateY(-10px); } }
