@@ -426,9 +426,10 @@ export default function OpretOpslagPage() {
                           onDragOver={e=>onDragOver(e,i)}
                           onDrop={e=>onDrop(e,i)}
                           onDragEnd={onDragEnd}
-                          onTouchStart={()=>startTouchDrag(i)}
-                          style={{ position:'relative', aspectRatio:'1', borderRadius:12, overflow:'hidden', border: overIdx===i ? `2px solid ${PRIMARY}` : i===0 ? `2px solid ${PRIMARY}` : '2px solid transparent', opacity: draggingIdx===i ? 0.35 : 1, cursor:'grab', transition:'opacity 0.15s, border-color 0.15s', userSelect:'none', touchAction:'none' }}>
-                          <img src={src} alt="" draggable={false} style={{ width:'100%', height:'100%', objectFit:'cover', pointerEvents:'none', userSelect:'none' }} />
+                          onTouchStart={e=>{ e.preventDefault(); startTouchDrag(i); }}
+                          onContextMenu={e=>e.preventDefault()}
+                          style={{ position:'relative', aspectRatio:'1', borderRadius:12, overflow:'hidden', border: overIdx===i ? `2px solid ${PRIMARY}` : i===0 ? `2px solid ${PRIMARY}` : '2px solid transparent', opacity: draggingIdx===i ? 0.35 : 1, cursor:'grab', transition:'opacity 0.15s, border-color 0.15s', userSelect:'none', WebkitUserSelect:'none', WebkitTouchCallout:'none', touchAction:'none' }}>
+                          <img src={src} alt="" draggable={false} style={{ width:'100%', height:'100%', objectFit:'cover', pointerEvents:'none', userSelect:'none', WebkitUserSelect:'none', WebkitTouchCallout:'none' }} />
                           <button onClick={e=>{e.stopPropagation();removeImg(i);}} style={{ position:'absolute', top:5, right:5, width:22, height:22, borderRadius:'50%', background:'rgba(22,34,28,0.7)', border:'none', color:'#fff', fontSize:11, cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center', lineHeight:1, touchAction:'auto' }}>✕</button>
                           {i===0 && <div style={{ position:'absolute', bottom:5, left:0, right:0, display:'flex', justifyContent:'center', pointerEvents:'none' }}><div style={{ background:PRIMARY, borderRadius:6, padding:'2px 8px', fontSize:9, color:'#fff', fontWeight:700, fontFamily:FONT }}>Forside</div></div>}
                         </div>
