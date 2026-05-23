@@ -588,7 +588,7 @@ export default function MessagesClient() {
   const showChat = !isMobile || !!active || !!activeShare || !!draftConv;
 
   return (
-    <div style={{ height:'100vh', display:'flex', flexDirection:'column', paddingTop:68, background:PAPER }} className="page-enter">
+    <div style={{ height: isMobile ? 'calc(100dvh - 84px - env(safe-area-inset-bottom, 0px))' : '100vh', display:'flex', flexDirection:'column', paddingTop:68, background:PAPER }} className="page-enter">
       {/* Shared hidden file input for image attachments */}
       <input ref={fileInputRef} type="file" accept="image/*" multiple style={{ display:'none' }}
         onChange={e=>{
@@ -598,10 +598,10 @@ export default function MessagesClient() {
       <div style={{ flex:1, display:'flex', overflow:'hidden', maxWidth:1200, width:'100%', margin:'0 auto', padding:isMobile?'8px 0 0':'16px 16px 0' }}>
 
         {/* ── Conversation list ── */}
-        {showList && <div style={{ width:isMobile?'100%':320, flexShrink:0, display:'flex', flexDirection:'column', background:PAPER2, borderRadius:isMobile?0:'18px 18px 0 0', border:'1px solid rgba(22,34,28,0.08)', boxShadow:'0 1px 6px rgba(22,34,28,0.06)', marginRight:isMobile?0:12, overflow:'hidden' }}>
-          <div style={{ padding:'20px 18px 12px' }}>
-            <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:12 }}>
-              <h2 style={{ fontFamily:FONT, fontWeight:800, fontSize:20, color:INK }}>Beskeder</h2>
+        {showList && <div style={{ width:isMobile?'100%':320, flexShrink:0, display:'flex', flexDirection:'column', background:isMobile?PAPER:PAPER2, borderRadius:isMobile?0:'18px 18px 0 0', border:isMobile?'none':'1px solid rgba(22,34,28,0.08)', boxShadow:isMobile?'none':'0 1px 6px rgba(22,34,28,0.06)', marginRight:isMobile?0:12, overflow:'hidden' }}>
+          <div style={{ padding: isMobile ? '16px 16px 10px' : '20px 18px 12px', borderBottom: isMobile ? `1px solid rgba(22,34,28,0.07)` : 'none' }}>
+            <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom: isMobile ? 14 : 12 }}>
+              <h2 style={{ fontFamily:FONT, fontWeight:800, fontSize: isMobile ? 22 : 20, color:INK }}>Indbakke</h2>
               <div style={{ display:'flex', alignItems:'center', gap:8 }}>
                 {totalUnread > 0 && !showArchived && <div style={{ background:'#e11d48', color:'#fff', borderRadius:99, padding:'2px 9px', fontSize:12, fontWeight:800, fontFamily:FONT }}>{totalUnread}</div>}
                 <button onClick={()=>setComposeOpen(true)} title="Ny besked" style={{ background:PRIMARY, border:'none', color:'#fff', borderRadius:99, width:32, height:32, cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center' }}>
@@ -643,20 +643,30 @@ export default function MessagesClient() {
               </div>
             )}
 
-            <div style={{ display:'flex', gap:6, marginBottom:10 }}>
-              <button onClick={()=>setShowArchived(false)} style={{ flex:1, padding:'6px 0', borderRadius:99, border:'none', background:!showArchived?PRIMARY:PAPER3, color:!showArchived?'#fff':INK3, fontSize:12, fontWeight:700, cursor:'pointer', fontFamily:FONT }}>Aktive</button>
-              <button onClick={()=>setShowArchived(true)} style={{ flex:1, padding:'6px 0', borderRadius:99, border:'none', background:showArchived?PRIMARY:PAPER3, color:showArchived?'#fff':INK3, fontSize:12, fontWeight:700, cursor:'pointer', fontFamily:FONT }}>Arkiveret</button>
-              {showArchived && convs.filter(c=>isArchived(c)).length > 0 && (
-                <button onClick={deleteAllArchived} title="Slet alle arkiverede" style={{ padding:'6px 10px', borderRadius:99, border:'none', background:'#FEF2F2', color:'#e11d48', fontSize:12, fontWeight:700, cursor:'pointer', flexShrink:0, fontFamily:FONT }}>Slet alle</button>
-              )}
-            </div>
+            {isMobile ? (
+              <div style={{ display:'flex', gap:0, borderRadius:12, overflow:'hidden', border:`1.5px solid ${PAPER3}`, background:PAPER2 }}>
+                <button onClick={()=>setShowArchived(false)} style={{ flex:1, padding:'8px 0', border:'none', background:!showArchived?PRIMARY:'transparent', color:!showArchived?'#fff':INK3, fontSize:13, fontWeight:700, cursor:'pointer', fontFamily:FONT }}>Meddelelser</button>
+                <button onClick={()=>setShowArchived(true)} style={{ flex:1, padding:'8px 0', border:'none', background:showArchived?PRIMARY:'transparent', color:showArchived?'#fff':INK3, fontSize:13, fontWeight:700, cursor:'pointer', fontFamily:FONT }}>Arkiveret</button>
+              </div>
+            ) : (
+              <div style={{ display:'flex', gap:6, marginBottom:10 }}>
+                <button onClick={()=>setShowArchived(false)} style={{ flex:1, padding:'6px 0', borderRadius:99, border:'none', background:!showArchived?PRIMARY:PAPER3, color:!showArchived?'#fff':INK3, fontSize:12, fontWeight:700, cursor:'pointer', fontFamily:FONT }}>Aktive</button>
+                <button onClick={()=>setShowArchived(true)} style={{ flex:1, padding:'6px 0', borderRadius:99, border:'none', background:showArchived?PRIMARY:PAPER3, color:showArchived?'#fff':INK3, fontSize:12, fontWeight:700, cursor:'pointer', fontFamily:FONT }}>Arkiveret</button>
+                {showArchived && convs.filter(c=>isArchived(c)).length > 0 && (
+                  <button onClick={deleteAllArchived} title="Slet alle arkiverede" style={{ padding:'6px 10px', borderRadius:99, border:'none', background:'#FEF2F2', color:'#e11d48', fontSize:12, fontWeight:700, cursor:'pointer', flexShrink:0, fontFamily:FONT }}>Slet alle</button>
+                )}
+              </div>
+            )}
 
-            <div style={{ position:'relative' }}>
+            <div style={{ position:'relative', marginTop: isMobile ? 10 : 0 }}>
               <span style={{ position:'absolute', left:11, top:'50%', transform:'translateY(-50%)', display:'flex', alignItems:'center' }}>
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke={INK3} strokeWidth="2" strokeLinecap="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
               </span>
-              <input value={search} onChange={e=>setSearch(e.target.value)} placeholder="Søg samtaler…" style={{ width:'100%', padding:'9px 12px 9px 32px', borderRadius:10, border:`1.5px solid ${PAPER3}`, fontSize:13, outline:'none', background:PAPER2, fontFamily:FONT }} />
+              <input value={search} onChange={e=>setSearch(e.target.value)} placeholder="Søg samtaler…" style={{ width:'100%', padding:'10px 12px 10px 32px', borderRadius:12, border:`1.5px solid ${PAPER3}`, fontSize:14, outline:'none', background:isMobile?PAPER2:PAPER2, fontFamily:FONT }} />
             </div>
+            {isMobile && showArchived && convs.filter(c=>isArchived(c)).length > 0 && (
+              <button onClick={deleteAllArchived} style={{ marginTop:8, width:'100%', padding:'7px', borderRadius:10, border:'none', background:'#FEF2F2', color:'#e11d48', fontSize:12, fontWeight:700, cursor:'pointer', fontFamily:FONT }}>Slet alle arkiverede</button>
+            )}
           </div>
 
           <div style={{ flex:1, overflowY:'auto' }}>
@@ -689,34 +699,37 @@ export default function MessagesClient() {
               ? <div style={{ padding:24, textAlign:'center', color:INK3, fontSize:13, fontFamily:FONT }}>Indlæser…</div>
               : filtered.length === 0
                 ? (
-                  <div style={{ padding:40, textAlign:'center' }}>
+                  <div style={{ padding: isMobile ? '48px 24px' : 40, textAlign:'center' }}>
                     <div style={{ fontFamily:FONT, fontWeight:800, fontSize:48, color:GREEN_SOFT, lineHeight:1, marginBottom:12 }}>{showArchived ? '0' : '—'}</div>
-                    <p style={{ fontSize:13, color:INK3, fontFamily:FONT }}>{showArchived ? 'Ingen arkiverede samtaler' : 'Ingen samtaler endnu'}</p>
-                    {!showArchived && <button onClick={()=>router.push('/opslag')} style={{ marginTop:12, background:'none', border:`1.5px solid ${PRIMARY}`, color:PRIMARY, borderRadius:99, padding:'7px 16px', fontSize:12, fontWeight:700, cursor:'pointer', fontFamily:FONT }}>Find opslag</button>}
+                    <p style={{ fontSize:14, color:INK3, fontFamily:FONT }}>{showArchived ? 'Ingen arkiverede samtaler' : 'Ingen samtaler endnu'}</p>
+                    {!showArchived && <button onClick={()=>router.push('/opslag')} style={{ marginTop:16, background:PRIMARY, border:'none', color:'#fff', borderRadius:99, padding:'10px 22px', fontSize:14, fontWeight:700, cursor:'pointer', fontFamily:FONT }}>Find opslag</button>}
                   </div>
                 )
               : filtered.map(c => {
                 const unread = myUnread(c);
                 const isAct = active?.id === c.id;
                 const archived = isArchived(c);
+                const avatarLetter = otherName(c)?.charAt(0)?.toUpperCase() || '?';
                 return (
-                  <div key={c.id} style={{ display:'flex', gap:12, padding:'13px 16px', cursor:'pointer', background:isAct?GREEN_TINT:PAPER2, borderLeft:isAct?`3px solid ${PRIMARY}`:'3px solid transparent', transition:'background 0.15s', position:'relative', borderBottom:`1px solid rgba(22,34,28,0.05)` }}
+                  <div key={c.id} style={{ display:'flex', gap:12, padding: isMobile ? '14px 16px' : '13px 16px', cursor:'pointer', background:isAct?GREEN_TINT:(isMobile?PAPER:PAPER2), borderLeft:isAct?`3px solid ${PRIMARY}`:'3px solid transparent', transition:'background 0.15s', position:'relative', borderBottom:`1px solid rgba(22,34,28,${isMobile?'0.07':'0.05'})` }}
                     onClick={()=>openConv(c)}>
-                    <div style={{ width:46, height:46, borderRadius:12, background:c.listing_image?PAPER3:c.listing_color||'#FFD166', display:'flex', alignItems:'center', justifyContent:'center', fontSize:22, flexShrink:0, overflow:'hidden' }}>
-                      {c.listing_image ? <img src={c.listing_image} style={{ width:'100%', height:'100%', objectFit:'cover' }} alt="" /> : c.listing_emoji||'🧸'}
+                    <div style={{ width: isMobile?52:46, height: isMobile?52:46, borderRadius: isMobile?'50%':12, background:c.listing_image?PAPER3:c.listing_color||'#FFD166', display:'flex', alignItems:'center', justifyContent:'center', fontSize: isMobile?20:22, flexShrink:0, overflow:'hidden', position:'relative' }}>
+                      {c.listing_image ? <img src={c.listing_image} style={{ width:'100%', height:'100%', objectFit:'cover' }} alt="" /> : (isMobile ? <span style={{ fontFamily:FONT, fontWeight:800, fontSize:18, color:'rgba(22,34,28,0.6)' }}>{avatarLetter}</span> : c.listing_emoji||'🧸')}
+                      {isMobile && unread > 0 && <div style={{ position:'absolute', top:2, right:2, width:10, height:10, borderRadius:'50%', background:'#e11d48', border:'2px solid white' }} />}
                     </div>
                     <div style={{ flex:1, minWidth:0 }}>
-                      <div style={{ display:'flex', justifyContent:'space-between', alignItems:'baseline', marginBottom:3 }}>
-                        <div style={{ fontFamily:FONT, fontWeight:unread>0?800:600, fontSize:13, whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis', maxWidth:110, color:INK }}>{otherName(c)}</div>
-                        <div style={{ fontSize:11, color:INK3, flexShrink:0, marginLeft:4, fontFamily:FONT }}>{relTime(c.last_message_at)}</div>
+                      <div style={{ display:'flex', justifyContent:'space-between', alignItems:'baseline', marginBottom: isMobile?3:3 }}>
+                        <div style={{ fontFamily:FONT, fontWeight:unread>0?800:600, fontSize: isMobile?15:13, whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis', maxWidth: isMobile?'60%':110, color:INK }}>{otherName(c)}</div>
+                        <div style={{ fontSize: isMobile?12:11, color:INK3, flexShrink:0, marginLeft:4, fontFamily:FONT }}>{relTime(c.last_message_at)}</div>
                       </div>
-                      <div style={{ fontSize:12, color:INK3, fontWeight:600, whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis', marginBottom:2, fontFamily:FONT }}>
+                      {!isMobile && <div style={{ fontSize:12, color:INK3, fontWeight:600, whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis', marginBottom:2, fontFamily:FONT }}>
                         {c.listing_title}
                         {amInitiator(c) && <span style={{ marginLeft:6, background:GREEN_TINT, color:PRIMARY, borderRadius:99, padding:'1px 6px', fontSize:10, fontWeight:700 }}>Sendt</span>}
-                      </div>
-                      <div style={{ fontSize:12, color:unread>0?INK:INK3, fontWeight:unread>0?600:400, whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis', fontFamily:FONT }}>{c.last_message || 'Samtale startet'}</div>
+                      </div>}
+                      {isMobile && <div style={{ fontSize:12, color:PRIMARY, fontWeight:600, whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis', marginBottom:2, fontFamily:FONT }}>{c.listing_title}</div>}
+                      <div style={{ fontSize: isMobile?13:12, color:unread>0?INK:INK3, fontWeight:unread>0?600:400, whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis', fontFamily:FONT }}>{c.last_message || 'Samtale startet'}</div>
                     </div>
-                    {archived ? (
+                    {!isMobile && (archived ? (
                       <div style={{ display:'flex', gap:2, flexShrink:0, alignSelf:'center' }}>
                         <button onClick={e=>unarchiveConv(c,e)} title="Flyt til indbakke" style={{ background:'none', border:'none', fontSize:13, cursor:'pointer', padding:'4px', color:INK3, fontFamily:FONT }}>↑</button>
                         <button onClick={e=>deleteConv(c,e)} title="Slet permanent" style={{ background:'none', border:'none', fontSize:13, cursor:'pointer', padding:'4px', color:INK3 }}>
@@ -735,6 +748,14 @@ export default function MessagesClient() {
                           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><polyline points="21 8 21 21 3 21 3 8"/><rect x="1" y="3" width="22" height="5"/><line x1="10" y1="12" x2="14" y2="12"/></svg>
                         </button>
                       </div>
+                    ))}
+                    {isMobile && archived && (
+                      <div style={{ display:'flex', gap:2, flexShrink:0, alignSelf:'center' }}>
+                        <button onClick={e=>unarchiveConv(c,e)} title="Flyt til indbakke" style={{ background:'none', border:'none', fontSize:13, cursor:'pointer', padding:'4px', color:INK3, fontFamily:FONT }}>↑</button>
+                        <button onClick={e=>deleteConv(c,e)} title="Slet permanent" style={{ background:'none', border:'none', fontSize:13, cursor:'pointer', padding:'4px', color:INK3 }}>
+                          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6M14 11v6"/></svg>
+                        </button>
+                      </div>
                     )}
                   </div>
                 );
@@ -743,11 +764,13 @@ export default function MessagesClient() {
         </div>}
 
         {/* ── Chat panel ── */}
-        {showChat && <div style={{ flex:1, display:'flex', flexDirection:'column', background:PAPER2, borderRadius:isMobile?0:'18px 18px 0 0', border:'1px solid rgba(22,34,28,0.08)', boxShadow:'0 1px 6px rgba(22,34,28,0.06)', overflow:'hidden' }}>
+        {showChat && <div style={{ flex:1, display:'flex', flexDirection:'column', background:isMobile?PAPER:PAPER2, borderRadius:isMobile?0:'18px 18px 0 0', border:isMobile?'none':'1px solid rgba(22,34,28,0.08)', boxShadow:isMobile?'none':'0 1px 6px rgba(22,34,28,0.06)', overflow:'hidden' }}>
           {!active && !activeShare && draftConv ? (
             <>
-              <div style={{ padding:'12px 16px', borderBottom:`1px solid rgba(22,34,28,0.08)`, display:'flex', alignItems:'center', gap:12, background:PAPER2 }}>
-                {isMobile && <button onClick={()=>setDraftConv(null)} style={{ background:'none', border:'none', fontSize:20, color:INK3, cursor:'pointer', padding:'4px 6px 4px 0', lineHeight:1, flexShrink:0 }}>←</button>}
+              <div style={{ padding:'10px 12px', borderBottom:`1px solid rgba(22,34,28,0.08)`, display:'flex', alignItems:'center', gap:12, background: isMobile ? PAPER : PAPER2 }}>
+                {isMobile && <button onClick={()=>setDraftConv(null)} style={{ background:'none', border:'none', cursor:'pointer', padding:'6px 4px', flexShrink:0, display:'flex', alignItems:'center', color:INK }}>
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><line x1="19" y1="12" x2="5" y2="12"/><polyline points="12 19 5 12 12 5"/></svg>
+                </button>}
                 <div style={{ width:44, height:44, borderRadius:12, background:'#e0e7ff', display:'flex', alignItems:'center', justifyContent:'center', fontSize:22, flexShrink:0 }}>💬</div>
                 <div style={{ flex:1, minWidth:0 }}>
                   <div style={{ fontSize:11, color:INK3, fontWeight:600, marginBottom:2, fontFamily:FONT }}>Ny samtale med</div>
@@ -803,8 +826,10 @@ export default function MessagesClient() {
             </div>
           ) : activeShare && !active ? (
             <>
-              <div style={{ padding:'12px 16px', borderBottom:`1px solid rgba(22,34,28,0.08)`, display:'flex', alignItems:'center', gap:12, background:PAPER2 }}>
-                {isMobile && <button onClick={()=>setActiveShare(null)} style={{ background:'none', border:'none', fontSize:20, color:INK3, cursor:'pointer', padding:'4px 6px 4px 0', lineHeight:1, flexShrink:0 }}>←</button>}
+              <div style={{ padding:'10px 12px', borderBottom:`1px solid rgba(22,34,28,0.08)`, display:'flex', alignItems:'center', gap:12, background: isMobile ? PAPER : PAPER2 }}>
+                {isMobile && <button onClick={()=>setActiveShare(null)} style={{ background:'none', border:'none', cursor:'pointer', padding:'6px 4px', flexShrink:0, display:'flex', alignItems:'center', color:INK }}>
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><line x1="19" y1="12" x2="5" y2="12"/><polyline points="12 19 5 12 12 5"/></svg>
+                </button>}
                 <div style={{ width:38, height:38, borderRadius:10, background:GREEN_TINT, display:'flex', alignItems:'center', justifyContent:'center' }}>
                   <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke={PRIMARY} strokeWidth="2" strokeLinecap="round"><path d="M4 12v8a2 2 0 002 2h12a2 2 0 002-2v-8"/><polyline points="16 6 12 2 8 6"/><line x1="12" y1="2" x2="12" y2="15"/></svg>
                 </div>
@@ -842,23 +867,25 @@ export default function MessagesClient() {
           ) : (
             <>
               {/* Chat header */}
-              <div style={{ padding:'12px 16px', borderBottom:`1px solid rgba(22,34,28,0.08)`, display:'flex', alignItems:'center', gap:12, background:PAPER2 }}>
+              <div style={{ padding: isMobile ? '10px 12px' : '12px 16px', borderBottom:`1px solid rgba(22,34,28,0.08)`, display:'flex', alignItems:'center', gap: isMobile ? 10 : 12, background: isMobile ? PAPER : PAPER2 }}>
                 {isMobile && (
-                  <button onClick={()=>router.back()} style={{ background:'none', border:'none', fontSize:20, color:INK3, cursor:'pointer', padding:'4px 6px 4px 0', lineHeight:1, flexShrink:0 }}>←</button>
+                  <button onClick={()=>router.back()} style={{ background:'none', border:'none', cursor:'pointer', padding:'6px 4px', flexShrink:0, display:'flex', alignItems:'center', color:INK }}>
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><line x1="19" y1="12" x2="5" y2="12"/><polyline points="12 19 5 12 12 5"/></svg>
+                  </button>
                 )}
-                <div style={{ width:44, height:44, borderRadius:12, background:active.listing_image?PAPER3:active.listing_color||'#FFD166', display:'flex', alignItems:'center', justifyContent:'center', fontSize:22, flexShrink:0, overflow:'hidden' }}>
+                <div style={{ width: isMobile?42:44, height: isMobile?42:44, borderRadius: isMobile?'50%':12, background:active.listing_image?PAPER3:active.listing_color||'#FFD166', display:'flex', alignItems:'center', justifyContent:'center', fontSize: isMobile?18:22, flexShrink:0, overflow:'hidden' }}>
                   {active.listing_image ? <img src={active.listing_image} style={{ width:'100%', height:'100%', objectFit:'cover' }} alt="" /> : active.listing_emoji||'🧸'}
                 </div>
                 <div style={{ flex:1, minWidth:0 }}>
-                  <div style={{ fontSize:11, color:INK3, fontWeight:600, marginBottom:2, fontFamily:FONT }}>Samtale om</div>
-                  <div style={{ fontFamily:FONT, fontWeight:800, fontSize:15, whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis', color:INK }}>{active.listing_title}</div>
-                  <div style={{ fontSize:12, color:INK3, marginTop:1, fontFamily:FONT }}>med <strong style={{ color:INK }}>{otherName(active)}</strong></div>
+                  {!isMobile && <div style={{ fontSize:11, color:INK3, fontWeight:600, marginBottom:2, fontFamily:FONT }}>Samtale om</div>}
+                  <div style={{ fontFamily:FONT, fontWeight:800, fontSize: isMobile?16:15, whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis', color:INK }}>{isMobile ? otherName(active) : active.listing_title}</div>
+                  <div style={{ fontSize:12, color:INK3, marginTop:1, fontFamily:FONT }}>{isMobile ? active.listing_title : <>med <strong style={{ color:INK }}>{otherName(active)}</strong></>}</div>
                 </div>
                 <button onClick={()=>router.push('/opslag/detail')} style={{ fontSize:12, fontWeight:700, color:PRIMARY, background:GREEN_TINT, border:'none', borderRadius:99, padding:'6px 14px', cursor:'pointer', whiteSpace:'nowrap', fontFamily:FONT }}>Se opslag →</button>
               </div>
 
               {/* Messages */}
-              <div style={{ flex:1, overflowY:'auto', padding:'20px 24px', display:'flex', flexDirection:'column', gap:6, background:PAPER }}>
+              <div style={{ flex:1, overflowY:'auto', padding: isMobile ? '16px 12px' : '20px 24px', display:'flex', flexDirection:'column', gap:6, background:PAPER }}>
                 {msgLoad
                   ? <div style={{ textAlign:'center', color:INK3, paddingTop:40, fontFamily:FONT }}>Indlæser…</div>
                   : messages.length === 0
@@ -1169,7 +1196,7 @@ export default function MessagesClient() {
               )}
 
               {/* Input bar */}
-              <div style={{ borderTop:`1px solid rgba(22,34,28,0.08)`, background:PAPER2, position:'relative' }}>
+              <div style={{ borderTop:`1px solid rgba(22,34,28,0.08)`, background: isMobile ? PAPER : PAPER2, position:'relative' }}>
                 {uploadError && (
                   <div style={{ background:'#FEF2F2', borderTop:'1px solid #FCA5A5', padding:'8px 16px', display:'flex', alignItems:'center', justifyContent:'space-between', gap:8 }}>
                     <span style={{ fontSize:12, color:'#B91C1C', fontFamily:FONT, fontWeight:600 }}>⚠ {uploadError}</span>

@@ -15,7 +15,7 @@ export default function RootLayout({ children }) {
   return (
     <html lang="da" style={{ background: '#F6F2EA' }}>
       <head>
-        <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover" />
+        <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
         {/* Inline splash CSS — paper bg matches browser default so no white flash, slide-up exit */}
         <style dangerouslySetInnerHTML={{ __html: `
           #__splash{position:fixed;inset:0;z-index:9999;background:#F6F2EA;display:flex;align-items:center;justify-content:center;animation:splashExit 0.5s cubic-bezier(0.4,0,0.2,1) 0.85s forwards}
