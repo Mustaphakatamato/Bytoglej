@@ -393,7 +393,7 @@ export default function DashboardClient() {
         <div style={{ display:'grid', gridTemplateColumns:isMobile?'1fr':'1fr 1fr', gap:isMobile?16:24 }}>
 
           {/* Mine opslag */}
-          <div ref={listingsRef} style={{ background:PAPER2, borderRadius:22, padding:isMobile?20:28, border:'1px solid rgba(22,34,28,0.07)', boxShadow:'0 1px 4px rgba(22,34,28,0.06)' }}>
+          <div ref={listingsRef} style={{ background:PAPER2, borderRadius:22, padding:isMobile?20:28, border:'1px solid rgba(22,34,28,0.07)', boxShadow:'0 1px 4px rgba(22,34,28,0.06)', minWidth:0, overflow:'hidden' }}>
             <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:20 }}>
               <h2 style={{ fontFamily:FONT, fontWeight:800, fontSize:18, color:INK, margin:0 }}>Mine opslag</h2>
               <div style={{ display:'flex', gap:4 }}>
@@ -464,13 +464,13 @@ export default function DashboardClient() {
                     : !l.is_active
                       ? <span style={{ background:PAPER3, color:INK3, borderRadius:99, padding:'3px 10px', fontSize:11, fontWeight:700, flexShrink:0, fontFamily:FONT }}>Inaktiv</span>
                       : <Badge type={l.type} />}
-                  {!l.is_sold && <div style={{ display:'flex', gap:6, flexShrink:0 }} onClick={e=>e.stopPropagation()}>
-                    <button onClick={()=>openEdit(l)} style={{ background:GREEN_TINT, border:'none', borderRadius:99, padding:'6px 12px', fontSize:12, fontWeight:700, color:PRIMARY, cursor:'pointer', fontFamily:FONT }}>Rediger</button>
-                    <button onClick={()=>toggleActive(l.id, l.is_active)} title={l.is_active?'Deaktivér opslag':'Aktivér opslag'} style={{ background:l.is_active?'#FEF9C3':'#F0FDF4', border:'none', borderRadius:99, padding:'6px 12px', fontSize:12, fontWeight:700, color:l.is_active?'#B45309':'#15803D', cursor:'pointer', fontFamily:FONT }}>{l.is_active?'Deaktivér':'Aktivér'}</button>
-                    <button onClick={()=>toggleReserved(l.id, l.is_reserved)} title={l.is_reserved?'Fjern reservation':'Markér som reserveret'} style={{ background:l.is_reserved?'#FEF3C7':PAPER3, border:'none', borderRadius:99, padding:'6px 12px', fontSize:12, fontWeight:700, color:l.is_reserved?'#B45309':INK3, cursor:'pointer', fontFamily:FONT }}>{l.is_reserved?'Frigiv':'Reserver'}</button>
-                    <button onClick={()=>setConfirmDelete(l.id)} style={{ background:'#FEF2F2', border:'none', borderRadius:99, padding:'6px 12px', fontSize:12, fontWeight:700, color:'#e11d48', cursor:'pointer', fontFamily:FONT }}>Slet</button>
-                  </div>}
                 </div>
+                {!l.is_sold && <div style={{ display:'flex', gap:isMobile?6:6, padding:isMobile?'0 12px 10px':'0 14px 10px', flexWrap:'wrap' }} onClick={e=>e.stopPropagation()}>
+                  <button onClick={()=>openEdit(l)} style={{ flex:isMobile?1:undefined, background:GREEN_TINT, border:'none', borderRadius:99, padding:isMobile?'7px 0':'6px 12px', fontSize:12, fontWeight:700, color:PRIMARY, cursor:'pointer', fontFamily:FONT }}>Rediger</button>
+                  <button onClick={()=>toggleActive(l.id, l.is_active)} title={l.is_active?'Deaktivér opslag':'Aktivér opslag'} style={{ flex:isMobile?1:undefined, background:l.is_active?'#FEF9C3':'#F0FDF4', border:'none', borderRadius:99, padding:isMobile?'7px 0':'6px 12px', fontSize:12, fontWeight:700, color:l.is_active?'#B45309':'#15803D', cursor:'pointer', fontFamily:FONT }}>{l.is_active?'Deaktivér':'Aktivér'}</button>
+                  {!isMobile && <button onClick={()=>toggleReserved(l.id, l.is_reserved)} style={{ background:l.is_reserved?'#FEF3C7':PAPER3, border:'none', borderRadius:99, padding:'6px 12px', fontSize:12, fontWeight:700, color:l.is_reserved?'#B45309':INK3, cursor:'pointer', fontFamily:FONT }}>{l.is_reserved?'Frigiv':'Reserver'}</button>}
+                  {!isMobile && <button onClick={()=>setConfirmDelete(l.id)} style={{ background:'#FEF2F2', border:'none', borderRadius:99, padding:'6px 12px', fontSize:12, fontWeight:700, color:'#e11d48', cursor:'pointer', fontFamily:FONT }}>Slet</button>}
+                </div>}
                 {confirmDelete===l.id && (
                   <div style={{ background:'#FFF5F5', borderTop:`1px solid #FECACA`, padding:'10px 14px', display:'flex', alignItems:'center', justifyContent:'space-between' }}>
                     <span style={{ fontSize:13, color:'#B91C1C', fontWeight:600, fontFamily:FONT }}>Slet dette opslag permanent?</span>
@@ -485,7 +485,7 @@ export default function DashboardClient() {
           </div>
 
           {/* Mine favoritter */}
-          <div style={{ background:PAPER2, borderRadius:22, padding:isMobile?20:28, border:'1px solid rgba(22,34,28,0.07)', boxShadow:'0 1px 4px rgba(22,34,28,0.06)' }}>
+          <div style={{ background:PAPER2, borderRadius:22, padding:isMobile?20:28, border:'1px solid rgba(22,34,28,0.07)', boxShadow:'0 1px 4px rgba(22,34,28,0.06)', minWidth:0, overflow:'hidden' }}>
             <div style={{ display:'flex', alignItems:'center', gap:10, marginBottom:20 }}>
               <h2 style={{ fontFamily:FONT, fontWeight:800, fontSize:18, color:INK }}>Mine favoritter</h2>
               {favListings.length>0 && <div style={{ background:'#FEF2F2', border:'1px solid #FECACA', borderRadius:99, padding:'2px 10px', fontSize:12, fontWeight:700, color:'#e11d48', fontFamily:FONT }}>{favListings.length}</div>}
