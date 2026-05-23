@@ -11,6 +11,97 @@ const FONT = "'Sora', sans-serif";
 const INK2 = '#3A473D';
 const ADMIN_EMAIL = 'mustaphakatamato@live.dk';
 
+function ConvSwipeRow({ children, enabled, onSwipeLeft, onSwipeRight, leftBg, rightBg, leftLabel, rightLabel }) {
+  const [offset, setOffset] = useState(0);
+  const [settling, setSettling] = useState(false);
+  const startX = useRef(0);
+  const startY = useRef(0);
+  const curOffset = useRef(0);
+  const isHoriz = useRef(false);
+  const swiped = useRef(false);
+  const rowRef = useRef(null);
+  const leftCbRef = useRef(onSwipeLeft);
+  const rightCbRef = useRef(onSwipeRight);
+  useEffect(() => { leftCbRef.current = onSwipeLeft; }, [onSwipeLeft]);
+  useEffect(() => { rightCbRef.current = onSwipeRight; }, [onSwipeRight]);
+  const THRESHOLD = 80;
+
+  useEffect(() => {
+    if (!enabled) return;
+    const el = rowRef.current;
+    if (!el) return;
+    function onStart(e) {
+      startX.current = e.touches[0].clientX;
+      startY.current = e.touches[0].clientY;
+      isHoriz.current = false;
+      swiped.current = false;
+      curOffset.current = 0;
+    }
+    function onMove(e) {
+      const dx = e.touches[0].clientX - startX.current;
+      const dy = e.touches[0].clientY - startY.current;
+      if (!isHoriz.current) {
+        if (Math.abs(dy) > Math.abs(dx) + 4) return;
+        if (Math.abs(dx) > 8) isHoriz.current = true;
+        else return;
+      }
+      e.preventDefault();
+      curOffset.current = Math.max(-180, Math.min(180, dx));
+      setOffset(curOffset.current);
+      setSettling(false);
+    }
+    function onEnd() {
+      const dx = curOffset.current;
+      setSettling(true);
+      if (dx < -THRESHOLD && leftCbRef.current) {
+        swiped.current = true;
+        setOffset(-window.innerWidth);
+        setTimeout(() => { leftCbRef.current(); setOffset(0); setSettling(false); }, 260);
+      } else if (dx > THRESHOLD && rightCbRef.current) {
+        swiped.current = true;
+        rightCbRef.current();
+        setTimeout(() => { setOffset(0); setSettling(false); }, 10);
+      } else {
+        setOffset(0);
+      }
+    }
+    el.addEventListener('touchstart', onStart, { passive: true });
+    el.addEventListener('touchmove', onMove, { passive: false });
+    el.addEventListener('touchend', onEnd, { passive: true });
+    return () => {
+      el.removeEventListener('touchstart', onStart);
+      el.removeEventListener('touchmove', onMove);
+      el.removeEventListener('touchend', onEnd);
+    };
+  }, [enabled]);
+
+  if (!enabled) return children;
+
+  const revealRight = Math.max(0, -offset);
+  const revealLeft  = Math.max(0, offset);
+
+  return (
+    <div style={{ position: 'relative', overflow: 'hidden' }}>
+      {/* swipe-right → left action background */}
+      <div style={{ position:'absolute', left:0, top:0, bottom:0, width:revealLeft, background:rightBg, display:'flex', alignItems:'center', paddingLeft:20, overflow:'hidden' }}>
+        {revealLeft > 30 && <span style={{ color:'#fff', fontSize:12, fontWeight:800, fontFamily:FONT, whiteSpace:'nowrap' }}>{rightLabel}</span>}
+      </div>
+      {/* swipe-left → right action background */}
+      <div style={{ position:'absolute', right:0, top:0, bottom:0, width:revealRight, background:leftBg, display:'flex', alignItems:'center', justifyContent:'flex-end', paddingRight:20, overflow:'hidden' }}>
+        {revealRight > 30 && <span style={{ color:'#fff', fontSize:12, fontWeight:800, fontFamily:FONT, whiteSpace:'nowrap' }}>{leftLabel}</span>}
+      </div>
+      {/* sliding row */}
+      <div
+        ref={rowRef}
+        style={{ transform:`translateX(${offset}px)`, transition: settling ? 'transform 0.25s cubic-bezier(0.25,0.46,0.45,0.94)' : 'none', position:'relative', zIndex:1, willChange:'transform' }}
+        onClick={e => { if (swiped.current) { e.stopPropagation(); swiped.current = false; } }}
+      >
+        {children}
+      </div>
+    </div>
+  );
+}
+
 function LoginInline({ onLogin }) {
   const router = useRouter();
   const { setLoggedIn } = useApp();
@@ -714,7 +805,15 @@ export default function MessagesClient() {
                 const archived = isArchived(c);
                 const avatarLetter = otherName(c)?.charAt(0)?.toUpperCase() || '?';
                 return (
-                  <div key={c.id} style={{ display:'flex', gap:12, padding: isMobile ? '14px 16px' : '13px 16px', cursor:'pointer', background:isAct?GREEN_TINT:(isMobile?PAPER:PAPER2), borderLeft:isAct?`3px solid ${PRIMARY}`:'3px solid transparent', transition:'background 0.15s', position:'relative', borderBottom:`1px solid rgba(22,34,28,${isMobile?'0.07':'0.05'})` }}
+                  <ConvSwipeRow
+                    key={c.id}
+                    enabled={isMobile && !archived}
+                    onSwipeLeft={() => archiveConv(c, { stopPropagation: () => {} })}
+                    onSwipeRight={() => toggleReadUnread(c, { stopPropagation: () => {} })}
+                    leftBg="#e11d48" leftLabel="Arkiver"
+                    rightBg={unread > 0 ? '#3B82F6' : PRIMARY}
+                    rightLabel={unread > 0 ? 'Markér læst' : 'Markér ulæst'}>
+                  <div style={{ display:'flex', gap:12, padding: isMobile ? '14px 16px' : '13px 16px', cursor:'pointer', background:isAct?GREEN_TINT:(isMobile?PAPER:PAPER2), borderLeft:isAct?`3px solid ${PRIMARY}`:'3px solid transparent', transition:'background 0.15s', position:'relative', borderBottom:`1px solid rgba(22,34,28,${isMobile?'0.07':'0.05'})` }}
                     onClick={()=>openConv(c)}>
                     <div style={{ width: isMobile?52:46, height: isMobile?52:46, borderRadius: isMobile?'50%':12, background:c.listing_image?PAPER3:c.listing_color||'#FFD166', display:'flex', alignItems:'center', justifyContent:'center', fontSize: isMobile?20:22, flexShrink:0, overflow:'hidden', position:'relative' }}>
                       {c.listing_image ? <img src={c.listing_image} style={{ width:'100%', height:'100%', objectFit:'cover' }} alt="" /> : (isMobile ? <span style={{ fontFamily:FONT, fontWeight:800, fontSize:18, color:'rgba(22,34,28,0.6)' }}>{avatarLetter}</span> : c.listing_emoji||'🧸')}
@@ -761,6 +860,7 @@ export default function MessagesClient() {
                       </div>
                     )}
                   </div>
+                  </ConvSwipeRow>
                 );
               })}
           </div>
