@@ -69,6 +69,9 @@ export default function OpretOpslagPage() {
   const [institution, setInstitution] = useState(ctxInstitution || null);
   const [imgFiles, setImgFiles] = useState([]);
   const [imgPreviews, setImgPreviews] = useState([]);
+  const [draggingIdx, setDraggingIdx] = useState(null);
+  const [overIdx, setOverIdx] = useState(null);
+  const dragState = useRef({ dragging: null, over: null });
   const [form, setForm] = useState({
     title:'', type:'køb', price:'', age_group:'3-6 år',
     description:'', condition:'God', emoji:'🧸', color:'#FFD166',
@@ -104,21 +107,59 @@ export default function OpretOpslagPage() {
     setImgPreviews(p => p.filter((_,j) => j!==i));
   }
 
-  function moveImg(i, dir) {
-    const ni = i + dir;
-    if (ni < 0 || ni >= imgFiles.length) return;
-    const nf = [...imgFiles]; const np = [...imgPreviews];
-    [nf[i], nf[ni]] = [nf[ni], nf[i]];
-    [np[i], np[ni]] = [np[ni], np[i]];
-    setImgFiles(nf); setImgPreviews(np);
+  function reorderImgs(from, to) {
+    if (from === to || from === null || to === null) return;
+    setImgFiles(prev => { const a=[...prev]; const [x]=a.splice(from,1); a.splice(to,0,x); return a; });
+    setImgPreviews(prev => { const a=[...prev]; const [x]=a.splice(from,1); a.splice(to,0,x); return a; });
   }
 
-  function setCoverImg(i) {
-    if (i === 0) return;
-    const nf = [...imgFiles]; const np = [...imgPreviews];
-    nf.unshift(nf.splice(i, 1)[0]);
-    np.unshift(np.splice(i, 1)[0]);
-    setImgFiles(nf); setImgPreviews(np);
+  // Touch drag (mobile hold & drag)
+  function startTouchDrag(i) {
+    dragState.current = { dragging: i, over: null };
+    setDraggingIdx(i); setOverIdx(null);
+    const onMove = (e) => {
+      e.preventDefault();
+      const t = e.touches[0];
+      const el = document.elementFromPoint(t.clientX, t.clientY);
+      const item = el?.closest('[data-img-idx]');
+      if (item) {
+        const idx = Number(item.dataset.imgIdx);
+        if (Number.isFinite(idx) && idx !== dragState.current.dragging && idx !== dragState.current.over) {
+          dragState.current.over = idx; setOverIdx(idx);
+        }
+      }
+    };
+    const onEnd = () => {
+      document.removeEventListener('touchmove', onMove);
+      reorderImgs(dragState.current.dragging, dragState.current.over);
+      dragState.current = { dragging: null, over: null };
+      setDraggingIdx(null); setOverIdx(null);
+    };
+    document.addEventListener('touchmove', onMove, { passive: false });
+    document.addEventListener('touchend', onEnd, { once: true });
+  }
+
+  // Desktop HTML5 drag
+  function onDragStart(e, i) {
+    e.dataTransfer.effectAllowed = 'move';
+    dragState.current = { dragging: i, over: null };
+    setDraggingIdx(i);
+  }
+  function onDragOver(e, i) {
+    e.preventDefault(); e.dataTransfer.dropEffect = 'move';
+    if (i !== dragState.current.dragging && i !== dragState.current.over) {
+      dragState.current.over = i; setOverIdx(i);
+    }
+  }
+  function onDrop(e, i) {
+    e.preventDefault();
+    reorderImgs(dragState.current.dragging, i);
+    dragState.current = { dragging: null, over: null };
+    setDraggingIdx(null); setOverIdx(null);
+  }
+  function onDragEnd() {
+    dragState.current = { dragging: null, over: null };
+    setDraggingIdx(null); setOverIdx(null);
   }
 
   async function handleImprove() {
@@ -377,23 +418,19 @@ export default function OpretOpslagPage() {
                   ) : (
                     <div style={{ display:'grid', gridTemplateColumns:'repeat(3,1fr)', gap:8 }}>
                       {imgPreviews.map((src,i) => (
-                        <div key={i} style={{ position:'relative', aspectRatio:'1', borderRadius:12, overflow:'hidden', border: i===0 ? `2px solid ${PRIMARY}` : '2px solid transparent' }}>
-                          <img src={src} alt="" style={{ width:'100%', height:'100%', objectFit:'cover' }} />
-                          {/* Remove */}
-                          <button onClick={()=>removeImg(i)} style={{ position:'absolute', top:5, right:5, width:22, height:22, borderRadius:'50%', background:'rgba(22,34,28,0.7)', border:'none', color:'#fff', fontSize:11, cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center', lineHeight:1 }}>✕</button>
-                          {/* Set as cover — only on non-first */}
-                          {i > 0 && (
-                            <button onClick={()=>setCoverImg(i)} title="Sæt som forside" style={{ position:'absolute', top:5, left:5, width:22, height:22, borderRadius:'50%', background:'rgba(241,196,75,0.92)', border:'none', color:'#333', fontSize:12, cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center', lineHeight:1 }}>★</button>
-                          )}
-                          {/* Forside badge on first */}
-                          {i === 0 && <div style={{ position:'absolute', bottom:5, left:0, right:0, display:'flex', justifyContent:'center' }}><div style={{ background:PRIMARY, borderRadius:6, padding:'2px 8px', fontSize:9, color:'#fff', fontWeight:700, fontFamily:FONT }}>Forside</div></div>}
-                          {/* Reorder arrows */}
-                          {imgPreviews.length > 1 && (
-                            <div style={{ position:'absolute', bottom:5, display:'flex', gap:3, left:'50%', transform:'translateX(-50%)', marginTop: i===0 ? 0 : 0 }}>
-                              {i > 0 && <button onClick={()=>moveImg(i,-1)} style={{ width:20, height:20, borderRadius:4, background:'rgba(22,34,28,0.65)', border:'none', color:'#fff', fontSize:11, cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center', lineHeight:1 }}>‹</button>}
-                              {i < imgPreviews.length-1 && <button onClick={()=>moveImg(i,1)} style={{ width:20, height:20, borderRadius:4, background:'rgba(22,34,28,0.65)', border:'none', color:'#fff', fontSize:11, cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center', lineHeight:1 }}>›</button>}
-                            </div>
-                          )}
+                        <div
+                          key={i}
+                          data-img-idx={i}
+                          draggable
+                          onDragStart={e=>onDragStart(e,i)}
+                          onDragOver={e=>onDragOver(e,i)}
+                          onDrop={e=>onDrop(e,i)}
+                          onDragEnd={onDragEnd}
+                          onTouchStart={()=>startTouchDrag(i)}
+                          style={{ position:'relative', aspectRatio:'1', borderRadius:12, overflow:'hidden', border: overIdx===i ? `2px solid ${PRIMARY}` : i===0 ? `2px solid ${PRIMARY}` : '2px solid transparent', opacity: draggingIdx===i ? 0.35 : 1, cursor:'grab', transition:'opacity 0.15s, border-color 0.15s', userSelect:'none', touchAction:'none' }}>
+                          <img src={src} alt="" draggable={false} style={{ width:'100%', height:'100%', objectFit:'cover', pointerEvents:'none', userSelect:'none' }} />
+                          <button onClick={e=>{e.stopPropagation();removeImg(i);}} style={{ position:'absolute', top:5, right:5, width:22, height:22, borderRadius:'50%', background:'rgba(22,34,28,0.7)', border:'none', color:'#fff', fontSize:11, cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center', lineHeight:1, touchAction:'auto' }}>✕</button>
+                          {i===0 && <div style={{ position:'absolute', bottom:5, left:0, right:0, display:'flex', justifyContent:'center', pointerEvents:'none' }}><div style={{ background:PRIMARY, borderRadius:6, padding:'2px 8px', fontSize:9, color:'#fff', fontWeight:700, fontFamily:FONT }}>Forside</div></div>}
                         </div>
                       ))}
                       {imgFiles.length < 6 && (
@@ -401,6 +438,7 @@ export default function OpretOpslagPage() {
                       )}
                     </div>
                   )}
+                  {imgPreviews.length > 1 && <div style={{ fontSize:11, color:INK3, textAlign:'center', marginTop:6, fontFamily:FONT }}>Hold og træk billeder for at ændre rækkefølge · Det første er forsiden</div>}
                 </div>
 
                 <div style={{ display:'flex', gap:10, marginTop:4 }}>
