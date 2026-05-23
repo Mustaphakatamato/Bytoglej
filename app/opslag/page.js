@@ -4,9 +4,7 @@ import { useRouter } from 'next/navigation';
 import dynamic from 'next/dynamic';
 import { PRIMARY, GREEN_DEEP, GREEN_SOFT, GREEN_TINT, PAPER, PAPER2, PAPER3, INK, INK2, INK3, CORAL, TYPE_CFG, LISTING_TAGS } from '@/lib/constants';
 import { CATEGORIES } from '@/lib/categories';
-
-const CITIES = ['alle','Aarhus','København','Odense','Aalborg','Esbjerg','Randers','Vejle','Kolding'];
-import { useWindowWidth, useDebounce, haversine } from '@/lib/hooks';
+import { useWindowWidth, useDebounce } from '@/lib/hooks';
 import { Btn, SkeletonCard } from '@/components/ui';
 import ListingCard from '@/components/ListingCard';
 import { useApp } from '@/providers/AppProvider';
@@ -38,17 +36,6 @@ function CategoryBrowser({ onSelect }) {
 
 const FONT = "'Sora', sans-serif";
 
-const geoCache = {};
-const NOM_HEADERS = { 'User-Agent': 'BytogLeg/1.0 (support@bytogleg.dk)', 'Accept-Language': 'da' };
-async function geocodeCity(city) {
-  if (geoCache[city]) return geoCache[city];
-  try {
-    const r = await fetch(`https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(city+', Danmark')}&format=json&limit=1&countrycodes=dk`, { headers: NOM_HEADERS });
-    const d = await r.json();
-    if (d[0]) { geoCache[city] = { lat: parseFloat(d[0].lat), lon: parseFloat(d[0].lon) }; return geoCache[city]; }
-  } catch {}
-  return null;
-}
 
 export default function OpslagPage() {
   const router = useRouter();
@@ -57,13 +44,12 @@ export default function OpslagPage() {
   const isMobile = ww < 640;
   const [filter, setFilter] = useState('alle');
   const [search, setSearch] = useState('');
-  const [city, setCity] = useState('alle');
   const [sort, setSort] = useState('newest');
-  const [maxDist, setMaxDist] = useState('alle');
   const [category, setCategory] = useState('');
   const [subcategory, setSubcategory] = useState('');
   const [activeTags, setActiveTags] = useState([]);
   const [tagDropOpen, setTagDropOpen] = useState(false);
+  const [viewMode, setViewMode] = useState('list');
   const [saveSearchModal, setSaveSearchModal] = useState(false);
   const [saveSearchName, setSaveSearchName] = useState('');
   const [savingSearch, setSavingSearch] = useState(false);
@@ -74,91 +60,38 @@ export default function OpslagPage() {
     document.addEventListener('mousedown', handleClick);
     return () => document.removeEventListener('mousedown', handleClick);
   }, [tagDropOpen]);
-  const [viewMode, setViewMode] = useState('list');
-  const [userCoords, setUserCoords] = useState(null);
-  const [userHasCoords, setUserHasCoords] = useState(null);
-  const [geoLoading, setGeoLoading] = useState(false);
-  const [listingCoords, setListingCoords] = useState({});
   const dSearch = useDebounce(search, 180);
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
     const params = new URLSearchParams(window.location.search);
     const t = params.get('type');
-    const c = params.get('city');
     const s = params.get('search');
     const tgs = params.get('tags');
-    const md = params.get('maxDist');
     if (t && t !== 'alle') setFilter(t);
-    if (c && c !== 'alle') setCity(c);
     if (s) setSearch(s);
     if (tgs) { try { setActiveTags(JSON.parse(tgs)); } catch {} }
-    if (md && md !== 'alle') setMaxDist(md);
     const cat = params.get('category');
     const sub = params.get('subcategory');
     if (cat) setCategory(cat);
     if (sub) setSubcategory(sub);
   }, []);
 
-  useEffect(() => {
-    db.auth.getUser().then(async ({ data:{ user } }) => {
-      if (!user) { setUserHasCoords(false); return; }
-      const { data: inst } = await db.from('institutions').select('city,zipcode,latitude,longitude').eq('email', user.email).maybeSingle();
-      if (!inst) { setUserHasCoords(false); return; }
-      if (inst.latitude && inst.longitude) {
-        setUserCoords({ lat: inst.latitude, lon: inst.longitude });
-        setUserHasCoords(true);
-        return;
-      }
-      setUserHasCoords(false);
-      setGeoLoading(true);
-      const q = inst.zipcode ? `${inst.zipcode} ${inst.city}, Danmark` : `${inst.city}, Danmark`;
-      const coords = await geocodeCity(q);
-      if (coords) setUserCoords(coords);
-      setGeoLoading(false);
-    });
-  }, []);
-
-  useEffect(() => {
-    if (maxDist === 'alle' && viewMode !== 'map') return;
-    const cities = [...new Set(listings.map(l => l.city).filter(Boolean))];
-    cities.forEach(async c => {
-      if (listingCoords[c]) return;
-      const coords = await geocodeCity(c);
-      if (coords) setListingCoords(prev => ({ ...prev, [c]: coords }));
-    });
-  }, [maxDist, viewMode, listings]);
-
   const filtered = useMemo(() => {
     let r = listings.filter(l => {
       const matchType   = filter === 'alle' || l.type === filter;
-      const matchCity   = city === 'alle'   || l.city === city;
       const matchSearch = !dSearch || l.title.toLowerCase().includes(dSearch.toLowerCase()) || (l.institution_name||'').toLowerCase().includes(dSearch.toLowerCase()) || (l.tags||[]).some(t => t.toLowerCase().includes(dSearch.toLowerCase()));
       const matchTag = activeTags.length === 0 || activeTags.every(t => (l.tags||[]).includes(t));
       const matchCategory = !category || l.category === category;
       const matchSubcategory = !subcategory || l.subcategory === subcategory;
-      let matchDist = true;
-      if (maxDist !== 'alle' && userCoords && l.city) {
-        const coords = listingCoords[l.city];
-        if (coords) matchDist = haversine(userCoords.lat, userCoords.lon, coords.lat, coords.lon) <= Number(maxDist);
-        else matchDist = true;
-      }
-      return matchType && matchCity && matchSearch && matchDist && matchTag && matchCategory && matchSubcategory;
+      return matchType && matchSearch && matchTag && matchCategory && matchSubcategory;
     });
     if (sort === 'newest')     r = [...r].sort((a,b) => new Date(b.created_at) - new Date(a.created_at));
     if (sort === 'price-asc')  r = [...r].sort((a,b) => (a.price||0) - (b.price||0));
     if (sort === 'price-desc') r = [...r].sort((a,b) => (b.price||0) - (a.price||0));
     if (sort === 'bids')       r = [...r].sort((a,b) => (b.bid_count||0) - (a.bid_count||0));
-    if (maxDist !== 'alle' && userCoords) {
-      r = [...r].sort((a,b) => {
-        const ca = listingCoords[a.city], cb = listingCoords[b.city];
-        const da = ca ? haversine(userCoords.lat, userCoords.lon, ca.lat, ca.lon) : 9999;
-        const db2 = cb ? haversine(userCoords.lat, userCoords.lon, cb.lat, cb.lon) : 9999;
-        return da - db2;
-      });
-    }
     return r;
-  }, [listings, filter, city, dSearch, sort, maxDist, userCoords, listingCoords, activeTags, category, subcategory]);
+  }, [listings, filter, dSearch, sort, activeTags, category, subcategory]);
 
   async function handleSaveSearch() {
     if (!saveSearchName.trim()) return;
@@ -169,10 +102,8 @@ export default function OpslagPage() {
       const { data: inst } = await db.from('institutions').select('id,name,email').ilike('email', user.email).maybeSingle();
       const filters = {};
       if (filter !== 'alle') filters.type = filter;
-      if (city !== 'alle') filters.city = city;
       if (activeTags.length) filters.tags = activeTags;
       if (dSearch) filters.search = dSearch;
-      if (maxDist !== 'alle') filters.maxDist = maxDist;
       if (category) filters.category = category;
       if (subcategory) filters.subcategory = subcategory;
       const { error: insertErr } = await db.from('saved_searches').insert({
@@ -204,7 +135,7 @@ export default function OpslagPage() {
     color: INK2, cursor: 'pointer', appearance: 'none', WebkitAppearance: 'none',
   };
 
-  const showCategoryBrowser = isMobile && !category && !dSearch && filter === 'alle' && city === 'alle' && !activeTags.length && maxDist === 'alle';
+  const showCategoryBrowser = isMobile && !category && !dSearch && filter === 'alle' && !activeTags.length;
 
   return (
     <div style={{ minHeight: '100vh', background: PAPER }}>
@@ -328,49 +259,15 @@ export default function OpslagPage() {
               })}
             </div>
 
-            {/* City select */}
+            {/* Sort */}
             <div style={{ position: 'relative' }}>
-              <select value={city} onChange={e => setCity(e.target.value)} style={selectStyle}>
-                {CITIES.map(c => <option key={c} value={c}>{c === 'alle' ? 'Alle byer' : c}</option>)}
+              <select value={sort} onChange={e => setSort(e.target.value)} style={selectStyle}>
+                <option value="newest">Nyeste</option>
+                <option value="price-asc">Pris ↑</option>
+                <option value="price-desc">Pris ↓</option>
+                <option value="bids">Flest bud</option>
               </select>
               <span style={{ position: 'absolute', right: 10, top: '50%', transform: 'translateY(-50%)', fontSize: 9, color: INK3, pointerEvents: 'none' }}>▼</span>
-            </div>
-
-            {/* Sort */}
-            {viewMode === 'list' && (
-              <div style={{ position: 'relative' }}>
-                <select value={sort} onChange={e => setSort(e.target.value)} style={selectStyle}>
-                  <option value="newest">Nyeste</option>
-                  <option value="price-asc">Pris ↑</option>
-                  <option value="price-desc">Pris ↓</option>
-                  <option value="bids">Flest bud</option>
-                </select>
-                <span style={{ position: 'absolute', right: 10, top: '50%', transform: 'translateY(-50%)', fontSize: 9, color: INK3, pointerEvents: 'none' }}>▼</span>
-              </div>
-            )}
-
-            {/* Distance */}
-            <div style={{ position: 'relative' }}>
-              <select value={maxDist} onChange={e => setMaxDist(e.target.value)} style={{
-                ...selectStyle,
-                border: `1.5px solid ${maxDist !== 'alle' ? PRIMARY : PAPER3}`,
-                background: maxDist !== 'alle' ? GREEN_TINT : PAPER2,
-                color: maxDist !== 'alle' ? PRIMARY : INK2,
-                fontWeight: maxDist !== 'alle' ? 700 : 400,
-              }}>
-                <option value="alle">Afstand</option>
-                <option value="5">Inden for 5 km</option>
-                <option value="10">Inden for 10 km</option>
-                <option value="25">Inden for 25 km</option>
-                <option value="50">Inden for 50 km</option>
-                <option value="100">Inden for 100 km</option>
-              </select>
-              <span style={{ position: 'absolute', right: 10, top: '50%', transform: 'translateY(-50%)', fontSize: 9, color: maxDist !== 'alle' ? PRIMARY : INK3, pointerEvents: 'none' }}>▼</span>
-              {!userCoords && maxDist !== 'alle' && (
-                <div style={{ position: 'absolute', top: 'calc(100% + 6px)', left: 0, background: PAPER, border: `1.5px solid ${CORAL}`, borderRadius: 10, padding: '8px 12px', fontSize: 12, color: CORAL, fontFamily: FONT, fontWeight: 600, whiteSpace: 'nowrap', zIndex: 10 }}>
-                  Log ind for at bruge afstandsfilter
-                </div>
-              )}
             </div>
 
             {/* Tags dropdown */}
@@ -443,12 +340,12 @@ export default function OpslagPage() {
             {viewMode === 'map' && !loading && <span style={{ marginLeft: 8, fontSize: 12 }}>— pins baseret på by</span>}
           </p>
           <div style={{ display:'flex', gap:10, alignItems:'center' }}>
-            {(filter !== 'alle' || city !== 'alle' || activeTags.length || maxDist !== 'alle' || dSearch || category || subcategory) && (
-              <button onClick={() => { setFilter('alle'); setSearch(''); setCity('alle'); setActiveTags([]); setMaxDist('alle'); setCategory(''); setSubcategory(''); window.history.replaceState({}, '', '/opslag'); }} style={{ fontSize: 12, fontWeight: 600, color: PRIMARY, background: 'none', border: 'none', cursor: 'pointer', fontFamily: FONT, padding: 0 }}>
+            {(filter !== 'alle' || activeTags.length || dSearch || category || subcategory) && (
+              <button onClick={() => { setFilter('alle'); setSearch(''); setActiveTags([]); setCategory(''); setSubcategory(''); window.history.replaceState({}, '', '/opslag'); }} style={{ fontSize: 12, fontWeight: 600, color: PRIMARY, background: 'none', border: 'none', cursor: 'pointer', fontFamily: FONT, padding: 0 }}>
                 Nulstil filtre
               </button>
             )}
-            {loggedIn && (filter !== 'alle' || city !== 'alle' || activeTags.length || maxDist !== 'alle' || dSearch || category || subcategory) && (
+            {loggedIn && (filter !== 'alle' || activeTags.length || dSearch || category || subcategory) && (
               <button onClick={() => setSaveSearchModal(true)} style={{ fontSize: 12, fontWeight: 700, color: '#fff', background: PRIMARY, border: 'none', borderRadius: 99, cursor: 'pointer', fontFamily: FONT, padding: '5px 14px', display:'flex', alignItems:'center', gap:5 }}>
                 🔔 Gem søgning
               </button>
@@ -459,8 +356,8 @@ export default function OpslagPage() {
         {viewMode === 'map' ? (
           <MapContainer
             listings={filtered}
-            listingCoords={listingCoords}
-            userCoords={userCoords}
+            listingCoords={{}}
+            userCoords={null}
             onListingClick={handleListingClick}
             isMobile={isMobile}
           />
@@ -475,7 +372,7 @@ export default function OpslagPage() {
             <div style={{ fontFamily: FONT, fontWeight: 800, fontSize: isMobile ? 60 : 96, color: GREEN_SOFT, lineHeight: 1, letterSpacing: '-0.05em', marginBottom: 12, userSelect: 'none' }}>0</div>
             <div style={{ fontFamily: FONT, fontWeight: 800, fontSize: isMobile ? 20 : 26, color: INK, marginBottom: 8, letterSpacing: '-0.03em' }}>Ingen opslag fundet</div>
             <p style={{ fontSize: 15, color: INK3, marginBottom: 28 }}>Prøv at ændre eller nulstille dine filtre</p>
-            <button onClick={() => { setFilter('alle'); setSearch(''); setCity('alle'); setActiveTags([]); setMaxDist('alle'); setCategory(''); setSubcategory(''); window.history.replaceState({}, '', '/opslag'); }} style={{
+            <button onClick={() => { setFilter('alle'); setSearch(''); setActiveTags([]); setCategory(''); setSubcategory(''); window.history.replaceState({}, '', '/opslag'); }} style={{
               background: 'none', border: `1.5px solid ${PRIMARY}`, color: PRIMARY,
               borderRadius: 99, padding: '10px 24px', fontSize: 14, fontWeight: 700,
               fontFamily: FONT, cursor: 'pointer',
