@@ -104,6 +104,23 @@ export default function OpretOpslagPage() {
     setImgPreviews(p => p.filter((_,j) => j!==i));
   }
 
+  function moveImg(i, dir) {
+    const ni = i + dir;
+    if (ni < 0 || ni >= imgFiles.length) return;
+    const nf = [...imgFiles]; const np = [...imgPreviews];
+    [nf[i], nf[ni]] = [nf[ni], nf[i]];
+    [np[i], np[ni]] = [np[ni], np[i]];
+    setImgFiles(nf); setImgPreviews(np);
+  }
+
+  function setCoverImg(i) {
+    if (i === 0) return;
+    const nf = [...imgFiles]; const np = [...imgPreviews];
+    nf.unshift(nf.splice(i, 1)[0]);
+    np.unshift(np.splice(i, 1)[0]);
+    setImgFiles(nf); setImgPreviews(np);
+  }
+
   async function handleImprove() {
     setAiImproving(true);
     try {
@@ -360,10 +377,23 @@ export default function OpretOpslagPage() {
                   ) : (
                     <div style={{ display:'grid', gridTemplateColumns:'repeat(3,1fr)', gap:8 }}>
                       {imgPreviews.map((src,i) => (
-                        <div key={i} style={{ position:'relative', aspectRatio:'1', borderRadius:12, overflow:'hidden' }}>
+                        <div key={i} style={{ position:'relative', aspectRatio:'1', borderRadius:12, overflow:'hidden', border: i===0 ? `2px solid ${PRIMARY}` : '2px solid transparent' }}>
                           <img src={src} alt="" style={{ width:'100%', height:'100%', objectFit:'cover' }} />
-                          <button onClick={()=>removeImg(i)} style={{ position:'absolute', top:6, right:6, width:24, height:24, borderRadius:'50%', background:'rgba(22,34,28,0.65)', border:'none', color:'#fff', fontSize:12, cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center' }}>✕</button>
-                          {i===0 && <div style={{ position:'absolute', bottom:6, left:6, background:'rgba(22,34,28,0.6)', borderRadius:6, padding:'2px 8px', fontSize:10, color:'#fff', fontWeight:700, fontFamily:FONT }}>Forside</div>}
+                          {/* Remove */}
+                          <button onClick={()=>removeImg(i)} style={{ position:'absolute', top:5, right:5, width:22, height:22, borderRadius:'50%', background:'rgba(22,34,28,0.7)', border:'none', color:'#fff', fontSize:11, cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center', lineHeight:1 }}>✕</button>
+                          {/* Set as cover — only on non-first */}
+                          {i > 0 && (
+                            <button onClick={()=>setCoverImg(i)} title="Sæt som forside" style={{ position:'absolute', top:5, left:5, width:22, height:22, borderRadius:'50%', background:'rgba(241,196,75,0.92)', border:'none', color:'#333', fontSize:12, cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center', lineHeight:1 }}>★</button>
+                          )}
+                          {/* Forside badge on first */}
+                          {i === 0 && <div style={{ position:'absolute', bottom:5, left:0, right:0, display:'flex', justifyContent:'center' }}><div style={{ background:PRIMARY, borderRadius:6, padding:'2px 8px', fontSize:9, color:'#fff', fontWeight:700, fontFamily:FONT }}>Forside</div></div>}
+                          {/* Reorder arrows */}
+                          {imgPreviews.length > 1 && (
+                            <div style={{ position:'absolute', bottom:5, display:'flex', gap:3, left:'50%', transform:'translateX(-50%)', marginTop: i===0 ? 0 : 0 }}>
+                              {i > 0 && <button onClick={()=>moveImg(i,-1)} style={{ width:20, height:20, borderRadius:4, background:'rgba(22,34,28,0.65)', border:'none', color:'#fff', fontSize:11, cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center', lineHeight:1 }}>‹</button>}
+                              {i < imgPreviews.length-1 && <button onClick={()=>moveImg(i,1)} style={{ width:20, height:20, borderRadius:4, background:'rgba(22,34,28,0.65)', border:'none', color:'#fff', fontSize:11, cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center', lineHeight:1 }}>›</button>}
+                            </div>
+                          )}
                         </div>
                       ))}
                       {imgFiles.length < 6 && (

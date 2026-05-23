@@ -122,6 +122,7 @@ export default function MessagesClient() {
 
   const [userId,      setUserId]      = useState(null);
   const [userEmail,   setUserEmail]   = useState(null);
+  const [authChecked, setAuthChecked] = useState(false);
   const [convs,       setConvs]       = useState([]);
   const [active,      setActive]      = useState(null);
   const [messages,    setMessages]    = useState([]);
@@ -159,6 +160,7 @@ export default function MessagesClient() {
 
   useEffect(() => {
     db.auth.getUser().then(({ data: { user } }) => {
+      setAuthChecked(true);
       if (!user) { setLoading(false); return; }
       setUserId(user.id);
       setUserEmail(user.email);
@@ -577,6 +579,7 @@ export default function MessagesClient() {
     .filter(c => otherName(c).toLowerCase().includes(search.toLowerCase()) || c.listing_title.toLowerCase().includes(search.toLowerCase()));
   const totalUnread = convs.filter(c => !isArchived(c)).reduce((s,c) => s + myUnread(c), 0);
 
+  if (!authChecked) return <div style={{ minHeight:'100vh', background:PAPER }} />;
   if (!userId) return (
     <div style={{ minHeight:'100vh', display:'flex', alignItems:'center', justifyContent:'center', padding:'80px 24px 48px', background:PAPER }} className="page-enter">
       <LoginInline onLogin={() => window.location.reload()} />
