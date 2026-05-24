@@ -368,8 +368,9 @@ export default function DashboardClient() {
   const favListings = allListings ? allListings.filter(l=>favs?.includes(l.id)) : [];
 
   const favoritersGrouped = myListings
-    .filter(l => listingFavoriters.some(f => f.listing_id === l.id))
+    .filter(l => listingFavoriters.some(f => f.listing_id === l.id) || (l.fav_count > 0 && !listingFavoriters.length))
     .map(l => ({ listing: l, favoriters: listingFavoriters.filter(f => f.listing_id === l.id) }));
+  const rlsBlocked = !listingFavoriters.length && myListings.some(l => l.fav_count > 0);
 
   async function startConversationWithFavoriter(listing, favoriterInstId, favoriterInstName) {
     if (!institution) return;
@@ -618,20 +619,25 @@ export default function DashboardClient() {
             </div>
           ) : (
             <div style={{ display:'flex', flexDirection:'column', gap:12 }}>
+              {rlsBlocked && (
+                <div style={{ background:'#FEF9C3', border:'1px solid #FDE047', borderRadius:12, padding:'12px 16px', fontSize:13, color:'#92400E', fontFamily:FONT }}>
+                  <strong>Tæller vises, men ikke hvem</strong> — kontakt os for at aktivere fuldt visning af interesserede.
+                </div>
+              )}
               {favoritersGrouped.map(({ listing, favoriters }) => (
                 <div key={listing.id} style={{ border:`1px solid rgba(22,34,28,0.08)`, borderRadius:16, overflow:'hidden', background:PAPER }}>
-                  <div style={{ display:'flex', alignItems:'center', gap:12, padding:'12px 16px', borderBottom:`1px solid rgba(22,34,28,0.06)`, background:GREEN_TINT }}>
+                  <div style={{ display:'flex', alignItems:'center', gap:12, padding:'12px 16px', borderBottom: favoriters.length > 0 ? `1px solid rgba(22,34,28,0.06)` : 'none', background:GREEN_TINT }}>
                     <div style={{ width:40, height:40, borderRadius:10, background:listing.images?.[0]?PAPER3:listing.color||'#FFD166', display:'flex', alignItems:'center', justifyContent:'center', fontSize:20, flexShrink:0, overflow:'hidden' }}>
                       {listing.images?.[0] ? <img src={listing.images[0]} style={{ width:'100%', height:'100%', objectFit:'cover' }} alt="" /> : listing.emoji||'🧸'}
                     </div>
                     <div style={{ flex:1, minWidth:0 }}>
                       <div style={{ fontFamily:FONT, fontWeight:700, fontSize:14, color:INK, whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis' }}>{listing.title}</div>
                       <div style={{ fontSize:11, color:PRIMARY, fontWeight:600, fontFamily:FONT }}>
-                        {favoriters.length} {favoriters.length === 1 ? 'interesseret' : 'interesserede'}
+                        {favoriters.length > 0 ? `${favoriters.length} ${favoriters.length === 1 ? 'interesseret' : 'interesserede'}` : `${listing.fav_count || '?'} interesserede`}
                       </div>
                     </div>
                   </div>
-                  <div>
+                  {favoriters.length > 0 && <div>
                     {favoriters.map((f, idx) => (
                       <div key={`${f.listing_id}-${f.user_id}-${idx}`} style={{ display:'flex', alignItems:'center', gap:12, padding:'10px 16px', borderBottom: idx < favoriters.length - 1 ? `1px solid rgba(22,34,28,0.05)` : 'none' }}>
                         <div style={{ width:36, height:36, borderRadius:'50%', background:GREEN_TINT, display:'flex', alignItems:'center', justifyContent:'center', fontSize:13, fontWeight:800, color:PRIMARY, flexShrink:0, fontFamily:FONT, border:`2px solid ${GREEN_SOFT}` }}>
@@ -648,7 +654,7 @@ export default function DashboardClient() {
                         </button>
                       </div>
                     ))}
-                  </div>
+                  </div>}
                 </div>
               ))}
             </div>
