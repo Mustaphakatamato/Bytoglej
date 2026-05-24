@@ -14,23 +14,36 @@ function GridCard({ l, setQuickViewListing, openEdit, toggleActive, toggleReserv
   const [imgIdx, setImgIdx] = useState(0);
   const imgs = l.images || [];
   const hasMultiple = imgs.length > 1;
+  const startX = useRef(0);
+  const moved = useRef(false);
+
+  function onTouchStart(e) { startX.current = e.touches[0].clientX; moved.current = false; }
+  function onTouchEnd(e) {
+    const dx = e.changedTouches[0].clientX - startX.current;
+    if (Math.abs(dx) > 40 && hasMultiple) {
+      moved.current = true;
+      setImgIdx(i => dx < 0 ? (i+1)%imgs.length : (i-1+imgs.length)%imgs.length);
+    }
+  }
+
   return (
     <div style={{ border:`1px solid ${l.is_sold?'#FECACA':l.is_active?'rgba(22,34,28,0.08)':'rgba(22,34,28,0.04)'}`, borderRadius:14, overflow:'hidden', background:l.is_sold?'#FFF5F5':l.is_active?PAPER:'rgba(22,34,28,0.03)', opacity:l.is_active||l.is_sold?1:0.7 }}>
-      <div onClick={()=>setQuickViewListing(l)} style={{ cursor:'pointer' }}>
-        <div style={{ height:90, background:imgs[imgIdx]?PAPER3:l.color||'#FFD166', position:'relative', overflow:'hidden', display:'flex', alignItems:'center', justifyContent:'center' }}>
+      <div onClick={e=>{ if (moved.current) { moved.current=false; return; } setQuickViewListing(l); }} style={{ cursor:'pointer' }}>
+        <div style={{ height:110, background:imgs[imgIdx]?PAPER3:l.color||'#FFD166', position:'relative', overflow:'hidden', display:'flex', alignItems:'center', justifyContent:'center' }}
+          onTouchStart={onTouchStart} onTouchEnd={onTouchEnd}>
           {imgs[imgIdx] ? <img src={imgs[imgIdx]} style={{ width:'100%', height:'100%', objectFit:'cover' }} alt="" /> : <span style={{ fontSize:32 }}>{l.emoji||'🧸'}</span>}
-          {l.is_sold && <div style={{ position:'absolute', inset:0, background:'rgba(22,34,28,0.5)', display:'flex', alignItems:'center', justifyContent:'center' }}><span style={{ fontSize:10, fontWeight:900, color:'#fff', letterSpacing:0.5, fontFamily:FONT }}>SOLGT</span></div>}
-          {!l.is_sold && !l.is_active && <div style={{ position:'absolute', inset:0, background:'rgba(22,34,28,0.35)', display:'flex', alignItems:'center', justifyContent:'center' }}><span style={{ fontSize:10, fontWeight:900, color:'#fff', letterSpacing:0.5, fontFamily:FONT }}>INAKTIV</span></div>}
-          {l.is_reserved && !l.is_sold && <div style={{ position:'absolute', top:6, left:6, background:'#F59E0B', borderRadius:99, padding:'2px 7px', fontSize:9, fontWeight:800, color:'#fff', fontFamily:FONT }}>RESERV.</div>}
+          {l.is_sold && <div style={{ position:'absolute', inset:0, background:'rgba(22,34,28,0.5)', display:'flex', alignItems:'center', justifyContent:'center', zIndex:2 }}><span style={{ fontSize:10, fontWeight:900, color:'#fff', letterSpacing:0.5, fontFamily:FONT }}>SOLGT</span></div>}
+          {!l.is_sold && !l.is_active && <div style={{ position:'absolute', inset:0, background:'rgba(22,34,28,0.35)', display:'flex', alignItems:'center', justifyContent:'center', zIndex:2 }}><span style={{ fontSize:10, fontWeight:900, color:'#fff', letterSpacing:0.5, fontFamily:FONT }}>INAKTIV</span></div>}
+          {l.is_reserved && !l.is_sold && <div style={{ position:'absolute', top:6, left:6, background:'#F59E0B', borderRadius:99, padding:'2px 7px', fontSize:9, fontWeight:800, color:'#fff', fontFamily:FONT, zIndex:3 }}>RESERV.</div>}
           {hasMultiple && <>
-            <button onClick={e=>{ e.stopPropagation(); setImgIdx(i=>(i-1+imgs.length)%imgs.length); }} style={{ position:'absolute', left:4, top:'50%', transform:'translateY(-50%)', background:'rgba(0,0,0,0.45)', border:'none', borderRadius:'50%', width:22, height:22, color:'#fff', cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center', padding:0 }}>
-              <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2.5" strokeLinecap="round"><polyline points="15 18 9 12 15 6"/></svg>
+            <button onClick={e=>{ e.stopPropagation(); setImgIdx(i=>(i-1+imgs.length)%imgs.length); }} style={{ position:'absolute', left:4, top:'50%', transform:'translateY(-50%)', background:'rgba(0,0,0,0.55)', border:'none', borderRadius:'50%', width:26, height:26, color:'#fff', cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center', padding:0, zIndex:5 }}>
+              <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2.5" strokeLinecap="round"><polyline points="15 18 9 12 15 6"/></svg>
             </button>
-            <button onClick={e=>{ e.stopPropagation(); setImgIdx(i=>(i+1)%imgs.length); }} style={{ position:'absolute', right:4, top:'50%', transform:'translateY(-50%)', background:'rgba(0,0,0,0.45)', border:'none', borderRadius:'50%', width:22, height:22, color:'#fff', cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center', padding:0 }}>
-              <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2.5" strokeLinecap="round"><polyline points="9 18 15 12 9 6"/></svg>
+            <button onClick={e=>{ e.stopPropagation(); setImgIdx(i=>(i+1)%imgs.length); }} style={{ position:'absolute', right:4, top:'50%', transform:'translateY(-50%)', background:'rgba(0,0,0,0.55)', border:'none', borderRadius:'50%', width:26, height:26, color:'#fff', cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center', padding:0, zIndex:5 }}>
+              <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2.5" strokeLinecap="round"><polyline points="9 18 15 12 9 6"/></svg>
             </button>
-            <div style={{ position:'absolute', bottom:4, left:'50%', transform:'translateX(-50%)', display:'flex', gap:3 }}>
-              {imgs.map((_,i)=><div key={i} style={{ width:5, height:5, borderRadius:'50%', background: i===imgIdx?'#fff':'rgba(255,255,255,0.45)' }}/>)}
+            <div style={{ position:'absolute', bottom:5, left:'50%', transform:'translateX(-50%)', display:'flex', gap:4, zIndex:5 }}>
+              {imgs.map((_,i)=><div key={i} style={{ width:6, height:6, borderRadius:'50%', background: i===imgIdx?'#fff':'rgba(255,255,255,0.5)', transition:'background 0.2s' }}/>)}
             </div>
           </>}
         </div>
