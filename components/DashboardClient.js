@@ -206,8 +206,12 @@ export default function DashboardClient() {
   async function fetchListingFavoriters(listings) {
     if (!listings?.length) return;
     const ids = listings.map(l => l.id);
-    const { data } = await db.rpc('get_listing_favorites_for_owner', { p_listing_ids: ids });
-    if (data) setListingFavoriters(data);
+    const { data, error } = await db.from('listing_favorites')
+      .select('listing_id, institution_name, institution_id, user_id, created_at')
+      .in('listing_id', ids)
+      .order('created_at', { ascending: false });
+    if (error) console.error('fetchListingFavoriters error:', error.message);
+    if (data?.length) setListingFavoriters(data);
   }
 
   function openEdit(l) {
@@ -614,7 +618,7 @@ export default function DashboardClient() {
             </div>
           ) : (
             <div style={{ display:'flex', flexDirection:'column', gap:12 }}>
-              {rlsBlocked && (
+              {false && (
                 <div style={{ background:'#FEF9C3', border:'1px solid #FDE047', borderRadius:12, padding:'12px 16px', fontSize:13, color:'#92400E', fontFamily:FONT }}>
                   <strong>Tæller vises, men ikke hvem</strong> — kontakt os for at aktivere fuldt visning af interesserede.
                 </div>
