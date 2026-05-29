@@ -1,7 +1,7 @@
--- Fix listing_favorites: clean up duplicate policies and ensure correct RLS
+-- Fix listing_favorites RLS policies
 -- Run this in Supabase SQL Editor
 
--- 1. Ensure table exists with correct structure
+-- 1. Ensure table exists
 CREATE TABLE IF NOT EXISTS listing_favorites (
   id               uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   listing_id       uuid NOT NULL REFERENCES listings(id) ON DELETE CASCADE,
@@ -23,31 +23,37 @@ DROP POLICY IF EXISTS "users_manage_own_favorites"              ON listing_favor
 DROP POLICY IF EXISTS "listing_owners_read_favorites"           ON listing_favorites;
 DROP POLICY IF EXISTS "institution_members_read_favorites"      ON listing_favorites;
 
--- 3. Policy: users can insert/delete/select their OWN favorites
+-- 3. Users can manage their own favorites
 CREATE POLICY "users_manage_own_favorites"
   ON listing_favorites FOR ALL
   USING  (auth.uid() = user_id)
   WITH CHECK (auth.uid() = user_id);
 
--- 4. Policy: listing owner (user_id on listing) can see favorites
+-- 4. Direct listing owners can read favorites on their listings
 CREATE POLICY "listing_owners_read_favorites"
   ON listing_favorites FOR SELECT
   USING (
     listing_id IN (
-      SELECT id FROM listings WHERE user_id = auth.uid()
+      SELECT listings.id
+      FROM listings
+      WHERE listings.user_id = auth.uid()
     )
   );
 
--- 5. Policy: institution members can see favorites on their institution's listings
+-- 5. Institution members can read favorites on their institution's listings
 CREATE POLICY "institution_members_read_favorites"
   ON listing_favorites FOR SELECT
   USING (
     listing_id IN (
-      SELECT l.id
-      FROM listings l
-      JOIN institutions inst ON inst.name = l.institution_name
-      JOIN institution_members mem ON mem.institution_id = inst.id
-      WHERE mem.email = auth.email()
+      SELECT listings.id
+      FROM listings
+      JOIN institutions
+        ON institutions.name = listings.institution_name
+      JOIN institution_members
+        ON institution_members.institution_id = institutions.id
+      WHERE institution_members.email = (
+        SELECT email FROM auth.users WHERE id = auth.uid()
+      )
     )
   );
 
