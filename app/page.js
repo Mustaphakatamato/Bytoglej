@@ -86,7 +86,7 @@ function MobileCard({ listing, onClick, favs, toggleFav }) {
 function MobileHomeFeed({ listings, loading }) {
   const router = useRouter();
   const { setQuickViewListing, favs, toggleFav } = useApp();
-  const newest = useMemo(() => [...listings].sort((a, b) => new Date(b.created_at) - new Date(a.created_at)).slice(0, 40), [listings]);
+  const newest = useMemo(() => listings.slice(0, 40), [listings]);
 
   return (
     <div style={{ background: PAPER, minHeight: '100vh', paddingTop: 68 }}>
