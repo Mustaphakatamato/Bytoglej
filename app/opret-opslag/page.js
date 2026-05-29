@@ -71,6 +71,7 @@ export default function OpretOpslagPage() {
   const [imgPreviews, setImgPreviews] = useState([]);
   const [draggingIdx, setDraggingIdx] = useState(null);
   const dragState = useRef({ dragging: null, lastOver: null });
+  const [copiedFrom, setCopiedFrom] = useState(null);
   const [form, setForm] = useState({
     title:'', type:'køb', price:'', age_group:'3-6 år',
     description:'', condition:'God', emoji:'🧸', color:'#FFD166',
@@ -86,6 +87,29 @@ export default function OpretOpslagPage() {
         const { data: mem } = await db.from('institution_members').select('role,institutions(*)').eq('email', user.email).maybeSingle();
         if (mem?.institutions) setInstitution({ ...mem.institutions, _memberRole: mem.role });
       }
+    });
+  }, []);
+
+  useEffect(() => {
+    const fromId = new URLSearchParams(window.location.search).get('from');
+    if (!fromId) return;
+    db.from('listings').select('*').eq('id', fromId).maybeSingle().then(({ data }) => {
+      if (!data) return;
+      setCopiedFrom(data.title);
+      setForm({
+        title: data.title,
+        type: data.type || 'køb',
+        price: data.price || '',
+        age_group: data.age_group || '3-6 år',
+        description: data.description || '',
+        condition: data.condition || 'God',
+        emoji: data.emoji || '🧸',
+        color: data.color || '#FFD166',
+        tags: data.tags || [],
+        min_bid: data.min_bid || '',
+        category: data.category || '',
+        subcategory: data.subcategory || '',
+      });
     });
   }, []);
 
@@ -264,8 +288,14 @@ export default function OpretOpslagPage() {
           <button onClick={()=>router.push('/dashboard')} style={{ background:'rgba(255,255,255,0.12)', border:'none', borderRadius:99, padding:'7px 16px', color:'rgba(255,255,255,0.8)', fontSize:13, fontWeight:600, cursor:'pointer', fontFamily:FONT, marginBottom:20, display:'flex', alignItems:'center', gap:6 }}>
             ← Tilbage til dashboard
           </button>
-          <h1 style={{ fontFamily:FONT, fontWeight:800, fontSize:isMobile?26:36, color:'#fff', letterSpacing:'-0.04em', marginBottom:8, lineHeight:1.1 }}>Opret nyt opslag</h1>
-          <p style={{ fontSize:14, color:'rgba(255,255,255,0.6)', fontFamily:FONT, margin:0 }}>Udfyld oplysningerne nedenfor — det tager kun 2 minutter</p>
+          <h1 style={{ fontFamily:FONT, fontWeight:800, fontSize:isMobile?26:36, color:'#fff', letterSpacing:'-0.04em', marginBottom:8, lineHeight:1.1 }}>{copiedFrom ? 'Opret lignende opslag' : 'Opret nyt opslag'}</h1>
+          <p style={{ fontSize:14, color:'rgba(255,255,255,0.6)', fontFamily:FONT, margin:0 }}>{copiedFrom ? 'Oplysningerne er udfyldt fra dit tidligere opslag — tilpas og publicer' : 'Udfyld oplysningerne nedenfor — det tager kun 2 minutter'}</p>
+          {copiedFrom && (
+            <div style={{ marginTop:12, display:'inline-flex', alignItems:'center', gap:8, background:'rgba(255,255,255,0.15)', borderRadius:99, padding:'6px 14px' }}>
+              <span style={{ fontSize:14 }}>📋</span>
+              <span style={{ fontSize:13, fontWeight:600, color:'rgba(255,255,255,0.9)', fontFamily:FONT }}>Kopieret fra: {copiedFrom}</span>
+            </div>
+          )}
 
           {/* Step indicator */}
           <div style={{ display:'flex', alignItems:'center', gap:0, marginTop:28, maxWidth:320 }}>

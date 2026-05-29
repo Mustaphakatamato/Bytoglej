@@ -11,7 +11,7 @@ import PullToRefresh from '@/components/PullToRefresh';
 
 const FONT = "'Sora', sans-serif";
 
-function GridCard({ l, setQuickViewListing, openEdit, toggleActive, toggleReserved, setConfirmDelete, confirmDelete, handleDelete }) {
+function GridCard({ l, setQuickViewListing, openEdit, onCopy, toggleActive, toggleReserved, setConfirmDelete, confirmDelete, handleDelete }) {
   const [imgIdx, setImgIdx] = useState(0);
   const imgs = l.images || [];
   const hasMultiple = imgs.length > 1;
@@ -54,7 +54,9 @@ function GridCard({ l, setQuickViewListing, openEdit, toggleActive, toggleReserv
         </div>
       </div>
       {!l.is_sold && <div style={{ display:'flex', gap:4, padding:'6px 10px 10px', flexWrap:'wrap' }} onClick={e=>e.stopPropagation()}>
-        <button onClick={()=>openEdit(l)} style={{ flex:1, background:GREEN_TINT, border:'none', borderRadius:99, padding:'5px 0', fontSize:11, fontWeight:700, color:PRIMARY, cursor:'pointer', fontFamily:FONT }}>Rediger</button>        <button onClick={()=>toggleActive(l.id, l.is_active)} style={{ flex:1, background:l.is_active?'#FEF9C3':'#F0FDF4', border:'none', borderRadius:99, padding:'5px 0', fontSize:11, fontWeight:700, color:l.is_active?'#B45309':'#15803D', cursor:'pointer', fontFamily:FONT }}>{l.is_active?'Deaktivér':'Aktivér'}</button>
+        <button onClick={()=>openEdit(l)} style={{ flex:1, background:GREEN_TINT, border:'none', borderRadius:99, padding:'5px 0', fontSize:11, fontWeight:700, color:PRIMARY, cursor:'pointer', fontFamily:FONT }}>Rediger</button>
+        <button onClick={()=>onCopy(l.id)} style={{ flex:1, background:PAPER2, border:`1px solid ${PAPER3}`, borderRadius:99, padding:'5px 0', fontSize:11, fontWeight:700, color:INK2, cursor:'pointer', fontFamily:FONT }}>Kopier</button>
+        <button onClick={()=>toggleActive(l.id, l.is_active)} style={{ flex:1, background:l.is_active?'#FEF9C3':'#F0FDF4', border:'none', borderRadius:99, padding:'5px 0', fontSize:11, fontWeight:700, color:l.is_active?'#B45309':'#15803D', cursor:'pointer', fontFamily:FONT }}>{l.is_active?'Deaktivér':'Aktivér'}</button>
         <button onClick={()=>toggleReserved(l.id, l.is_reserved)} style={{ flex:1, background:l.is_reserved?'#FEF3C7':'#FAFAF9', border:'none', borderRadius:99, padding:'5px 0', fontSize:11, fontWeight:700, color:l.is_reserved?'#B45309':INK3, cursor:'pointer', fontFamily:FONT }}>{l.is_reserved?'Frigiv':'Reserver'}</button>
       </div>}
       {confirmDelete===l.id && (
@@ -222,6 +224,10 @@ export default function DashboardClient() {
 
   function openEdit(l) {
     router.push(`/rediger-opslag/${l.id}`);
+  }
+
+  function copyListing(id) {
+    router.push(`/opret-opslag?from=${id}`);
   }
 
   async function handleUpdate() {
@@ -551,7 +557,7 @@ export default function DashboardClient() {
             ) : listingsView === 'grid' ? (
               <div style={{ display:'grid', gridTemplateColumns:'repeat(2,1fr)', gap:10 }}>
                 {myListings.map(l=>(
-                  <GridCard key={l.id} l={l} setQuickViewListing={setQuickViewListing} openEdit={openEdit} toggleActive={toggleActive} toggleReserved={toggleReserved} setConfirmDelete={setConfirmDelete} confirmDelete={confirmDelete} handleDelete={handleDelete} />
+                  <GridCard key={l.id} l={l} setQuickViewListing={setQuickViewListing} openEdit={openEdit} onCopy={copyListing} toggleActive={toggleActive} toggleReserved={toggleReserved} setConfirmDelete={setConfirmDelete} confirmDelete={confirmDelete} handleDelete={handleDelete} />
                 ))}
               </div>
             ) : myListings.map(l=>(
@@ -578,6 +584,7 @@ export default function DashboardClient() {
                 </div>
                 {!l.is_sold && <div style={{ display:'flex', gap:isMobile?6:6, padding:isMobile?'0 12px 10px':'0 14px 10px', flexWrap:'wrap' }} onClick={e=>e.stopPropagation()}>
                   <button onClick={()=>openEdit(l)} style={{ flex:isMobile?1:undefined, background:GREEN_TINT, border:'none', borderRadius:99, padding:isMobile?'7px 0':'6px 12px', fontSize:12, fontWeight:700, color:PRIMARY, cursor:'pointer', fontFamily:FONT }}>Rediger</button>
+                  <button onClick={()=>copyListing(l.id)} style={{ flex:isMobile?1:undefined, background:PAPER2, border:`1px solid ${PAPER3}`, borderRadius:99, padding:isMobile?'7px 0':'6px 12px', fontSize:12, fontWeight:700, color:INK2, cursor:'pointer', fontFamily:FONT }}>Kopier</button>
                   <button onClick={()=>toggleActive(l.id, l.is_active)} title={l.is_active?'Deaktivér opslag':'Aktivér opslag'} style={{ flex:isMobile?1:undefined, background:l.is_active?'#FEF9C3':'#F0FDF4', border:'none', borderRadius:99, padding:isMobile?'7px 0':'6px 12px', fontSize:12, fontWeight:700, color:l.is_active?'#B45309':'#15803D', cursor:'pointer', fontFamily:FONT }}>{l.is_active?'Deaktivér':'Aktivér'}</button>
                   {!isMobile && <button onClick={()=>toggleReserved(l.id, l.is_reserved)} style={{ background:l.is_reserved?'#FEF3C7':PAPER3, border:'none', borderRadius:99, padding:'6px 12px', fontSize:12, fontWeight:700, color:l.is_reserved?'#B45309':INK3, cursor:'pointer', fontFamily:FONT }}>{l.is_reserved?'Frigiv':'Reserver'}</button>}
                   {!isMobile && <button onClick={()=>setConfirmDelete(l.id)} style={{ background:'#FEF2F2', border:'none', borderRadius:99, padding:'6px 12px', fontSize:12, fontWeight:700, color:'#e11d48', cursor:'pointer', fontFamily:FONT }}>Slet</button>}
