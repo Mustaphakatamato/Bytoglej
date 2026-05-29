@@ -378,6 +378,7 @@ export default function DashboardClient() {
 
   async function startConversationWithFavoriter(listing, favoriterInstId, favoriterInstName) {
     if (!institution) return;
+    let convId = null;
     if (favoriterInstId && institution.id) {
       const { data: existing } = await db.from('conversations')
         .select('id')
@@ -385,8 +386,10 @@ export default function DashboardClient() {
         .or(`owner_institution_id.eq.${institution.id},initiator_institution_id.eq.${institution.id}`)
         .or(`owner_institution_id.eq.${favoriterInstId},initiator_institution_id.eq.${favoriterInstId}`)
         .maybeSingle();
-      if (!existing) {
-        await db.from('conversations').insert({
+      if (existing) {
+        convId = existing.id;
+      } else {
+        const { data: created } = await db.from('conversations').insert({
           owner_id: authUserId,
           owner_name: institution.name,
           owner_institution_id: institution.id,
@@ -398,10 +401,11 @@ export default function DashboardClient() {
           listing_emoji: listing.emoji || '🧸',
           listing_color: listing.color || '#FFD166',
           listing_type: listing.type,
-        });
+        }).select('id').single();
+        convId = created?.id;
       }
     }
-    router.push('/beskeder');
+    router.push(convId ? `/beskeder?conv=${convId}` : '/beskeder');
   }
 
   const soldTrades = trades.filter(t => t.owner_institution_id === institution?.id || t.owner_name === institution?.name);
