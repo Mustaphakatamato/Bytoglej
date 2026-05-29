@@ -492,7 +492,7 @@ function Nav({ pathname, navigate, loggedIn, setLoggedIn, unreadTotal, instituti
     <nav style={{ position:'fixed', top:0, left:0, right:0, zIndex:500, background:transparent?'transparent':'rgba(246,242,234,0.96)', backdropFilter:transparent?'none':'blur(18px)', boxShadow:transparent?'none':'0 1px 0 rgba(22,34,28,0.08)', transition:'all 0.3s' }}>
 
       {/* ── Main row ── */}
-      <div style={{ maxWidth:1140, margin:'0 auto', display:'flex', alignItems:'center', height:68, gap:isMobile?10:20, padding:'0 16px' }}>
+      <div style={{ maxWidth:1140, margin:'0 auto', display:'flex', alignItems:'center', height:68, gap:isMobile?10:20, padding: isMobile ? '0 20px' : '0 16px' }}>
 
         {/* Logo */}
         <Link href="/" style={{ display:'flex', alignItems:'center', cursor:'pointer', flexShrink:0, textDecoration:'none' }}>
@@ -584,7 +584,7 @@ function Nav({ pathname, navigate, loggedIn, setLoggedIn, unreadTotal, instituti
 
         {/* Mobile right: hamburger menu */}
         {isMobile && (
-          <button onClick={()=>setMenuOpen(o=>!o)} style={{ width:36, height:36, borderRadius:10, background:menuOpen?PRIMARY:GREEN_TINT, border:'none', display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center', gap:4, cursor:'pointer', flexShrink:0, padding:0, transition:'background 0.2s' }}>
+          <button onClick={()=>setMenuOpen(o=>!o)} style={{ width:36, height:36, borderRadius:10, background:menuOpen?PRIMARY:GREEN_TINT, border:'none', display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center', gap:4, cursor:'pointer', flexShrink:0, padding:0, transition:'background 0.2s', marginRight:6 }}>
             <span style={{ display:'block', width:16, height:2, background:menuOpen?'#fff':PRIMARY, borderRadius:2, transition:'all 0.2s', transform: menuOpen?'translateY(6px) rotate(45deg)':'none' }}/>
             <span style={{ display:'block', width:16, height:2, background:menuOpen?'#fff':PRIMARY, borderRadius:2, transition:'all 0.2s', opacity: menuOpen?0:1 }}/>
             <span style={{ display:'block', width:16, height:2, background:menuOpen?'#fff':PRIMARY, borderRadius:2, transition:'all 0.2s', transform: menuOpen?'translateY(-6px) rotate(-45deg)':'none' }}/>
