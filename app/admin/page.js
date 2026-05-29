@@ -433,7 +433,7 @@ function EditListingModal({ listing, onClose, onSave }) {
 }
 
 function ListingsTab({ allInstitutions = [], isMobile }) {
-  const { listings: activeListings } = useApp();
+  const { listings: activeListings, fetchListings } = useApp();
   const [listings, setListings] = useState([]);
   const [loading, setLoading] = useState(true);
   const [query, setQuery] = useState('');
@@ -467,6 +467,7 @@ function ListingsTab({ allInstitutions = [], isMobile }) {
     await db.from('listings').delete().eq('id', id);
     setListings(prev => prev.filter(l => l.id !== id));
     setConfirm(null);
+    fetchListings();
   }
 
   const filtered = listings.filter(l => {
