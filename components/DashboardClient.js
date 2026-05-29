@@ -53,8 +53,7 @@ function GridCard({ l, setQuickViewListing, openEdit, toggleActive, toggleReserv
         </div>
       </div>
       {!l.is_sold && <div style={{ display:'flex', gap:4, padding:'6px 10px 10px', flexWrap:'wrap' }} onClick={e=>e.stopPropagation()}>
-        <button onClick={()=>openEdit(l)} style={{ flex:1, background:GREEN_TINT, border:'none', borderRadius:99, padding:'5px 0', fontSize:11, fontWeight:700, color:PRIMARY, cursor:'pointer', fontFamily:FONT }}>Rediger</button>
-        <button onClick={()=>toggleActive(l.id, l.is_active)} style={{ flex:1, background:l.is_active?'#FEF9C3':'#F0FDF4', border:'none', borderRadius:99, padding:'5px 0', fontSize:11, fontWeight:700, color:l.is_active?'#B45309':'#15803D', cursor:'pointer', fontFamily:FONT }}>{l.is_active?'Deaktivér':'Aktivér'}</button>
+        <button onClick={()=>openEdit(l)} style={{ flex:1, background:GREEN_TINT, border:'none', borderRadius:99, padding:'5px 0', fontSize:11, fontWeight:700, color:PRIMARY, cursor:'pointer', fontFamily:FONT }}>Rediger</button>        <button onClick={()=>toggleActive(l.id, l.is_active)} style={{ flex:1, background:l.is_active?'#FEF9C3':'#F0FDF4', border:'none', borderRadius:99, padding:'5px 0', fontSize:11, fontWeight:700, color:l.is_active?'#B45309':'#15803D', cursor:'pointer', fontFamily:FONT }}>{l.is_active?'Deaktivér':'Aktivér'}</button>
         <button onClick={()=>toggleReserved(l.id, l.is_reserved)} style={{ flex:1, background:l.is_reserved?'#FEF3C7':'#FAFAF9', border:'none', borderRadius:99, padding:'5px 0', fontSize:11, fontWeight:700, color:l.is_reserved?'#B45309':INK3, cursor:'pointer', fontFamily:FONT }}>{l.is_reserved?'Frigiv':'Reserver'}</button>
       </div>}
       {confirmDelete===l.id && (
@@ -215,8 +214,7 @@ export default function DashboardClient() {
   }
 
   function openEdit(l) {
-    setEditForm({ title:l.title, type:l.type, price:l.price||'', age_group:l.age_group, description:l.description||'', condition:l.condition||'God', emoji:l.emoji||'🧸', color:l.color||'#FFD166', tags:l.tags||[] });
-    setEditListing(l);
+    router.push(`/rediger-opslag/${l.id}`);
   }
 
   async function handleUpdate() {

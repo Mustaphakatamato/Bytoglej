@@ -466,8 +466,10 @@ export default function ListingDetailClient() {
             )}
             {isOwn && (
               <div style={{ background:GREEN_TINT, borderRadius:20, padding:20, border:`1.5px solid ${GREEN_SOFT}` }}>
-                <div style={{ fontFamily:FONT, fontWeight:800, fontSize:14, color:PRIMARY, marginBottom:4, textAlign:'center' }}>Dit eget opslag</div>
-                <div style={{ fontSize:13, color:INK3, fontFamily:FONT, textAlign:'center', marginBottom: favoriters.length ? 16 : 0 }}>Rediger det fra din dashboard</div>
+                <div style={{ fontFamily:FONT, fontWeight:800, fontSize:14, color:PRIMARY, marginBottom:12, textAlign:'center' }}>Dit eget opslag</div>
+                <button onClick={()=>router.push(`/rediger-opslag/${listing.id}`)} style={{ width:'100%', padding:'11px', borderRadius:14, background:PRIMARY, border:'none', color:'#fff', fontFamily:FONT, fontWeight:700, fontSize:14, cursor:'pointer', marginBottom: favoriters.length ? 12 : 0 }}>
+                  Rediger opslag
+                </button>
                 {favoriters.length > 0 && (
                   <div style={{ borderTop:`1px solid ${GREEN_SOFT}`, paddingTop:14, marginTop:4 }}>
                     <div style={{ fontFamily:FONT, fontWeight:700, fontSize:12, color:PRIMARY, marginBottom:10, display:'flex', alignItems:'center', gap:6 }}>
