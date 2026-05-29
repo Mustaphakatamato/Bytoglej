@@ -582,14 +582,61 @@ function Nav({ pathname, navigate, loggedIn, setLoggedIn, unreadTotal, instituti
           </div>
         )}
 
-        {/* Mobile right: login button if not logged in */}
-        {isMobile && !loggedIn && (
-          <Link href="/login" style={{ background:PRIMARY, color:'#fff', fontWeight:700, fontSize:12, padding:'7px 14px', borderRadius:22, textDecoration:'none', flexShrink:0 }}>Log ind</Link>
+        {/* Mobile right: hamburger menu */}
+        {isMobile && (
+          <button onClick={()=>setMenuOpen(o=>!o)} style={{ width:36, height:36, borderRadius:10, background:menuOpen?PRIMARY:GREEN_TINT, border:'none', display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center', gap:4, cursor:'pointer', flexShrink:0, padding:0, transition:'background 0.2s' }}>
+            <span style={{ display:'block', width:16, height:2, background:menuOpen?'#fff':PRIMARY, borderRadius:2, transition:'all 0.2s', transform: menuOpen?'translateY(6px) rotate(45deg)':'none' }}/>
+            <span style={{ display:'block', width:16, height:2, background:menuOpen?'#fff':PRIMARY, borderRadius:2, transition:'all 0.2s', opacity: menuOpen?0:1 }}/>
+            <span style={{ display:'block', width:16, height:2, background:menuOpen?'#fff':PRIMARY, borderRadius:2, transition:'all 0.2s', transform: menuOpen?'translateY(-6px) rotate(-45deg)':'none' }}/>
+          </button>
         )}
       </div>
 
       {/* Category strip */}
       {showCategoryStrip && <CategoryStrip router={router} />}
+
+      {/* Mobile drawer */}
+      {isMobile && menuOpen && (
+        <>
+          <div onClick={()=>setMenuOpen(false)} style={{ position:'fixed', inset:0, top:68, background:'rgba(22,34,28,0.4)', zIndex:490, backdropFilter:'blur(2px)' }} />
+          <div style={{ position:'fixed', top:68, left:0, right:0, zIndex:495, background:PAPER, borderBottom:`1px solid rgba(22,34,28,0.10)`, padding:'16px 20px 24px', display:'flex', flexDirection:'column', gap:0, animation:'slideDown 0.2s ease' }}>
+
+            {/* Nav links */}
+            <div style={{ display:'flex', flexDirection:'column', marginBottom:16 }}>
+              {[
+                { href:'/opslag',   label:'Opslag',              icon:<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg> },
+                { href:'/hvordan',  label:'Sådan virker det',    icon:<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg> },
+                { href:'/om-os',    label:'Om os',               icon:<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg> },
+                { href:'/kontakt',  label:'Kontakt',             icon:<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg> },
+              ].map(({ href, label, icon }) => (
+                <Link key={href} href={href} onClick={()=>setMenuOpen(false)}
+                  style={{ display:'flex', alignItems:'center', gap:12, padding:'13px 4px', fontSize:15, fontWeight:600, color:pathname===href?PRIMARY:INK, textDecoration:'none', fontFamily:FONT, borderBottom:`1px solid rgba(22,34,28,0.06)` }}>
+                  <span style={{ color:pathname===href?PRIMARY:INK3 }}>{icon}</span>
+                  {label}
+                  {pathname===href && <span style={{ marginLeft:'auto', width:6, height:6, borderRadius:'50%', background:PRIMARY }} />}
+                </Link>
+              ))}
+            </div>
+
+            {/* Auth buttons */}
+            {!loggedIn ? (
+              <div style={{ display:'flex', gap:10 }}>
+                <Link href="/login" onClick={()=>setMenuOpen(false)} style={{ flex:1, padding:'13px', borderRadius:99, border:`2px solid ${PRIMARY}`, color:PRIMARY, fontFamily:FONT, fontWeight:700, fontSize:14, textDecoration:'none', textAlign:'center' }}>
+                  Log ind
+                </Link>
+                <Link href="/signup" onClick={()=>setMenuOpen(false)} style={{ flex:1, padding:'13px', borderRadius:99, background:PRIMARY, color:'#fff', fontFamily:FONT, fontWeight:700, fontSize:14, textDecoration:'none', textAlign:'center' }}>
+                  Tilmeld institution
+                </Link>
+              </div>
+            ) : (
+              <button onClick={async()=>{ await db.auth.signOut(); setLoggedIn(false); setMenuOpen(false); go('/'); }}
+                style={{ width:'100%', padding:'13px', borderRadius:99, background:'#FEF2F2', border:'none', color:'#DC2626', fontFamily:FONT, fontWeight:700, fontSize:14, cursor:'pointer' }}>
+                Log ud
+              </button>
+            )}
+          </div>
+        </>
+      )}
 
     </nav>
   );
