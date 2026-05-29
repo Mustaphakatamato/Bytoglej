@@ -4,7 +4,7 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import nextDynamic from 'next/dynamic';
 import { PRIMARY, GREEN_DEEP, GREEN_SOFT, GREEN_TINT, PAPER, PAPER2, PAPER3, INK, INK2, INK3, CORAL, TYPE_CFG } from '@/lib/constants';
 import { CATEGORIES } from '@/lib/categories';
-import { useWindowWidth } from '@/lib/hooks';
+import { useWindowWidth, useFeedListings } from '@/lib/hooks';
 import { Btn, SkeletonCard, SkeletonMobileCard } from '@/components/ui';
 import ListingCard from '@/components/ListingCard';
 import PullToRefresh from '@/components/PullToRefresh';
@@ -134,10 +134,11 @@ function SubcategoryBrowser({ categoryKey, onBack, onSelectAll, onSelectSub }) {
 function OpslagInner() {
   const router = useRouter();
   const urlParams = useSearchParams();
-  const { listings: allListings, loadingListings: loading, fetchListings, setActiveListing, favs, toggleFav, showToast, loggedIn, setQuickViewListing, realUserId, institution } = useApp();
-  const listings = allListings.filter(l =>
+  const { listings: allListings, loadingListings: loading, fetchListings, refreshSeed, setActiveListing, favs, toggleFav, showToast, loggedIn, setQuickViewListing, realUserId, institution } = useApp();
+  const ownFiltered = allListings.filter(l =>
     l.user_id !== realUserId && !(institution?.name && l.institution_name === institution.name)
   );
+  const listings = useFeedListings(ownFiltered, refreshSeed);
   const ww = useWindowWidth();
   const isMobile = ww < 640;
   const [filter, setFilter] = useState('alle');
@@ -171,7 +172,7 @@ function OpslagInner() {
       const matchSubcategory = !subcategory || l.subcategory === subcategory;
       return matchType && matchSearch && matchCategory && matchSubcategory;
     });
-    if (sort === 'newest')     r = [...r].sort((a,b) => new Date(b.created_at) - new Date(a.created_at));
+    if (sort === 'newest')     { /* order comes from useFeedListings */ }
     if (sort === 'price-asc')  r = [...r].sort((a,b) => (a.price||0) - (b.price||0));
     if (sort === 'price-desc') r = [...r].sort((a,b) => (b.price||0) - (a.price||0));
     if (sort === 'bids')       r = [...r].sort((a,b) => (b.bid_count||0) - (a.bid_count||0));

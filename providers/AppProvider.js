@@ -23,6 +23,7 @@ export function AppProvider({ children }) {
   const [adminInst,       setAdminInst]       = useState(null);
   const [allInstitutions, setAllInstitutions] = useState([]);
   const [listings,        setListings]        = useState([]);
+  const [refreshSeed,     setRefreshSeed]     = useState(0);
   const [loadingListings, setLoadingListings] = useState(true);
   const [realUserId,      setRealUserId]      = useState(null);
   const [realEmail,       setRealEmail]       = useState(null);
@@ -62,6 +63,7 @@ export function AppProvider({ children }) {
     const { data } = await db.from('listings').select('*').eq('is_active', true).order('created_at', { ascending: false });
     if (data) setListings(data);
     setLoadingListings(false);
+    setRefreshSeed(s => s + 1);
   }
 
   async function fetchUnread(userId) {
@@ -197,7 +199,7 @@ export function AppProvider({ children }) {
     institution, setInstitution,
     isAdmin, adminInst, setAdminInst,
     allInstitutions,
-    listings, loadingListings, fetchListings,
+    listings, loadingListings, fetchListings, refreshSeed,
     realUserId, realEmail,
     unreadTotal, fetchUnread,
     toast, setToast, showToast,

@@ -1,9 +1,9 @@
 'use client';
 // v2
-import { useState, useMemo, useRef } from 'react';
+import { useState, useMemo, useRef, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { PRIMARY, GREEN_DEEP, GREEN_SOFT, GREEN_TINT, PAPER, PAPER2, PAPER3, INK, INK2, INK3, CORAL, SKY, TYPE_CFG } from '@/lib/constants';
-import { useWindowWidth, useDebounce } from '@/lib/hooks';
+import { useWindowWidth, useDebounce, useFeedListings } from '@/lib/hooks';
 import { SkeletonCard } from '@/components/ui';
 import ListingCard from '@/components/ListingCard';
 import PullToRefresh from '@/components/PullToRefresh';
@@ -459,13 +459,14 @@ function CtaBanner() {
 /* ── Page ─────────────────────────────────────────────────── */
 export default function HomePage() {
   const router = useRouter();
-  const { listings, loadingListings, fetchListings, realUserId, institution } = useApp();
+  const { listings, loadingListings, fetchListings, refreshSeed, realUserId, institution } = useApp();
   const w = useWindowWidth();
   const isMobile = w !== null && w < 768;
 
-  const visibleListings = listings.filter(l =>
+  const ownFiltered = listings.filter(l =>
     l.user_id !== realUserId && !(institution?.name && l.institution_name === institution.name)
   );
+  const visibleListings = useFeedListings(ownFiltered, refreshSeed);
 
   if (isMobile) {
     return <PullToRefresh onRefresh={fetchListings}><MobileHomeFeed listings={visibleListings} loading={loadingListings} /></PullToRefresh>;

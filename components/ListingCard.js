@@ -89,6 +89,7 @@ export default function ListingCard({ listing, onClick, favs, toggleFav, onInsti
       {/* Body */}
       <div style={{ padding: '12px 14px 16px', flex: 1, display: 'flex', flexDirection: 'column' }}>
         <div style={{ display: 'flex', gap: 6, marginBottom: 8, flexWrap: 'wrap', alignItems: 'center' }}>
+          {listing._isNew && <span style={{ background: '#22c55e', color: '#fff', borderRadius: 99, padding: '3px 10px', fontSize: 11, fontWeight: 800, fontFamily: FONT }}>Ny</span>}
           <span style={{ background: tc.bg, color: tc.color, borderRadius: 99, padding: '3px 10px', fontSize: 11, fontWeight: 700, fontFamily: FONT }}>{tc.label}</span>
           {listing.condition && (
             <span style={{ background: condStyle.bg, color: condStyle.color, borderRadius: 99, padding: '3px 10px', fontSize: 11, fontWeight: 700, fontFamily: FONT }}>{listing.condition}</span>
