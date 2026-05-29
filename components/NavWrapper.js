@@ -624,6 +624,18 @@ function Nav({ pathname, navigate, loggedIn, setLoggedIn, unreadTotal, instituti
               ))}
             </div>
 
+            {/* Admin link — only for admin user */}
+            {isAdmin && loggedIn && (
+              <Link href="/admin" onClick={()=>setMenuOpen(false)}
+                style={{ display:'flex', alignItems:'center', gap:12, padding:'13px 4px', fontSize:15, fontWeight:600, color:pathname==='/admin'?PRIMARY:INK, textDecoration:'none', fontFamily:FONT, borderBottom:`1px solid rgba(22,34,28,0.06)`, marginBottom:16 }}>
+                <span style={{ color:pathname==='/admin'?PRIMARY:INK3 }}>
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><circle cx="12" cy="12" r="3"/><path d="M19.07 4.93a10 10 0 010 14.14"/><path d="M4.93 4.93a10 10 0 000 14.14"/></svg>
+                </span>
+                Admin
+                {pathname==='/admin' && <span style={{ marginLeft:'auto', width:6, height:6, borderRadius:'50%', background:PRIMARY }} />}
+              </Link>
+            )}
+
             {/* Auth buttons */}
             {!loggedIn ? (
               <div style={{ display:'flex', gap:10 }}>
