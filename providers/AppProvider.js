@@ -101,17 +101,12 @@ export function AppProvider({ children }) {
     if (!user) return;
 
     if (adding) {
-      const { data: member } = await db
-        .from('institution_members')
-        .select('institution_id, institutions(id, name)')
-        .eq('email', user.email)
-        .maybeSingle();
-      const inst = member?.institutions;
+      const effectiveInst = adminInst || institution;
       const { error } = await db.from('listing_favorites').upsert({
         listing_id: listingId,
         user_id: user.id,
-        institution_id: inst?.id || null,
-        institution_name: inst?.name || null,
+        institution_id: effectiveInst?.id || null,
+        institution_name: effectiveInst?.name || null,
       }, { onConflict: 'listing_id,user_id' });
       if (error) console.error('listing_favorites insert error:', error.message);
     } else {
