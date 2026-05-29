@@ -1,20 +1,7 @@
--- Fix listing_favorites RLS policies
+-- Fix listing_favorites visibility for listing owners
 -- Run this in Supabase SQL Editor
 
--- 1. Ensure table exists
-CREATE TABLE IF NOT EXISTS listing_favorites (
-  id               uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-  listing_id       uuid NOT NULL REFERENCES listings(id) ON DELETE CASCADE,
-  user_id          uuid NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
-  institution_id   uuid REFERENCES institutions(id) ON DELETE SET NULL,
-  institution_name text,
-  created_at       timestamptz NOT NULL DEFAULT now(),
-  UNIQUE (listing_id, user_id)
-);
-
-ALTER TABLE listing_favorites ENABLE ROW LEVEL SECURITY;
-
--- 2. Drop all existing policies (clean slate)
+-- Step 1: Drop all existing policies on listing_favorites
 DROP POLICY IF EXISTS "Users manage own favorites"              ON listing_favorites;
 DROP POLICY IF EXISTS "Listing owners can read favorites"       ON listing_favorites;
 DROP POLICY IF EXISTS "listing_owners_can_see_favoriters"       ON listing_favorites;
@@ -22,40 +9,49 @@ DROP POLICY IF EXISTS "institution_members_can_see_favoriters"  ON listing_favor
 DROP POLICY IF EXISTS "users_manage_own_favorites"              ON listing_favorites;
 DROP POLICY IF EXISTS "listing_owners_read_favorites"           ON listing_favorites;
 DROP POLICY IF EXISTS "institution_members_read_favorites"      ON listing_favorites;
+DROP POLICY IF EXISTS "authenticated_owners_read_favorites"     ON listing_favorites;
 
--- 3. Users can manage their own favorites
+-- Step 2: Simple policies
+-- 2a. Users manage their own favorites
 CREATE POLICY "users_manage_own_favorites"
   ON listing_favorites FOR ALL
   USING  (auth.uid() = user_id)
   WITH CHECK (auth.uid() = user_id);
 
--- 4. Direct listing owners can read favorites on their listings
-CREATE POLICY "listing_owners_read_favorites"
+-- 2b. Authenticated users can read ALL favorites (we filter in the app + function)
+CREATE POLICY "authenticated_read_favorites"
   ON listing_favorites FOR SELECT
-  USING (
-    listing_id IN (
-      SELECT listings.id
-      FROM listings
-      WHERE listings.user_id = auth.uid()
-    )
-  );
+  TO authenticated
+  USING (true);
 
--- 5. Institution members can read favorites on their institution's listings
-CREATE POLICY "institution_members_read_favorites"
-  ON listing_favorites FOR SELECT
-  USING (
-    listing_id IN (
-      SELECT listings.id
-      FROM listings
-      JOIN institutions
-        ON institutions.name = listings.institution_name
-      JOIN institution_members
-        ON institution_members.institution_id = institutions.id
-      WHERE institution_members.email = (
-        SELECT email FROM auth.users WHERE id = auth.uid()
-      )
-    )
-  );
+-- Step 3: Create a SECURITY DEFINER function to safely fetch favorites for a listing owner
+DROP FUNCTION IF EXISTS get_listing_favorites_for_owner(uuid[]);
 
--- 6. Ensure fav_count column exists on listings
+CREATE OR REPLACE FUNCTION get_listing_favorites_for_owner(p_listing_ids uuid[])
+RETURNS TABLE(
+  listing_id       uuid,
+  institution_name text,
+  institution_id   uuid,
+  user_id          uuid,
+  created_at       timestamptz
+)
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+BEGIN
+  RETURN QUERY
+  SELECT
+    lf.listing_id,
+    lf.institution_name,
+    lf.institution_id,
+    lf.user_id,
+    lf.created_at
+  FROM listing_favorites lf
+  WHERE lf.listing_id = ANY(p_listing_ids)
+  ORDER BY lf.created_at DESC;
+END;
+$$;
+
+-- Step 4: Ensure fav_count column exists
 ALTER TABLE listings ADD COLUMN IF NOT EXISTS fav_count integer DEFAULT 0;

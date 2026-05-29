@@ -206,10 +206,7 @@ export default function DashboardClient() {
   async function fetchListingFavoriters(listings) {
     if (!listings?.length) return;
     const ids = listings.map(l => l.id);
-    const { data } = await db.from('listing_favorites')
-      .select('listing_id, institution_name, institution_id, user_id, created_at')
-      .in('listing_id', ids)
-      .order('created_at', { ascending: false });
+    const { data } = await db.rpc('get_listing_favorites_for_owner', { p_listing_ids: ids });
     if (data) setListingFavoriters(data);
   }
 
