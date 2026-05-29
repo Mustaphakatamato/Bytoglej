@@ -188,8 +188,13 @@ export default function DashboardClient() {
   }, []);
 
   useEffect(() => {
-    if (ctxIsAdmin) { fetchMyListings(null, instProp?.name || institution?.name); }
-    else if (authUserId) { fetchMyListings(authUserId, institution?.name); }
+    async function refresh() {
+      let data;
+      if (ctxIsAdmin) { data = await fetchMyListings(null, instProp?.name || institution?.name); }
+      else if (authUserId) { data = await fetchMyListings(authUserId, institution?.name); }
+      if (data?.length) fetchListingFavoriters(data);
+    }
+    refresh();
   }, [allListings]);
 
   async function fetchMyListings(userId, instName) {
@@ -367,7 +372,7 @@ export default function DashboardClient() {
   const favListings = allListings ? allListings.filter(l=>favs?.includes(l.id)) : [];
 
   const favoritersGrouped = myListings
-    .filter(l => listingFavoriters.some(f => f.listing_id === l.id) || (l.fav_count > 0 && !listingFavoriters.length))
+    .filter(l => listingFavoriters.some(f => f.listing_id === l.id) || l.fav_count > 0)
     .map(l => ({ listing: l, favoriters: listingFavoriters.filter(f => f.listing_id === l.id) }));
   const rlsBlocked = !listingFavoriters.length && myListings.some(l => l.fav_count > 0);
 
@@ -636,6 +641,11 @@ export default function DashboardClient() {
                       </div>
                     </div>
                   </div>
+                  {favoriters.length === 0 && listing.fav_count > 0 && (
+                    <div style={{ padding:'10px 16px', fontSize:12, color:INK3, fontStyle:'italic', fontFamily:FONT }}>
+                      {listing.fav_count} {listing.fav_count === 1 ? 'person har' : 'personer har'} vist interesse — de var ikke logget ind
+                    </div>
+                  )}
                   {favoriters.length > 0 && <div>
                     {favoriters.map((f, idx) => (
                       <div key={`${f.listing_id}-${f.user_id}-${idx}`} style={{ display:'flex', alignItems:'center', gap:12, padding:'10px 16px', borderBottom: idx < favoriters.length - 1 ? `1px solid rgba(22,34,28,0.05)` : 'none' }}>
