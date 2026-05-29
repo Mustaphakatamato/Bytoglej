@@ -13,32 +13,15 @@ export default function ListingCard({ listing, onClick, favs, toggleFav, onInsti
   const [popping, setPopping] = useState(false);
   const [imgIdx, setImgIdx] = useState(0);
   const [hovered, setHovered] = useState(false);
-  const [localFavCount, setLocalFavCount] = useState(listing.fav_count || 0);
   const imgs = listing.images?.length ? listing.images : [];
 
   async function handleFav(e) {
     e.stopPropagation();
     const { data: { user } } = await db.auth.getUser();
     if (!user) { router.push('/login'); return; }
-    const adding = !isFav;
-    toggleFav(listing.id);
     setPopping(true);
     setTimeout(() => setPopping(false), 350);
-    const newCount = Math.max(0, localFavCount + (adding ? 1 : -1));
-    setLocalFavCount(newCount);
-    db.from('listings').update({ fav_count: newCount }).eq('id', listing.id);
-
-    if (adding) {
-      const { data: member } = await db.from('institution_members').select('institution_id, institutions(id, name)').eq('email', user.email).maybeSingle();
-      const inst = member?.institutions;
-      db.from('listing_favorites').upsert({
-        listing_id: listing.id, user_id: user.id,
-        institution_id: inst?.id || null,
-        institution_name: inst?.name || null,
-      }, { onConflict: 'listing_id,user_id' });
-    } else {
-      db.from('listing_favorites').delete().eq('listing_id', listing.id).eq('user_id', user.id);
-    }
+    toggleFav(listing.id);
   }
 
   function prevImg(e) { e.stopPropagation(); setImgIdx(i => (i - 1 + imgs.length) % imgs.length); }
@@ -139,7 +122,7 @@ export default function ListingCard({ listing, onClick, favs, toggleFav, onInsti
               </span>
               {listing.city ? `, ${listing.city}` : ''}
             </div>
-            {localFavCount > 0 && <div style={{ fontSize: 11, color: CORAL, fontWeight: 700 }}>♥ {localFavCount}</div>}
+            {listing.fav_count > 0 && <div style={{ fontSize: 11, color: CORAL, fontWeight: 700 }}>♥ {listing.fav_count}</div>}
           </div>
         </div>
       </div>

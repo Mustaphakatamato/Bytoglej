@@ -2,7 +2,6 @@
 import React, { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react';
 import { db } from '@/lib/supabase';
 import { ADMIN_EMAIL } from '@/lib/constants';
-import { useFavs } from '@/lib/hooks';
 import QuickViewModal from '@/components/QuickViewModal';
 import ChatBubble from '@/components/ChatBubble';
 
@@ -33,7 +32,7 @@ export function AppProvider({ children }) {
   const [activeListing,   setActiveListing]   = useState(null);
   const [selectedConvId,  setSelectedConvId]  = useState(null);
   const [activeInstName,  setActiveInstName]  = useState(null);
-  const [favs,            toggleFav]          = useFavs();
+  const [favs,            setFavs]            = useState([]);
 
   const effectiveInstitution = adminInst || institution;
 
@@ -80,6 +79,57 @@ export function AppProvider({ children }) {
       return sum + (amInit ? (c.initiator_unread || 0) : (c.owner_unread || 0));
     }, 0);
     setUnreadTotal(total);
+  }
+
+  // ─── Favourites ───────────────────────────────────────────────────────────────
+  useEffect(() => {
+    try { setFavs(JSON.parse(localStorage.getItem('ltb_favs') || '[]')); } catch { setFavs([]); }
+  }, []);
+
+  async function toggleFav(listingId) {
+    // Optimistic local update
+    let adding;
+    setFavs(prev => {
+      adding = !prev.includes(listingId);
+      const next = adding ? [...prev, listingId] : prev.filter(id => id !== listingId);
+      try { localStorage.setItem('ltb_favs', JSON.stringify(next)); } catch {}
+      return next;
+    });
+
+    // Sync to DB
+    const { data: { user } } = await db.auth.getUser();
+    if (!user) return;
+
+    if (adding) {
+      const { data: member } = await db
+        .from('institution_members')
+        .select('institution_id, institutions(id, name)')
+        .eq('email', user.email)
+        .maybeSingle();
+      const inst = member?.institutions;
+      const { error } = await db.from('listing_favorites').upsert({
+        listing_id: listingId,
+        user_id: user.id,
+        institution_id: inst?.id || null,
+        institution_name: inst?.name || null,
+      }, { onConflict: 'listing_id,user_id' });
+      if (error) console.error('listing_favorites insert error:', error.message);
+    } else {
+      const { error } = await db.from('listing_favorites')
+        .delete()
+        .eq('listing_id', listingId)
+        .eq('user_id', user.id);
+      if (error) console.error('listing_favorites delete error:', error.message);
+    }
+
+    // Update fav_count to match real DB count
+    const { count } = await db
+      .from('listing_favorites')
+      .select('*', { count: 'exact', head: true })
+      .eq('listing_id', listingId);
+    if (count != null) {
+      db.from('listings').update({ fav_count: count }).eq('id', listingId);
+    }
   }
 
   // Re-fetch when institution loads (fetchUnread may have run before institution was ready)
@@ -151,7 +201,7 @@ export function AppProvider({ children }) {
     activeListing, setActiveListing,
     selectedConvId, setSelectedConvId,
     activeInstName, setActiveInstName,
-    favs, toggleFav,
+    favs, toggleFav, setFavs,
     effectiveInstitution,
     quickViewListing, setQuickViewListing,
   };
