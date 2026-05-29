@@ -15,6 +15,7 @@ DROP POLICY IF EXISTS "manage_own"                             ON listing_favori
 DROP POLICY IF EXISTS "read_all"                               ON listing_favorites;
 DROP POLICY IF EXISTS "read_all_favorites"                     ON listing_favorites;
 DROP POLICY IF EXISTS "own_favorites"                          ON listing_favorites;
+DROP POLICY IF EXISTS "manage_own_favorites"                    ON listing_favorites;
 
 -- Step 2: Make sure RLS is enabled
 ALTER TABLE listing_favorites ENABLE ROW LEVEL SECURITY;
