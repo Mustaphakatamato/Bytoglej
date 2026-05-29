@@ -11,7 +11,7 @@ import PullToRefresh from '@/components/PullToRefresh';
 
 const FONT = "'Sora', sans-serif";
 
-function GridCard({ l, setQuickViewListing, openEdit, onCopy, toggleActive, toggleReserved, setConfirmDelete, confirmDelete, handleDelete }) {
+function GridCard({ l, setQuickViewListing, openEdit, onCopy, toggleActive, toggleReserved, setConfirmDelete, confirmDelete, handleDelete, bulkMode, selected, onToggleSelect }) {
   const [imgIdx, setImgIdx] = useState(0);
   const imgs = l.images || [];
   const hasMultiple = imgs.length > 1;
@@ -28,14 +28,19 @@ function GridCard({ l, setQuickViewListing, openEdit, onCopy, toggleActive, togg
   }
 
   return (
-    <div style={{ border:`1px solid ${l.is_sold?'#FECACA':l.is_active?'rgba(22,34,28,0.08)':'rgba(22,34,28,0.04)'}`, borderRadius:14, overflow:'hidden', background:l.is_sold?'#FFF5F5':l.is_active?PAPER:'rgba(22,34,28,0.03)', opacity:l.is_active||l.is_sold?1:0.7 }}>
-      <div onClick={e=>{ if (moved.current) { moved.current=false; return; } setQuickViewListing(l); }} style={{ cursor:'pointer' }}>
+    <div onClick={bulkMode ? ()=>onToggleSelect(l.id) : undefined} style={{ border:`2px solid ${selected?PRIMARY:l.is_sold?'#FECACA':l.is_active?'rgba(22,34,28,0.08)':'rgba(22,34,28,0.04)'}`, borderRadius:14, overflow:'hidden', background:selected?GREEN_TINT:l.is_sold?'#FFF5F5':l.is_active?PAPER:'rgba(22,34,28,0.03)', opacity:l.is_active||l.is_sold?1:0.7, cursor:bulkMode?'pointer':'default', transition:'border-color 0.15s, background 0.15s' }}>
+      <div onClick={e=>{ if (bulkMode) return; if (moved.current) { moved.current=false; return; } setQuickViewListing(l); }} style={{ cursor:bulkMode?'pointer':'pointer', position:'relative' }}>
         <div style={{ height:110, background:imgs[imgIdx]?PAPER3:l.color||'#FFD166', position:'relative', overflow:'hidden', display:'flex', alignItems:'center', justifyContent:'center' }}
           onTouchStart={onTouchStart} onTouchEnd={onTouchEnd}>
           {imgs[imgIdx] ? <img src={imgs[imgIdx]} style={{ width:'100%', height:'100%', objectFit:'cover' }} alt="" /> : <span style={{ fontSize:32 }}>{l.emoji||'🧸'}</span>}
           {l.is_sold && <div style={{ position:'absolute', inset:0, background:'rgba(22,34,28,0.5)', display:'flex', alignItems:'center', justifyContent:'center', zIndex:2 }}><span style={{ fontSize:10, fontWeight:900, color:'#fff', letterSpacing:0.5, fontFamily:FONT }}>SOLGT</span></div>}
           {!l.is_sold && !l.is_active && <div style={{ position:'absolute', inset:0, background:'rgba(22,34,28,0.35)', display:'flex', alignItems:'center', justifyContent:'center', zIndex:2 }}><span style={{ fontSize:10, fontWeight:900, color:'#fff', letterSpacing:0.5, fontFamily:FONT }}>INAKTIV</span></div>}
           {l.is_reserved && !l.is_sold && <div style={{ position:'absolute', top:6, left:6, background:'#F59E0B', borderRadius:99, padding:'2px 7px', fontSize:9, fontWeight:800, color:'#fff', fontFamily:FONT, zIndex:3 }}>RESERV.</div>}
+          {bulkMode && (
+            <div style={{ position:'absolute', top:6, right:6, width:22, height:22, borderRadius:6, border:`2px solid ${selected?PRIMARY:'rgba(255,255,255,0.8)'}`, background:selected?PRIMARY:'rgba(255,255,255,0.85)', display:'flex', alignItems:'center', justifyContent:'center', zIndex:6, backdropFilter:'blur(2px)' }}>
+              {selected && <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>}
+            </div>
+          )}
           {hasMultiple && <>
             <button onClick={e=>{ e.stopPropagation(); setImgIdx(i=>(i-1+imgs.length)%imgs.length); }} style={{ position:'absolute', left:4, top:'50%', transform:'translateY(-50%)', background:'rgba(0,0,0,0.55)', border:'none', borderRadius:'50%', width:26, height:26, color:'#fff', cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center', padding:0, zIndex:5 }}>
               <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2.5" strokeLinecap="round"><polyline points="15 18 9 12 15 6"/></svg>
@@ -53,7 +58,7 @@ function GridCard({ l, setQuickViewListing, openEdit, onCopy, toggleActive, togg
           <Badge type={l.type} />
         </div>
       </div>
-      {!l.is_sold && <div style={{ display:'flex', gap:4, padding:'6px 10px 10px', flexWrap:'wrap' }} onClick={e=>e.stopPropagation()}>
+      {!l.is_sold && !bulkMode && <div style={{ display:'flex', gap:4, padding:'6px 10px 10px', flexWrap:'wrap' }} onClick={e=>e.stopPropagation()}>
         <button onClick={()=>openEdit(l)} style={{ flex:1, background:GREEN_TINT, border:'none', borderRadius:99, padding:'5px 0', fontSize:11, fontWeight:700, color:PRIMARY, cursor:'pointer', fontFamily:FONT }}>Rediger</button>
         <button onClick={()=>onCopy(l.id)} style={{ flex:1, background:PAPER2, border:`1px solid ${PAPER3}`, borderRadius:99, padding:'5px 0', fontSize:11, fontWeight:700, color:INK2, cursor:'pointer', fontFamily:FONT }}>Kopier</button>
         <button onClick={()=>toggleActive(l.id, l.is_active)} style={{ flex:1, background:l.is_active?'#FEF9C3':'#F0FDF4', border:'none', borderRadius:99, padding:'5px 0', fontSize:11, fontWeight:700, color:l.is_active?'#B45309':'#15803D', cursor:'pointer', fontFamily:FONT }}>{l.is_active?'Deaktivér':'Aktivér'}</button>
@@ -128,6 +133,9 @@ export default function DashboardClient() {
   const isAdmin = !!institution && !institution._memberRole;
   const [listingsView, setListingsView] = useState('list');
   const [tradesTab, setTradesTab] = useState('all');
+  const [bulkMode, setBulkMode] = useState(false);
+  const [selectedIds, setSelectedIds] = useState(new Set());
+  const [bulkConfirmDelete, setBulkConfirmDelete] = useState(false);
 
   function onInstitutionChange(updated) {
     if (adminInst) { setAdminInst(updated); }
@@ -228,6 +236,42 @@ export default function DashboardClient() {
 
   function copyListing(id) {
     router.push(`/opret-opslag?from=${id}`);
+  }
+
+  function toggleSelectId(id) {
+    setSelectedIds(prev => {
+      const next = new Set(prev);
+      next.has(id) ? next.delete(id) : next.add(id);
+      return next;
+    });
+  }
+
+  function selectAll() {
+    setSelectedIds(new Set(myListings.filter(l => !l.is_sold).map(l => l.id)));
+  }
+
+  function exitBulk() {
+    setBulkMode(false);
+    setSelectedIds(new Set());
+    setBulkConfirmDelete(false);
+  }
+
+  async function handleBulkActivate(activate) {
+    const ids = [...selectedIds];
+    await Promise.all(ids.map(id => db.from('listings').update({ is_active: activate }).eq('id', id)));
+    showToast(`${ids.length} opslag ${activate ? 'aktiveret' : 'deaktiveret'} ✓`);
+    exitBulk();
+    fetchMyListings(ctxIsAdmin ? null : authUserId, institution?.name);
+    onListingCreated();
+  }
+
+  async function handleBulkDelete() {
+    const ids = [...selectedIds];
+    await Promise.all(ids.map(id => db.from('listings').update({ is_active: false }).eq('id', id)));
+    showToast(`${ids.length} opslag slettet`);
+    exitBulk();
+    fetchMyListings(ctxIsAdmin ? null : authUserId, institution?.name);
+    onListingCreated();
   }
 
   async function handleUpdate() {
@@ -540,13 +584,25 @@ export default function DashboardClient() {
           <div ref={listingsRef} style={{ background:PAPER2, borderRadius:22, padding:isMobile?20:28, border:'1px solid rgba(22,34,28,0.07)', boxShadow:'0 1px 4px rgba(22,34,28,0.06)', minWidth:0, overflow:'hidden' }}>
             <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:20 }}>
               <h2 style={{ fontFamily:FONT, fontWeight:800, fontSize:18, color:INK, margin:0 }}>Mine opslag</h2>
-              <div style={{ display:'flex', gap:4 }}>
-                <button onClick={()=>setListingsView('list')} title="Listevisning" style={{ width:32, height:32, borderRadius:8, border:`1.5px solid ${listingsView==='list'?PRIMARY:PAPER3}`, background:listingsView==='list'?GREEN_TINT:'transparent', color:listingsView==='list'?PRIMARY:INK3, cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center' }}>
-                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
-                </button>
-                <button onClick={()=>setListingsView('grid')} title="Gittervisning" style={{ width:32, height:32, borderRadius:8, border:`1.5px solid ${listingsView==='grid'?PRIMARY:PAPER3}`, background:listingsView==='grid'?GREEN_TINT:'transparent', color:listingsView==='grid'?PRIMARY:INK3, cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center' }}>
-                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/></svg>
-                </button>
+              <div style={{ display:'flex', gap:4, alignItems:'center' }}>
+                {myListings.length > 0 && (
+                  <button onClick={()=>{ if(bulkMode){exitBulk();}else{setBulkMode(true);} }} style={{ padding:'5px 12px', borderRadius:99, border:`1.5px solid ${bulkMode?PRIMARY:PAPER3}`, background:bulkMode?GREEN_TINT:'transparent', color:bulkMode?PRIMARY:INK3, cursor:'pointer', fontSize:12, fontWeight:700, fontFamily:FONT }}>
+                    {bulkMode ? 'Annuller' : 'Vælg'}
+                  </button>
+                )}
+                {bulkMode && myListings.length > 0 && (
+                  <button onClick={selectedIds.size === myListings.filter(l=>!l.is_sold).length ? ()=>setSelectedIds(new Set()) : selectAll} style={{ padding:'5px 12px', borderRadius:99, border:`1.5px solid ${PAPER3}`, background:'transparent', color:INK3, cursor:'pointer', fontSize:12, fontWeight:700, fontFamily:FONT }}>
+                    {selectedIds.size === myListings.filter(l=>!l.is_sold).length ? 'Fravælg alle' : 'Vælg alle'}
+                  </button>
+                )}
+                {!bulkMode && <>
+                  <button onClick={()=>setListingsView('list')} title="Listevisning" style={{ width:32, height:32, borderRadius:8, border:`1.5px solid ${listingsView==='list'?PRIMARY:PAPER3}`, background:listingsView==='list'?GREEN_TINT:'transparent', color:listingsView==='list'?PRIMARY:INK3, cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center' }}>
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
+                  </button>
+                  <button onClick={()=>setListingsView('grid')} title="Gittervisning" style={{ width:32, height:32, borderRadius:8, border:`1.5px solid ${listingsView==='grid'?PRIMARY:PAPER3}`, background:listingsView==='grid'?GREEN_TINT:'transparent', color:listingsView==='grid'?PRIMARY:INK3, cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center' }}>
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/></svg>
+                  </button>
+                </>}
               </div>
             </div>
             {myListings.length===0 ? (
@@ -557,12 +613,17 @@ export default function DashboardClient() {
             ) : listingsView === 'grid' ? (
               <div style={{ display:'grid', gridTemplateColumns:'repeat(2,1fr)', gap:10 }}>
                 {myListings.map(l=>(
-                  <GridCard key={l.id} l={l} setQuickViewListing={setQuickViewListing} openEdit={openEdit} onCopy={copyListing} toggleActive={toggleActive} toggleReserved={toggleReserved} setConfirmDelete={setConfirmDelete} confirmDelete={confirmDelete} handleDelete={handleDelete} />
+                  <GridCard key={l.id} l={l} setQuickViewListing={setQuickViewListing} openEdit={openEdit} onCopy={copyListing} toggleActive={toggleActive} toggleReserved={toggleReserved} setConfirmDelete={setConfirmDelete} confirmDelete={confirmDelete} handleDelete={handleDelete} bulkMode={bulkMode} selected={selectedIds.has(l.id)} onToggleSelect={toggleSelectId} />
                 ))}
               </div>
             ) : myListings.map(l=>(
-              <div key={l.id} style={{ border:`1px solid ${l.is_sold?'#FECACA':l.is_active?'rgba(22,34,28,0.08)':'rgba(22,34,28,0.04)'}`, borderRadius:14, marginBottom:10, overflow:'hidden', opacity:l.is_active||l.is_sold?1:0.7, background:l.is_sold?'#FFF5F5':l.is_active?PAPER:'rgba(22,34,28,0.02)' }}>
-                <div onClick={()=>setQuickViewListing(l)} style={{ display:'flex', alignItems:'center', gap:14, padding:'12px 14px', cursor:'pointer' }}>
+              <div key={l.id} onClick={bulkMode?()=>toggleSelectId(l.id):undefined} style={{ border:`1.5px solid ${bulkMode&&selectedIds.has(l.id)?PRIMARY:l.is_sold?'#FECACA':l.is_active?'rgba(22,34,28,0.08)':'rgba(22,34,28,0.04)'}`, borderRadius:14, marginBottom:10, overflow:'hidden', opacity:l.is_active||l.is_sold?1:0.7, background:bulkMode&&selectedIds.has(l.id)?GREEN_TINT:l.is_sold?'#FFF5F5':l.is_active?PAPER:'rgba(22,34,28,0.02)', cursor:bulkMode?'pointer':'default', transition:'border-color 0.15s, background 0.15s' }}>
+                <div onClick={bulkMode?undefined:()=>setQuickViewListing(l)} style={{ display:'flex', alignItems:'center', gap:14, padding:'12px 14px', cursor:bulkMode?'pointer':'pointer' }}>
+                  {bulkMode && (
+                    <div style={{ width:22, height:22, borderRadius:6, border:`2px solid ${selectedIds.has(l.id)?PRIMARY:PAPER3}`, background:selectedIds.has(l.id)?PRIMARY:'#fff', display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0, transition:'all 0.15s' }}>
+                      {selectedIds.has(l.id) && <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>}
+                    </div>
+                  )}
                   <div style={{ width:48, height:48, borderRadius:10, background:l.images?.[0]?PAPER3:l.color||'#FFD166', display:'flex', alignItems:'center', justifyContent:'center', fontSize:24, flexShrink:0, overflow:'hidden', position:'relative' }}>
                     {l.images?.[0] ? <img src={l.images[0]} style={{ width:'100%', height:'100%', objectFit:'cover' }} alt="" /> : l.emoji||'🧸'}
                     {l.is_sold && <div style={{ position:'absolute', inset:0, background:'rgba(22,34,28,0.45)', display:'flex', alignItems:'center', justifyContent:'center', borderRadius:10 }}><span style={{ fontSize:9, fontWeight:900, color:'#fff', letterSpacing:0.3, fontFamily:FONT }}>SOLGT</span></div>}
@@ -582,7 +643,7 @@ export default function DashboardClient() {
                       ? <span style={{ background:PAPER3, color:INK3, borderRadius:99, padding:'3px 10px', fontSize:11, fontWeight:700, flexShrink:0, fontFamily:FONT }}>Inaktiv</span>
                       : <Badge type={l.type} />}
                 </div>
-                {!l.is_sold && <div style={{ display:'flex', gap:isMobile?6:6, padding:isMobile?'0 12px 10px':'0 14px 10px', flexWrap:'wrap' }} onClick={e=>e.stopPropagation()}>
+                {!l.is_sold && !bulkMode && <div style={{ display:'flex', gap:isMobile?6:6, padding:isMobile?'0 12px 10px':'0 14px 10px', flexWrap:'wrap' }} onClick={e=>e.stopPropagation()}>
                   <button onClick={()=>openEdit(l)} style={{ flex:isMobile?1:undefined, background:GREEN_TINT, border:'none', borderRadius:99, padding:isMobile?'7px 0':'6px 12px', fontSize:12, fontWeight:700, color:PRIMARY, cursor:'pointer', fontFamily:FONT }}>Rediger</button>
                   <button onClick={()=>copyListing(l.id)} style={{ flex:isMobile?1:undefined, background:PAPER2, border:`1px solid ${PAPER3}`, borderRadius:99, padding:isMobile?'7px 0':'6px 12px', fontSize:12, fontWeight:700, color:INK2, cursor:'pointer', fontFamily:FONT }}>Kopier</button>
                   <button onClick={()=>toggleActive(l.id, l.is_active)} title={l.is_active?'Deaktivér opslag':'Aktivér opslag'} style={{ flex:isMobile?1:undefined, background:l.is_active?'#FEF9C3':'#F0FDF4', border:'none', borderRadius:99, padding:isMobile?'7px 0':'6px 12px', fontSize:12, fontWeight:700, color:l.is_active?'#B45309':'#15803D', cursor:'pointer', fontFamily:FONT }}>{l.is_active?'Deaktivér':'Aktivér'}</button>
@@ -969,6 +1030,26 @@ export default function DashboardClient() {
       </Modal>
 
     </div>
+
+    {/* Bulk action bar */}
+    {bulkMode && selectedIds.size > 0 && (
+      <div style={{ position:'fixed', bottom:isMobile?72:24, left:'50%', transform:'translateX(-50%)', zIndex:500, display:'flex', alignItems:'center', gap:8, background:'#1a2218', borderRadius:99, padding:'10px 16px', boxShadow:'0 8px 32px rgba(22,34,28,0.35)', flexWrap:'wrap', justifyContent:'center', maxWidth:'calc(100vw - 32px)' }}>
+        <span style={{ fontFamily:FONT, fontWeight:700, fontSize:13, color:'rgba(255,255,255,0.8)', paddingRight:4 }}>{selectedIds.size} valgt</span>
+        <div style={{ width:1, height:20, background:'rgba(255,255,255,0.15)' }} />
+        <button onClick={()=>handleBulkActivate(true)} style={{ padding:'7px 14px', borderRadius:99, background:'#16a34a', border:'none', color:'#fff', fontSize:12, fontWeight:700, cursor:'pointer', fontFamily:FONT }}>Aktivér alle</button>
+        <button onClick={()=>handleBulkActivate(false)} style={{ padding:'7px 14px', borderRadius:99, background:'#b45309', border:'none', color:'#fff', fontSize:12, fontWeight:700, cursor:'pointer', fontFamily:FONT }}>Deaktivér alle</button>
+        {!bulkConfirmDelete
+          ? <button onClick={()=>setBulkConfirmDelete(true)} style={{ padding:'7px 14px', borderRadius:99, background:'#e11d48', border:'none', color:'#fff', fontSize:12, fontWeight:700, cursor:'pointer', fontFamily:FONT }}>Slet alle</button>
+          : <div style={{ display:'flex', alignItems:'center', gap:6 }}>
+              <span style={{ fontSize:12, color:'#fca5a5', fontFamily:FONT }}>Er du sikker?</span>
+              <button onClick={handleBulkDelete} style={{ padding:'7px 14px', borderRadius:99, background:'#e11d48', border:'none', color:'#fff', fontSize:12, fontWeight:800, cursor:'pointer', fontFamily:FONT }}>Ja, slet</button>
+              <button onClick={()=>setBulkConfirmDelete(false)} style={{ padding:'7px 14px', borderRadius:99, background:'rgba(255,255,255,0.1)', border:'none', color:'#fff', fontSize:12, fontWeight:700, cursor:'pointer', fontFamily:FONT }}>Nej</button>
+            </div>
+        }
+        <button onClick={exitBulk} style={{ padding:'7px 12px', borderRadius:99, background:'rgba(255,255,255,0.1)', border:'none', color:'rgba(255,255,255,0.6)', fontSize:12, fontWeight:700, cursor:'pointer', fontFamily:FONT }}>✕</button>
+      </div>
+    )}
+
     </PullToRefresh>
   );
 }
