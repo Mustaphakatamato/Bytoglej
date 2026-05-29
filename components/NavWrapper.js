@@ -492,7 +492,7 @@ function Nav({ pathname, navigate, loggedIn, setLoggedIn, unreadTotal, instituti
     <nav style={{ position:'fixed', top:0, left:0, right:0, zIndex:500, background:transparent?'transparent':'rgba(246,242,234,0.96)', backdropFilter:transparent?'none':'blur(18px)', boxShadow:transparent?'none':'0 1px 0 rgba(22,34,28,0.08)', transition:'all 0.3s' }}>
 
       {/* ── Main row ── */}
-      <div style={{ maxWidth:1140, margin:'0 auto', display:'flex', alignItems:'center', height:68, gap:isMobile?10:20, padding: isMobile ? '0 20px' : '0 16px' }}>
+      <div style={{ maxWidth:1140, margin:'0 auto', display:'flex', alignItems:'center', height:68, gap:isMobile?10:20, paddingLeft:16, paddingRight:isMobile?20:16, boxSizing:'border-box', width:'100%' }}>
 
         {/* Logo */}
         <Link href="/" style={{ display:'flex', alignItems:'center', cursor:'pointer', flexShrink:0, textDecoration:'none' }}>
