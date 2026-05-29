@@ -100,6 +100,14 @@ export function AppProvider({ children }) {
     const { data: { user } } = await db.auth.getUser();
     if (!user) return;
 
+    // Block favoriting own listings
+    const { data: listingRow } = await db.from('listings').select('user_id, institution_name').eq('id', listingId).maybeSingle();
+    if (listingRow) {
+      const ownedByUser = listingRow.user_id === user.id;
+      const ownedByInst = institution?.name && listingRow.institution_name === institution.name;
+      if (ownedByUser || ownedByInst) return;
+    }
+
     if (adding) {
       const effectiveInst = adminInst || institution;
       const { error } = await db.from('listing_favorites').upsert({
