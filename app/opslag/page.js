@@ -133,7 +133,10 @@ function SubcategoryBrowser({ categoryKey, onBack, onSelectAll, onSelectSub }) {
 function OpslagInner() {
   const router = useRouter();
   const urlParams = useSearchParams();
-  const { listings, loadingListings: loading, setActiveListing, favs, toggleFav, showToast, loggedIn, setQuickViewListing } = useApp();
+  const { listings: allListings, loadingListings: loading, setActiveListing, favs, toggleFav, showToast, loggedIn, setQuickViewListing, realUserId, institution } = useApp();
+  const listings = allListings.filter(l =>
+    l.user_id !== realUserId && !(institution?.name && l.institution_name === institution.name)
+  );
   const ww = useWindowWidth();
   const isMobile = ww < 640;
   const [filter, setFilter] = useState('alle');

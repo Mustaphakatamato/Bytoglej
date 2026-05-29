@@ -458,12 +458,16 @@ function CtaBanner() {
 /* ── Page ─────────────────────────────────────────────────── */
 export default function HomePage() {
   const router = useRouter();
-  const { listings, loadingListings } = useApp();
+  const { listings, loadingListings, realUserId, institution } = useApp();
   const w = useWindowWidth();
   const isMobile = w !== null && w < 768;
 
+  const visibleListings = listings.filter(l =>
+    l.user_id !== realUserId && !(institution?.name && l.institution_name === institution.name)
+  );
+
   if (isMobile) {
-    return <MobileHomeFeed listings={listings} loading={loadingListings} />;
+    return <MobileHomeFeed listings={visibleListings} loading={loadingListings} />;
   }
 
   function goToInstitution(name) {
@@ -473,7 +477,7 @@ export default function HomePage() {
   return (
     <>
       <HeroSection />
-      <ListingsPreview listings={listings} loading={loadingListings} goToInstitution={goToInstitution} />
+      <ListingsPreview listings={visibleListings} loading={loadingListings} goToInstitution={goToInstitution} />
       <HowSection />
       <TradeTypesStrip />
       <MissionSection />
