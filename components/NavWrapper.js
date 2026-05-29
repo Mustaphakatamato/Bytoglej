@@ -152,6 +152,20 @@ function BottomNav({ pathname, navigate, loggedIn, unreadTotal }) {
   );
 }
 
+// ── Constants ──────────────────────────────────────────────────────────────────
+const POPULAR = ['Trælegetøj', 'Bøger', 'Bamser', 'Cykler', 'Puslespil'];
+const HISTORY_KEY = 'ltb_search_history';
+const MAX_HISTORY = 10;
+
+function levenshtein(a, b) {
+  const m = a.length, n = b.length;
+  const dp = Array.from({ length: m + 1 }, (_, i) => Array.from({ length: n + 1 }, (_, j) => i === 0 ? j : j === 0 ? i : 0));
+  for (let i = 1; i <= m; i++)
+    for (let j = 1; j <= n; j++)
+      dp[i][j] = a[i-1] === b[j-1] ? dp[i-1][j-1] : 1 + Math.min(dp[i-1][j], dp[i][j-1], dp[i-1][j-1]);
+  return dp[m][n];
+}
+
 // ── Search bar ─────────────────────────────────────────────────────────────────
 function SearchBar({ transparent, router }) {
   const searchParams = useSearchParams();
@@ -164,9 +178,15 @@ function SearchBar({ transparent, router }) {
   const [open, setOpen] = useState(false);
   const [focused, setFocused] = useState(false);
   const [cursor, setCursor] = useState(-1);
+  const [history, setHistory] = useState([]);
   const wrapRef = useRef(null);
   const w = useWindowWidth();
   const isMobile = w < 768;
+
+  // Load search history from localStorage
+  useEffect(() => {
+    try { setHistory(JSON.parse(localStorage.getItem(HISTORY_KEY) || '[]')); } catch {}
+  }, []);
 
   // Sync from URL when already on /opslag
   useEffect(() => {
@@ -180,84 +200,147 @@ function SearchBar({ transparent, router }) {
     return () => document.removeEventListener('mousedown', handle);
   }, []);
 
-  // Build suggestions whenever q changes
-  const suggestions = useMemo(() => {
+  function saveToHistory(term) {
+    if (!term.trim()) return;
+    const next = [term.trim(), ...history.filter(h => h.toLowerCase() !== term.trim().toLowerCase())].slice(0, MAX_HISTORY);
+    setHistory(next);
+    try { localStorage.setItem(HISTORY_KEY, JSON.stringify(next)); } catch {}
+  }
+
+  function removeFromHistory(term, e) {
+    e.stopPropagation();
+    e.preventDefault();
+    const next = history.filter(h => h !== term);
+    setHistory(next);
+    try { localStorage.setItem(HISTORY_KEY, JSON.stringify(next)); } catch {}
+  }
+
+  // Build autocomplete suggestions (grouped by type)
+  const groups = useMemo(() => {
     const term = q.trim().toLowerCase();
     if (term.length < 2) return [];
-    const results = [];
     const seen = new Set();
+    const opslag = [], institutions = [], kategorier = [];
 
-    function add(label, type, href) {
+    function tryAdd(arr, label, href) {
       const key = label.toLowerCase();
       if (seen.has(key)) return;
       seen.add(key);
-      results.push({ label, type, href });
+      arr.push({ label, href });
     }
 
-    // Category + subcategory matches
-    for (const cat of CATEGORIES) {
-      if (cat.label.toLowerCase().includes(term))
-        add(`${cat.emoji} ${cat.label}`, 'kategori', `/opslag?category=${cat.key}`);
-      for (const sub of cat.sub) {
-        if (sub.toLowerCase().includes(term))
-          add(`${cat.emoji} ${sub}`, 'kategori', `/opslag?category=${cat.key}&subcategory=${encodeURIComponent(sub)}`);
-      }
-    }
-
-    // Listing title matches
     for (const l of listings) {
       if (l.title?.toLowerCase().includes(term))
-        add(l.title, 'opslag', `/opslag?search=${encodeURIComponent(l.title)}`);
-      if (results.length >= 8) break;
+        tryAdd(opslag, l.title, `/opslag?search=${encodeURIComponent(l.title)}`);
+      if (opslag.length >= 4) break;
     }
-
-    // Institution matches
+    const instSeen = new Set();
     for (const l of listings) {
-      if (l.institution_name?.toLowerCase().includes(term))
-        add(l.institution_name, 'institution', `/institution/${encodeURIComponent(l.institution_name)}`);
-      if (results.length >= 9) break;
+      if (!instSeen.has(l.institution_name) && l.institution_name?.toLowerCase().includes(term)) {
+        instSeen.add(l.institution_name);
+        tryAdd(institutions, l.institution_name, `/institution/${encodeURIComponent(l.institution_name)}`);
+      }
+      if (institutions.length >= 3) break;
+    }
+    for (const cat of CATEGORIES) {
+      if (cat.label.toLowerCase().includes(term))
+        tryAdd(kategorier, `${cat.emoji} ${cat.label}`, `/opslag?category=${cat.key}`);
+      for (const sub of cat.sub) {
+        if (sub.toLowerCase().includes(term))
+          tryAdd(kategorier, `${cat.emoji} ${sub}`, `/opslag?category=${cat.key}&subcategory=${encodeURIComponent(sub)}`);
+      }
+      if (kategorier.length >= 4) break;
     }
 
-    return results.slice(0, 8);
+    const result = [];
+    if (opslag.length)       result.push({ section: 'Opslag',       items: opslag });
+    if (institutions.length) result.push({ section: 'Institutioner', items: institutions });
+    if (kategorier.length)   result.push({ section: 'Kategorier',   items: kategorier });
+    return result;
   }, [q, listings]);
 
-  const showDrop = open && focused && q.trim().length >= 2;
+  // All navigable items flattened (for keyboard cursor)
+  const allItems = useMemo(() => {
+    const term = q.trim();
+    const flat = groups.flatMap(g => g.items.map(item => ({ ...item, section: g.section })));
+    if (term.length >= 2) flat.push({ label: `Søg efter "${term}"`, href: `/opslag?search=${encodeURIComponent(term)}`, isSearch: true });
+    return flat;
+  }, [groups, q]);
 
-  function go(href) {
+  // "Mente du...?" fuzzy suggestion when no results
+  const didYouMean = useMemo(() => {
+    const term = q.trim().toLowerCase();
+    if (groups.length > 0 || term.length < 3) return null;
+    const candidates = [
+      ...POPULAR,
+      ...listings.map(l => l.title).filter(Boolean).slice(0, 80),
+    ];
+    let best = null, bestDist = Infinity;
+    for (const c of candidates) {
+      const d = levenshtein(term, c.toLowerCase());
+      if (d < bestDist && d <= Math.max(2, Math.floor(term.length / 3))) { best = c; bestDist = d; }
+    }
+    return best;
+  }, [q, groups, listings]);
+
+  const showEmpty  = open && focused && q.trim().length < 2;
+  const showDrop   = open && focused && q.trim().length >= 2;
+  const hasHistory = history.length > 0;
+  const showPopular = showEmpty && !hasHistory;
+  const showHistory = showEmpty && hasHistory;
+
+  function go(href, term) {
+    if (term) saveToHistory(term);
     router.push(href);
     setOpen(false);
     setCursor(-1);
   }
 
   function submit(e) {
-    e.preventDefault();
-    if (cursor >= 0 && suggestions[cursor]) { go(suggestions[cursor].href); return; }
-    const params = new URLSearchParams();
-    if (q.trim()) params.set('search', q.trim());
-    router.push('/opslag' + (params.toString() ? '?' + params : ''));
+    e?.preventDefault();
+    const term = q.trim();
+    if (cursor >= 0 && allItems[cursor]) {
+      go(allItems[cursor].href, allItems[cursor].isSearch ? term : allItems[cursor].label);
+      return;
+    }
+    if (!term) return;
+    saveToHistory(term);
+    router.push(`/opslag?search=${encodeURIComponent(term)}`);
     setOpen(false);
   }
 
   function onKeyDown(e) {
-    if (!showDrop) return;
-    if (e.key === 'ArrowDown') { e.preventDefault(); setCursor(c => Math.min(c + 1, suggestions.length)); }
+    if (!showDrop && !showEmpty) return;
+    const maxIdx = showDrop ? allItems.length - 1 : (showHistory ? history.length - 1 : POPULAR.length - 1);
+    if (e.key === 'ArrowDown') { e.preventDefault(); setCursor(c => Math.min(c + 1, maxIdx)); }
     if (e.key === 'ArrowUp')   { e.preventDefault(); setCursor(c => Math.max(c - 1, -1)); }
     if (e.key === 'Escape')    { setOpen(false); setCursor(-1); }
+    if (e.key === 'Enter' && cursor >= 0) submit();
   }
 
-  // Total items = suggestions + "Søg efter X" row
-  const totalItems = suggestions.length + 1;
-  const searchRowIdx = suggestions.length;
+  const dropOpen = (showEmpty && (hasHistory || true)) || showDrop;
+
+  const IconSearch = ({ color = INK, opacity = 0.3 }) => (
+    <svg width="13" height="13" viewBox="0 0 14 14" fill="none" style={{ flexShrink:0, opacity }}>
+      <circle cx="6" cy="6" r="5" stroke={color} strokeWidth="1.5"/>
+      <path d="M10 10L13 13" stroke={color} strokeWidth="1.5" strokeLinecap="round"/>
+    </svg>
+  );
+  const IconClock = () => (
+    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke={INK3} strokeWidth="2" strokeLinecap="round" style={{ flexShrink:0, opacity:0.5 }}>
+      <circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/>
+    </svg>
+  );
 
   return (
     <div ref={wrapRef} style={{ flex:1, maxWidth:560, position:'relative' }}>
       <form onSubmit={submit}>
         <div style={{
           display:'flex', alignItems:'center', gap:8,
-          background: transparent ? 'rgba(255,255,255,0.15)' : (showDrop ? PAPER : PAPER2),
-          borderRadius: showDrop ? '16px 16px 0 0' : 99,
-          border: `1.5px solid ${transparent ? 'rgba(255,255,255,0.3)' : (showDrop ? PAPER3 : PAPER3)}`,
-          borderBottom: showDrop ? 'none' : undefined,
+          background: transparent ? 'rgba(255,255,255,0.15)' : (dropOpen && open && focused ? PAPER : PAPER2),
+          borderRadius: (dropOpen && open && focused) ? '16px 16px 0 0' : 99,
+          border: `1.5px solid ${transparent ? 'rgba(255,255,255,0.3)' : PAPER3}`,
+          borderBottom: (dropOpen && open && focused) ? 'none' : undefined,
           padding:'0 6px 0 16px',
           transition:'border-radius 0.15s, background 0.15s',
         }}>
@@ -273,16 +356,14 @@ function SearchBar({ transparent, router }) {
             onKeyDown={onKeyDown}
             placeholder={isMobile ? 'Søg...' : 'Søg efter legetøj, institution...'}
             autoComplete="off"
-            style={{
-              flex:1, border:'none', background:'transparent', outline:'none',
-              fontSize:14, fontFamily:FONT, color: transparent ? '#fff' : INK,
-              padding:'10px 0', minWidth:0,
-            }}
+            aria-label="Søg"
+            style={{ flex:1, border:'none', background:'transparent', outline:'none', fontSize:14, fontFamily:FONT, color: transparent ? '#fff' : INK, padding:'10px 0', minWidth:0 }}
           />
           {q && (
-            <button type="button" onClick={() => { setQ(''); setOpen(false); }} style={{ background:'none', border:'none', color: transparent ? 'rgba(255,255,255,0.7)' : INK3, fontSize:14, cursor:'pointer', padding:'4px', lineHeight:1, flexShrink:0 }}>✕</button>
+            <button type="button" onClick={() => { setQ(''); setCursor(-1); }} aria-label="Ryd søgning"
+              style={{ background:'none', border:'none', color: transparent ? 'rgba(255,255,255,0.7)' : INK3, fontSize:14, cursor:'pointer', padding:'4px', lineHeight:1, flexShrink:0 }}>✕</button>
           )}
-          <button type="submit" style={{
+          <button type="submit" aria-label="Søg" style={{
             background: transparent ? 'rgba(255,255,255,0.25)' : PRIMARY,
             color:'#fff', border:'none', borderRadius:99,
             padding: isMobile ? '7px 10px' : '7px 18px',
@@ -297,59 +378,104 @@ function SearchBar({ transparent, router }) {
         </div>
       </form>
 
-      {/* Dropdown */}
-      {showDrop && (
-        <div style={{
+      {/* ── Dropdown ── */}
+      {open && focused && (
+        <div role="listbox" style={{
           position:'absolute', top:'100%', left:0, right:0, zIndex:700,
-          background: PAPER,
-          border: `1.5px solid ${PAPER3}`,
-          borderTop: 'none',
-          borderRadius: '0 0 16px 16px',
-          overflow:'hidden',
-          boxShadow: '0 12px 32px rgba(22,34,28,0.12)',
+          background: PAPER, border:`1.5px solid ${PAPER3}`, borderTop:'none',
+          borderRadius:'0 0 16px 16px', overflow:'hidden',
+          boxShadow:'0 12px 32px rgba(22,34,28,0.12)',
+          maxHeight: 420, overflowY: 'auto',
         }}>
-          {suggestions.map((s, i) => (
-            <div
-              key={i}
-              onMouseDown={() => go(s.href)}
-              onMouseEnter={() => setCursor(i)}
-              style={{
-                display:'flex', alignItems:'center', gap:10,
-                padding:'11px 16px', cursor:'pointer',
-                background: cursor === i ? PAPER2 : 'transparent',
-                transition:'background 0.1s',
-              }}
-            >
-              <svg width="13" height="13" viewBox="0 0 14 14" fill="none" style={{ flexShrink:0, opacity:0.3 }}>
-                <circle cx="6" cy="6" r="5" stroke={INK} strokeWidth="1.5"/>
-                <path d="M10 10L13 13" stroke={INK} strokeWidth="1.5" strokeLinecap="round"/>
-              </svg>
-              <span style={{ flex:1, fontSize:14, color:INK, fontFamily:FONT }}>
-                {highlightMatch(s.label, q)}
-              </span>
-              <span style={{ fontSize:11, color:INK3, fontFamily:FONT, flexShrink:0 }}>{s.type}</span>
-            </div>
-          ))}
-          {/* "Søg efter X" row */}
-          <div
-            onMouseDown={submit}
-            onMouseEnter={() => setCursor(searchRowIdx)}
-            style={{
-              display:'flex', alignItems:'center', gap:10,
-              padding:'11px 16px', cursor:'pointer',
-              background: cursor === searchRowIdx ? PAPER2 : 'transparent',
-              borderTop: suggestions.length ? `1px solid ${PAPER2}` : 'none',
-              transition:'background 0.1s',
-            }}
-          >
-            <svg width="13" height="13" viewBox="0 0 14 14" fill="none" style={{ flexShrink:0, opacity:0.5 }}>
-              <circle cx="6" cy="6" r="5" stroke={PRIMARY} strokeWidth="1.5"/>
-              <path d="M10 10L13 13" stroke={PRIMARY} strokeWidth="1.5" strokeLinecap="round"/>
-            </svg>
-            <span style={{ fontSize:14, color:PRIMARY, fontFamily:FONT, fontWeight:600 }}>
-              Søg efter &ldquo;{q.trim()}&rdquo;
-            </span>
-          </div>
+
+          {/* ── Empty state: history or popular ── */}
+          {showEmpty && (
+            <>
+              {showHistory && (
+                <>
+                  <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', padding:'10px 16px 4px' }}>
+                    <span style={{ fontSize:11, fontWeight:700, color:INK3, textTransform:'uppercase', letterSpacing:0.5, fontFamily:FONT }}>Seneste søgninger</span>
+                    <button onMouseDown={e => { e.preventDefault(); const next = []; setHistory(next); try { localStorage.setItem(HISTORY_KEY, JSON.stringify(next)); } catch {} }}
+                      style={{ background:'none', border:'none', fontSize:11, color:INK3, cursor:'pointer', fontFamily:FONT }}>Ryd alt</button>
+                  </div>
+                  {history.map((h, i) => (
+                    <div key={h} onMouseDown={() => { setQ(h); saveToHistory(h); router.push(`/opslag?search=${encodeURIComponent(h)}`); setOpen(false); }}
+                      onMouseEnter={() => setCursor(i)}
+                      style={{ display:'flex', alignItems:'center', gap:10, padding:'9px 16px', cursor:'pointer', background: cursor === i ? PAPER2 : 'transparent' }}>
+                      <IconClock />
+                      <span style={{ flex:1, fontSize:14, color:INK, fontFamily:FONT }}>{h}</span>
+                      <button onMouseDown={e => removeFromHistory(h, e)} aria-label="Fjern"
+                        style={{ background:'none', border:'none', color:INK3, fontSize:14, cursor:'pointer', padding:'2px 4px', lineHeight:1, opacity:0.5 }}>✕</button>
+                    </div>
+                  ))}
+                </>
+              )}
+              {showPopular && (
+                <>
+                  <div style={{ padding:'10px 16px 4px' }}>
+                    <span style={{ fontSize:11, fontWeight:700, color:INK3, textTransform:'uppercase', letterSpacing:0.5, fontFamily:FONT }}>Populære søgninger</span>
+                  </div>
+                  {POPULAR.map((p, i) => (
+                    <div key={p} onMouseDown={() => { setQ(p); saveToHistory(p); router.push(`/opslag?search=${encodeURIComponent(p)}`); setOpen(false); }}
+                      onMouseEnter={() => setCursor(i)}
+                      style={{ display:'flex', alignItems:'center', gap:10, padding:'9px 16px', cursor:'pointer', background: cursor === i ? PAPER2 : 'transparent' }}>
+                      <IconSearch color={PRIMARY} opacity={0.6} />
+                      <span style={{ fontSize:14, color:INK, fontFamily:FONT }}>{p}</span>
+                      <span style={{ marginLeft:'auto', fontSize:11, color:INK3, fontFamily:FONT }}>populær</span>
+                    </div>
+                  ))}
+                </>
+              )}
+            </>
+          )}
+
+          {/* ── Active search: grouped suggestions ── */}
+          {showDrop && (
+            <>
+              {groups.length === 0 ? (
+                <div style={{ padding:'16px', textAlign:'center' }}>
+                  <p style={{ fontSize:13, color:INK3, fontFamily:FONT, marginBottom: didYouMean ? 8 : 0 }}>Ingen resultater for &ldquo;{q.trim()}&rdquo;</p>
+                  {didYouMean && (
+                    <button onMouseDown={() => { setQ(didYouMean); router.push(`/opslag?search=${encodeURIComponent(didYouMean)}`); setOpen(false); }}
+                      style={{ background:'none', border:'none', cursor:'pointer', fontFamily:FONT, fontSize:13, color:PRIMARY }}>
+                      Mente du <strong>&ldquo;{didYouMean}&rdquo;</strong>?
+                    </button>
+                  )}
+                </div>
+              ) : (
+                <>
+                  {(() => {
+                    let flatIdx = 0;
+                    return groups.map(group => (
+                      <div key={group.section}>
+                        <div style={{ padding:'8px 16px 2px', fontSize:11, fontWeight:700, color:INK3, textTransform:'uppercase', letterSpacing:0.5, fontFamily:FONT, background:PAPER2 }}>
+                          {group.section}
+                        </div>
+                        {group.items.map(item => {
+                          const idx = flatIdx++;
+                          return (
+                            <div key={item.label} onMouseDown={() => go(item.href, item.label)} onMouseEnter={() => setCursor(idx)}
+                              style={{ display:'flex', alignItems:'center', gap:10, padding:'10px 16px', cursor:'pointer', background: cursor === idx ? PAPER2 : 'transparent', transition:'background 0.1s' }}>
+                              <IconSearch />
+                              <span style={{ flex:1, fontSize:14, color:INK, fontFamily:FONT }}>{highlightMatch(item.label, q)}</span>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    ));
+                  })()}
+                  {/* Søg efter X */}
+                  {(() => { const idx = allItems.length - 1; return (
+                    <div onMouseDown={submit} onMouseEnter={() => setCursor(idx)}
+                      style={{ display:'flex', alignItems:'center', gap:10, padding:'10px 16px', cursor:'pointer', background: cursor === idx ? PAPER2 : 'transparent', borderTop:`1px solid ${PAPER2}`, transition:'background 0.1s' }}>
+                      <IconSearch color={PRIMARY} opacity={0.6} />
+                      <span style={{ fontSize:14, color:PRIMARY, fontFamily:FONT, fontWeight:600 }}>Søg efter &ldquo;{q.trim()}&rdquo;</span>
+                    </div>
+                  ); })()}
+                </>
+              )}
+            </>
+          )}
         </div>
       )}
     </div>
