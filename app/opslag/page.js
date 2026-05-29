@@ -409,7 +409,8 @@ function OpslagInner() {
                   const { data: { user } } = await db.auth.getUser();
                   if (user) {
                     if (adding) {
-                      const { data: inst } = await db.from('institutions').select('id,name').ilike('email', user.email).maybeSingle();
+                      const { data: member } = await db.from('institution_members').select('institution_id, institutions(id, name)').eq('email', user.email).maybeSingle();
+                      const inst = member?.institutions;
                       db.from('listing_favorites').upsert({ listing_id: id, user_id: user.id, institution_id: inst?.id || null, institution_name: inst?.name || null }, { onConflict: 'listing_id,user_id' });
                     } else {
                       db.from('listing_favorites').delete().eq('listing_id', id).eq('user_id', user.id);
