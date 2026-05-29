@@ -156,7 +156,10 @@ function BottomNav({ pathname, navigate, loggedIn, unreadTotal }) {
 function SearchBar({ transparent, router }) {
   const searchParams = useSearchParams();
   const pathname = usePathname();
-  const { listings } = useApp();
+  const { listings: allListings, realUserId, institution } = useApp();
+  const listings = allListings.filter(l =>
+    l.user_id !== realUserId && !(institution?.name && l.institution_name === institution.name)
+  );
   const [q, setQ] = useState('');
   const [open, setOpen] = useState(false);
   const [focused, setFocused] = useState(false);
