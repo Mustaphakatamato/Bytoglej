@@ -1033,20 +1033,20 @@ export default function DashboardClient() {
 
     {/* Bulk action bar */}
     {bulkMode && selectedIds.size > 0 && (
-      <div style={{ position:'fixed', bottom:isMobile?72:24, left:'50%', transform:'translateX(-50%)', zIndex:500, display:'flex', alignItems:'center', gap:8, background:'#1a2218', borderRadius:99, padding:'10px 16px', boxShadow:'0 8px 32px rgba(22,34,28,0.35)', flexWrap:'wrap', justifyContent:'center', maxWidth:'calc(100vw - 32px)' }}>
-        <span style={{ fontFamily:FONT, fontWeight:700, fontSize:13, color:'rgba(255,255,255,0.8)', paddingRight:4 }}>{selectedIds.size} valgt</span>
-        <div style={{ width:1, height:20, background:'rgba(255,255,255,0.15)' }} />
-        <button onClick={()=>handleBulkActivate(true)} style={{ padding:'7px 14px', borderRadius:99, background:'#16a34a', border:'none', color:'#fff', fontSize:12, fontWeight:700, cursor:'pointer', fontFamily:FONT }}>Aktivér alle</button>
-        <button onClick={()=>handleBulkActivate(false)} style={{ padding:'7px 14px', borderRadius:99, background:'#b45309', border:'none', color:'#fff', fontSize:12, fontWeight:700, cursor:'pointer', fontFamily:FONT }}>Deaktivér alle</button>
+      <div style={{ position:'fixed', bottom:isMobile?72:24, left:'50%', transform:'translateX(-50%)', zIndex:500, display:'flex', alignItems:'center', gap:8, background:PAPER2, borderRadius:99, padding:'10px 16px', boxShadow:'0 8px 32px rgba(22,34,28,0.18)', border:`1px solid rgba(22,34,28,0.10)`, flexWrap:'wrap', justifyContent:'center', maxWidth:'calc(100vw - 32px)' }}>
+        <span style={{ fontFamily:FONT, fontWeight:700, fontSize:13, color:INK, paddingRight:4 }}>{selectedIds.size} valgt</span>
+        <div style={{ width:1, height:20, background:PAPER3 }} />
+        <button onClick={()=>handleBulkActivate(true)} style={{ padding:'7px 14px', borderRadius:99, background:'#F0FDF4', border:'none', color:'#15803D', fontSize:12, fontWeight:700, cursor:'pointer', fontFamily:FONT }}>Aktivér alle</button>
+        <button onClick={()=>handleBulkActivate(false)} style={{ padding:'7px 14px', borderRadius:99, background:'#FEF9C3', border:'none', color:'#B45309', fontSize:12, fontWeight:700, cursor:'pointer', fontFamily:FONT }}>Deaktivér alle</button>
         {!bulkConfirmDelete
-          ? <button onClick={()=>setBulkConfirmDelete(true)} style={{ padding:'7px 14px', borderRadius:99, background:'#e11d48', border:'none', color:'#fff', fontSize:12, fontWeight:700, cursor:'pointer', fontFamily:FONT }}>Slet alle</button>
+          ? <button onClick={()=>setBulkConfirmDelete(true)} style={{ padding:'7px 14px', borderRadius:99, background:'#FEF2F2', border:'none', color:'#e11d48', fontSize:12, fontWeight:700, cursor:'pointer', fontFamily:FONT }}>Slet alle</button>
           : <div style={{ display:'flex', alignItems:'center', gap:6 }}>
-              <span style={{ fontSize:12, color:'#fca5a5', fontFamily:FONT }}>Er du sikker?</span>
+              <span style={{ fontSize:12, color:'#e11d48', fontWeight:600, fontFamily:FONT }}>Er du sikker?</span>
               <button onClick={handleBulkDelete} style={{ padding:'7px 14px', borderRadius:99, background:'#e11d48', border:'none', color:'#fff', fontSize:12, fontWeight:800, cursor:'pointer', fontFamily:FONT }}>Ja, slet</button>
-              <button onClick={()=>setBulkConfirmDelete(false)} style={{ padding:'7px 14px', borderRadius:99, background:'rgba(255,255,255,0.1)', border:'none', color:'#fff', fontSize:12, fontWeight:700, cursor:'pointer', fontFamily:FONT }}>Nej</button>
+              <button onClick={()=>setBulkConfirmDelete(false)} style={{ padding:'7px 14px', borderRadius:99, background:PAPER3, border:'none', color:INK3, fontSize:12, fontWeight:700, cursor:'pointer', fontFamily:FONT }}>Nej</button>
             </div>
         }
-        <button onClick={exitBulk} style={{ padding:'7px 12px', borderRadius:99, background:'rgba(255,255,255,0.1)', border:'none', color:'rgba(255,255,255,0.6)', fontSize:12, fontWeight:700, cursor:'pointer', fontFamily:FONT }}>✕</button>
+        <button onClick={exitBulk} style={{ padding:'7px 12px', borderRadius:99, background:PAPER3, border:'none', color:INK3, fontSize:12, fontWeight:700, cursor:'pointer', fontFamily:FONT }}>✕</button>
       </div>
     )}
 
