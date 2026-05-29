@@ -74,6 +74,49 @@ export function SkeletonCard() {
   );
 }
 
+export function SkeletonMobileCard() {
+  return (
+    <div style={{ background:PAPER2, borderRadius:14, overflow:'hidden' }}>
+      <div className="skeleton" style={{ height:130 }} />
+      <div style={{ padding:'8px 10px 10px' }}>
+        <div className="skeleton" style={{ height:14, marginBottom:6 }} />
+        <div className="skeleton" style={{ height:12, width:'60%', marginBottom:6 }} />
+        <div className="skeleton" style={{ height:16, width:'40%' }} />
+      </div>
+    </div>
+  );
+}
+
+export function SkeletonMessageRow() {
+  return (
+    <div style={{ display:'flex', alignItems:'center', gap:12, padding:'14px 16px', borderBottom:`1px solid ${PAPER3}` }}>
+      <div className="skeleton" style={{ width:44, height:44, borderRadius:'50%', flexShrink:0 }} />
+      <div style={{ flex:1, minWidth:0 }}>
+        <div className="skeleton" style={{ height:14, width:'55%', marginBottom:8 }} />
+        <div className="skeleton" style={{ height:12, width:'80%' }} />
+      </div>
+      <div className="skeleton" style={{ width:36, height:12, borderRadius:4, flexShrink:0 }} />
+    </div>
+  );
+}
+
+export function SkeletonDashboardBox({ rows = 3 }) {
+  return (
+    <div style={{ background:PAPER2, borderRadius:22, padding:24, border:'1px solid rgba(22,34,28,0.07)' }}>
+      <div className="skeleton" style={{ height:22, width:'45%', marginBottom:20 }} />
+      {Array.from({ length: rows }).map((_, i) => (
+        <div key={i} style={{ display:'flex', alignItems:'center', gap:12, padding:'10px 0', borderBottom: i < rows - 1 ? `1px solid rgba(22,34,28,0.06)` : 'none' }}>
+          <div className="skeleton" style={{ width:40, height:40, borderRadius:10, flexShrink:0 }} />
+          <div style={{ flex:1 }}>
+            <div className="skeleton" style={{ height:14, width:'60%', marginBottom:6 }} />
+            <div className="skeleton" style={{ height:11, width:'40%' }} />
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
 export function InfoRow({ icon, label, value, link }) {
   return (
     <div style={{ display:'flex', gap:8, alignItems:'flex-start', marginBottom:7 }}>

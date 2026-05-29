@@ -5,8 +5,9 @@ import nextDynamic from 'next/dynamic';
 import { PRIMARY, GREEN_DEEP, GREEN_SOFT, GREEN_TINT, PAPER, PAPER2, PAPER3, INK, INK2, INK3, CORAL, TYPE_CFG } from '@/lib/constants';
 import { CATEGORIES } from '@/lib/categories';
 import { useWindowWidth } from '@/lib/hooks';
-import { Btn, SkeletonCard } from '@/components/ui';
+import { Btn, SkeletonCard, SkeletonMobileCard } from '@/components/ui';
 import ListingCard from '@/components/ListingCard';
+import PullToRefresh from '@/components/PullToRefresh';
 import { useApp } from '@/providers/AppProvider';
 import { db } from '@/lib/supabase';
 
@@ -133,7 +134,7 @@ function SubcategoryBrowser({ categoryKey, onBack, onSelectAll, onSelectSub }) {
 function OpslagInner() {
   const router = useRouter();
   const urlParams = useSearchParams();
-  const { listings: allListings, loadingListings: loading, setActiveListing, favs, toggleFav, showToast, loggedIn, setQuickViewListing, realUserId, institution } = useApp();
+  const { listings: allListings, loadingListings: loading, fetchListings, setActiveListing, favs, toggleFav, showToast, loggedIn, setQuickViewListing, realUserId, institution } = useApp();
   const listings = allListings.filter(l =>
     l.user_id !== realUserId && !(institution?.name && l.institution_name === institution.name)
   );
@@ -223,6 +224,7 @@ function OpslagInner() {
   const showSubcategoryBrowser = isMobile && noFilters && !!pendingCategory;
 
   return (
+    <PullToRefresh onRefresh={fetchListings}>
     <div style={{ minHeight: '100vh', background: PAPER }}>
 
       {/* ── Desktop header only ── */}
@@ -385,7 +387,7 @@ function OpslagInner() {
         ) : loading ? (
           <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr 1fr' : 'repeat(auto-fill,minmax(240px,1fr))', gap: isMobile ? 8 : 18 }}>
             {[1,2,3,4,5,6].map(i => isMobile
-              ? <div key={i} className="skeleton" style={{ aspectRatio: '3/4', borderRadius: 12 }} />
+              ? <SkeletonMobileCard key={i} />
               : <SkeletonCard key={i} />)}
           </div>
         ) : filtered.length === 0 ? (
@@ -446,6 +448,7 @@ function OpslagInner() {
         </div>
       )}
     </div>
+    </PullToRefresh>
   );
 }
 

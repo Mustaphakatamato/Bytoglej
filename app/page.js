@@ -6,6 +6,7 @@ import { PRIMARY, GREEN_DEEP, GREEN_SOFT, GREEN_TINT, PAPER, PAPER2, PAPER3, INK
 import { useWindowWidth, useDebounce } from '@/lib/hooks';
 import { SkeletonCard } from '@/components/ui';
 import ListingCard from '@/components/ListingCard';
+import PullToRefresh from '@/components/PullToRefresh';
 import { useApp } from '@/providers/AppProvider';
 import { LogoLockup } from '@/components/Logo';
 import { db } from '@/lib/supabase';
@@ -458,7 +459,7 @@ function CtaBanner() {
 /* ── Page ─────────────────────────────────────────────────── */
 export default function HomePage() {
   const router = useRouter();
-  const { listings, loadingListings, realUserId, institution } = useApp();
+  const { listings, loadingListings, fetchListings, realUserId, institution } = useApp();
   const w = useWindowWidth();
   const isMobile = w !== null && w < 768;
 
@@ -467,7 +468,7 @@ export default function HomePage() {
   );
 
   if (isMobile) {
-    return <MobileHomeFeed listings={visibleListings} loading={loadingListings} />;
+    return <PullToRefresh onRefresh={fetchListings}><MobileHomeFeed listings={visibleListings} loading={loadingListings} /></PullToRefresh>;
   }
 
   function goToInstitution(name) {

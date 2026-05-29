@@ -5,7 +5,8 @@ import { db } from '@/lib/supabase';
 import { PRIMARY, GREEN_SOFT, GREEN_TINT, PAPER, PAPER2, PAPER3, INK, INK3, CORAL } from '@/lib/constants';
 import { useWindowWidth, relTime } from '@/lib/hooks';
 import { useApp, useActiveUser } from '@/providers/AppProvider';
-import { Badge, Btn, Spinner } from '@/components/ui';
+import { Badge, Btn, Spinner, SkeletonMessageRow } from '@/components/ui';
+import PullToRefresh from '@/components/PullToRefresh';
 
 const FONT = "'Sora', sans-serif";
 const INK2 = '#3A473D';
@@ -698,6 +699,9 @@ export default function MessagesClient() {
               <h2 style={{ fontFamily:FONT, fontWeight:800, fontSize: isMobile ? 22 : 20, color:INK }}>Indbakke</h2>
               <div style={{ display:'flex', alignItems:'center', gap:8 }}>
                 {totalUnread > 0 && !showArchived && <div style={{ background:'#e11d48', color:'#fff', borderRadius:99, padding:'2px 9px', fontSize:12, fontWeight:800, fontFamily:FONT }}>{totalUnread}</div>}
+                <button onClick={() => { if (userId) loadConvs(userId); }} title="Opdater" style={{ background:'transparent', border:`1.5px solid ${PAPER3}`, color:INK3, borderRadius:99, width:32, height:32, cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center' }}>
+                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 .49-3.5"/></svg>
+                </button>
                 <button onClick={()=>setComposeOpen(true)} title="Ny besked" style={{ background:PRIMARY, border:'none', color:'#fff', borderRadius:99, width:32, height:32, cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center' }}>
                   <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
                 </button>
@@ -790,7 +794,7 @@ export default function MessagesClient() {
             )}
 
             {loading
-              ? <div style={{ padding:24, textAlign:'center', color:INK3, fontSize:13, fontFamily:FONT }}>Indlæser…</div>
+              ? [1,2,3,4].map(i => <SkeletonMessageRow key={i} />)
               : filtered.length === 0
                 ? (
                   <div style={{ padding: isMobile ? '48px 24px' : 40, textAlign:'center' }}>

@@ -6,7 +6,8 @@ import { db } from '@/lib/supabase';
 import { PRIMARY, GREEN_SOFT, GREEN_TINT, PAPER, PAPER2, PAPER3, INK, INK2, INK3, CORAL, TYPE_CFG, CONDITIONS, AGE_GROUPS, LISTING_TAGS } from '@/lib/constants';
 import { useWindowWidth, geocodeAddress, relTime } from '@/lib/hooks';
 import { useApp, useActiveUser } from '@/providers/AppProvider';
-import { Badge, Btn, Spinner, Modal } from '@/components/ui';
+import { Badge, Btn, Spinner, Modal, SkeletonDashboardBox } from '@/components/ui';
+import PullToRefresh from '@/components/PullToRefresh';
 
 const FONT = "'Sora', sans-serif";
 
@@ -447,10 +448,27 @@ export default function DashboardClient() {
   const ww = useWindowWidth();
   const isMobile = ww < 768;
 
+  async function handleRefresh() {
+    const listings = await fetchMyListings(ctxIsAdmin ? null : authUserId, institution?.name);
+    if (listings?.length) await fetchListingFavoriters(listings);
+    onListingCreated();
+  }
+
   const inputStyle = { width:'100%', padding:'11px 14px', borderRadius:10, border:`1.5px solid ${PAPER3}`, fontSize:14, outline:'none', fontFamily:FONT, background:PAPER2 };
   const labelStyle = { display:'block', fontSize:13, fontWeight:700, marginBottom:6, fontFamily:FONT, color:INK2 };
 
+  if (instLoading) return (
+    <div style={{ minHeight:'100vh', paddingTop:80, background:PAPER }}>
+      <div style={{ maxWidth:1140, margin:'0 auto', padding:isMobile?'24px 16px':'36px 24px', display:'flex', flexDirection:'column', gap:20 }}>
+        <SkeletonDashboardBox rows={1} />
+        <SkeletonDashboardBox rows={3} />
+        <SkeletonDashboardBox rows={3} />
+      </div>
+    </div>
+  );
+
   return (
+    <PullToRefresh onRefresh={handleRefresh}>
     <div style={{ minHeight:'100vh', paddingTop:80, background:PAPER }} className="page-enter">
       <div style={{ maxWidth:1140, margin:'0 auto', padding:isMobile?'24px 16px':'36px 24px' }}>
 
@@ -468,7 +486,7 @@ export default function DashboardClient() {
             <input ref={logoRef} type="file" accept="image/*" style={{ display:'none' }} onChange={handleLogoUpload} />
             <div>
               <h1 style={{ fontFamily:FONT, fontWeight:800, fontSize:isMobile?22:30, letterSpacing:'-0.03em', color:INK }}>
-                {institution?.name || (instLoading ? 'Indlæser…' : 'Min institution')}
+                {institution?.name || 'Min institution'}
               </h1>
               <p style={{ color:INK3, fontSize:13, marginTop:4, display:'flex', alignItems:'center', gap:8, flexWrap:'wrap', fontFamily:FONT }}>
                 <span>{institution ? `${institution.pnr ? `P-nr: ${institution.pnr}` : `CVR: ${institution.cvr}`} · ${institution.city}` : instLoading ? '…' : 'Institution ikke fundet'}</span>
@@ -944,5 +962,6 @@ export default function DashboardClient() {
       </Modal>
 
     </div>
+    </PullToRefresh>
   );
 }
