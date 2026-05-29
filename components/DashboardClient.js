@@ -129,6 +129,8 @@ export default function DashboardClient() {
 
   const [savedSearches, setSavedSearches] = useState([]);
   const [listingFavoriters, setListingFavoriters] = useState([]);
+  const [activityFeed, setActivityFeed] = useState([]);
+  const [feedLoading, setFeedLoading] = useState(false);
 
   const isAdmin = !!institution && !institution._memberRole;
   const [listingsView, setListingsView] = useState('list');
@@ -174,6 +176,7 @@ export default function DashboardClient() {
 
       const listings = await fetchMyListings(ctxIsAdmin ? null : user.id, inst?.name);
       if (!cancelled) await fetchListingFavoriters(listings);
+      if (!cancelled) fetchActivityFeed(listings, inst, user.id);
 
       let incoming;
       const instId = inst?.id;
@@ -228,6 +231,54 @@ export default function DashboardClient() {
       .order('created_at', { ascending: false });
     if (error) console.error('fetchListingFavoriters error:', error.message);
     if (data?.length) setListingFavoriters(data);
+  }
+
+  async function fetchActivityFeed(listings, inst, uid) {
+    setFeedLoading(true);
+    const events = [];
+    const myIds = listings?.map(l => l.id) || [];
+
+    if (myIds.length) {
+      const { data: favEvents } = await db.from('listing_favorites')
+        .select('listing_id, institution_name, created_at')
+        .in('listing_id', myIds)
+        .order('created_at', { ascending: false })
+        .limit(30);
+      if (favEvents) {
+        const listingMap = Object.fromEntries((listings || []).map(l => [l.id, l]));
+        favEvents.forEach(f => {
+          const l = listingMap[f.listing_id];
+          events.push({ type: 'favorite', actor: f.institution_name || 'Nogen', listing_title: l?.title, listing_emoji: l?.emoji || '🧸', created_at: f.created_at });
+        });
+      }
+    }
+
+    const orParts = [];
+    if (inst?.id) orParts.push(`owner_institution_id.eq.${inst.id}`, `initiator_institution_id.eq.${inst.id}`);
+    if (uid) orParts.push(`owner_id.eq.${uid}`, `initiator_id.eq.${uid}`);
+    if (inst?.name) orParts.push(`owner_name.eq.${inst.name}`, `initiator_name.eq.${inst.name}`);
+    if (orParts.length) {
+      const { data: convEvents } = await db.from('conversations')
+        .select('id, listing_title, listing_emoji, owner_name, owner_institution_id, initiator_name, deal_completed, deal_completed_at, created_at, last_message_at')
+        .or(orParts.join(','))
+        .order('last_message_at', { ascending: false })
+        .limit(30);
+      if (convEvents) {
+        convEvents.forEach(c => {
+          const isOwner = c.owner_institution_id === inst?.id || c.owner_name === inst?.name;
+          const other = isOwner ? c.initiator_name : c.owner_name;
+          if (c.deal_completed) {
+            events.push({ type: 'deal', actor: other, listing_title: c.listing_title, listing_emoji: c.listing_emoji || '🧸', created_at: c.deal_completed_at || c.last_message_at, convId: c.id });
+          } else {
+            events.push({ type: 'message', actor: other, listing_title: c.listing_title, listing_emoji: c.listing_emoji || '🧸', created_at: c.last_message_at || c.created_at, convId: c.id });
+          }
+        });
+      }
+    }
+
+    events.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+    setActivityFeed(events.slice(0, 25));
+    setFeedLoading(false);
   }
 
   function openEdit(l) {
@@ -501,6 +552,7 @@ export default function DashboardClient() {
   async function handleRefresh() {
     const listings = await fetchMyListings(ctxIsAdmin ? null : authUserId, institution?.name);
     if (listings?.length) await fetchListingFavoriters(listings);
+    fetchActivityFeed(listings, institution, authUserId);
     onListingCreated();
   }
 
@@ -826,6 +878,51 @@ export default function DashboardClient() {
             </div>
           )}
         </div>
+
+        {/* Aktivitets-feed */}
+        <div style={{ background:PAPER2, borderRadius:22, padding:isMobile?20:28, border:'1px solid rgba(22,34,28,0.07)', boxShadow:'0 1px 4px rgba(22,34,28,0.06)', marginTop:isMobile?16:24 }}>
+          <div style={{ display:'flex', alignItems:'center', gap:10, marginBottom:20 }}>
+            <h2 style={{ fontFamily:FONT, fontWeight:800, fontSize:18, color:INK, margin:0 }}>Seneste aktivitet</h2>
+            {activityFeed.length > 0 && <div style={{ background:GREEN_TINT, border:`1px solid ${GREEN_SOFT}`, borderRadius:99, padding:'2px 10px', fontSize:12, fontWeight:700, color:PRIMARY, fontFamily:FONT }}>{activityFeed.length}</div>}
+          </div>
+          {feedLoading ? (
+            <div style={{ display:'flex', flexDirection:'column', gap:10 }}>
+              {[1,2,3].map(i => <div key={i} className="skeleton" style={{ height:56, borderRadius:12 }} />)}
+            </div>
+          ) : activityFeed.length === 0 ? (
+            <div style={{ textAlign:'center', padding:'40px 0' }}>
+              <div style={{ fontFamily:FONT, fontWeight:800, fontSize:48, color:GREEN_SOFT, lineHeight:1, marginBottom:12 }}>📊</div>
+              <p style={{ fontSize:14, color:INK3, fontFamily:FONT }}>Ingen aktivitet endnu — det kommer når nogen interagerer med dine opslag</p>
+            </div>
+          ) : (
+            <div style={{ display:'flex', flexDirection:'column', gap:1 }}>
+              {activityFeed.map((ev, i) => {
+                const cfg = ev.type === 'favorite'
+                  ? { icon:'♥', iconBg:'#FEF2F2', iconColor:'#e11d48', label:`favoriserede` }
+                  : ev.type === 'deal'
+                  ? { icon:'🤝', iconBg:GREEN_TINT, iconColor:PRIMARY, label:`handel gennemført` }
+                  : { icon:'💬', iconBg:'#EFF6FF', iconColor:'#3B82F6', label:`sendte en besked` };
+                return (
+                  <div key={i}
+                    onClick={ev.convId ? ()=>router.push(`/beskeder?conv=${ev.convId}`) : undefined}
+                    style={{ display:'flex', alignItems:'center', gap:12, padding:'11px 14px', borderRadius:12, cursor:ev.convId?'pointer':'default', transition:'background 0.12s' }}
+                    onMouseEnter={e=>{ if(ev.convId) e.currentTarget.style.background=PAPER; }}
+                    onMouseLeave={e=>{ e.currentTarget.style.background='transparent'; }}>
+                    <div style={{ width:36, height:36, borderRadius:10, background:cfg.iconBg, display:'flex', alignItems:'center', justifyContent:'center', fontSize:16, flexShrink:0 }}>{cfg.icon}</div>
+                    <div style={{ flex:1, minWidth:0 }}>
+                      <div style={{ fontFamily:FONT, fontSize:13, color:INK, lineHeight:1.4 }}>
+                        <strong>{ev.actor || 'Nogen'}</strong> {cfg.label}
+                        {ev.listing_title && <> · <span style={{ color:INK3 }}>{ev.listing_emoji} {ev.listing_title}</span></>}
+                      </div>
+                    </div>
+                    <div style={{ fontSize:11, color:INK3, fontFamily:FONT, flexShrink:0 }}>{relTime(ev.created_at)}</div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+
       </div>
 
       {/* Edit modal */}
