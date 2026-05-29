@@ -1,5 +1,6 @@
 'use client';
 import { useState } from 'react';
+import { useRouter } from 'next/navigation';
 import { PRIMARY, GREEN_TINT, GREEN_SOFT, PAPER2, INK, INK3, CORAL, TYPE_CFG, CONDITION_COLORS } from '@/lib/constants';
 import { CATEGORIES } from '@/lib/categories';
 import { db } from '@/lib/supabase';
@@ -7,6 +8,7 @@ import { db } from '@/lib/supabase';
 const FONT = "'Sora', sans-serif";
 
 export default function ListingCard({ listing, onClick, favs, toggleFav, onInstitutionClick }) {
+  const router = useRouter();
   const isFav = favs.includes(listing.id);
   const [popping, setPopping] = useState(false);
   const [imgIdx, setImgIdx] = useState(0);
@@ -16,6 +18,8 @@ export default function ListingCard({ listing, onClick, favs, toggleFav, onInsti
 
   async function handleFav(e) {
     e.stopPropagation();
+    const { data: { user } } = await db.auth.getUser();
+    if (!user) { router.push('/login'); return; }
     const adding = !isFav;
     toggleFav(listing.id);
     setPopping(true);
@@ -24,19 +28,16 @@ export default function ListingCard({ listing, onClick, favs, toggleFav, onInsti
     setLocalFavCount(newCount);
     db.from('listings').update({ fav_count: newCount }).eq('id', listing.id);
 
-    const { data: { user } } = await db.auth.getUser();
-    if (user) {
-      if (adding) {
-        const { data: member } = await db.from('institution_members').select('institution_id, institutions(id, name)').eq('email', user.email).maybeSingle();
-        const inst = member?.institutions;
-        db.from('listing_favorites').upsert({
-          listing_id: listing.id, user_id: user.id,
-          institution_id: inst?.id || null,
-          institution_name: inst?.name || null,
-        }, { onConflict: 'listing_id,user_id' });
-      } else {
-        db.from('listing_favorites').delete().eq('listing_id', listing.id).eq('user_id', user.id);
-      }
+    if (adding) {
+      const { data: member } = await db.from('institution_members').select('institution_id, institutions(id, name)').eq('email', user.email).maybeSingle();
+      const inst = member?.institutions;
+      db.from('listing_favorites').upsert({
+        listing_id: listing.id, user_id: user.id,
+        institution_id: inst?.id || null,
+        institution_name: inst?.name || null,
+      }, { onConflict: 'listing_id,user_id' });
+    } else {
+      db.from('listing_favorites').delete().eq('listing_id', listing.id).eq('user_id', user.id);
     }
   }
 

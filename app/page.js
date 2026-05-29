@@ -14,6 +14,7 @@ const FONT = "'Sora', sans-serif";
 
 /* ── Compact mobile listing card (Vinted-style) ───────────── */
 function MobileCard({ listing, onClick, favs, toggleFav }) {
+  const router = useRouter();
   const isFav = favs.includes(listing.id);
   const [popping, setPopping] = useState(false);
   const [imgIdx, setImgIdx] = useState(0);
@@ -24,18 +25,18 @@ function MobileCard({ listing, onClick, favs, toggleFav }) {
 
   async function handleFav(e) {
     e.stopPropagation();
+    const { data: { user } } = await db.auth.getUser();
+    if (!user) { router.push('/login'); return; }
+    const adding = !isFav;
     toggleFav(listing.id);
     setPopping(true);
     setTimeout(() => setPopping(false), 350);
-    const adding = !isFav;
-    const { data: { user } } = await db.auth.getUser();
-    if (user) {
-      if (adding) {
-        const { data: member } = await db.from('institution_members').select('institution_id, institutions(id, name)').eq('email', user.email).maybeSingle();
-        const inst = member?.institutions;
-        db.from('listing_favorites').upsert({ listing_id: listing.id, user_id: user.id, institution_id: inst?.id || null, institution_name: inst?.name || null }, { onConflict: 'listing_id,user_id' });
-      }
-      else db.from('listing_favorites').delete().eq('listing_id', listing.id).eq('user_id', user.id);
+    if (adding) {
+      const { data: member } = await db.from('institution_members').select('institution_id, institutions(id, name)').eq('email', user.email).maybeSingle();
+      const inst = member?.institutions;
+      db.from('listing_favorites').upsert({ listing_id: listing.id, user_id: user.id, institution_id: inst?.id || null, institution_name: inst?.name || null }, { onConflict: 'listing_id,user_id' });
+    } else {
+      db.from('listing_favorites').delete().eq('listing_id', listing.id).eq('user_id', user.id);
     }
   }
 
