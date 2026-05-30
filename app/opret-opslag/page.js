@@ -249,10 +249,12 @@ export default function OpretOpslagPage() {
       category: form.category || null, subcategory: form.subcategory || null,
     };
     if (form.type==='byd' && form.min_bid) insertData.min_bid = Number(form.min_bid);
-    // urgency stored separately — gracefully ignored if column not yet added
-    if (isSøges) insertData.urgency = form.urgency || 'ingen';
     const { data: listing, error } = await db.from('listings').insert(insertData).select().single();
-    if (error) { showToast('Noget gik galt — prøv igen', 'error'); setSaving(false); return; }
+    if (error) { console.error('Insert error:', error); showToast('Noget gik galt — prøv igen', 'error'); setSaving(false); return; }
+    // urgency: update separately so it fails silently if column doesn't exist yet
+    if (isSøges && listing?.id) {
+      await db.from('listings').update({ urgency: form.urgency || 'ingen' }).eq('id', listing.id).then(() => {});
+    }
     if (!isSøges && imgFiles.length > 0) {
       const urls = [];
       for (const file of imgFiles) {
