@@ -150,13 +150,21 @@ export default function DashboardClient() {
 
   async function startMatchConversation(match) {
     if (!institution || !authUserId) { router.push('/login'); return; }
+    // Check for existing conversation on this listing where current user is initiator
     const { data: existing } = await db.from('conversations')
       .select('id')
       .eq('listing_id', match.id)
-      .or(`owner_institution_id.eq.${institution.id},initiator_institution_id.eq.${institution.id}`)
+      .eq('initiator_id', authUserId)
       .maybeSingle();
     if (existing) { setMatchesModal(null); router.push(`/beskeder?conv=${existing.id}`); return; }
-    const { data: created, error } = await db.from('conversations').insert({
+    // Also check if current institution is owner_institution_id
+    const { data: existingAsOwner } = await db.from('conversations')
+      .select('id')
+      .eq('listing_id', match.id)
+      .eq('initiator_institution_id', institution.id)
+      .maybeSingle();
+    if (existingAsOwner) { setMatchesModal(null); router.push(`/beskeder?conv=${existingAsOwner.id}`); return; }
+    const { data: created, error: convError } = await db.from('conversations').insert({
       owner_id: match.user_id || null,
       owner_name: match.institution_name,
       initiator_id: authUserId,
@@ -169,6 +177,7 @@ export default function DashboardClient() {
       listing_color: match.color || '#FFD166',
       listing_type: match.type,
     }).select('id').single();
+    if (convError) console.error('Conv insert error:', convError.message, convError.details);
     setMatchesModal(null);
     router.push(created?.id ? `/beskeder?conv=${created.id}` : '/beskeder');
   }
@@ -1264,9 +1273,9 @@ export default function DashboardClient() {
     {matchesModal && typeof document !== 'undefined' && createPortal(
       <div onClick={()=>setMatchesModal(null)} style={{ position:'fixed', inset:0, background:'rgba(22,34,28,0.65)', zIndex:10002, display:'flex', alignItems:'flex-end', justifyContent:'center' }}>
         <div onClick={e=>e.stopPropagation()} style={{ background:PAPER, borderRadius:'20px 20px 0 0', width:'100%', maxWidth:640, maxHeight:'80vh', display:'flex', flexDirection:'column', boxShadow:'0 -8px 40px rgba(22,34,28,0.2)' }}>
-          {/* Drag handle — tap to close */}
-          <div onClick={()=>setMatchesModal(null)} style={{ padding:'12px 0 0', display:'flex', justifyContent:'center', cursor:'pointer', flexShrink:0 }}>
-            <div style={{ width:40, height:4, borderRadius:99, background:PAPER3 }} />
+          {/* Tap-to-close zone */}
+          <div onClick={()=>setMatchesModal(null)} style={{ padding:'14px 0 8px', display:'flex', justifyContent:'center', cursor:'pointer', flexShrink:0, WebkitTapHighlightColor:'transparent' }}>
+            <div style={{ width:48, height:5, borderRadius:99, background:PAPER3 }} />
           </div>
           {/* Header */}
           <div style={{ padding:'12px 20px 14px', borderBottom:`1px solid ${PAPER2}`, flexShrink:0 }}>
