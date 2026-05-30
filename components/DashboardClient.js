@@ -1271,7 +1271,7 @@ export default function DashboardClient() {
 
     {/* Matches modal */}
     {matchesModal && typeof document !== 'undefined' && createPortal(
-      <div onClick={()=>setMatchesModal(null)} style={{ position:'fixed', inset:0, background:'rgba(22,34,28,0.65)', zIndex:10002, display:'flex', alignItems:'flex-end', justifyContent:'center' }}>
+      <div onClick={()=>setMatchesModal(null)} style={{ position:'fixed', inset:0, background:'rgba(22,34,28,0.65)', zIndex:10002, display:'flex', alignItems:'flex-end', justifyContent:'center', cursor:'pointer' }}>
         <div onClick={e=>e.stopPropagation()} style={{ background:PAPER, borderRadius:'20px 20px 0 0', width:'100%', maxWidth:640, maxHeight:'80vh', display:'flex', flexDirection:'column', boxShadow:'0 -8px 40px rgba(22,34,28,0.2)' }}>
           {/* Tap-to-close zone */}
           <div onClick={()=>setMatchesModal(null)} style={{ padding:'14px 0 8px', display:'flex', justifyContent:'center', cursor:'pointer', flexShrink:0, WebkitTapHighlightColor:'transparent' }}>
@@ -1314,7 +1314,7 @@ export default function DashboardClient() {
                     </div>
                     <div style={{ display:'flex', flexDirection:'column', gap:6, flexShrink:0 }} onClick={e=>e.stopPropagation()}>
                       {m.price > 0 && <div style={{ fontFamily:FONT, fontWeight:800, fontSize:13, color:PRIMARY }}>{m.price} kr.</div>}
-                      <button onClick={()=>startMatchConversation(m)} style={{ background:'#7C3AED', color:'#fff', border:'none', borderRadius:99, padding:'6px 12px', fontSize:11, fontWeight:700, cursor:'pointer', fontFamily:FONT, whiteSpace:'nowrap' }}>
+                      <button onClick={()=>setQuickViewListing(m)} style={{ background:'#7C3AED', color:'#fff', border:'none', borderRadius:99, padding:'6px 12px', fontSize:11, fontWeight:700, cursor:'pointer', fontFamily:FONT, whiteSpace:'nowrap' }}>
                         Kontakt →
                       </button>
                     </div>
