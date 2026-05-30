@@ -11,7 +11,6 @@ import { useApp } from '@/providers/AppProvider';
 import { db } from '@/lib/supabase';
 import { getCO2Comparison } from '@/lib/co2/calculator';
 import { LogoLockup } from '@/components/Logo';
-import { db } from '@/lib/supabase';
 
 const FONT = "'Sora', sans-serif";
 
