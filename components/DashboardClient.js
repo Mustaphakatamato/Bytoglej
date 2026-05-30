@@ -183,6 +183,7 @@ export default function DashboardClient() {
       if (!cancelled) await fetchListingFavoriters(listings);
       if (!cancelled) fetchActivityFeed(listings, inst, user.id);
       if (!cancelled) fetchCO2Savings(inst, user.id);
+      if (!cancelled) fetchTrades();
 
       let incoming;
       const instId = inst?.id;
@@ -572,6 +573,7 @@ export default function DashboardClient() {
     if (listings?.length) await fetchListingFavoriters(listings);
     fetchActivityFeed(listings, institution, authUserId);
     fetchCO2Savings(institution, authUserId);
+    fetchTrades();
     onListingCreated();
   }
 
