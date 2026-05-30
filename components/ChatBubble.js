@@ -186,6 +186,29 @@ export default function ChatBubble() {
     if (m.message_type === 'bundle') return <span style={{ fontSize: 12 }}>📦 Bundttilbud — tryk for at se</span>;
     if (m.message_type === 'bid')    return <span style={{ fontSize: 12 }}>💰 Bud</span>;
     if (m.message_type === 'swap')   return <span style={{ fontSize: 12 }}>🔄 Bytteforslag</span>;
+    if (m.message_type === 'buy_request') {
+      let d = null;
+      try { d = JSON.parse(m.content); } catch {}
+      return (
+        <div>
+          <div style={{ fontSize: 10, fontWeight: 700, color: PRIMARY, textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 4, display: 'flex', alignItems: 'center', gap: 4 }}>
+            <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke={PRIMARY} strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><circle cx="9" cy="21" r="1"/><circle cx="20" cy="21" r="1"/><path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"/></svg>
+            Købsforespørgsel
+          </div>
+          {d?.items?.map((item, i) => (
+            <div key={i} style={{ fontSize: 12, display: 'flex', justifyContent: 'space-between', gap: 8, marginBottom: 2 }}>
+              <span>{item.emoji} {item.title}</span>
+              {item.price && <span style={{ fontWeight: 700 }}>{item.price} kr.</span>}
+            </div>
+          ))}
+          {d?.totalPrice > 0 && (
+            <div style={{ fontSize: 12, fontWeight: 800, borderTop: '1px solid rgba(22,34,28,0.1)', marginTop: 4, paddingTop: 4, textAlign: 'right' }}>
+              Total: {d.totalPrice} kr.
+            </div>
+          )}
+        </div>
+      );
+    }
     return <span style={{ fontSize: 13, lineHeight: 1.45, wordBreak: 'break-word', fontFamily: FONT }}>{m.content}</span>;
   }
 
@@ -275,7 +298,7 @@ export default function ChatBubble() {
               <div style={{ flex: 1, overflowY: 'auto', padding: '10px 12px', display: 'flex', flexDirection: 'column', gap: 5 }}>
                 {messages.map(m => {
                   const mine     = m.sender_id === userId;
-                  const special  = ['image', 'bundle', 'bid', 'swap'].includes(m.message_type);
+                  const special  = ['image', 'bundle', 'bid', 'swap', 'buy_request'].includes(m.message_type);
                   const isImg    = m.message_type === 'image';
                   return (
                     <div key={m.id} style={{ display: 'flex', justifyContent: mine ? 'flex-end' : 'flex-start' }}>

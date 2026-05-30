@@ -1466,8 +1466,8 @@ export default function MessagesClient() {
                     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
                   </button>
                   <textarea ref={inputRef} value={newMsg} onChange={e=>setNewMsg(e.target.value)} onKeyDown={onKey}
-                    placeholder="Skriv en besked… (Enter for at sende)" rows={1}
-                    style={{ flex:1, padding:'11px 14px', borderRadius:14, border:`1.5px solid ${PAPER3}`, fontSize:14, resize:'none', fontFamily:FONT, outline:'none', lineHeight:1.5, maxHeight:120, overflowY:'auto', background:PAPER }}
+                    placeholder="Skriv en besked…" rows={1}
+                    style={{ flex:1, padding:'11px 14px', borderRadius:14, border:`1.5px solid ${PAPER3}`, fontSize:14, resize:'none', fontFamily:FONT, outline:'none', lineHeight:1.5, maxHeight:120, minHeight:44, overflowY:'auto', background:PAPER }}
                     onInput={e=>{ e.target.style.height='auto'; e.target.style.height=Math.min(e.target.scrollHeight,120)+'px'; }}
                   />
                   <button onClick={send} disabled={(!newMsg.trim()&&chatImages.length===0)||sending}
