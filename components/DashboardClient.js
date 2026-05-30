@@ -291,12 +291,10 @@ export default function DashboardClient() {
   }
 
   async function fetchCO2Savings(inst, uid) {
-    if (!inst?.id && !uid) return;
-    const orParts = [];
-    if (inst?.id) orParts.push(`seller_institution_id.eq.${inst.id}`, `buyer_institution_id.eq.${inst.id}`);
-    if (uid) orParts.push(`seller_institution_id.eq.${uid}`, `buyer_institution_id.eq.${uid}`);
+    if (!inst?.id) return;
     const { data } = await db.from('transaction_co2_savings')
       .select('net_saved_kg, breakdown, methodology_version, calculated_at, transaction_id, seller_name, buyer_name, listing_category_id')
+      .or(`seller_institution_id.eq.${inst.id},buyer_institution_id.eq.${inst.id}`)
       .order('calculated_at', { ascending: false });
     if (data) setCo2Savings(data);
   }
