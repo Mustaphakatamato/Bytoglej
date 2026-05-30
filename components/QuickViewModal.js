@@ -156,7 +156,7 @@ export default function QuickViewModal({ listing, onClose }) {
   }
 
   return (
-    <div style={{ position:'fixed', inset:0, background:'rgba(22,34,28,0.65)', zIndex:1000, display:'flex', alignItems:'center', justifyContent:'center', padding:16 }} onClick={mode === 'main' ? onClose : undefined}>
+    <div style={{ position:'fixed', inset:0, background:'rgba(22,34,28,0.65)', zIndex:10003, display:'flex', alignItems:'center', justifyContent:'center', padding:16 }} onClick={mode === 'main' ? onClose : undefined}>
       <div style={{ background:PAPER, borderRadius:24, maxWidth:580, width:'100%', maxHeight:'92vh', overflowY:'auto', boxShadow:'0 24px 80px rgba(22,34,28,0.3)', position:'relative' }} onClick={e=>e.stopPropagation()}>
 
         <button onClick={()=>{ if (mode !== 'main') setMode('main'); else onClose(); }} style={{ position:'absolute', top:12, right:12, zIndex:10, width:34, height:34, borderRadius:'50%', background:'rgba(22,34,28,0.55)', border:'none', color:'#fff', fontSize:16, cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center', backdropFilter:'blur(4px)' }}>

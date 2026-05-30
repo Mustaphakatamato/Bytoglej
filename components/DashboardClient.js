@@ -1289,7 +1289,7 @@ export default function DashboardClient() {
             ) : (
               <div style={{ display:'flex', flexDirection:'column', gap:10 }}>
                 {matches.map(m => (
-                  <div key={m.id} onClick={()=>{ setMatchesModal(null); setQuickViewListing(m); }} style={{ background:'#fff', borderRadius:14, border:`1.5px solid ${m._score > 0 ? '#DDD6FE' : PAPER2}`, padding:'12px 14px', display:'flex', gap:12, alignItems:'center', cursor:'pointer' }}>
+                  <div key={m.id} onClick={()=>setQuickViewListing(m)} style={{ background:'#fff', borderRadius:14, border:`1.5px solid ${m._score > 0 ? '#DDD6FE' : PAPER2}`, padding:'12px 14px', display:'flex', gap:12, alignItems:'center', cursor:'pointer' }}>
                     <div style={{ width:52, height:52, borderRadius:10, background:m.images?.[0]?PAPER3:m.color||GREEN_TINT, display:'flex', alignItems:'center', justifyContent:'center', fontSize:24, flexShrink:0, overflow:'hidden' }}>
                       {m.images?.[0] ? <img src={m.images[0]} style={{ width:'100%', height:'100%', objectFit:'cover' }} alt="" /> : m.emoji||'🧸'}
                     </div>
