@@ -586,9 +586,16 @@ export default function MessagesClient() {
       ]);
       let o = ownerRes.data;
       let i = initiatorRes.data;
+      console.log('[CO2] institutions:', {
+        owner_id: conversation.owner_institution_id,
+        initiator_id: conversation.initiator_institution_id,
+        owner: o ? { zipcode: o.zipcode, city: o.city, hasLatLon: !!(o.latitude && o.longitude) } : null,
+        initiator: i ? { zipcode: i.zipcode, city: i.city, hasLatLon: !!(i.latitude && i.longitude) } : null,
+      });
       // Geocode if coordinates not cached
       if (o && !o.latitude) {
         const c = await geocodeForCO2(o.address, o.zipcode, o.city);
+        console.log('[CO2] owner geocode result:', c);
         if (c) {
           db.from('institutions').update({ latitude: c.lat, longitude: c.lon }).eq('id', conversation.owner_institution_id);
           o = { ...o, latitude: c.lat, longitude: c.lon };
@@ -596,6 +603,7 @@ export default function MessagesClient() {
       }
       if (i && !i.latitude) {
         const c = await geocodeForCO2(i.address, i.zipcode, i.city);
+        console.log('[CO2] initiator geocode result:', c);
         if (c) {
           db.from('institutions').update({ latitude: c.lat, longitude: c.lon }).eq('id', conversation.initiator_institution_id);
           i = { ...i, latitude: c.lat, longitude: c.lon };
@@ -604,6 +612,7 @@ export default function MessagesClient() {
       if (o?.latitude && i?.latitude) {
         distanceKm = haversine(o.latitude, o.longitude, i.latitude, i.longitude);
       }
+      console.log('[CO2] distanceKm:', distanceKm);
       // Fetch listing category if not provided
       let resolvedCategory = categoryId;
       if (!resolvedCategory && conversation.listing_id) {
