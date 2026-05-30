@@ -219,6 +219,8 @@ export default function ChatBubble() {
     <>
       {/* ── Panel ─────────────────────────────────────────────────────────── */}
       {open && (
+        <>
+        <div onClick={() => setOpen(false)} style={{ position: 'fixed', inset: 0, zIndex: 9997 }} />
         <div style={{
           position: 'fixed', bottom: panelBottom, right: 20, width: PANEL_W, maxHeight: 500,
           background: PAPER, borderRadius: 20, zIndex: 9998,
@@ -344,6 +346,7 @@ export default function ChatBubble() {
             </>
           )}
         </div>
+        </>
       )}
 
       {/* ── Bubble button ──────────────────────────────────────────────────── */}
