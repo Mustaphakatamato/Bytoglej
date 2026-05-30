@@ -156,9 +156,10 @@ export default function DashboardClient() {
       .or(`owner_institution_id.eq.${institution.id},initiator_institution_id.eq.${institution.id}`)
       .maybeSingle();
     if (existing) { setMatchesModal(null); router.push(`/beskeder?conv=${existing.id}`); return; }
-    const { data: created } = await db.from('conversations').insert({
-      owner_id: authUserId,
+    const { data: created, error } = await db.from('conversations').insert({
+      owner_id: match.user_id || null,
       owner_name: match.institution_name,
+      initiator_id: authUserId,
       initiator_name: institution.name,
       initiator_institution_id: institution.id,
       listing_id: match.id,
@@ -180,7 +181,7 @@ export default function DashboardClient() {
     const minRank = conditionRank[søgesListing.condition] ?? 3;
 
     let q = db.from('listings')
-      .select('id,title,description,condition,category,age_group,price,images,emoji,color,institution_name,type,is_active,is_sold')
+      .select('id,title,description,condition,category,age_group,price,images,emoji,color,institution_name,user_id,type,is_active,is_sold')
       .eq('is_active', true)
       .eq('is_sold', false)
       .neq('type', 'søges')
@@ -1262,9 +1263,13 @@ export default function DashboardClient() {
     {/* Matches modal */}
     {matchesModal && typeof document !== 'undefined' && createPortal(
       <div onClick={()=>setMatchesModal(null)} style={{ position:'fixed', inset:0, background:'rgba(22,34,28,0.65)', zIndex:10002, display:'flex', alignItems:'flex-end', justifyContent:'center' }}>
-        <div onClick={e=>e.stopPropagation()} style={{ background:PAPER, borderRadius:'20px 20px 0 0', width:'100%', maxWidth:640, maxHeight:'85vh', display:'flex', flexDirection:'column', boxShadow:'0 -8px 40px rgba(22,34,28,0.2)' }}>
+        <div onClick={e=>e.stopPropagation()} style={{ background:PAPER, borderRadius:'20px 20px 0 0', width:'100%', maxWidth:640, maxHeight:'80vh', display:'flex', flexDirection:'column', boxShadow:'0 -8px 40px rgba(22,34,28,0.2)' }}>
+          {/* Drag handle — tap to close */}
+          <div onClick={()=>setMatchesModal(null)} style={{ padding:'12px 0 0', display:'flex', justifyContent:'center', cursor:'pointer', flexShrink:0 }}>
+            <div style={{ width:40, height:4, borderRadius:99, background:PAPER3 }} />
+          </div>
           {/* Header */}
-          <div style={{ padding:'20px 20px 14px', borderBottom:`1px solid ${PAPER2}`, flexShrink:0 }}>
+          <div style={{ padding:'12px 20px 14px', borderBottom:`1px solid ${PAPER2}`, flexShrink:0 }}>
             <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:6 }}>
               <div style={{ fontFamily:FONT, fontWeight:800, fontSize:16, color:INK }}>Mulige matches</div>
               <button onClick={()=>setMatchesModal(null)} style={{ background:'none', border:'none', fontSize:20, cursor:'pointer', color:INK3, lineHeight:1, padding:4 }}>✕</button>
