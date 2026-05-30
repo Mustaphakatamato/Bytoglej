@@ -670,7 +670,11 @@ export default function MessagesClient() {
     setConvs(cs => cs.map(c => c.id === active.id ? { ...c, ...upd } : c));
     setMessages(ms => ms.map(m => m.id === msg.id ? { ...m, bid_status: 'accepted' } : m));
     // Persist CO2 saving non-blockingly after deal is confirmed
-    persistCO2Saving(active, active.listing_category || null);
+    // Pass ctxInstId as fallback for initiator if conversation was created without institution context
+    const convWithInstFallback = active.initiator_institution_id
+      ? active
+      : { ...active, initiator_institution_id: ctxInstId || null };
+    persistCO2Saving(convWithInstFallback, active.listing_category || null);
   }
 
   async function handleRejectBid() {
