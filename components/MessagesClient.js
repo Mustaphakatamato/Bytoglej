@@ -8,6 +8,7 @@ import { useApp, useActiveUser } from '@/providers/AppProvider';
 import { Badge, Btn, Spinner, SkeletonMessageRow } from '@/components/ui';
 import PullToRefresh from '@/components/PullToRefresh';
 import { calculateCO2Savings } from '@/lib/co2/calculator';
+import { geocodeForCO2 } from '@/lib/co2/geocoding';
 
 const FONT = "'Sora', sans-serif";
 const INK2 = '#3A473D';
@@ -587,14 +588,14 @@ export default function MessagesClient() {
       let i = initiatorRes.data;
       // Geocode if coordinates not cached
       if (o && !o.latitude) {
-        const c = await geocodeAddress(o.address, o.zipcode, o.city);
+        const c = await geocodeForCO2(o.address, o.zipcode, o.city);
         if (c) {
           db.from('institutions').update({ latitude: c.lat, longitude: c.lon }).eq('id', conversation.owner_institution_id);
           o = { ...o, latitude: c.lat, longitude: c.lon };
         }
       }
       if (i && !i.latitude) {
-        const c = await geocodeAddress(i.address, i.zipcode, i.city);
+        const c = await geocodeForCO2(i.address, i.zipcode, i.city);
         if (c) {
           db.from('institutions').update({ latitude: c.lat, longitude: c.lon }).eq('id', conversation.initiator_institution_id);
           i = { ...i, latitude: c.lat, longitude: c.lon };
