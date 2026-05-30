@@ -183,7 +183,7 @@ export default function DashboardClient() {
       if (!cancelled) await fetchListingFavoriters(listings);
       if (!cancelled) fetchActivityFeed(listings, inst, user.id);
       if (!cancelled) fetchCO2Savings(inst, user.id);
-      if (!cancelled) fetchTrades();
+      if (!cancelled) fetchTrades(inst, user.id);
 
       let incoming;
       const instId = inst?.id;
@@ -405,14 +405,15 @@ export default function DashboardClient() {
     e.target.value = '';
   }
 
-  async function fetchTrades() {
+  async function fetchTrades(inst, uid) {
     setTradesLoading(true);
-    const instId = institution?.id;
-    const uid = authUserId;
+    const instId = (inst ?? institution)?.id;
+    const userId = uid ?? authUserId;
+    const instName = (inst ?? institution)?.name;
     const orParts = [];
     if (instId) orParts.push(`owner_institution_id.eq.${instId}`, `initiator_institution_id.eq.${instId}`);
-    if (uid) orParts.push(`initiator_id.eq.${uid}`, `owner_id.eq.${uid}`);
-    if (institution?.name) orParts.push(`owner_name.eq.${institution.name}`, `initiator_name.eq.${institution.name}`);
+    if (userId) orParts.push(`initiator_id.eq.${userId}`, `owner_id.eq.${userId}`);
+    if (instName) orParts.push(`owner_name.eq.${instName}`, `initiator_name.eq.${instName}`);
     if (!orParts.length) { setTradesLoading(false); return; }
     const { data } = await db.from('conversations').select('*').or(orParts.join(',')).eq('deal_completed', true).order('deal_completed_at', { ascending: false });
     if (data) setTrades(data);
@@ -573,7 +574,7 @@ export default function DashboardClient() {
     if (listings?.length) await fetchListingFavoriters(listings);
     fetchActivityFeed(listings, institution, authUserId);
     fetchCO2Savings(institution, authUserId);
-    fetchTrades();
+    fetchTrades(institution, authUserId);
     onListingCreated();
   }
 
