@@ -1,6 +1,7 @@
 'use client';
 // dashboard
 import { useState, useEffect, useRef, useCallback } from 'react';
+import { createPortal } from 'react-dom';
 import { useRouter } from 'next/navigation';
 import { db } from '@/lib/supabase';
 import { PRIMARY, GREEN_SOFT, GREEN_TINT, PAPER, PAPER2, PAPER3, INK, INK2, INK3, CORAL, TYPE_CFG, CONDITIONS, AGE_GROUPS, LISTING_TAGS } from '@/lib/constants';
@@ -1093,61 +1094,68 @@ export default function DashboardClient() {
         )}
       </Modal>
 
-      {/* Trades modal */}
-      <Modal open={tradesOpen} onClose={()=>setTradesOpen(false)} title="Gennemførte handler">
-        <div>
-          <div style={{ display:'flex', gap:8, marginBottom:16 }}>
-            {[['all','Alle'], ['sold','Solgt'], ['bought','Købt']].map(([key, label]) => (
-              <button key={key} onClick={()=>setTradesTab(key)}
-                style={{ flex:1, padding:'8px', borderRadius:99, border:`1.5px solid ${tradesTab===key?PRIMARY:PAPER3}`, background:tradesTab===key?GREEN_TINT:'transparent', color:tradesTab===key?PRIMARY:INK3, fontFamily:FONT, fontWeight:700, fontSize:13, cursor:'pointer', transition:'all 0.15s' }}>
-                {label}
-              </button>
-            ))}
-          </div>
-          {tradesLoading
-            ? <div style={{ textAlign:'center', padding:'32px 0', color:INK3, fontFamily:FONT }}>Indlæser…</div>
-            : (() => {
-                const filtered = tradesTab === 'sold' ? soldTrades : tradesTab === 'bought' ? boughtTrades : trades;
-                if (filtered.length === 0) return (
-                  <div style={{ textAlign:'center', padding:'40px 0' }}>
-                    <div style={{ fontFamily:FONT, fontWeight:800, fontSize:48, color:GREEN_SOFT, lineHeight:1, marginBottom:12 }}>0</div>
-                    <p style={{ fontSize:14, color:INK3, fontFamily:FONT }}>Ingen gennemførte handler endnu</p>
-                    <p style={{ fontSize:12, color:INK3, marginTop:6, fontFamily:FONT }}>Handler optræder her når et bud accepteres</p>
-                  </div>
-                );
-                return filtered.map(t => {
-                  const isSeller = t.owner_institution_id === institution?.id || t.owner_name === institution?.name;
-                  const otherParty = isSeller ? t.initiator_name : t.owner_name;
-                  const dealDate = t.deal_completed_at || t.handled_at;
-                  const tradeCo2 = co2Savings.find(s => s.transaction_id === t.id);
-                  return (
-                    <div key={t.id} style={{ border:`1px solid ${isSeller?GREEN_SOFT:'#BFDBFE'}`, borderRadius:14, padding:'14px 16px', marginBottom:10, background:isSeller?GREEN_TINT:'#EFF6FF' }}>
-                      <div style={{ display:'flex', justifyContent:'space-between', alignItems:'flex-start', marginBottom:8 }}>
-                        <div style={{ flex:1, minWidth:0, marginRight:12 }}>
-                          <div style={{ fontFamily:FONT, fontWeight:800, fontSize:14, marginBottom:2, color:INK }}>{t.listing_title || 'Direkte besked'}</div>
-                          <div style={{ fontSize:12, color:INK3, fontFamily:FONT }}>
-                            {isSeller ? 'Solgt til' : 'Købt fra'} <strong style={{ color:INK }}>{otherParty}</strong>
-                          </div>
-                        </div>
-                        <span style={{ background:isSeller?PRIMARY:'#3B82F6', color:'#fff', borderRadius:99, padding:'3px 10px', fontSize:11, fontWeight:800, flexShrink:0, fontFamily:FONT }}>{isSeller?'Solgt':'Købt'}</span>
-                      </div>
-                      <div style={{ display:'flex', gap:12, flexWrap:'wrap', fontSize:11, color:INK3, fontFamily:FONT }}>
-                        <span>{dealDate ? new Date(dealDate).toLocaleDateString('da-DK',{day:'numeric',month:'long',year:'numeric'}) : '—'}</span>
-                        {t.deal_type && <span>{t.deal_type === 'byd' ? 'Bud accepteret' : t.deal_type === 'byt' ? 'Bytte' : 'Køb'}</span>}
-                      </div>
-                      {tradeCo2 && (
-                        <button onClick={()=>{ setCo2ModalData(tradeCo2); setCo2ModalOpen(true); }}
-                          style={{ marginTop:8, display:'inline-flex', alignItems:'center', gap:5, background:'#F0FDF4', border:`1px solid ${GREEN_SOFT}`, borderRadius:99, padding:'4px 10px', fontSize:12, fontWeight:700, color:PRIMARY, cursor:'pointer', fontFamily:FONT }}>
-                          🌱 ≈ {tradeCo2.net_saved_kg} kg CO₂e sparet
-                        </button>
-                      )}
-                      <button onClick={()=>router.push('/beskeder')} style={{ marginTop:10, background:'none', border:`1.5px solid ${PRIMARY}`, color:PRIMARY, borderRadius:99, padding:'5px 12px', fontSize:12, fontWeight:700, cursor:'pointer', fontFamily:FONT }}>Se samtale →</button>
+      {/* Trades drawer — rendered via portal to escape page-enter stacking context */}
+      {tradesOpen && typeof document !== 'undefined' && createPortal(
+        <div onClick={()=>setTradesOpen(false)} style={{ position:'fixed', inset:0, background:'rgba(22,34,28,0.65)', zIndex:10002, display:'flex', alignItems:isMobile?'flex-end':'center', justifyContent:'center', padding:isMobile?0:20 }}>
+          <div onClick={e=>e.stopPropagation()} style={{ background:PAPER, borderRadius:isMobile?'20px 20px 0 0':'24px', padding:isMobile?`24px 20px calc(env(safe-area-inset-bottom, 0px) + 80px)`:'36px', width:'100%', maxWidth:isMobile?'100%':500, boxShadow:'0 28px 70px rgba(22,34,28,0.25)', maxHeight:'92vh', overflowY:'auto' }}>
+            <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:24 }}>
+              <h2 style={{ fontFamily:FONT, fontWeight:800, fontSize:22, letterSpacing:'-0.03em', color:INK, margin:0 }}>Gennemførte handler</h2>
+              <button onClick={()=>setTradesOpen(false)} style={{ background:PAPER2, border:'none', borderRadius:999, width:34, height:34, fontSize:16, display:'flex', alignItems:'center', justifyContent:'center', color:INK2, cursor:'pointer' }}>✕</button>
+            </div>
+            <div style={{ display:'flex', gap:8, marginBottom:16 }}>
+              {[['all','Alle'], ['sold','Solgt'], ['bought','Købt']].map(([key, label]) => (
+                <button key={key} onClick={()=>setTradesTab(key)}
+                  style={{ flex:1, padding:'8px', borderRadius:99, border:`1.5px solid ${tradesTab===key?PRIMARY:PAPER3}`, background:tradesTab===key?GREEN_TINT:'transparent', color:tradesTab===key?PRIMARY:INK3, fontFamily:FONT, fontWeight:700, fontSize:13, cursor:'pointer', transition:'all 0.15s' }}>
+                  {label}
+                </button>
+              ))}
+            </div>
+            {tradesLoading
+              ? <div style={{ textAlign:'center', padding:'32px 0', color:INK3, fontFamily:FONT }}>Indlæser…</div>
+              : (() => {
+                  const filtered = tradesTab === 'sold' ? soldTrades : tradesTab === 'bought' ? boughtTrades : trades;
+                  if (filtered.length === 0) return (
+                    <div style={{ textAlign:'center', padding:'40px 0' }}>
+                      <div style={{ fontFamily:FONT, fontWeight:800, fontSize:48, color:GREEN_SOFT, lineHeight:1, marginBottom:12 }}>0</div>
+                      <p style={{ fontSize:14, color:INK3, fontFamily:FONT }}>Ingen gennemførte handler endnu</p>
+                      <p style={{ fontSize:12, color:INK3, marginTop:6, fontFamily:FONT }}>Handler optræder her når et bud accepteres</p>
                     </div>
                   );
-                });
-              })()}
-        </div>
-      </Modal>
+                  return filtered.map(t => {
+                    const isSeller = t.owner_institution_id === institution?.id || t.owner_name === institution?.name;
+                    const otherParty = isSeller ? t.initiator_name : t.owner_name;
+                    const dealDate = t.deal_completed_at || t.handled_at;
+                    const tradeCo2 = co2Savings.find(s => s.transaction_id === t.id);
+                    return (
+                      <div key={t.id} style={{ border:`1px solid ${isSeller?GREEN_SOFT:'#BFDBFE'}`, borderRadius:14, padding:'14px 16px', marginBottom:10, background:isSeller?GREEN_TINT:'#EFF6FF' }}>
+                        <div style={{ display:'flex', justifyContent:'space-between', alignItems:'flex-start', marginBottom:8 }}>
+                          <div style={{ flex:1, minWidth:0, marginRight:12 }}>
+                            <div style={{ fontFamily:FONT, fontWeight:800, fontSize:14, marginBottom:2, color:INK }}>{t.listing_title || 'Direkte besked'}</div>
+                            <div style={{ fontSize:12, color:INK3, fontFamily:FONT }}>
+                              {isSeller ? 'Solgt til' : 'Købt fra'} <strong style={{ color:INK }}>{otherParty}</strong>
+                            </div>
+                          </div>
+                          <span style={{ background:isSeller?PRIMARY:'#3B82F6', color:'#fff', borderRadius:99, padding:'3px 10px', fontSize:11, fontWeight:800, flexShrink:0, fontFamily:FONT }}>{isSeller?'Solgt':'Købt'}</span>
+                        </div>
+                        <div style={{ display:'flex', gap:12, flexWrap:'wrap', fontSize:11, color:INK3, fontFamily:FONT }}>
+                          <span>{dealDate ? new Date(dealDate).toLocaleDateString('da-DK',{day:'numeric',month:'long',year:'numeric'}) : '—'}</span>
+                          {t.deal_type && <span>{t.deal_type === 'byd' ? 'Bud accepteret' : t.deal_type === 'byt' ? 'Bytte' : 'Køb'}</span>}
+                        </div>
+                        {tradeCo2 && (
+                          <button onClick={()=>{ setCo2ModalData(tradeCo2); setCo2ModalOpen(true); }}
+                            style={{ marginTop:8, display:'inline-flex', alignItems:'center', gap:5, background:'#F0FDF4', border:`1px solid ${GREEN_SOFT}`, borderRadius:99, padding:'4px 10px', fontSize:12, fontWeight:700, color:PRIMARY, cursor:'pointer', fontFamily:FONT }}>
+                            🌱 ≈ {tradeCo2.net_saved_kg} kg CO₂e sparet
+                          </button>
+                        )}
+                        <button onClick={()=>router.push('/beskeder')} style={{ marginTop:10, background:'none', border:`1.5px solid ${PRIMARY}`, color:PRIMARY, borderRadius:99, padding:'5px 12px', fontSize:12, fontWeight:700, cursor:'pointer', fontFamily:FONT }}>Se samtale →</button>
+                      </div>
+                    );
+                  });
+                })()}
+          </div>
+        </div>,
+        document.body
+      )}
 
       {/* Activity modal */}
       <Modal open={activityOpen} onClose={()=>setActivityOpen(false)} title="Sendte tilbud og forespørgsler">

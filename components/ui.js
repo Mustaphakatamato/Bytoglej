@@ -1,5 +1,6 @@
 'use client';
 import { useState, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { PRIMARY, INK, INK2, INK3, PAPER, PAPER2, PAPER3, TYPE_CFG, CONDITION_COLORS } from '@/lib/constants';
 import { useWindowWidth } from '@/lib/hooks';
 
@@ -30,17 +31,18 @@ export function Modal({ open, onClose, children, title }) {
   useEffect(() => { document.body.style.overflow = open ? 'hidden' : ''; return () => { document.body.style.overflow = ''; }; }, [open]);
   const w = useWindowWidth();
   const isMobile = w < 600;
-  if (!open) return null;
-  return (
+  if (!open || typeof document === 'undefined') return null;
+  return createPortal(
     <div onClick={onClose} style={{ position:'fixed', inset:0, background:'rgba(22,34,28,0.65)', zIndex:10001, display:'flex', alignItems:isMobile?'flex-end':'center', justifyContent:'center', padding:isMobile?0:20, animation:'fadeIn 0.2s ease' }}>
       <div onClick={e=>e.stopPropagation()} style={{ background:PAPER, borderRadius:isMobile?'20px 20px 0 0':'24px', padding:isMobile?`24px 20px calc(env(safe-area-inset-bottom, 0px) + 80px)`:'36px', width:'100%', maxWidth:isMobile?'100%':500, boxShadow:'0 28px 70px rgba(22,34,28,0.25)', maxHeight:'92vh', overflowY:'auto', animation:'popIn 0.25s ease' }}>
         <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:24 }}>
           <h2 style={{ fontFamily:FONT, fontWeight:800, fontSize:22, letterSpacing:'-0.03em', color:INK }}>{title}</h2>
-          <button onClick={onClose} style={{ background:PAPER2, border:'none', borderRadius:999, width:34, height:34, fontSize:16, display:'flex', alignItems:'center', justifyContent:'center', color:INK2 }}>✕</button>
+          <button onClick={onClose} style={{ background:PAPER2, border:'none', borderRadius:999, width:34, height:34, fontSize:16, display:'flex', alignItems:'center', justifyContent:'center', color:INK2, cursor:'pointer' }}>✕</button>
         </div>
         {children}
       </div>
-    </div>
+    </div>,
+    document.body
   );
 }
 
