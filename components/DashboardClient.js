@@ -144,6 +144,45 @@ export default function DashboardClient() {
   const [bulkMode, setBulkMode] = useState(false);
   const [selectedIds, setSelectedIds] = useState(new Set());
   const [bulkConfirmDelete, setBulkConfirmDelete] = useState(false);
+  const [matchesModal, setMatchesModal] = useState(null); // søges listing
+  const [matches, setMatches] = useState([]);
+  const [matchesLoading, setMatchesLoading] = useState(false);
+
+  async function openMatches(søgesListing) {
+    setMatchesModal(søgesListing);
+    setMatches([]);
+    setMatchesLoading(true);
+    const conditionRank = { 'Ny':0, 'Meget god':1, 'God':2, 'Acceptabel':3 };
+    const minRank = conditionRank[søgesListing.condition] ?? 3;
+
+    let q = db.from('listings')
+      .select('id,title,description,condition,category,age_group,price,images,emoji,color,institution_name,type,is_active,is_sold')
+      .eq('is_active', true)
+      .eq('is_sold', false)
+      .neq('type', 'søges')
+      .neq('institution_name', søgesListing.institution_name);
+
+    if (søgesListing.category) q = q.eq('category', søgesListing.category);
+    if (søgesListing.age_group) q = q.eq('age_group', søgesListing.age_group);
+
+    const { data } = await q.limit(100);
+    if (data) {
+      const keywords = (søgesListing.title || '').toLowerCase().split(/\s+/).filter(w => w.length > 2);
+      const scored = data
+        .filter(l => {
+          const rank = conditionRank[l.condition] ?? 3;
+          return rank <= minRank;
+        })
+        .map(l => {
+          const text = (l.title + ' ' + (l.description || '')).toLowerCase();
+          const score = keywords.reduce((s, w) => s + (text.includes(w) ? 1 : 0), 0);
+          return { ...l, _score: score };
+        })
+        .sort((a, b) => b._score - a._score);
+      setMatches(scored);
+    }
+    setMatchesLoading(false);
+  }
 
   function onInstitutionChange(updated) {
     if (adminInst) { setAdminInst(updated); }
@@ -666,7 +705,7 @@ export default function DashboardClient() {
                 </div>
                 {!l.is_sold && !bulkMode && <div style={{ display:'flex', gap:isMobile?6:6, padding:isMobile?'0 12px 10px':'0 14px 10px', flexWrap:'wrap' }} onClick={e=>e.stopPropagation()}>
                   {l.type === 'søges' && (
-                    <button onClick={()=>{ const params = new URLSearchParams(); if(l.category) params.set('category',l.category); router.push('/opslag?' + params.toString()); }} style={{ flex:isMobile?'1 0 100%':undefined, background:'#F5F0FF', border:'1px solid #DDD6FE', borderRadius:99, padding:isMobile?'7px 0':'6px 12px', fontSize:12, fontWeight:700, color:'#7C3AED', cursor:'pointer', fontFamily:FONT }}>🔍 Se mulige matches</button>
+                    <button onClick={()=>openMatches(l)} style={{ flex:isMobile?'1 0 100%':undefined, background:'#F5F0FF', border:'1px solid #DDD6FE', borderRadius:99, padding:isMobile?'7px 0':'6px 12px', fontSize:12, fontWeight:700, color:'#7C3AED', cursor:'pointer', fontFamily:FONT }}>🔍 Se mulige matches</button>
                   )}
                   <button onClick={()=>openEdit(l)} style={{ flex:isMobile?1:undefined, background:GREEN_TINT, border:'none', borderRadius:99, padding:isMobile?'7px 0':'6px 12px', fontSize:12, fontWeight:700, color:PRIMARY, cursor:'pointer', fontFamily:FONT }}>Rediger</button>
                   <button onClick={()=>copyListing(l.id)} style={{ flex:isMobile?1:undefined, background:PAPER2, border:`1px solid ${PAPER3}`, borderRadius:99, padding:isMobile?'7px 0':'6px 12px', fontSize:12, fontWeight:700, color:INK2, cursor:'pointer', fontFamily:FONT }}>Kopier</button>
@@ -1194,6 +1233,61 @@ export default function DashboardClient() {
         }
         <button onClick={exitBulk} style={{ padding:'7px 12px', borderRadius:99, background:PAPER3, border:'none', color:INK3, fontSize:12, fontWeight:700, cursor:'pointer', fontFamily:FONT }}>✕</button>
       </div>
+    )}
+
+    {/* Matches modal */}
+    {matchesModal && typeof document !== 'undefined' && createPortal(
+      <div onClick={()=>setMatchesModal(null)} style={{ position:'fixed', inset:0, background:'rgba(22,34,28,0.65)', zIndex:10002, display:'flex', alignItems:'flex-end', justifyContent:'center' }}>
+        <div onClick={e=>e.stopPropagation()} style={{ background:PAPER, borderRadius:'20px 20px 0 0', width:'100%', maxWidth:640, maxHeight:'85vh', display:'flex', flexDirection:'column', boxShadow:'0 -8px 40px rgba(22,34,28,0.2)' }}>
+          {/* Header */}
+          <div style={{ padding:'20px 20px 14px', borderBottom:`1px solid ${PAPER2}`, flexShrink:0 }}>
+            <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:6 }}>
+              <div style={{ fontFamily:FONT, fontWeight:800, fontSize:16, color:INK }}>Mulige matches</div>
+              <button onClick={()=>setMatchesModal(null)} style={{ background:'none', border:'none', fontSize:20, cursor:'pointer', color:INK3, lineHeight:1, padding:4 }}>✕</button>
+            </div>
+            <div style={{ fontFamily:FONT, fontSize:12, color:INK3 }}>
+              Opslag der passer til "<strong style={{color:INK}}>{matchesModal.title}</strong>" · {matchesModal.condition}+ · {matchesModal.age_group}
+            </div>
+          </div>
+
+          {/* Content */}
+          <div style={{ overflowY:'auto', flex:1, padding:'12px 16px 24px' }}>
+            {matchesLoading ? (
+              <div style={{ display:'flex', flexDirection:'column', gap:10 }}>
+                {[1,2,3].map(i => <div key={i} style={{ height:72, background:PAPER2, borderRadius:12, animation:'pulse 1.5s ease-in-out infinite' }} />)}
+              </div>
+            ) : matches.length === 0 ? (
+              <div style={{ textAlign:'center', padding:'40px 0' }}>
+                <div style={{ fontSize:36, marginBottom:10 }}>🔍</div>
+                <div style={{ fontFamily:FONT, fontWeight:700, fontSize:15, color:INK, marginBottom:6 }}>Ingen matches fundet endnu</div>
+                <div style={{ fontSize:13, color:INK3, fontFamily:FONT }}>Prøv igen senere — nye opslag tilføjes løbende</div>
+              </div>
+            ) : (
+              <div style={{ display:'flex', flexDirection:'column', gap:10 }}>
+                {matches.map(m => (
+                  <div key={m.id} style={{ background:'#fff', borderRadius:14, border:`1.5px solid ${m._score > 0 ? '#DDD6FE' : PAPER2}`, padding:'12px 14px', display:'flex', gap:12, alignItems:'center' }}>
+                    <div style={{ width:52, height:52, borderRadius:10, background:m.images?.[0]?PAPER3:m.color||GREEN_TINT, display:'flex', alignItems:'center', justifyContent:'center', fontSize:24, flexShrink:0, overflow:'hidden' }}>
+                      {m.images?.[0] ? <img src={m.images[0]} style={{ width:'100%', height:'100%', objectFit:'cover' }} alt="" /> : m.emoji||'🧸'}
+                    </div>
+                    <div style={{ flex:1, minWidth:0 }}>
+                      <div style={{ fontFamily:FONT, fontWeight:700, fontSize:13, color:INK, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{m.title}</div>
+                      <div style={{ fontSize:11, color:INK3, fontFamily:FONT, marginTop:2 }}>{m.institution_name} · {m.condition}</div>
+                      {m._score > 0 && <div style={{ fontSize:10, color:'#7C3AED', fontWeight:700, fontFamily:FONT, marginTop:2 }}>{'★'.repeat(Math.min(m._score,3))} God match</div>}
+                    </div>
+                    <div style={{ display:'flex', flexDirection:'column', gap:6, flexShrink:0 }}>
+                      {m.price > 0 && <div style={{ fontFamily:FONT, fontWeight:800, fontSize:13, color:PRIMARY }}>{m.price} kr.</div>}
+                      <button onClick={()=>{ setMatchesModal(null); router.push(`/beskeder?listing=${m.id}`); }} style={{ background:'#7C3AED', color:'#fff', border:'none', borderRadius:99, padding:'6px 12px', fontSize:11, fontWeight:700, cursor:'pointer', fontFamily:FONT, whiteSpace:'nowrap' }}>
+                        Kontakt →
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+      </div>,
+      document.body
     )}
 
     </PullToRefresh>

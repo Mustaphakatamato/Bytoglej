@@ -282,15 +282,8 @@ export default function OpretOpslagPage() {
     }).catch(()=>{});
     fetchListings?.();
     setSaving(false);
-    if (isSøges) {
-      showToast('Søges-opslag publiceret! Her er opslag der måske matcher 🔍');
-      const params = new URLSearchParams();
-      if (form.category) params.set('category', form.category);
-      router.push('/opslag?' + params.toString());
-    } else {
-      showToast('Opslag publiceret! 🎉');
-      router.push('/dashboard');
-    }
+    showToast(isSøges ? 'Søges-opslag publiceret! Tjek mulige matches på dit dashboard 🔍' : 'Opslag publiceret! 🎉');
+    router.push('/dashboard');
   }
 
   const inputStyle = { width:'100%', padding:'12px 14px', borderRadius:12, border:`1.5px solid ${PAPER3}`, fontSize:14, outline:'none', fontFamily:FONT, background:'#fff', color:INK, boxSizing:'border-box' };
