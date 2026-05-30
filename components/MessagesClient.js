@@ -611,9 +611,8 @@ export default function MessagesClient() {
       }
       if (o?.latitude && i?.latitude) {
         const raw = haversine(o.latitude, o.longitude, i.latitude, i.longitude);
-        // < 0.5 km betyder sandsynligvis samme postnummer-centroid for to forskellige institutioner
-        // → brug null så calculator falder til 25 km default frem for at rapportere 0
-        distanceKm = raw >= 0.5 ? raw : null;
+        // < 0.5 km: sandsynligvis samme postnummer-centroid → brug 3 km som minimum intra-område
+        distanceKm = raw >= 0.5 ? raw : 3;
       }
       console.log('[CO2] distanceKm:', distanceKm);
       // Fetch listing category if not provided

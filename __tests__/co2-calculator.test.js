@@ -136,10 +136,10 @@ describe('aggregateSavings', () => {
 
 // ─── 5. Edge cases ────────────────────────────────────────────────────────────
 describe('edge cases', () => {
-  test('null distanceKm bruger 25 km default og markerer distanceEstimated', () => {
+  test('null distanceKm bruger 10 km default og markerer distanceEstimated', () => {
     const r = calculateCO2Savings({ categoryId: 'board-games', distanceKm: null });
     expect(r.breakdown.distanceEstimated).toBe(true);
-    expect(r.breakdown.rawDistanceKm).toBe(25);
+    expect(r.breakdown.rawDistanceKm).toBe(10);
   });
 
   test('ukendt kategori falder tilbage til "other" (2.0 kg)', () => {

@@ -42,7 +42,7 @@ version                     text PRIMARY KEY  -- fx "1.0"
 displacement_rate           numeric(4,3)
 transport_emission_g_per_km integer
 route_buffer_factor         numeric(4,3)      -- default 1.3
-default_distance_km         integer           -- default 25
+default_distance_km         integer           -- default 10
 active                      boolean           -- kun én kan være aktiv
 ```
 
@@ -86,7 +86,7 @@ netto_sparet        = max(0, produktion_sparet − transport_cost)
 | DISPLACEMENT_RATE | 0.6 | S3, S6, S7 (konservativt) |
 | TRANSPORT_KG_PER_KM | 0.170 | EEA 2024 (S8) |
 | ROUTE_BUFFER | 1.3 | 30% over haversine-distance |
-| DEFAULT_DISTANCE_KM | 25 | gennemsnitlig kommuneradius |
+| DEFAULT_DISTANCE_KM | 10 | gennemsnitlig typisk intra-kommunal afstand |
 
 ---
 
@@ -140,7 +140,7 @@ Admin-siden fremhæver "AFVIGER" hvis kode-konstanten afviger fra DB-værdien.
 Koordinater caches på `institutions.latitude/longitude` efter første opslag.
 
 Haversine-distancen ganges med `ROUTE_BUFFER = 1.3` for at simulere reel rute.
-Ved manglende koordinater bruges `DEFAULT_DISTANCE_KM = 25`.
+Ved manglende koordinater bruges `DEFAULT_DISTANCE_KM = 10`.
 
 ---
 
