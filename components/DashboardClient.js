@@ -632,11 +632,10 @@ export default function DashboardClient() {
         </div>
 
         {/* Stats */}
-        <div style={{ display:'grid', gridTemplateColumns:isMobile?'repeat(2,1fr)':'repeat(4,1fr)', gap:isMobile?12:16, marginBottom:isMobile?24:32 }}>
+        <div style={{ display:'grid', gridTemplateColumns:isMobile?'repeat(2,1fr)':'repeat(3,1fr)', gap:isMobile?12:16, marginBottom:isMobile?24:32 }}>
           {[
             { n:myListings.filter(l=>l.is_active&&!l.is_sold).length, label:'Aktive opslag', color:PRIMARY, onClick:()=>listingsRef.current?.scrollIntoView({behavior:'smooth',block:'start'}) },
-            { n:soldTrades.length||0, label:'Solgt', color:PRIMARY, onClick:()=>{ setTradesTab('sold'); setTradesOpen(true); fetchTrades(); } },
-            { n:boughtTrades.length||0, label:'Købt', color:PRIMARY, onClick:()=>{ setTradesTab('bought'); setTradesOpen(true); fetchTrades(); } },
+            { n:trades.length||0, label:'Handler', color:PRIMARY, onClick:()=>{ setTradesTab('all'); setTradesOpen(true); fetchTrades(); } },
             { n:activity.length||0, label:'Sendte tilbud', color:PRIMARY, onClick:()=>{ setActivityOpen(true); fetchActivity(); } },
           ].map((s,i)=>(
             <div key={i} onClick={s.onClick} style={{ background:PAPER2, borderRadius:20, padding:'20px 22px', border:'1px solid rgba(22,34,28,0.07)', boxShadow:'0 1px 4px rgba(22,34,28,0.06)', animation:`slideUp 0.4s ease ${i*0.08}s both`, cursor:'pointer', transition:'transform 0.15s, box-shadow 0.15s' }}
