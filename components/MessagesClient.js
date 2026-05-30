@@ -8,7 +8,7 @@ import { useApp, useActiveUser } from '@/providers/AppProvider';
 import { Badge, Btn, Spinner, SkeletonMessageRow } from '@/components/ui';
 import PullToRefresh from '@/components/PullToRefresh';
 import { calculateCO2Savings } from '@/lib/co2/calculator';
-import { geocodeForCO2 } from '@/lib/co2/geocoding';
+import { geocodeForCO2, getRoutingDistanceKm } from '@/lib/co2/geocoding';
 
 const FONT = "'Sora', sans-serif";
 const INK2 = '#3A473D';
@@ -609,19 +609,30 @@ export default function MessagesClient() {
           i = { ...i, latitude: c.lat, longitude: c.lon };
         }
       }
+      let isRoutedDistance = false;
       if (o?.latitude && i?.latitude) {
-        const raw = haversine(o.latitude, o.longitude, i.latitude, i.longitude);
-        // < 0.5 km: sandsynligvis samme postnummer-centroid → brug 3 km som minimum intra-område
-        distanceKm = raw >= 0.5 ? raw : 3;
+        // Forsøg OSRM routing (faktisk kørselsafstand, ingen buffer nødvendig)
+        const routed = await getRoutingDistanceKm(
+          { lat: o.latitude, lon: o.longitude },
+          { lat: i.latitude, lon: i.longitude }
+        );
+        if (routed != null && routed >= 0.5) {
+          distanceKm = routed;
+          isRoutedDistance = true;
+        } else {
+          // Fallback: haversine — < 0.5 km = sandsynligvis samme postnummer-centroid → 3 km minimum
+          const raw = haversine(o.latitude, o.longitude, i.latitude, i.longitude);
+          distanceKm = raw >= 0.5 ? raw : 3;
+        }
       }
-      console.log('[CO2] distanceKm:', distanceKm);
+      console.log('[CO2] distanceKm (routed):', distanceKm, isRoutedDistance ? '(OSRM)' : '(haversine/default)');
       // Fetch listing category if not provided
       let resolvedCategory = categoryId;
       if (!resolvedCategory && conversation.listing_id) {
         const { data: listing } = await db.from('listings').select('category').eq('id', conversation.listing_id).maybeSingle();
         resolvedCategory = listing?.category || null;
       }
-      const result = calculateCO2Savings({ categoryId: resolvedCategory, distanceKm });
+      const result = calculateCO2Savings({ categoryId: resolvedCategory, distanceKm, isRoutedDistance });
       await Promise.all([
         db.from('transaction_co2_savings').insert({
           transaction_id: conversation.id,
