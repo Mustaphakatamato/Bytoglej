@@ -595,6 +595,75 @@ function CategoryStrip({ router }) {
   );
 }
 
+// ── Notification bell ─────────────────────────────────────────────────────────
+function NotificationBell({ institution, transparent }) {
+  const [open, setOpen] = useState(false);
+  const [notes, setNotes] = useState([]);
+  const [unread, setUnread] = useState(0);
+  const ref = useRef(null);
+
+  useEffect(() => {
+    if (!institution?.name) return;
+    async function load() {
+      const { data } = await db.from('notifications')
+        .select('*')
+        .eq('institution_name', institution.name)
+        .order('created_at', { ascending: false })
+        .limit(20);
+      if (data) {
+        setNotes(data);
+        setUnread(data.filter(n => !n.read).length);
+      }
+    }
+    load();
+  }, [institution?.name]);
+
+  useEffect(() => {
+    function handle(e) { if (ref.current && !ref.current.contains(e.target)) setOpen(false); }
+    document.addEventListener('mousedown', handle);
+    return () => document.removeEventListener('mousedown', handle);
+  }, []);
+
+  async function handleOpen() {
+    setOpen(o => !o);
+    if (!open && unread > 0) {
+      setUnread(0);
+      setNotes(n => n.map(x => ({ ...x, read: true })));
+      await db.from('notifications')
+        .update({ read: true })
+        .eq('institution_name', institution.name)
+        .eq('read', false);
+    }
+  }
+
+  if (!institution?.name) return null;
+
+  return (
+    <div ref={ref} style={{ position:'relative', flexShrink:0 }}>
+      <button onClick={handleOpen} style={{ position:'relative', width:36, height:36, borderRadius:'50%', background: open ? PRIMARY : (transparent ? 'rgba(255,255,255,0.15)' : GREEN_TINT), border:'none', display:'flex', alignItems:'center', justifyContent:'center', cursor:'pointer', transition:'background 0.15s' }}>
+        <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke={open || transparent ? '#fff' : PRIMARY} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/>
+        </svg>
+        {unread > 0 && <span style={{ position:'absolute', top:-2, right:-2, background:'#EF476F', color:'#fff', borderRadius:99, fontSize:9, fontWeight:800, minWidth:15, height:15, display:'flex', alignItems:'center', justifyContent:'center', padding:'0 3px', lineHeight:1 }}>{unread > 9 ? '9+' : unread}</span>}
+      </button>
+
+      {open && (
+        <div style={{ position:'absolute', top:'calc(100% + 8px)', right:0, zIndex:700, background:'#fff', borderRadius:16, boxShadow:'0 8px 32px rgba(22,34,28,0.15)', border:`1px solid ${PAPER2}`, minWidth:300, maxWidth:360, maxHeight:400, overflowY:'auto' }}>
+          <div style={{ padding:'12px 16px', borderBottom:`1px solid ${PAPER2}`, fontFamily:FONT, fontWeight:800, fontSize:14, color:INK }}>Notifikationer</div>
+          {notes.length === 0 ? (
+            <div style={{ padding:'24px 16px', textAlign:'center', color:INK3, fontFamily:FONT, fontSize:13 }}>Ingen notifikationer endnu</div>
+          ) : notes.map(n => (
+            <div key={n.id} style={{ padding:'12px 16px', borderBottom:`1px solid ${PAPER2}`, background: n.read ? '#fff' : '#F5F0FF' }}>
+              <div style={{ fontFamily:FONT, fontWeight:700, fontSize:13, color:INK, marginBottom:2 }}>{n.title}</div>
+              <div style={{ fontFamily:FONT, fontSize:12, color:INK3, lineHeight:1.4 }}>{n.body}</div>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ── Main nav ───────────────────────────────────────────────────────────────────
 function Nav({ pathname, navigate, loggedIn, setLoggedIn, unreadTotal, institution, isAdmin, router }) {
   const [scrolled,  setScrolled]  = useState(false);
@@ -686,6 +755,7 @@ function Nav({ pathname, navigate, loggedIn, setLoggedIn, unreadTotal, instituti
                 <Link href="/opret-opslag" style={{ background:PRIMARY, color:'#fff', fontWeight:700, fontSize:13, padding:'8px 18px', borderRadius:22, textDecoration:'none', display:'inline-flex', alignItems:'center' }}>
                   + Opret opslag
                 </Link>
+                <NotificationBell institution={institution} transparent={transparent} />
                 <div style={{ position:'relative', flexShrink:0 }} onMouseEnter={()=>setProfileOpen(true)} onMouseLeave={()=>setProfileOpen(false)}>
                   <button style={{ width:36, height:36, borderRadius:'50%', background:PRIMARY, display:'flex', alignItems:'center', justifyContent:'center', color:'#fff', fontWeight:800, fontSize:13, cursor:'pointer', overflow:'hidden', border:`2px solid ${profileOpen?'#fff':PRIMARY}`, outline:'none', transition:'border-color 0.15s', boxShadow: profileOpen?`0 0 0 3px ${PRIMARY}40`:'none' }}>
                     {institution?.logo_url

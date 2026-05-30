@@ -2,7 +2,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { db } from '@/lib/supabase';
-import { PRIMARY, GREEN_DEEP, GREEN_SOFT, GREEN_TINT, PAPER, PAPER2, PAPER3, INK, INK2, INK3, CORAL, TYPE_CFG, CONDITIONS, AGE_GROUPS } from '@/lib/constants';
+import { PRIMARY, GREEN_DEEP, GREEN_SOFT, GREEN_TINT, PAPER, PAPER2, PAPER3, INK, INK2, INK3, CORAL, TYPE_CFG, CONDITIONS, AGE_GROUPS, URGENCY_OPTIONS } from '@/lib/constants';
 import { CATEGORIES } from '@/lib/categories';
 import { useWindowWidth } from '@/lib/hooks';
 import { useApp, useActiveUser } from '@/providers/AppProvider';
@@ -75,7 +75,7 @@ export default function OpretOpslagPage() {
   const [form, setForm] = useState({
     title:'', type:'køb', price:'', age_group:'3-6 år',
     description:'', condition:'God', emoji:'🧸', color:'#FFD166',
-    tags:[], min_bid:'', category:'', subcategory:'',
+    tags:[], min_bid:'', category:'', subcategory:'', urgency:'ingen',
   });
 
   useEffect(() => {
@@ -235,21 +235,25 @@ export default function OpretOpslagPage() {
       const { data } = await db.from('institutions').select('*').ilike('email', user.email).maybeSingle();
       if (data) inst = data;
     }
+    const isSøges = form.type === 'søges';
     const insertData = {
       title: form.title, type: form.type,
-      price: form.type==='køb' ? Number(form.price)||null : null,
+      price: (form.type==='køb' || isSøges) ? Number(form.price)||null : null,
       age_group: form.age_group, description: form.description,
       condition: form.condition, city: inst?.city || '',
       institution_name: inst?.name || 'Min institution',
       user_id: user?.id || null,
-      emoji: form.emoji, color: form.color,
+      emoji: isSøges ? '🔍' : form.emoji,
+      color: isSøges ? '#F5F0FF' : form.color,
       tags: form.tags || [], images: [], bid_count: 0, is_active: true,
       category: form.category || null, subcategory: form.subcategory || null,
     };
     if (form.type==='byd' && form.min_bid) insertData.min_bid = Number(form.min_bid);
+    // urgency stored separately — gracefully ignored if column not yet added
+    if (isSøges) insertData.urgency = form.urgency || 'ingen';
     const { data: listing, error } = await db.from('listings').insert(insertData).select().single();
     if (error) { showToast('Noget gik galt — prøv igen', 'error'); setSaving(false); return; }
-    if (imgFiles.length > 0) {
+    if (!isSøges && imgFiles.length > 0) {
       const urls = [];
       for (const file of imgFiles) {
         const ext = file.name.split('.').pop().toLowerCase();
@@ -259,13 +263,24 @@ export default function OpretOpslagPage() {
       }
       if (urls.length) await db.from('listings').update({ images: urls }).eq('id', listing.id);
     }
+    // Fire-and-forget: saved-search email notifications
     fetch('/api/match-searches', {
       method:'POST', headers:{'Content-Type':'application/json'},
       body: JSON.stringify({ listingId:listing.id, title:listing.title, type:listing.type, tags:listing.tags||[], city:listing.city, age_group:listing.age_group }),
     }).catch(()=>{});
+    // Fire-and-forget: in-app auto-match notifications (both directions)
+    fetch('/api/auto-match-soges', {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({
+        mode: isSøges ? 'new-søges' : 'new-listing',
+        listingId: listing.id, category: listing.category,
+        age_group: listing.age_group, condition: listing.condition,
+        title: listing.title, institutionName: inst?.name, institutionId: inst?.id,
+      }),
+    }).catch(()=>{});
     fetchListings?.();
     setSaving(false);
-    showToast('Opslag publiceret! 🎉');
+    showToast(isSøges ? 'Søges-opslag publiceret! 🔍' : 'Opslag publiceret! 🎉');
     router.push('/dashboard');
   }
 
@@ -324,14 +339,19 @@ export default function OpretOpslagPage() {
             {step === 1 && (
               <div style={{ display:'flex', flexDirection:'column', gap:20 }}>
                 <div>
-                  <label style={labelStyle}>Handelsform</label>
-                  <div style={{ display:'flex', gap:8 }}>
-                    {['køb','byd','byt'].map(t => (
-                      <button key={t} onClick={()=>setForm({...form,type:t})} style={{ flex:1, padding:'12px 8px', borderRadius:12, background:form.type===t?TYPE_CFG[t].bg:PAPER2, color:form.type===t?TYPE_CFG[t].color:INK3, fontFamily:FONT, fontWeight:700, fontSize:13, border:form.type===t?`2px solid ${TYPE_CFG[t].color}`:'2px solid transparent', cursor:'pointer', transition:'all 0.15s' }}>
+                  <label style={labelStyle}>Opslagstype</label>
+                  <div style={{ display:'flex', gap:8, flexWrap:'wrap' }}>
+                    {['køb','byd','byt','søges'].map(t => (
+                      <button key={t} onClick={()=>setForm({...form,type:t})} style={{ flex:'1 1 80px', padding:'12px 8px', borderRadius:12, background:form.type===t?TYPE_CFG[t].bg:PAPER2, color:form.type===t?TYPE_CFG[t].color:INK3, fontFamily:FONT, fontWeight:700, fontSize:13, border:form.type===t?`2px solid ${TYPE_CFG[t].color}`:'2px solid transparent', cursor:'pointer', transition:'all 0.15s' }}>
                         {TYPE_CFG[t].icon} {TYPE_CFG[t].label}
                       </button>
                     ))}
                   </div>
+                  {form.type === 'søges' && (
+                    <div style={{ marginTop:10, background:'#F5F0FF', borderRadius:10, padding:'10px 14px', fontSize:12, color:'#7C3AED', fontFamily:FONT, fontWeight:600 }}>
+                      🔍 Søges-opslag vises i en separat fane og matcher automatisk eksisterende opslag
+                    </div>
+                  )}
                 </div>
 
                 <div>
@@ -349,6 +369,25 @@ export default function OpretOpslagPage() {
                   <div>
                     <label style={labelStyle}>Mindste bud (kr.) <span style={{ fontWeight:400, color:INK3 }}>— valgfri</span></label>
                     <input type="number" value={form.min_bid||''} onChange={e=>setForm({...form,min_bid:e.target.value})} placeholder="Lad stå tom for intet minimum" min="1" style={inputStyle} />
+                  </div>
+                )}
+                {form.type === 'søges' && (
+                  <div>
+                    <label style={labelStyle}>Budget (kr.) <span style={{ fontWeight:400, color:INK3 }}>— valgfri, lad stå tom hvis byt</span></label>
+                    <input type="number" value={form.price} onChange={e=>setForm({...form,price:e.target.value})} placeholder="Fx 200" min="0" style={inputStyle} />
+                  </div>
+                )}
+                {form.type === 'søges' && (
+                  <div>
+                    <label style={labelStyle}>Hvor hurtigt har I brug for det?</label>
+                    <div style={{ display:'flex', gap:8 }}>
+                      {URGENCY_OPTIONS.map(u => (
+                        <button key={u.key} onClick={()=>setForm({...form,urgency:u.key})}
+                          style={{ flex:1, padding:'10px 6px', borderRadius:12, background:form.urgency===u.key?'#F5F0FF':PAPER2, color:form.urgency===u.key?'#7C3AED':INK3, fontFamily:FONT, fontWeight:700, fontSize:12, border:form.urgency===u.key?'2px solid #7C3AED':'2px solid transparent', cursor:'pointer', transition:'all 0.15s', textAlign:'center' }}>
+                          {u.emoji}<br /><span style={{ fontSize:11 }}>{u.label}</span>
+                        </button>
+                      ))}
+                    </div>
                   </div>
                 )}
 
@@ -414,20 +453,24 @@ export default function OpretOpslagPage() {
                       </button>
                     )}
                   </div>
-                  <textarea value={form.description} onChange={e=>setForm({...form,description:e.target.value})} placeholder="Beskriv legetøjets stand, hvad der medfølger, mål, begrundelse for salg osv." rows={4} style={{ ...inputStyle, resize:'vertical', minHeight:100 }} />
+                  <textarea value={form.description} onChange={e=>setForm({...form,description:e.target.value})}
+                    placeholder={form.type==='søges'
+                      ? 'Beskriv hvad I leder efter, stand-krav, og hvad I evt. tilbyder i bytte…'
+                      : 'Beskriv legetøjets stand, hvad der medfølger, mål, begrundelse for salg osv.'}
+                    rows={4} style={{ ...inputStyle, resize:'vertical', minHeight:100 }} />
                 </div>
 
                 <div>
-                  <label style={labelStyle}>Stand</label>
+                  <label style={labelStyle}>{form.type==='søges' ? 'Minimum acceptable stand' : 'Stand'}</label>
                   <div style={{ display:'flex', gap:8, flexWrap:'wrap' }}>
                     {CONDITIONS.map(c => (
                       <button key={c} onClick={()=>setForm({...form,condition:c})} style={{ padding:'9px 18px', borderRadius:99, fontSize:13, fontWeight:600, border: form.condition===c ? `2px solid ${PRIMARY}` : '2px solid transparent', background: form.condition===c ? GREEN_TINT : PAPER2, color: form.condition===c ? PRIMARY : INK3, fontFamily:FONT, cursor:'pointer', transition:'all 0.12s' }}>{c}</button>
                     ))}
                   </div>
+                  {form.type==='søges' && <div style={{ fontSize:11, color:INK3, fontFamily:FONT, marginTop:6 }}>Vi accepterer denne stand eller bedre</div>}
                 </div>
 
-                {/* Images */}
-                <div>
+                {form.type !== 'søges' && <div>
                   <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:10 }}>
                     <label style={{ ...labelStyle, marginBottom:0 }}>Billeder <span style={{ fontWeight:400, color:INK3 }}>(op til 6)</span></label>
                     {imgFiles.length > 0 && imgFiles.length < 6 && (
@@ -471,7 +514,7 @@ export default function OpretOpslagPage() {
                     </div>
                   )}
                   {imgPreviews.length > 1 && <div style={{ fontSize:11, color:INK3, textAlign:'center', marginTop:6, fontFamily:FONT }}>Hold og træk billeder for at ændre rækkefølge · Det første er forsiden</div>}
-                </div>
+                </div>}
 
                 <div style={{ display:'flex', gap:10, marginTop:4 }}>
                   <button onClick={()=>setStep(1)} style={{ flex:1, padding:'13px', borderRadius:99, background:PAPER2, color:INK2, border:'none', fontFamily:FONT, fontWeight:700, fontSize:14, cursor:'pointer' }}>

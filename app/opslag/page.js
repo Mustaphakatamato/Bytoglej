@@ -2,7 +2,7 @@
 import { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import nextDynamic from 'next/dynamic';
-import { PRIMARY, GREEN_DEEP, GREEN_SOFT, GREEN_TINT, PAPER, PAPER2, PAPER3, INK, INK2, INK3, CORAL, TYPE_CFG } from '@/lib/constants';
+import { PRIMARY, GREEN_DEEP, GREEN_SOFT, GREEN_TINT, PAPER, PAPER2, PAPER3, INK, INK2, INK3, CORAL, TYPE_CFG, URGENCY_OPTIONS } from '@/lib/constants';
 import { CATEGORIES } from '@/lib/categories';
 import { useWindowWidth, useFeedListings } from '@/lib/hooks';
 import { Btn, SkeletonCard, SkeletonMobileCard } from '@/components/ui';
@@ -131,6 +131,44 @@ function SubcategoryBrowser({ categoryKey, onBack, onSelectAll, onSelectSub }) {
   );
 }
 
+function SøgesCard({ l, onContact }) {
+  const urgency = URGENCY_OPTIONS.find(u => u.key === l.urgency) || URGENCY_OPTIONS[2];
+  const catObj = CATEGORIES.find(c => c.key === l.category);
+
+  return (
+    <div style={{ background:'#fff', borderRadius:16, border:`1.5px solid #EDE9FE`, boxShadow:'0 2px 8px rgba(124,58,237,0.06)', padding:'18px 20px', display:'flex', flexDirection:'column', gap:10 }}>
+      <div style={{ display:'flex', alignItems:'flex-start', justifyContent:'space-between', gap:8 }}>
+        <div style={{ display:'flex', alignItems:'center', gap:8, flex:1, minWidth:0 }}>
+          <div style={{ width:36, height:36, borderRadius:10, background:'#F5F0FF', display:'flex', alignItems:'center', justifyContent:'center', fontSize:18, flexShrink:0 }}>🔍</div>
+          <div style={{ minWidth:0 }}>
+            <div style={{ fontFamily:FONT, fontWeight:700, fontSize:14, color:INK, lineHeight:1.3, overflow:'hidden', display:'-webkit-box', WebkitLineClamp:2, WebkitBoxOrient:'vertical' }}>{l.title}</div>
+            <div style={{ fontSize:11, color:'#7C3AED', fontFamily:FONT, fontWeight:600, marginTop:2 }}>{l.institution_name || 'Ukendt institution'}</div>
+          </div>
+        </div>
+        <div style={{ display:'flex', alignItems:'center', gap:4, background: urgency.key==='haster'?'#FEF2F2': urgency.key==='måneden'?'#FFFBEB':'#F0FDF4', borderRadius:99, padding:'3px 10px', flexShrink:0, whiteSpace:'nowrap' }}>
+          <span style={{ fontSize:11 }}>{urgency.emoji}</span>
+          <span style={{ fontSize:11, fontWeight:700, fontFamily:FONT, color: urgency.key==='haster'?'#DC2626': urgency.key==='måneden'?'#D97706':'#16A34A' }}>{urgency.label}</span>
+        </div>
+      </div>
+
+      <div style={{ display:'flex', gap:6, flexWrap:'wrap' }}>
+        {catObj && <span style={{ fontSize:11, fontWeight:600, color:INK3, background:PAPER2, borderRadius:99, padding:'3px 10px', fontFamily:FONT }}>{catObj.emoji} {catObj.label}</span>}
+        {l.age_group && <span style={{ fontSize:11, fontWeight:600, color:INK3, background:PAPER2, borderRadius:99, padding:'3px 10px', fontFamily:FONT }}>{l.age_group}</span>}
+        {l.condition && <span style={{ fontSize:11, fontWeight:600, color:INK3, background:PAPER2, borderRadius:99, padding:'3px 10px', fontFamily:FONT }}>{l.condition}+</span>}
+        {l.price > 0 && <span style={{ fontSize:11, fontWeight:700, color:'#7C3AED', background:'#EDE9FE', borderRadius:99, padding:'3px 10px', fontFamily:FONT }}>Budget: {l.price} kr.</span>}
+      </div>
+
+      {l.description && (
+        <div style={{ fontSize:12, color:INK3, fontFamily:FONT, lineHeight:1.5, overflow:'hidden', display:'-webkit-box', WebkitLineClamp:2, WebkitBoxOrient:'vertical' }}>{l.description}</div>
+      )}
+
+      <button onClick={onContact} style={{ marginTop:2, padding:'10px', borderRadius:99, background:'#7C3AED', color:'#fff', border:'none', fontFamily:FONT, fontWeight:700, fontSize:13, cursor:'pointer', textAlign:'center' }}>
+        Vi har noget der matcher →
+      </button>
+    </div>
+  );
+}
+
 function OpslagInner() {
   const router = useRouter();
   const urlParams = useSearchParams();
@@ -141,6 +179,7 @@ function OpslagInner() {
   const listings = useFeedListings(ownFiltered, refreshSeed);
   const ww = useWindowWidth();
   const isMobile = ww < 640;
+  const [mainTab, setMainTab] = useState('opslag');
   const [filter, setFilter] = useState('alle');
   const [sort, setSort] = useState('newest');
   const [category, setCategory] = useState('');
@@ -164,8 +203,16 @@ function OpslagInner() {
 
   const search = urlParams.get('search') || '';
 
+  const søgesListings = useMemo(() => {
+    return listings.filter(l => l.type === 'søges').sort((a,b) => {
+      const urgencyOrder = { haster: 0, måneden: 1, ingen: 2 };
+      return (urgencyOrder[a.urgency] ?? 2) - (urgencyOrder[b.urgency] ?? 2);
+    });
+  }, [listings]);
+
   const filtered = useMemo(() => {
     let r = listings.filter(l => {
+      if (l.type === 'søges') return false;
       const matchType   = filter === 'alle' || l.type === filter;
       const matchSearch = !search || l.title.toLowerCase().includes(search.toLowerCase()) || (l.institution_name||'').toLowerCase().includes(search.toLowerCase());
       const matchCategory = !category || l.category === category;
@@ -319,13 +366,55 @@ function OpslagInner() {
       {/* ── Mobile: top spacer (replaces sticky filter bar) ── */}
       {isMobile && <div style={{ height: 68 }} />}
 
+      {/* ── Main tab switcher ── */}
+      <div style={{ maxWidth:1140, margin:'0 auto', padding: isMobile ? '12px 16px 0' : '16px 24px 0', display:'flex', gap:4 }}>
+        {[{ key:'opslag', label:'Opslag' }, { key:'søges', label:`Søges (${søgesListings.length})` }].map(({ key, label }) => (
+          <button key={key} onClick={() => setMainTab(key)} style={{ padding: isMobile ? '8px 16px' : '9px 20px', borderRadius:99, border:'none', background: mainTab===key ? (key==='søges' ? '#7C3AED' : PRIMARY) : PAPER2, color: mainTab===key ? '#fff' : INK3, fontFamily:FONT, fontWeight:700, fontSize:13, cursor:'pointer', transition:'all 0.15s' }}>
+            {key === 'søges' && <span style={{ marginRight:5 }}>🔍</span>}{label}
+          </button>
+        ))}
+      </div>
+
+      {/* ── Søges tab ── */}
+      {mainTab === 'søges' && (
+        <div style={{ maxWidth:1140, margin:'0 auto', padding: isMobile ? '16px 8px 40px' : '24px 24px 60px' }}>
+          <div style={{ marginBottom:16, display:'flex', alignItems:'center', gap:10, background:'#F5F0FF', borderRadius:12, padding:'12px 16px' }}>
+            <span style={{ fontSize:20 }}>🔍</span>
+            <div>
+              <div style={{ fontFamily:FONT, fontWeight:700, fontSize:13, color:'#7C3AED' }}>Andre institutioner søger</div>
+              <div style={{ fontSize:12, color:INK3, fontFamily:FONT }}>Har du noget der matcher? Send dem en besked!</div>
+            </div>
+          </div>
+          {loading ? (
+            <div style={{ display:'grid', gridTemplateColumns: isMobile ? '1fr' : 'repeat(auto-fill,minmax(300px,1fr))', gap:12 }}>
+              {[1,2,3].map(i => <div key={i} style={{ height:160, background:PAPER2, borderRadius:16, animation:'pulse 1.5s ease-in-out infinite' }} />)}
+            </div>
+          ) : søgesListings.length === 0 ? (
+            <div style={{ textAlign:'center', padding:'60px 0 80px' }}>
+              <div style={{ fontSize:48, marginBottom:12 }}>🔍</div>
+              <div style={{ fontFamily:FONT, fontWeight:800, fontSize:20, color:INK, marginBottom:8 }}>Ingen aktive søges-opslag</div>
+              <p style={{ fontSize:14, color:INK3 }}>Institutioner kan oprette søges-opslag for at finde specifikt legetøj</p>
+            </div>
+          ) : (
+            <div style={{ display:'grid', gridTemplateColumns: isMobile ? '1fr' : 'repeat(auto-fill,minmax(300px,1fr))', gap:12 }}>
+              {søgesListings.map(l => (
+                <SøgesCard key={l.id} l={l} onContact={() => {
+                  if (!loggedIn) { router.push('/login'); return; }
+                  setQuickViewListing(l);
+                }} />
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
       {/* ── Category browser (mobile, no filters active) ── */}
-      {showCategoryBrowser && (
+      {mainTab === 'opslag' && showCategoryBrowser && (
         <CategoryBrowser onSelect={cat => { setPendingCategory(cat); window.scrollTo({ top: 0, behavior: 'instant' }); }} />
       )}
 
       {/* ── Subcategory browser (mobile) ── */}
-      {showSubcategoryBrowser && (
+      {mainTab === 'opslag' && showSubcategoryBrowser && (
         <SubcategoryBrowser
           categoryKey={pendingCategory}
           onBack={() => setPendingCategory('')}
@@ -335,7 +424,7 @@ function OpslagInner() {
       )}
 
       {/* ── Listings ── */}
-      {!showCategoryBrowser && !showSubcategoryBrowser && (
+      {mainTab === 'opslag' && !showCategoryBrowser && !showSubcategoryBrowser && (
       <div style={{ maxWidth: 1140, margin: '0 auto', padding: isMobile ? '12px 8px 40px' : '28px 24px 60px' }}>
 
         {/* Mobile: back button + breadcrumb */}
