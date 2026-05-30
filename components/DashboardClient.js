@@ -678,18 +678,18 @@ export default function DashboardClient() {
                 </>}
               </div>
             </div>
-            {myListings.length===0 ? (
+            {myListings.filter(l=>!l.is_sold).length===0 ? (
               <div style={{ textAlign:'center', padding:'40px 0' }}>
                 <div style={{ fontFamily:FONT, fontWeight:800, fontSize:48, color:GREEN_SOFT, lineHeight:1, marginBottom:12 }}>0</div>
                 <p style={{ fontSize:14, color:INK3, fontFamily:FONT }}>Ingen opslag endnu — opret dit første!</p>
               </div>
             ) : listingsView === 'grid' ? (
               <div style={{ display:'grid', gridTemplateColumns:'repeat(2,1fr)', gap:10 }}>
-                {myListings.map(l=>(
+                {myListings.filter(l=>!l.is_sold).map(l=>(
                   <GridCard key={l.id} l={l} setQuickViewListing={setQuickViewListing} openEdit={openEdit} onCopy={copyListing} toggleActive={toggleActive} toggleReserved={toggleReserved} setConfirmDelete={setConfirmDelete} confirmDelete={confirmDelete} handleDelete={handleDelete} bulkMode={bulkMode} selected={selectedIds.has(l.id)} onToggleSelect={toggleSelectId} />
                 ))}
               </div>
-            ) : myListings.map(l=>(
+            ) : myListings.filter(l=>!l.is_sold).map(l=>(
               <div key={l.id} onClick={bulkMode?()=>toggleSelectId(l.id):undefined} style={{ border:`1.5px solid ${bulkMode&&selectedIds.has(l.id)?PRIMARY:l.is_sold?'#FECACA':l.is_active?'rgba(22,34,28,0.08)':'rgba(22,34,28,0.04)'}`, borderRadius:14, marginBottom:10, overflow:'hidden', opacity:l.is_active||l.is_sold?1:0.7, background:bulkMode&&selectedIds.has(l.id)?GREEN_TINT:l.is_sold?'#FFF5F5':l.is_active?PAPER:'rgba(22,34,28,0.02)', cursor:bulkMode?'pointer':'default', transition:'border-color 0.15s, background 0.15s' }}>
                 <div onClick={bulkMode?undefined:()=>setQuickViewListing(l)} style={{ display:'flex', alignItems:'center', gap:14, padding:'12px 14px', cursor:bulkMode?'pointer':'pointer' }}>
                   {bulkMode && (
@@ -1127,14 +1127,23 @@ export default function DashboardClient() {
                     const tradeCo2 = co2Savings.find(s => s.transaction_id === t.id);
                     return (
                       <div key={t.id} style={{ border:`1px solid ${isSeller?GREEN_SOFT:'#BFDBFE'}`, borderRadius:14, padding:'14px 16px', marginBottom:10, background:isSeller?GREEN_TINT:'#EFF6FF' }}>
-                        <div style={{ display:'flex', justifyContent:'space-between', alignItems:'flex-start', marginBottom:8 }}>
-                          <div style={{ flex:1, minWidth:0, marginRight:12 }}>
-                            <div style={{ fontFamily:FONT, fontWeight:800, fontSize:14, marginBottom:2, color:INK }}>{t.listing_title || 'Direkte besked'}</div>
-                            <div style={{ fontSize:12, color:INK3, fontFamily:FONT }}>
-                              {isSeller ? 'Solgt til' : 'Købt fra'} <strong style={{ color:INK }}>{otherParty}</strong>
+                        <div style={{ display:'flex', alignItems:'flex-start', gap:12, marginBottom:8 }}>
+                          <div style={{ width:48, height:48, borderRadius:10, background:t.listing_image?PAPER3:(t.listing_color||'#FFD166'), flexShrink:0, overflow:'hidden', display:'flex', alignItems:'center', justifyContent:'center', fontSize:22 }}>
+                            {t.listing_image
+                              ? <img src={t.listing_image} alt="" style={{ width:'100%', height:'100%', objectFit:'cover' }} />
+                              : (t.listing_emoji || '🧸')}
+                          </div>
+                          <div style={{ flex:1, minWidth:0 }}>
+                            <div style={{ display:'flex', justifyContent:'space-between', alignItems:'flex-start', gap:8 }}>
+                              <div style={{ flex:1, minWidth:0 }}>
+                                <div style={{ fontFamily:FONT, fontWeight:800, fontSize:14, marginBottom:2, color:INK }}>{t.listing_title || 'Direkte besked'}</div>
+                                <div style={{ fontSize:12, color:INK3, fontFamily:FONT }}>
+                                  {isSeller ? 'Solgt til' : 'Købt fra'} <strong style={{ color:INK }}>{otherParty}</strong>
+                                </div>
+                              </div>
+                              <span style={{ background:isSeller?PRIMARY:'#3B82F6', color:'#fff', borderRadius:99, padding:'3px 10px', fontSize:11, fontWeight:800, flexShrink:0, fontFamily:FONT }}>{isSeller?'Solgt':'Købt'}</span>
                             </div>
                           </div>
-                          <span style={{ background:isSeller?PRIMARY:'#3B82F6', color:'#fff', borderRadius:99, padding:'3px 10px', fontSize:11, fontWeight:800, flexShrink:0, fontFamily:FONT }}>{isSeller?'Solgt':'Købt'}</span>
                         </div>
                         <div style={{ display:'flex', gap:12, flexWrap:'wrap', fontSize:11, color:INK3, fontFamily:FONT }}>
                           <span>{dealDate ? new Date(dealDate).toLocaleDateString('da-DK',{day:'numeric',month:'long',year:'numeric'}) : '—'}</span>
