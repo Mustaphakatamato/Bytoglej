@@ -665,6 +665,9 @@ export default function DashboardClient() {
                       : <Badge type={l.type} />}
                 </div>
                 {!l.is_sold && !bulkMode && <div style={{ display:'flex', gap:isMobile?6:6, padding:isMobile?'0 12px 10px':'0 14px 10px', flexWrap:'wrap' }} onClick={e=>e.stopPropagation()}>
+                  {l.type === 'søges' && (
+                    <button onClick={()=>{ const params = new URLSearchParams(); if(l.category) params.set('category',l.category); router.push('/opslag?' + params.toString()); }} style={{ flex:isMobile?'1 0 100%':undefined, background:'#F5F0FF', border:'1px solid #DDD6FE', borderRadius:99, padding:isMobile?'7px 0':'6px 12px', fontSize:12, fontWeight:700, color:'#7C3AED', cursor:'pointer', fontFamily:FONT }}>🔍 Se mulige matches</button>
+                  )}
                   <button onClick={()=>openEdit(l)} style={{ flex:isMobile?1:undefined, background:GREEN_TINT, border:'none', borderRadius:99, padding:isMobile?'7px 0':'6px 12px', fontSize:12, fontWeight:700, color:PRIMARY, cursor:'pointer', fontFamily:FONT }}>Rediger</button>
                   <button onClick={()=>copyListing(l.id)} style={{ flex:isMobile?1:undefined, background:PAPER2, border:`1px solid ${PAPER3}`, borderRadius:99, padding:isMobile?'7px 0':'6px 12px', fontSize:12, fontWeight:700, color:INK2, cursor:'pointer', fontFamily:FONT }}>Kopier</button>
                   <button onClick={()=>toggleActive(l.id, l.is_active)} title={l.is_active?'Deaktivér opslag':'Aktivér opslag'} style={{ flex:isMobile?1:undefined, background:l.is_active?'#FEF9C3':'#F0FDF4', border:'none', borderRadius:99, padding:isMobile?'7px 0':'6px 12px', fontSize:12, fontWeight:700, color:l.is_active?'#B45309':'#15803D', cursor:'pointer', fontFamily:FONT }}>{l.is_active?'Deaktivér':'Aktivér'}</button>
