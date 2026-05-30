@@ -1269,10 +1269,8 @@ export default function DashboardClient() {
 
     {/* Matches modal */}
     {matchesModal && typeof document !== 'undefined' && createPortal(
-      <div style={{ position:'fixed', inset:0, zIndex:10002, display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'flex-end' }}>
-        {/* Backdrop — tap to close */}
-        <div onClick={()=>setMatchesModal(null)} style={{ position:'absolute', inset:0, background:'rgba(22,34,28,0.65)' }} />
-        <div style={{ position:'relative', background:PAPER, borderRadius:'20px 20px 0 0', width:'100%', maxWidth:640, maxHeight:'80vh', display:'flex', flexDirection:'column', boxShadow:'0 -8px 40px rgba(22,34,28,0.2)' }}>
+      <div onClick={()=>setMatchesModal(null)} style={{ position:'fixed', inset:0, background:'rgba(22,34,28,0.65)', zIndex:10002, display:'flex', alignItems:'flex-end', justifyContent:'center', padding:'80px 0 0' }}>
+        <div onClick={e=>e.stopPropagation()} style={{ background:PAPER, borderRadius:'20px 20px 0 0', width:'100%', maxWidth:640, maxHeight:'80vh', display:'flex', flexDirection:'column', boxShadow:'0 -8px 40px rgba(22,34,28,0.2)' }}>
           {/* Handle */}
           <div onClick={()=>setMatchesModal(null)} style={{ padding:'14px 0 8px', display:'flex', justifyContent:'center', cursor:'pointer', flexShrink:0 }}>
             <div style={{ width:48, height:5, borderRadius:99, background:PAPER3 }} />
