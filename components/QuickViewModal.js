@@ -20,6 +20,20 @@ export default function QuickViewModal({ listing, onClose }) {
   const [bidAmount,    setBidAmount]    = useState('');
   const [selectedSwapId, setSelectedSwapId] = useState(null);
   const [swapOffer,    setSwapOffer]    = useState('');
+  const [trustScore,   setTrustScore]  = useState(null);
+
+  useEffect(() => {
+    if (!listing.institution_name) return;
+    db.from('transaction_reviews')
+      .select('description_score, contact_score, trade_again')
+      .eq('reviewed_institution_name', listing.institution_name)
+      .then(({ data }) => {
+        if (!data?.length) return;
+        const avg = data.reduce((s,r) => s + (r.description_score + r.contact_score) / 2, 0) / data.length;
+        const pct = Math.round((avg / 3) * 100);
+        setTrustScore({ pct, count: data.length, wouldTradeAgain: Math.round(data.filter(r=>r.trade_again==='ja').length / data.length * 100) });
+      });
+  }, [listing.institution_name]);
 
   const imgs = listing.images?.length ? listing.images : [];
   const tc = TYPE_CFG[listing.type] || { label: listing.type, color: INK3, bg: PAPER2 };
@@ -205,10 +219,16 @@ export default function QuickViewModal({ listing, onClose }) {
                 <div style={{ width:36, height:36, borderRadius:10, background:PRIMARY, display:'flex', alignItems:'center', justifyContent:'center', color:'#fff', fontWeight:800, fontSize:14, fontFamily:FONT, flexShrink:0 }}>
                   {listing.institution_name?.charAt(0).toUpperCase()}
                 </div>
-                <div>
+                <div style={{ flex:1, minWidth:0 }}>
                   <div style={{ fontFamily:FONT, fontWeight:700, fontSize:13, color:INK }}>{listing.institution_name}</div>
                   {listing.city && <div style={{ fontSize:11, color:INK3, fontFamily:FONT }}>{listing.city}</div>}
                 </div>
+                {trustScore && (
+                  <div style={{ flexShrink:0, textAlign:'center', background:PRIMARY, borderRadius:10, padding:'4px 10px' }}>
+                    <div style={{ fontFamily:FONT, fontWeight:800, fontSize:14, color:'#fff', lineHeight:1 }}>{trustScore.pct}%</div>
+                    <div style={{ fontSize:9, color:'rgba(255,255,255,0.8)', fontFamily:FONT, fontWeight:600 }}>Tillid</div>
+                  </div>
+                )}
               </div>
               {isOwn ? (
                 <div style={{ background:GREEN_TINT, borderRadius:14, padding:'12px 16px', marginBottom:12, textAlign:'center' }}>

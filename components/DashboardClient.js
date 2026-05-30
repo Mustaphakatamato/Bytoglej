@@ -148,6 +148,10 @@ export default function DashboardClient() {
   const [matchesModal, setMatchesModal] = useState(null); // søges listing
   const [matches, setMatches] = useState([]);
   const [matchesLoading, setMatchesLoading] = useState(false);
+  const [reviewModal, setReviewModal] = useState(null); // conversation to review
+  const [reviewForm, setReviewForm] = useState({ description_score:0, contact_score:0, trade_again:'', comment:'' });
+  const [reviewSaving, setReviewSaving] = useState(false);
+  const [reviewedConvIds, setReviewedConvIds] = useState(new Set());
 
   async function startMatchConversation(match) {
     if (!authUserId) { router.push('/login'); return; }
@@ -255,6 +259,10 @@ export default function DashboardClient() {
       if (!cancelled) await fetchListingFavoriters(listings);
       if (!cancelled) fetchCO2Savings(inst, user.id);
       if (!cancelled) fetchTrades(inst, user.id);
+      if (!cancelled && inst?.name) {
+        const { data: myReviews } = await db.from('transaction_reviews').select('conversation_id').eq('reviewer_institution_name', inst.name);
+        if (myReviews) setReviewedConvIds(new Set(myReviews.map(r => r.conversation_id)));
+      }
 
       let incoming;
       const instId = inst?.id;
@@ -1133,7 +1141,15 @@ export default function DashboardClient() {
                             🌱 ≈ {tradeCo2.net_saved_kg} kg CO₂e sparet
                           </button>
                         )}
-                        <button onClick={()=>router.push(`/beskeder?conv=${t.id}`)} style={{ marginTop:10, background:'none', border:`1.5px solid ${PRIMARY}`, color:PRIMARY, borderRadius:99, padding:'5px 12px', fontSize:12, fontWeight:700, cursor:'pointer', fontFamily:FONT }}>Se samtale →</button>
+                        <div style={{ display:'flex', gap:8, marginTop:10, flexWrap:'wrap', alignItems:'center' }}>
+                          <button onClick={()=>router.push(`/beskeder?conv=${t.id}`)} style={{ background:'none', border:`1.5px solid ${PRIMARY}`, color:PRIMARY, borderRadius:99, padding:'5px 12px', fontSize:12, fontWeight:700, cursor:'pointer', fontFamily:FONT }}>Se samtale →</button>
+                          {!isSeller && !reviewedConvIds.has(t.id) && (
+                            <button onClick={()=>{ setReviewModal(t); setReviewForm({ description_score:0, contact_score:0, trade_again:'', comment:'' }); }} style={{ background:PRIMARY, color:'#fff', border:'none', borderRadius:99, padding:'5px 12px', fontSize:12, fontWeight:700, cursor:'pointer', fontFamily:FONT }}>✓ Bekræft modtagelse</button>
+                          )}
+                          {!isSeller && reviewedConvIds.has(t.id) && (
+                            <span style={{ fontSize:11, color:PRIMARY, fontWeight:700, fontFamily:FONT }}>✓ Bekræftet</span>
+                          )}
+                        </div>
                       </div>
                     );
                   });
@@ -1265,6 +1281,98 @@ export default function DashboardClient() {
         }
         <button onClick={exitBulk} style={{ padding:'7px 12px', borderRadius:99, background:PAPER3, border:'none', color:INK3, fontSize:12, fontWeight:700, cursor:'pointer', fontFamily:FONT }}>✕</button>
       </div>
+    )}
+
+    {/* Review modal */}
+    {reviewModal && typeof document !== 'undefined' && createPortal(
+      <div onClick={()=>setReviewModal(null)} style={{ position:'fixed', inset:0, background:'rgba(22,34,28,0.65)', zIndex:10002, display:'flex', alignItems:'center', justifyContent:'center', padding:20 }}>
+        <div onClick={e=>e.stopPropagation()} style={{ background:PAPER, borderRadius:24, width:'100%', maxWidth:440, maxHeight:'90vh', overflowY:'auto', boxShadow:'0 24px 80px rgba(22,34,28,0.3)' }}>
+          <div style={{ padding:'24px 24px 0', display:'flex', alignItems:'center', justifyContent:'space-between' }}>
+            <div style={{ fontFamily:FONT, fontWeight:800, fontSize:18, color:INK }}>Bekræft modtagelse</div>
+            <button onClick={()=>setReviewModal(null)} style={{ background:'none', border:'none', fontSize:20, cursor:'pointer', color:INK3 }}>✕</button>
+          </div>
+          <div style={{ padding:'6px 24px 10px', fontSize:13, color:INK3, fontFamily:FONT }}>
+            Handel med <strong style={{color:INK}}>{reviewModal.owner_name}</strong> om "{reviewModal.listing_title}"
+          </div>
+
+          <div style={{ padding:'0 24px 24px', display:'flex', flexDirection:'column', gap:20 }}>
+            {/* Q1: Beskrivelse */}
+            <div>
+              <div style={{ fontFamily:FONT, fontWeight:700, fontSize:13, color:INK, marginBottom:8 }}>Stemte beskrivelsen overens med varen?</div>
+              <div style={{ display:'flex', gap:8 }}>
+                {[1,2,3].map(n => (
+                  <button key={n} onClick={()=>setReviewForm(f=>({...f, description_score:n}))} style={{ flex:1, padding:'10px 0', borderRadius:12, border:`2px solid ${reviewForm.description_score===n?PRIMARY:PAPER3}`, background:reviewForm.description_score===n?GREEN_TINT:PAPER2, fontFamily:FONT, fontWeight:700, fontSize:20, cursor:'pointer', transition:'all 0.12s' }}>
+                    {'⭐'.repeat(n)}
+                  </button>
+                ))}
+              </div>
+              <div style={{ display:'flex', justifyContent:'space-between', fontSize:10, color:INK3, fontFamily:FONT, marginTop:4 }}>
+                <span>Ikke helt</span><span>Perfekt</span>
+              </div>
+            </div>
+
+            {/* Q2: Kontakt */}
+            <div>
+              <div style={{ fontFamily:FONT, fontWeight:700, fontSize:13, color:INK, marginBottom:8 }}>Var kontakten nem og god?</div>
+              <div style={{ display:'flex', gap:8 }}>
+                {[1,2,3].map(n => (
+                  <button key={n} onClick={()=>setReviewForm(f=>({...f, contact_score:n}))} style={{ flex:1, padding:'10px 0', borderRadius:12, border:`2px solid ${reviewForm.contact_score===n?PRIMARY:PAPER3}`, background:reviewForm.contact_score===n?GREEN_TINT:PAPER2, fontFamily:FONT, fontWeight:700, fontSize:20, cursor:'pointer', transition:'all 0.12s' }}>
+                    {'⭐'.repeat(n)}
+                  </button>
+                ))}
+              </div>
+              <div style={{ display:'flex', justifyContent:'space-between', fontSize:10, color:INK3, fontFamily:FONT, marginTop:4 }}>
+                <span>Besværligt</span><span>Nemt og hurtigt</span>
+              </div>
+            </div>
+
+            {/* Q3: Handle igen */}
+            <div>
+              <div style={{ fontFamily:FONT, fontWeight:700, fontSize:13, color:INK, marginBottom:8 }}>Vil du handle med dem igen?</div>
+              <div style={{ display:'flex', gap:8 }}>
+                {[{k:'ja',l:'Ja 👍'},{k:'måske',l:'Måske 🤔'},{k:'nej',l:'Nej 👎'}].map(({k,l}) => (
+                  <button key={k} onClick={()=>setReviewForm(f=>({...f, trade_again:k}))} style={{ flex:1, padding:'9px 4px', borderRadius:12, border:`2px solid ${reviewForm.trade_again===k?PRIMARY:PAPER3}`, background:reviewForm.trade_again===k?GREEN_TINT:PAPER2, fontFamily:FONT, fontWeight:700, fontSize:12, cursor:'pointer', transition:'all 0.12s', color:INK }}>
+                    {l}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Kommentar */}
+            <div>
+              <div style={{ fontFamily:FONT, fontWeight:700, fontSize:13, color:INK, marginBottom:6 }}>Kommentar <span style={{fontWeight:400,color:INK3}}>(valgfrit)</span></div>
+              <textarea value={reviewForm.comment} onChange={e=>setReviewForm(f=>({...f,comment:e.target.value}))} placeholder="Del din oplevelse..." rows={3} style={{ width:'100%', borderRadius:12, border:`1.5px solid ${PAPER3}`, background:PAPER2, fontFamily:FONT, fontSize:13, color:INK, padding:'10px 12px', resize:'vertical', outline:'none', boxSizing:'border-box' }} />
+            </div>
+
+            <button
+              disabled={reviewSaving || !reviewForm.description_score || !reviewForm.contact_score || !reviewForm.trade_again}
+              onClick={async()=>{
+                setReviewSaving(true);
+                try {
+                  await db.from('transaction_reviews').insert({
+                    conversation_id: reviewModal.id,
+                    reviewer_institution_name: institution?.name,
+                    reviewer_institution_id: institution?.id || null,
+                    reviewed_institution_name: reviewModal.owner_name,
+                    description_score: reviewForm.description_score,
+                    contact_score: reviewForm.contact_score,
+                    trade_again: reviewForm.trade_again,
+                    comment: reviewForm.comment || null,
+                  });
+                  await db.from('conversations').update({ buyer_confirmed: true, buyer_confirmed_at: new Date().toISOString() }).eq('id', reviewModal.id);
+                  setReviewedConvIds(s => new Set([...s, reviewModal.id]));
+                  showToast('Tak for din vurdering! 🌟');
+                  setReviewModal(null);
+                } catch { showToast('Noget gik galt', 'error'); }
+                setReviewSaving(false);
+              }}
+              style={{ width:'100%', padding:'13px', borderRadius:99, background: (!reviewForm.description_score||!reviewForm.contact_score||!reviewForm.trade_again) ? PAPER3 : PRIMARY, color: (!reviewForm.description_score||!reviewForm.contact_score||!reviewForm.trade_again) ? INK3 : '#fff', border:'none', fontFamily:FONT, fontWeight:700, fontSize:15, cursor: (!reviewForm.description_score||!reviewForm.contact_score||!reviewForm.trade_again) ? 'not-allowed' : 'pointer', transition:'all 0.2s' }}>
+              {reviewSaving ? 'Gemmer…' : '✓ Bekræft modtagelse'}
+            </button>
+          </div>
+        </div>
+      </div>,
+      document.body
     )}
 
     {/* Matches modal */}

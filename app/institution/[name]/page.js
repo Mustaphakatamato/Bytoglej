@@ -43,6 +43,7 @@ export default function InstitutionPage() {
   const [bundleNote, setBundleNote] = useState('');
   const [sendingBundle, setSendingBundle] = useState(false);
   const [myInst, setMyInst] = useState(null);
+  const [trustScore, setTrustScore] = useState(null);
   const ww = useWindowWidth();
   const isMobile = ww < 768;
 
@@ -51,9 +52,14 @@ export default function InstitutionPage() {
     Promise.all([
       db.from('listings').select('*').eq('institution_name', institutionName).eq('is_active', true).eq('is_sold', false).order('created_at', { ascending: false }),
       db.from('institutions').select('*').eq('name', institutionName).maybeSingle(),
-    ]).then(([{ data: lst }, { data: instData }]) => {
+      db.from('transaction_reviews').select('description_score,contact_score,trade_again').eq('reviewed_institution_name', institutionName),
+    ]).then(([{ data: lst }, { data: instData }, { data: reviews }]) => {
       if (lst) setListings(lst);
       if (instData) setInst(instData);
+      if (reviews?.length) {
+        const avg = reviews.reduce((s,r) => s + (r.description_score + r.contact_score) / 2, 0) / reviews.length;
+        setTrustScore({ pct: Math.round((avg / 3) * 100), count: reviews.length, wouldTradeAgain: Math.round(reviews.filter(r=>r.trade_again==='ja').length / reviews.length * 100) });
+      }
       setLoading(false);
     });
   }, [institutionName]);
@@ -210,9 +216,18 @@ export default function InstitutionPage() {
                 {inst?.phone && <span>📞 {inst.phone}</span>}
               </div>
             </div>
-            <div style={{ background:'#E8F5EE', borderRadius:12, padding:'10px 18px', textAlign:'center', flexShrink:0 }}>
-              <div style={{ fontFamily:"'Nunito',sans-serif", fontWeight:900, fontSize:22, color:PRIMARY }}>{listings.length}</div>
-              <div style={{ fontSize:12, color:'#888' }}>aktive opslag</div>
+            <div style={{ display:'flex', gap:10, flexShrink:0 }}>
+              {trustScore && (
+                <div style={{ background:PRIMARY, borderRadius:12, padding:'10px 18px', textAlign:'center' }}>
+                  <div style={{ fontFamily:"'Nunito',sans-serif", fontWeight:900, fontSize:22, color:'#fff' }}>{trustScore.pct}%</div>
+                  <div style={{ fontSize:12, color:'rgba(255,255,255,0.85)' }}>Tillid · {trustScore.count} {trustScore.count===1?'anm.':'anm.'}</div>
+                  {trustScore.wouldTradeAgain >= 50 && <div style={{ fontSize:10, color:'rgba(255,255,255,0.7)', marginTop:2 }}>👍 {trustScore.wouldTradeAgain}% vil handle igen</div>}
+                </div>
+              )}
+              <div style={{ background:'#E8F5EE', borderRadius:12, padding:'10px 18px', textAlign:'center' }}>
+                <div style={{ fontFamily:"'Nunito',sans-serif", fontWeight:900, fontSize:22, color:PRIMARY }}>{listings.length}</div>
+                <div style={{ fontSize:12, color:'#888' }}>aktive opslag</div>
+              </div>
             </div>
           </div>
           <div style={{ marginTop:16, paddingTop:16, borderTop:'1px solid #e8e6e3', display:'flex', gap:10, flexWrap:'wrap' }}>
