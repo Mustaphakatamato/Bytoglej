@@ -9,6 +9,7 @@ import { useApp, useActiveUser } from '@/providers/AppProvider';
 import { Badge, Btn, Spinner, Modal, SkeletonDashboardBox } from '@/components/ui';
 import PullToRefresh from '@/components/PullToRefresh';
 import { getCO2Comparison, aggregateSavings } from '@/lib/co2/calculator';
+import { CATEGORIES } from '@/lib/categories';
 
 const FONT = "'Sora', sans-serif";
 
@@ -135,6 +136,7 @@ export default function DashboardClient() {
   const [co2Savings, setCo2Savings] = useState([]);
   const [co2Period, setCo2Period] = useState('total');
   const [co2ModalOpen, setCo2ModalOpen] = useState(false);
+  const [co2ListOpen, setCo2ListOpen] = useState(false);
   const [co2ModalData, setCo2ModalData] = useState(null);
 
   const isAdmin = !!institution && !institution._memberRole;
@@ -294,8 +296,7 @@ export default function DashboardClient() {
     if (inst?.id) orParts.push(`seller_institution_id.eq.${inst.id}`, `buyer_institution_id.eq.${inst.id}`);
     if (uid) orParts.push(`seller_institution_id.eq.${uid}`, `buyer_institution_id.eq.${uid}`);
     const { data } = await db.from('transaction_co2_savings')
-      .select('net_saved_kg, breakdown, methodology_version, calculated_at, transaction_id')
-      .or(orParts.join(','))
+      .select('net_saved_kg, breakdown, methodology_version, calculated_at, transaction_id, seller_name, buyer_name, listing_category_id')
       .order('calculated_at', { ascending: false });
     if (data) setCo2Savings(data);
   }
@@ -976,28 +977,33 @@ export default function DashboardClient() {
                     <span style={{ fontSize:14, color:INK3, fontFamily:FONT }}>sparet (estimeret)</span>
                   </div>
                   {comparison && <div style={{ fontSize:13, color:INK3, fontFamily:FONT, marginBottom:8 }}>{comparison}</div>}
-                  <div style={{ fontSize:12, color:INK3, fontFamily:FONT, marginBottom:12 }}>På tværs af {stats.count} byttehandel{stats.count !== 1 ? 'er' : ''}</div>
-                  <div style={{ borderTop:`1px solid ${GREEN_SOFT}`, paddingTop:12 }}>
-                    {co2Savings.filter(s => s.net_saved_kg > 0).slice(0, 5).map((s, idx) => (
-                      <div key={idx} onClick={() => { setCo2ModalData(s); setCo2ModalOpen(true); }}
-                        style={{ display:'flex', justifyContent:'space-between', alignItems:'center', padding:'8px 0', borderBottom:`1px solid ${GREEN_SOFT}`, cursor:'pointer' }}>
-                        <div>
-                          <div style={{ fontFamily:FONT, fontSize:13, fontWeight:600, color:INK }}>
-                            {s.breakdown?.categoryId ? s.breakdown.categoryId.replace(/-/g,' ') : 'Handel'}
-                          </div>
-                          <div style={{ fontFamily:FONT, fontSize:11, color:INK3 }}>
-                            {new Date(s.calculated_at).toLocaleDateString('da-DK', { day:'numeric', month:'short', year:'numeric' })}
-                          </div>
-                        </div>
-                        <div style={{ fontFamily:FONT, fontWeight:800, fontSize:15, color:PRIMARY }}>≈ {s.net_saved_kg} kg</div>
-                      </div>
-                    ))}
-                    {co2Savings.filter(s => s.net_saved_kg > 0).length > 5 && (
-                      <div style={{ fontSize:12, color:INK3, fontFamily:FONT, textAlign:'center', paddingTop:8 }}>
-                        + {co2Savings.filter(s => s.net_saved_kg > 0).length - 5} flere handler
-                      </div>
-                    )}
+                  <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:4 }}>
+                    <div style={{ fontSize:12, color:INK3, fontFamily:FONT }}>På tværs af {stats.count} byttehandel{stats.count !== 1 ? 'er' : ''}</div>
+                    <button onClick={() => setCo2ListOpen(v => !v)} style={{ fontSize:12, color:PRIMARY, fontWeight:700, fontFamily:FONT, background:'none', border:'none', cursor:'pointer', textDecoration:'underline' }}>
+                      {co2ListOpen ? 'Skjul handler' : 'Se handler'}
+                    </button>
                   </div>
+                  {co2ListOpen && (
+                    <div style={{ borderTop:`1px solid ${GREEN_SOFT}`, paddingTop:8, marginTop:8 }}>
+                      {co2Savings.filter(s => s.net_saved_kg > 0).map((s, idx) => {
+                        const isOwner = s.seller_name === institution?.name;
+                        const partner = isOwner ? s.buyer_name : s.seller_name;
+                        const role = isOwner ? 'Solgt til' : 'Købt fra';
+                        const catLabel = CATEGORIES.find(c => c.key === s.breakdown?.categoryId)?.label || s.listing_category_id || s.breakdown?.categoryId || 'Handel';
+                        return (
+                          <div key={idx} onClick={() => { setCo2ModalData(s); setCo2ModalOpen(true); }}
+                            style={{ display:'flex', justifyContent:'space-between', alignItems:'center', padding:'10px 0', borderBottom:`1px solid ${GREEN_SOFT}`, cursor:'pointer' }}>
+                            <div style={{ flex:1, minWidth:0 }}>
+                              <div style={{ fontFamily:FONT, fontSize:13, fontWeight:700, color:INK, marginBottom:2 }}>{catLabel}</div>
+                              <div style={{ fontFamily:FONT, fontSize:11, color:INK3 }}>{role} <strong style={{ color:INK2 }}>{partner || '—'}</strong></div>
+                              <div style={{ fontFamily:FONT, fontSize:11, color:INK3 }}>{new Date(s.calculated_at).toLocaleDateString('da-DK', { day:'numeric', month:'short', year:'numeric' })}</div>
+                            </div>
+                            <div style={{ fontFamily:FONT, fontWeight:800, fontSize:15, color:PRIMARY, marginLeft:12, whiteSpace:'nowrap' }}>≈ {s.net_saved_kg} kg</div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
                 </>
               )}
             </div>
