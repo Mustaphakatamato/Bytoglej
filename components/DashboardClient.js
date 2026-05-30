@@ -148,6 +148,30 @@ export default function DashboardClient() {
   const [matches, setMatches] = useState([]);
   const [matchesLoading, setMatchesLoading] = useState(false);
 
+  async function startMatchConversation(match) {
+    if (!institution || !authUserId) { router.push('/login'); return; }
+    const { data: existing } = await db.from('conversations')
+      .select('id')
+      .eq('listing_id', match.id)
+      .or(`owner_institution_id.eq.${institution.id},initiator_institution_id.eq.${institution.id}`)
+      .maybeSingle();
+    if (existing) { setMatchesModal(null); router.push(`/beskeder?conv=${existing.id}`); return; }
+    const { data: created } = await db.from('conversations').insert({
+      owner_id: authUserId,
+      owner_name: match.institution_name,
+      initiator_name: institution.name,
+      initiator_institution_id: institution.id,
+      listing_id: match.id,
+      listing_title: match.title,
+      listing_image: match.images?.[0] || null,
+      listing_emoji: match.emoji || '🧸',
+      listing_color: match.color || '#FFD166',
+      listing_type: match.type,
+    }).select('id').single();
+    setMatchesModal(null);
+    router.push(created?.id ? `/beskeder?conv=${created.id}` : '/beskeder');
+  }
+
   async function openMatches(søgesListing) {
     setMatchesModal(søgesListing);
     setMatches([]);
@@ -1265,7 +1289,7 @@ export default function DashboardClient() {
             ) : (
               <div style={{ display:'flex', flexDirection:'column', gap:10 }}>
                 {matches.map(m => (
-                  <div key={m.id} style={{ background:'#fff', borderRadius:14, border:`1.5px solid ${m._score > 0 ? '#DDD6FE' : PAPER2}`, padding:'12px 14px', display:'flex', gap:12, alignItems:'center' }}>
+                  <div key={m.id} onClick={()=>{ setMatchesModal(null); setQuickViewListing(m); }} style={{ background:'#fff', borderRadius:14, border:`1.5px solid ${m._score > 0 ? '#DDD6FE' : PAPER2}`, padding:'12px 14px', display:'flex', gap:12, alignItems:'center', cursor:'pointer' }}>
                     <div style={{ width:52, height:52, borderRadius:10, background:m.images?.[0]?PAPER3:m.color||GREEN_TINT, display:'flex', alignItems:'center', justifyContent:'center', fontSize:24, flexShrink:0, overflow:'hidden' }}>
                       {m.images?.[0] ? <img src={m.images[0]} style={{ width:'100%', height:'100%', objectFit:'cover' }} alt="" /> : m.emoji||'🧸'}
                     </div>
@@ -1274,9 +1298,9 @@ export default function DashboardClient() {
                       <div style={{ fontSize:11, color:INK3, fontFamily:FONT, marginTop:2 }}>{m.institution_name} · {m.condition}</div>
                       {m._score > 0 && <div style={{ fontSize:10, color:'#7C3AED', fontWeight:700, fontFamily:FONT, marginTop:2 }}>{'★'.repeat(Math.min(m._score,3))} God match</div>}
                     </div>
-                    <div style={{ display:'flex', flexDirection:'column', gap:6, flexShrink:0 }}>
+                    <div style={{ display:'flex', flexDirection:'column', gap:6, flexShrink:0 }} onClick={e=>e.stopPropagation()}>
                       {m.price > 0 && <div style={{ fontFamily:FONT, fontWeight:800, fontSize:13, color:PRIMARY }}>{m.price} kr.</div>}
-                      <button onClick={()=>{ setMatchesModal(null); router.push(`/beskeder?listing=${m.id}`); }} style={{ background:'#7C3AED', color:'#fff', border:'none', borderRadius:99, padding:'6px 12px', fontSize:11, fontWeight:700, cursor:'pointer', fontFamily:FONT, whiteSpace:'nowrap' }}>
+                      <button onClick={()=>startMatchConversation(m)} style={{ background:'#7C3AED', color:'#fff', border:'none', borderRadius:99, padding:'6px 12px', fontSize:11, fontWeight:700, cursor:'pointer', fontFamily:FONT, whiteSpace:'nowrap' }}>
                         Kontakt →
                       </button>
                     </div>
