@@ -8,6 +8,7 @@ import { useWindowWidth, geocodeAddress, relTime } from '@/lib/hooks';
 import { useApp, useActiveUser } from '@/providers/AppProvider';
 import { Badge, Btn, Spinner, Modal, SkeletonDashboardBox } from '@/components/ui';
 import PullToRefresh from '@/components/PullToRefresh';
+import { getCO2Comparison, aggregateSavings } from '@/lib/co2/calculator';
 
 const FONT = "'Sora', sans-serif";
 
@@ -131,6 +132,10 @@ export default function DashboardClient() {
   const [listingFavoriters, setListingFavoriters] = useState([]);
   const [activityFeed, setActivityFeed] = useState([]);
   const [feedLoading, setFeedLoading] = useState(false);
+  const [co2Savings, setCo2Savings] = useState([]);
+  const [co2Period, setCo2Period] = useState('total');
+  const [co2ModalOpen, setCo2ModalOpen] = useState(false);
+  const [co2ModalData, setCo2ModalData] = useState(null);
 
   const isAdmin = !!institution && !institution._memberRole;
   const [listingsView, setListingsView] = useState('list');
@@ -177,6 +182,7 @@ export default function DashboardClient() {
       const listings = await fetchMyListings(ctxIsAdmin ? null : user.id, inst?.name);
       if (!cancelled) await fetchListingFavoriters(listings);
       if (!cancelled) fetchActivityFeed(listings, inst, user.id);
+      if (!cancelled) fetchCO2Savings(inst, user.id);
 
       let incoming;
       const instId = inst?.id;
@@ -279,6 +285,18 @@ export default function DashboardClient() {
     events.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
     setActivityFeed(events.slice(0, 25));
     setFeedLoading(false);
+  }
+
+  async function fetchCO2Savings(inst, uid) {
+    if (!inst?.id && !uid) return;
+    const orParts = [];
+    if (inst?.id) orParts.push(`seller_institution_id.eq.${inst.id}`, `buyer_institution_id.eq.${inst.id}`);
+    if (uid) orParts.push(`seller_institution_id.eq.${uid}`, `buyer_institution_id.eq.${uid}`);
+    const { data } = await db.from('transaction_co2_savings')
+      .select('net_saved_kg, breakdown, methodology_version, calculated_at, transaction_id')
+      .or(orParts.join(','))
+      .order('calculated_at', { ascending: false });
+    if (data) setCo2Savings(data);
   }
 
   function openEdit(l) {
@@ -553,6 +571,7 @@ export default function DashboardClient() {
     const listings = await fetchMyListings(ctxIsAdmin ? null : authUserId, institution?.name);
     if (listings?.length) await fetchListingFavoriters(listings);
     fetchActivityFeed(listings, institution, authUserId);
+    fetchCO2Savings(institution, authUserId);
     onListingCreated();
   }
 
@@ -923,7 +942,79 @@ export default function DashboardClient() {
           )}
         </div>
 
+        {/* CO2 widget — Niveau 2: pr. institution */}
+        {(() => {
+          const stats = aggregateSavings(co2Savings);
+          const periodVal = co2Period === 'year' ? stats.thisYear : co2Period === 'last' ? stats.lastYear : stats.total;
+          const comparison = getCO2Comparison(periodVal);
+          return (
+            <div style={{ background:'#F0FDF4', borderRadius:22, padding:isMobile?20:28, border:`1px solid ${GREEN_SOFT}`, boxShadow:'0 1px 4px rgba(22,34,28,0.06)', marginTop:isMobile?16:24 }}>
+              <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:16, flexWrap:'wrap', gap:10 }}>
+                <h2 style={{ fontFamily:FONT, fontWeight:800, fontSize:18, color:INK, margin:0 }}>🌱 Din miljømæssige indsats</h2>
+                <button onClick={()=>router.push('/baeredygtighed/metode')} style={{ fontSize:11, color:PRIMARY, fontWeight:700, fontFamily:FONT, background:'none', border:'none', cursor:'pointer', textDecoration:'underline' }}>Sådan beregner vi det</button>
+              </div>
+              <div style={{ display:'flex', gap:8, marginBottom:16 }}>
+                {[['total','Total'],['year','I år'],['last','Sidste år']].map(([k,l]) => (
+                  <button key={k} onClick={()=>setCo2Period(k)}
+                    style={{ padding:'6px 14px', borderRadius:99, border:`1.5px solid ${co2Period===k?PRIMARY:GREEN_SOFT}`, background:co2Period===k?PRIMARY:'transparent', color:co2Period===k?'#fff':PRIMARY, fontSize:12, fontWeight:700, cursor:'pointer', fontFamily:FONT, transition:'all 0.15s' }}>
+                    {l}
+                  </button>
+                ))}
+              </div>
+              {co2Savings.length === 0 ? (
+                <div style={{ textAlign:'center', padding:'24px 0' }}>
+                  <p style={{ fontSize:14, color:INK3, fontFamily:FONT, margin:0 }}>Ingen gennemførte handler endnu — besparelser beregnes automatisk</p>
+                </div>
+              ) : (
+                <>
+                  <div style={{ display:'flex', alignItems:'baseline', gap:10, marginBottom:8 }}>
+                    <span style={{ fontFamily:FONT, fontWeight:800, fontSize:isMobile?36:48, color:PRIMARY, lineHeight:1 }}>≈ {periodVal}</span>
+                    <span style={{ fontFamily:FONT, fontWeight:700, fontSize:18, color:PRIMARY }}>kg CO₂e</span>
+                    <span style={{ fontSize:14, color:INK3, fontFamily:FONT }}>sparet (estimeret)</span>
+                  </div>
+                  {comparison && <div style={{ fontSize:13, color:INK3, fontFamily:FONT, marginBottom:8 }}>{comparison}</div>}
+                  <div style={{ fontSize:12, color:INK3, fontFamily:FONT }}>På tværs af {stats.count} byttehandel{stats.count !== 1 ? 'er' : ''}</div>
+                </>
+              )}
+            </div>
+          );
+        })()}
+
       </div>
+
+      {/* CO2 breakdown modal */}
+      <Modal open={co2ModalOpen} onClose={()=>setCo2ModalOpen(false)} title="🌱 Estimeret CO₂-besparelse">
+        {co2ModalData && (() => {
+          const b = co2ModalData.breakdown || {};
+          return (
+            <div style={{ display:'flex', flexDirection:'column', gap:14 }}>
+              <div style={{ background:'#F0FDF4', borderRadius:14, padding:'16px' }}>
+                <div style={{ fontFamily:FONT, fontWeight:800, fontSize:28, color:PRIMARY, marginBottom:4 }}>≈ {co2ModalData.net_saved_kg} kg CO₂e</div>
+                <div style={{ fontSize:13, color:INK3, fontFamily:FONT }}>Estimeret besparelse ved denne handel</div>
+              </div>
+              <div style={{ display:'flex', flexDirection:'column', gap:8 }}>
+                {[
+                  ['Kategori-faktor', `${b.categoryFactor} kg CO₂e/enhed`],
+                  ['Displacement rate', `${b.displacementRate} (60% erstatter nyt køb)`],
+                  ['Estimeret produktionsbesparelse', `${b.productionSavedKg} kg CO₂e`],
+                  [`Transport-omkostning (${b.rawDistanceKm} km${b.distanceEstimated ? ', estimeret' : ''}, tur/retur)`, `${b.transportCostKg} kg CO₂e`],
+                  ['Netto besparelse', `${co2ModalData.net_saved_kg} kg CO₂e`],
+                ].map(([label, val]) => (
+                  <div key={label} style={{ display:'flex', justifyContent:'space-between', gap:12, padding:'8px 0', borderBottom:`1px solid ${PAPER2}` }}>
+                    <span style={{ fontSize:13, color:INK3, fontFamily:FONT }}>{label}</span>
+                    <span style={{ fontSize:13, fontWeight:700, color:INK, fontFamily:FONT, textAlign:'right' }}>{val}</span>
+                  </div>
+                ))}
+              </div>
+              <div style={{ fontSize:11, color:INK3, fontFamily:FONT }}>Beregnet ud fra metode v{co2ModalData.methodology_version} · Alle tal er estimater</div>
+              <button onClick={()=>{ setCo2ModalOpen(false); router.push('/baeredygtighed/metode'); }}
+                style={{ padding:'10px', borderRadius:99, background:GREEN_TINT, border:`1px solid ${GREEN_SOFT}`, color:PRIMARY, fontFamily:FONT, fontWeight:700, fontSize:13, cursor:'pointer' }}>
+                Læs om beregningsmetoden →
+              </button>
+            </div>
+          );
+        })()}
+      </Modal>
 
       {/* Edit modal */}
       <Modal open={!!editListing} onClose={()=>{setEditListing(null);setEditForm(null);}} title="Rediger opslag">
@@ -1000,6 +1091,7 @@ export default function DashboardClient() {
                   const isSeller = t.owner_institution_id === institution?.id || t.owner_name === institution?.name;
                   const otherParty = isSeller ? t.initiator_name : t.owner_name;
                   const dealDate = t.deal_completed_at || t.handled_at;
+                  const tradeCo2 = co2Savings.find(s => s.transaction_id === t.id);
                   return (
                     <div key={t.id} style={{ border:`1px solid ${isSeller?GREEN_SOFT:'#BFDBFE'}`, borderRadius:14, padding:'14px 16px', marginBottom:10, background:isSeller?GREEN_TINT:'#EFF6FF' }}>
                       <div style={{ display:'flex', justifyContent:'space-between', alignItems:'flex-start', marginBottom:8 }}>
@@ -1015,6 +1107,12 @@ export default function DashboardClient() {
                         <span>{dealDate ? new Date(dealDate).toLocaleDateString('da-DK',{day:'numeric',month:'long',year:'numeric'}) : '—'}</span>
                         {t.deal_type && <span>{t.deal_type === 'byd' ? 'Bud accepteret' : t.deal_type === 'byt' ? 'Bytte' : 'Køb'}</span>}
                       </div>
+                      {tradeCo2 && (
+                        <button onClick={()=>{ setCo2ModalData(tradeCo2); setCo2ModalOpen(true); }}
+                          style={{ marginTop:8, display:'inline-flex', alignItems:'center', gap:5, background:'#F0FDF4', border:`1px solid ${GREEN_SOFT}`, borderRadius:99, padding:'4px 10px', fontSize:12, fontWeight:700, color:PRIMARY, cursor:'pointer', fontFamily:FONT }}>
+                          🌱 ≈ {tradeCo2.net_saved_kg} kg CO₂e sparet
+                        </button>
+                      )}
                       <button onClick={()=>router.push('/beskeder')} style={{ marginTop:10, background:'none', border:`1.5px solid ${PRIMARY}`, color:PRIMARY, borderRadius:99, padding:'5px 12px', fontSize:12, fontWeight:700, cursor:'pointer', fontFamily:FONT }}>Se samtale →</button>
                     </div>
                   );

@@ -1,6 +1,6 @@
 'use client';
 // v2
-import { useState, useMemo, useRef, useCallback } from 'react';
+import { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { PRIMARY, GREEN_DEEP, GREEN_SOFT, GREEN_TINT, PAPER, PAPER2, PAPER3, INK, INK2, INK3, CORAL, SKY, TYPE_CFG } from '@/lib/constants';
 import { useWindowWidth, useDebounce, useFeedListings } from '@/lib/hooks';
@@ -8,6 +8,8 @@ import { SkeletonCard } from '@/components/ui';
 import ListingCard from '@/components/ListingCard';
 import PullToRefresh from '@/components/PullToRefresh';
 import { useApp } from '@/providers/AppProvider';
+import { db } from '@/lib/supabase';
+import { getCO2Comparison } from '@/lib/co2/calculator';
 import { LogoLockup } from '@/components/Logo';
 import { db } from '@/lib/supabase';
 
@@ -416,6 +418,58 @@ function MissionSection() {
   );
 }
 
+/* ── Platform CO₂ stat — Niveau 3 ────────────────────────── */
+function PlatformCO2Stat() {
+  const router = useRouter();
+  const w = useWindowWidth();
+  const isMobile = w < 640;
+  const [totalKg, setTotalKg] = useState(null);
+  const [tradeCount, setTradeCount] = useState(null);
+
+  useEffect(() => {
+    db.from('transaction_co2_savings')
+      .select('net_saved_kg', { count: 'exact' })
+      .then(({ data, count }) => {
+        if (data) {
+          const sum = data.reduce((s, r) => s + (r.net_saved_kg || 0), 0);
+          setTotalKg(Math.round(sum * 10) / 10);
+          setTradeCount(count || data.length);
+        }
+      });
+  }, []);
+
+  const displayTons = totalKg != null && totalKg >= 10;
+  const displayVal  = totalKg == null ? '…'
+    : displayTons ? (totalKg / 1000).toFixed(2) + ' tons'
+    : totalKg + ' kg';
+  const comparison  = totalKg ? getCO2Comparison(totalKg) : null;
+
+  return (
+    <section style={{ background: GREEN_TINT, padding: isMobile ? '56px 20px' : '80px 24px', textAlign: 'center', borderTop: `1px solid ${GREEN_SOFT}` }}>
+      <div style={{ maxWidth: 600, margin: '0 auto' }}>
+        <div style={{ fontFamily: "'Sora',sans-serif", fontWeight: 700, fontSize: 12, letterSpacing: '0.1em', textTransform: 'uppercase', color: PRIMARY, marginBottom: 14, opacity: 0.7 }}>
+          Fællesskabets miljøindsats
+        </div>
+        <h2 style={{ fontFamily: "'Sora',sans-serif", fontWeight: 800, fontSize: isMobile ? 32 : 52, color: PRIMARY, letterSpacing: '-0.04em', lineHeight: 1, margin: '0 0 8px' }}>
+          🌱 ≈ {displayVal} CO₂e
+        </h2>
+        <p style={{ fontSize: 15, color: '#3A473D', fontFamily: "'Sora',sans-serif", marginBottom: 6 }}>
+          estimeret sparet af byt&amp;leg-fællesskabet
+          {tradeCount ? ` på tværs af ${tradeCount} handler` : ''}
+        </p>
+        {comparison && <p style={{ fontSize: 13, color: PRIMARY, fontFamily: "'Sora',sans-serif", marginBottom: 0, opacity: 0.8 }}>{comparison}</p>}
+        <button onClick={() => router.push('/baeredygtighed/metode')}
+          style={{ marginTop: 18, background: 'none', border: `1.5px solid ${PRIMARY}`, borderRadius: 99, padding: '7px 18px', fontSize: 12, fontWeight: 700, color: PRIMARY, cursor: 'pointer', fontFamily: "'Sora',sans-serif" }}>
+          Sådan beregner vi det →
+        </button>
+        <p style={{ fontSize: 10, color: PRIMARY, opacity: 0.5, fontFamily: "'Sora',sans-serif", marginTop: 10 }}>
+          Alle tal er estimater baseret på publiceret LCA-litteratur. Se metode-siden for fuld dokumentation.
+        </p>
+      </div>
+    </section>
+  );
+}
+
 /* ── CTA banner ───────────────────────────────────────────── */
 function CtaBanner() {
   const router = useRouter();
@@ -483,6 +537,7 @@ export default function HomePage() {
       <HowSection />
       <TradeTypesStrip />
       <MissionSection />
+      <PlatformCO2Stat />
       <CtaBanner />
     </>
   );
