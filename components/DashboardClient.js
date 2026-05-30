@@ -90,6 +90,7 @@ export default function DashboardClient() {
     toggleFav,
     setActiveListing,
     setQuickViewListing,
+    setSelectedConvId,
     unreadTotal,
     institution: ctxAppInstitution,
     setInstitution: setAppInstitution,
@@ -149,37 +150,34 @@ export default function DashboardClient() {
   const [matchesLoading, setMatchesLoading] = useState(false);
 
   async function startMatchConversation(match) {
-    if (!institution || !authUserId) { router.push('/login'); return; }
-    // Check for existing conversation on this listing where current user is initiator
+    if (!authUserId) { router.push('/login'); return; }
+    const orFilter = institution?.id
+      ? `initiator_institution_id.eq.${institution.id},initiator_id.eq.${authUserId}`
+      : `initiator_id.eq.${authUserId}`;
     const { data: existing } = await db.from('conversations')
-      .select('id')
-      .eq('listing_id', match.id)
-      .eq('initiator_id', authUserId)
-      .maybeSingle();
-    if (existing) { setMatchesModal(null); router.push(`/beskeder?conv=${existing.id}`); return; }
-    // Also check if current institution is owner_institution_id
-    const { data: existingAsOwner } = await db.from('conversations')
-      .select('id')
-      .eq('listing_id', match.id)
-      .eq('initiator_institution_id', institution.id)
-      .maybeSingle();
-    if (existingAsOwner) { setMatchesModal(null); router.push(`/beskeder?conv=${existingAsOwner.id}`); return; }
-    const { data: created, error: convError } = await db.from('conversations').insert({
-      owner_id: match.user_id || null,
-      owner_name: match.institution_name,
-      initiator_id: authUserId,
-      initiator_name: institution.name,
-      initiator_institution_id: institution.id,
-      listing_id: match.id,
-      listing_title: match.title,
-      listing_image: match.images?.[0] || null,
-      listing_emoji: match.emoji || '🧸',
-      listing_color: match.color || '#FFD166',
-      listing_type: match.type,
-    }).select('id').single();
-    if (convError) console.error('Conv insert error:', convError.message, convError.details);
+      .select('id').eq('listing_id', match.id).or(orFilter).maybeSingle();
+    let convId = existing?.id;
+    if (!convId) {
+      const { data: ownerInst } = await db.from('institutions')
+        .select('id,email,name').ilike('name', match.institution_name).maybeSingle();
+      const { data: conv } = await db.from('conversations').insert({
+        listing_id: match.id,
+        listing_title: match.title,
+        listing_emoji: match.emoji || '🧸',
+        listing_color: match.color || '#FFD166',
+        listing_image: match.images?.[0] || null,
+        initiator_id: authUserId,
+        initiator_name: institution?.name || '',
+        initiator_institution_id: institution?.id || null,
+        owner_id: match.user_id || null,
+        owner_name: match.institution_name,
+        owner_institution_id: ownerInst?.id || null,
+      }).select('id').single();
+      convId = conv?.id;
+    }
+    if (convId) setSelectedConvId(convId);
     setMatchesModal(null);
-    router.push(created?.id ? `/beskeder?conv=${created.id}` : '/beskeder');
+    router.push('/beskeder');
   }
 
   async function openMatches(søgesListing) {
@@ -1271,10 +1269,12 @@ export default function DashboardClient() {
 
     {/* Matches modal */}
     {matchesModal && typeof document !== 'undefined' && createPortal(
-      <div onClick={()=>setMatchesModal(null)} style={{ position:'fixed', inset:0, background:'rgba(22,34,28,0.65)', zIndex:10002, display:'flex', alignItems:'flex-end', justifyContent:'center', cursor:'pointer' }}>
-        <div onClick={e=>e.stopPropagation()} style={{ background:PAPER, borderRadius:'20px 20px 0 0', width:'100%', maxWidth:640, maxHeight:'80vh', display:'flex', flexDirection:'column', boxShadow:'0 -8px 40px rgba(22,34,28,0.2)' }}>
-          {/* Tap-to-close zone */}
-          <div onClick={()=>setMatchesModal(null)} style={{ padding:'14px 0 8px', display:'flex', justifyContent:'center', cursor:'pointer', flexShrink:0, WebkitTapHighlightColor:'transparent' }}>
+      <div style={{ position:'fixed', inset:0, zIndex:10002, display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'flex-end' }}>
+        {/* Backdrop — tap to close */}
+        <div onClick={()=>setMatchesModal(null)} style={{ position:'absolute', inset:0, background:'rgba(22,34,28,0.65)' }} />
+        <div style={{ position:'relative', background:PAPER, borderRadius:'20px 20px 0 0', width:'100%', maxWidth:640, maxHeight:'80vh', display:'flex', flexDirection:'column', boxShadow:'0 -8px 40px rgba(22,34,28,0.2)' }}>
+          {/* Handle */}
+          <div onClick={()=>setMatchesModal(null)} style={{ padding:'14px 0 8px', display:'flex', justifyContent:'center', cursor:'pointer', flexShrink:0 }}>
             <div style={{ width:48, height:5, borderRadius:99, background:PAPER3 }} />
           </div>
           {/* Header */}
@@ -1314,7 +1314,7 @@ export default function DashboardClient() {
                     </div>
                     <div style={{ display:'flex', flexDirection:'column', gap:6, flexShrink:0 }} onClick={e=>e.stopPropagation()}>
                       {m.price > 0 && <div style={{ fontFamily:FONT, fontWeight:800, fontSize:13, color:PRIMARY }}>{m.price} kr.</div>}
-                      <button onClick={()=>setQuickViewListing(m)} style={{ background:'#7C3AED', color:'#fff', border:'none', borderRadius:99, padding:'6px 12px', fontSize:11, fontWeight:700, cursor:'pointer', fontFamily:FONT, whiteSpace:'nowrap' }}>
+                      <button onClick={()=>startMatchConversation(m)} style={{ background:'#7C3AED', color:'#fff', border:'none', borderRadius:99, padding:'6px 12px', fontSize:11, fontWeight:700, cursor:'pointer', fontFamily:FONT, whiteSpace:'nowrap' }}>
                         Kontakt →
                       </button>
                     </div>
