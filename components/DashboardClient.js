@@ -1155,7 +1155,7 @@ export default function DashboardClient() {
                             🌱 ≈ {tradeCo2.net_saved_kg} kg CO₂e sparet
                           </button>
                         )}
-                        <button onClick={()=>router.push('/beskeder')} style={{ marginTop:10, background:'none', border:`1.5px solid ${PRIMARY}`, color:PRIMARY, borderRadius:99, padding:'5px 12px', fontSize:12, fontWeight:700, cursor:'pointer', fontFamily:FONT }}>Se samtale →</button>
+                        <button onClick={()=>router.push(`/beskeder?conv=${t.id}`)} style={{ marginTop:10, background:'none', border:`1.5px solid ${PRIMARY}`, color:PRIMARY, borderRadius:99, padding:'5px 12px', fontSize:12, fontWeight:700, cursor:'pointer', fontFamily:FONT }}>Se samtale →</button>
                       </div>
                     );
                   });
