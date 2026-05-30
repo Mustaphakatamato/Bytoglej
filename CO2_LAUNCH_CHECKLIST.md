@@ -69,7 +69,7 @@
 
 ## Admin-interface
 
-- [ ] Admin-siden `/admin/co2-config` er tilgængelig for `mustaphakatamato@gmail.com`
+- [ ] Admin-siden `/admin/co2-config` er tilgængelig for `mustaphakatamato@live.dk`
 - [ ] Siden afviser andre brugere med "Ingen adgang"
 - [ ] Faktortabel viser "AFVIGER"-badge når kode-konstant afviger fra DB-værdi
 - [ ] "Foreslå opdatering" kræver begrundelse (tomt felt = blokeret)

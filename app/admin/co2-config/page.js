@@ -7,7 +7,7 @@ import { EMISSION_FACTORS, METHODOLOGY_VERSION } from '@/lib/co2/emission-factor
 import { Spinner } from '@/components/ui';
 
 const FONT = "'Sora', sans-serif";
-const ADMIN_EMAIL = 'mustaphakatamato@gmail.com';
+const ADMIN_EMAIL = 'mustaphakatamato@live.dk';
 
 export default function Co2ConfigPage() {
   const router = useRouter();

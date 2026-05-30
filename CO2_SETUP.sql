@@ -19,8 +19,8 @@ CREATE TABLE IF NOT EXISTS co2_emission_factors (
 ALTER TABLE co2_emission_factors ENABLE ROW LEVEL SECURITY;
 CREATE POLICY "public_read_factors" ON co2_emission_factors FOR SELECT USING (true);
 CREATE POLICY "admin_manage_factors" ON co2_emission_factors FOR ALL TO authenticated
-  USING (auth.jwt() ->> 'email' = 'mustaphakatamato@gmail.com')
-  WITH CHECK (auth.jwt() ->> 'email' = 'mustaphakatamato@gmail.com');
+  USING (auth.jwt() ->> 'email' = 'mustaphakatamato@live.dk')
+  WITH CHECK (auth.jwt() ->> 'email' = 'mustaphakatamato@live.dk');
 
 INSERT INTO co2_emission_factors (id, name_da, co2_kg_per_unit, source_ids) VALUES
   ('books',               'Bøger',                       1.0,  '["S1","S5"]'),
@@ -63,8 +63,8 @@ CREATE TABLE IF NOT EXISTS co2_methodology_versions (
 ALTER TABLE co2_methodology_versions ENABLE ROW LEVEL SECURITY;
 CREATE POLICY "public_read_versions" ON co2_methodology_versions FOR SELECT USING (true);
 CREATE POLICY "admin_manage_versions" ON co2_methodology_versions FOR ALL TO authenticated
-  USING (auth.jwt() ->> 'email' = 'mustaphakatamato@gmail.com')
-  WITH CHECK (auth.jwt() ->> 'email' = 'mustaphakatamato@gmail.com');
+  USING (auth.jwt() ->> 'email' = 'mustaphakatamato@live.dk')
+  WITH CHECK (auth.jwt() ->> 'email' = 'mustaphakatamato@live.dk');
 
 INSERT INTO co2_methodology_versions
   (version, displacement_rate, transport_emission_g_per_km, route_buffer_factor, default_distance_km, notes, active)
@@ -99,7 +99,7 @@ CREATE POLICY "read_own_savings" ON transaction_co2_savings FOR SELECT TO authen
   USING (
     seller_institution_id IN (SELECT id FROM institutions WHERE email = (SELECT email FROM auth.users WHERE id = auth.uid()))
     OR buyer_institution_id IN (SELECT id FROM institutions WHERE email = (SELECT email FROM auth.users WHERE id = auth.uid()))
-    OR auth.jwt() ->> 'email' = 'mustaphakatamato@gmail.com'
+    OR auth.jwt() ->> 'email' = 'mustaphakatamato@live.dk'
   );
 
 -- ============================================================
@@ -126,5 +126,5 @@ CREATE TABLE IF NOT EXISTS co2_audit_log (
 
 ALTER TABLE co2_audit_log ENABLE ROW LEVEL SECURITY;
 CREATE POLICY "admin_read_audit" ON co2_audit_log FOR SELECT TO authenticated
-  USING (auth.jwt() ->> 'email' = 'mustaphakatamato@gmail.com');
+  USING (auth.jwt() ->> 'email' = 'mustaphakatamato@live.dk');
 CREATE POLICY "insert_audit" ON co2_audit_log FOR INSERT TO authenticated WITH CHECK (true);
