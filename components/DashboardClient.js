@@ -976,7 +976,28 @@ export default function DashboardClient() {
                     <span style={{ fontSize:14, color:INK3, fontFamily:FONT }}>sparet (estimeret)</span>
                   </div>
                   {comparison && <div style={{ fontSize:13, color:INK3, fontFamily:FONT, marginBottom:8 }}>{comparison}</div>}
-                  <div style={{ fontSize:12, color:INK3, fontFamily:FONT }}>På tværs af {stats.count} byttehandel{stats.count !== 1 ? 'er' : ''}</div>
+                  <div style={{ fontSize:12, color:INK3, fontFamily:FONT, marginBottom:12 }}>På tværs af {stats.count} byttehandel{stats.count !== 1 ? 'er' : ''}</div>
+                  <div style={{ borderTop:`1px solid ${GREEN_SOFT}`, paddingTop:12 }}>
+                    {co2Savings.filter(s => s.net_saved_kg > 0).slice(0, 5).map((s, idx) => (
+                      <div key={idx} onClick={() => { setCo2ModalData(s); setCo2ModalOpen(true); }}
+                        style={{ display:'flex', justifyContent:'space-between', alignItems:'center', padding:'8px 0', borderBottom:`1px solid ${GREEN_SOFT}`, cursor:'pointer' }}>
+                        <div>
+                          <div style={{ fontFamily:FONT, fontSize:13, fontWeight:600, color:INK }}>
+                            {s.breakdown?.categoryId ? s.breakdown.categoryId.replace(/-/g,' ') : 'Handel'}
+                          </div>
+                          <div style={{ fontFamily:FONT, fontSize:11, color:INK3 }}>
+                            {new Date(s.calculated_at).toLocaleDateString('da-DK', { day:'numeric', month:'short', year:'numeric' })}
+                          </div>
+                        </div>
+                        <div style={{ fontFamily:FONT, fontWeight:800, fontSize:15, color:PRIMARY }}>≈ {s.net_saved_kg} kg</div>
+                      </div>
+                    ))}
+                    {co2Savings.filter(s => s.net_saved_kg > 0).length > 5 && (
+                      <div style={{ fontSize:12, color:INK3, fontFamily:FONT, textAlign:'center', paddingTop:8 }}>
+                        + {co2Savings.filter(s => s.net_saved_kg > 0).length - 5} flere handler
+                      </div>
+                    )}
+                  </div>
                 </>
               )}
             </div>
