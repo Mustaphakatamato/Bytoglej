@@ -3,10 +3,11 @@ import React, { useState, useEffect, useRef } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { db } from '@/lib/supabase';
 import { PRIMARY, GREEN_SOFT, GREEN_TINT, PAPER, PAPER2, PAPER3, INK, INK3, CORAL } from '@/lib/constants';
-import { useWindowWidth, relTime } from '@/lib/hooks';
+import { useWindowWidth, relTime, haversine, geocodeAddress } from '@/lib/hooks';
 import { useApp, useActiveUser } from '@/providers/AppProvider';
 import { Badge, Btn, Spinner, SkeletonMessageRow } from '@/components/ui';
 import PullToRefresh from '@/components/PullToRefresh';
+import { calculateCO2Savings } from '@/lib/co2/calculator';
 
 const FONT = "'Sora', sans-serif";
 const INK2 = '#3A473D';
@@ -571,6 +572,68 @@ export default function MessagesClient() {
     return active.owner_id === userId ? active.owner_name : active.initiator_name;
   }
 
+  async function persistCO2Saving(conversation, categoryId) {
+    try {
+      let distanceKm = null;
+      const [ownerRes, initiatorRes] = await Promise.all([
+        conversation.owner_institution_id
+          ? db.from('institutions').select('latitude,longitude,address,zipcode,city').eq('id', conversation.owner_institution_id).maybeSingle()
+          : Promise.resolve({ data: null }),
+        conversation.initiator_institution_id
+          ? db.from('institutions').select('latitude,longitude,address,zipcode,city').eq('id', conversation.initiator_institution_id).maybeSingle()
+          : Promise.resolve({ data: null }),
+      ]);
+      let o = ownerRes.data;
+      let i = initiatorRes.data;
+      // Geocode if coordinates not cached
+      if (o && !o.latitude) {
+        const c = await geocodeAddress(o.address, o.zipcode, o.city);
+        if (c) {
+          db.from('institutions').update({ latitude: c.lat, longitude: c.lon }).eq('id', conversation.owner_institution_id);
+          o = { ...o, latitude: c.lat, longitude: c.lon };
+        }
+      }
+      if (i && !i.latitude) {
+        const c = await geocodeAddress(i.address, i.zipcode, i.city);
+        if (c) {
+          db.from('institutions').update({ latitude: c.lat, longitude: c.lon }).eq('id', conversation.initiator_institution_id);
+          i = { ...i, latitude: c.lat, longitude: c.lon };
+        }
+      }
+      if (o?.latitude && i?.latitude) {
+        distanceKm = haversine(o.latitude, o.longitude, i.latitude, i.longitude);
+      }
+      // Fetch listing category if not provided
+      let resolvedCategory = categoryId;
+      if (!resolvedCategory && conversation.listing_id) {
+        const { data: listing } = await db.from('listings').select('category').eq('id', conversation.listing_id).maybeSingle();
+        resolvedCategory = listing?.category || null;
+      }
+      const result = calculateCO2Savings({ categoryId: resolvedCategory, distanceKm });
+      await Promise.all([
+        db.from('transaction_co2_savings').insert({
+          transaction_id: conversation.id,
+          listing_category_id: result.breakdown.categoryId,
+          net_saved_kg: result.netSavedKg,
+          breakdown: result.breakdown,
+          methodology_version: result.methodologyVersion,
+          calculated_at: result.calculatedAt,
+          seller_institution_id: conversation.owner_institution_id || null,
+          buyer_institution_id: conversation.initiator_institution_id || null,
+          seller_name: conversation.owner_name || null,
+          buyer_name: conversation.initiator_name || null,
+        }),
+        db.from('conversations').update({
+          co2_net_saved_kg: result.netSavedKg,
+          co2_breakdown: result.breakdown,
+        }).eq('id', conversation.id),
+      ]);
+    } catch (err) {
+      // Non-fatal — log only, never block the deal flow
+      console.error('[CO2] persistCO2Saving failed (non-fatal):', err?.message);
+    }
+  }
+
   async function handleAcceptBid(msg) {
     const senderName = effectiveSenderName();
     await db.from('chat_messages').update({ bid_status: 'accepted' }).eq('id', msg.id);
@@ -596,6 +659,8 @@ export default function MessagesClient() {
     setActive(a => ({ ...a, ...upd }));
     setConvs(cs => cs.map(c => c.id === active.id ? { ...c, ...upd } : c));
     setMessages(ms => ms.map(m => m.id === msg.id ? { ...m, bid_status: 'accepted' } : m));
+    // Persist CO2 saving non-blockingly after deal is confirmed
+    persistCO2Saving(active, active.listing_category || null);
   }
 
   async function handleRejectBid() {
