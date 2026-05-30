@@ -263,25 +263,46 @@ export default function DashboardClient() {
       }
     }
 
-    const orParts = [];
-    if (inst?.id) orParts.push(`owner_institution_id.eq.${inst.id}`, `initiator_institution_id.eq.${inst.id}`);
-    if (uid) orParts.push(`owner_id.eq.${uid}`, `initiator_id.eq.${uid}`);
-    if (inst?.name) orParts.push(`owner_name.eq.${inst.name}`, `initiator_name.eq.${inst.name}`);
-    if (orParts.length) {
-      const { data: convEvents } = await db.from('conversations')
+    // Only fetch conversations where the logged-in user is the OWNER (incoming activity).
+    // Deals are included from all conversations they're part of.
+    const ownerParts = [];
+    if (inst?.id) ownerParts.push(`owner_institution_id.eq.${inst.id}`);
+    if (uid) ownerParts.push(`owner_id.eq.${uid}`);
+    if (inst?.name) ownerParts.push(`owner_name.eq.${inst.name}`);
+
+    const allParts = [];
+    if (inst?.id) allParts.push(`owner_institution_id.eq.${inst.id}`, `initiator_institution_id.eq.${inst.id}`);
+    if (uid) allParts.push(`owner_id.eq.${uid}`, `initiator_id.eq.${uid}`);
+    if (inst?.name) allParts.push(`owner_name.eq.${inst.name}`, `initiator_name.eq.${inst.name}`);
+
+    if (ownerParts.length) {
+      // Incoming messages: only where this institution is the owner
+      const { data: incomingConvs } = await db.from('conversations')
         .select('id, listing_title, listing_emoji, owner_name, owner_institution_id, initiator_name, deal_completed, deal_completed_at, created_at, last_message_at')
-        .or(orParts.join(','))
+        .or(ownerParts.join(','))
+        .eq('deal_completed', false)
         .order('last_message_at', { ascending: false })
-        .limit(30);
-      if (convEvents) {
-        convEvents.forEach(c => {
+        .limit(20);
+      if (incomingConvs) {
+        incomingConvs.forEach(c => {
+          events.push({ type: 'message', actor: c.initiator_name || 'Nogen', listing_title: c.listing_title, listing_emoji: c.listing_emoji || '🧸', created_at: c.last_message_at || c.created_at, convId: c.id });
+        });
+      }
+    }
+
+    if (allParts.length) {
+      // Completed deals: show from all conversations they're part of
+      const { data: dealConvs } = await db.from('conversations')
+        .select('id, listing_title, listing_emoji, owner_name, owner_institution_id, initiator_name, deal_completed, deal_completed_at, created_at, last_message_at')
+        .or(allParts.join(','))
+        .eq('deal_completed', true)
+        .order('deal_completed_at', { ascending: false })
+        .limit(10);
+      if (dealConvs) {
+        dealConvs.forEach(c => {
           const isOwner = c.owner_institution_id === inst?.id || c.owner_name === inst?.name;
           const other = isOwner ? c.initiator_name : c.owner_name;
-          if (c.deal_completed) {
-            events.push({ type: 'deal', actor: other, listing_title: c.listing_title, listing_emoji: c.listing_emoji || '🧸', created_at: c.deal_completed_at || c.last_message_at, convId: c.id });
-          } else {
-            events.push({ type: 'message', actor: other, listing_title: c.listing_title, listing_emoji: c.listing_emoji || '🧸', created_at: c.last_message_at || c.created_at, convId: c.id });
-          }
+          events.push({ type: 'deal', actor: other, listing_title: c.listing_title, listing_emoji: c.listing_emoji || '🧸', created_at: c.deal_completed_at || c.last_message_at, convId: c.id });
         });
       }
     }
