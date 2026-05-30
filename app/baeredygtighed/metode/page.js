@@ -60,7 +60,7 @@ export default function MetodePage() {
           {[
             ['Produktions-CO₂', 'Det estimerede klimafodaftryk ved at producere et nyt tilsvarende produkt'],
             ['Displacement rate', 'Sandsynligheden for at en brugt vare faktisk erstatter et nyt køb (i stedet for blot at være ekstra forbrug)'],
-            ['Transport-CO₂', 'Udledning fra at flytte legetøjet mellem institutionerne (tur/retur, inkl. 30% rute-buffer)'],
+            ['Transport-CO₂', 'Udledning fra at flytte legetøjet mellem institutionerne (tur/retur, faktisk vejafstand via OpenStreetMap routing)'],
           ].map(([term, def]) => (
             <div key={term} style={{ display: 'flex', gap: 12 }}>
               <span style={{ fontFamily: FONT, fontWeight: 700, fontSize: 14, color: PRIMARY, minWidth: 160, flexShrink: 0 }}>{term}</span>
@@ -102,7 +102,7 @@ export default function MetodePage() {
 
         <h3 style={h3}>Transport</h3>
         <p style={prose}>
-          Vi antager personbil-transport med en gennemsnitlig real-world emission på 170 g CO₂e/km (EEA 2024, S8). Afstanden beregnes som fugleflugt-distance (Haversine) mellem institutionernes adresser, ganget med 1,3 som rute-buffer, og derefter fordoblet (tur/retur). Hvis geocoding fejler, bruges 25 km som standard-estimat.
+          Vi antager personbil-transport med en gennemsnitlig real-world emission på 170 g CO₂e/km (EEA 2024, S8). Afstanden beregnes som faktisk vejafstand via OpenStreetMap routing (OSRM) og fordobles for tur/retur. Hvis routing ikke er mulig, beregnes fugleflugt-distance (Haversine) med 1,3× rute-buffer. Hvis geocoding fejler helt, bruges 10 km som standard-estimat svarende til typisk afstand inden for samme kommune.
         </p>
         <p style={prose}>
           Hvis legetøjet flyttes med ladcykel, elcykel eller som del af eksisterende bilkørsel, er den faktiske besparelse <em>højere</em> end vores estimat viser.

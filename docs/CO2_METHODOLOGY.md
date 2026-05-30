@@ -85,8 +85,8 @@ netto_sparet        = max(0, produktion_sparet − transport_cost)
 |----------|-------|-------|
 | DISPLACEMENT_RATE | 0.6 | S3, S6, S7 (konservativt) |
 | TRANSPORT_KG_PER_KM | 0.170 | EEA 2024 (S8) |
-| ROUTE_BUFFER | 1.3 | 30% over haversine-distance |
-| DEFAULT_DISTANCE_KM | 10 | gennemsnitlig typisk intra-kommunal afstand |
+| ROUTE_BUFFER | 1.0 (OSRM) / 1.3 (haversine-fallback) | OSRM returnerer faktisk vejafstand — buffer kun ved fallback |
+| DEFAULT_DISTANCE_KM | 10 | typisk intra-kommunal afstand (bruges kun hvis geocoding fejler) |
 
 ---
 
@@ -95,9 +95,9 @@ netto_sparet        = max(0, produktion_sparet − transport_cost)
 1. Bruger A accepterer bud i `MessagesClient.handleAcceptBid()`
 2. `deal_completed: true` sættes på `conversations`
 3. `persistCO2Saving(conversation, categoryId)` kaldes **non-blocking**:
-   a. Henter institutionskoordinater (geocoder + cacher hvis nødvendigt)
-   b. Beregner haversine-distance
-   c. Kalder `calculateCO2Savings({ categoryId, distanceKm })`
+   a. Henter institutionskoordinater (Nominatim geocoding + cacher på institutions-tabel)
+   b. Beregner faktisk vejafstand via OSRM routing (fallback: haversine × 1.3)
+   c. Kalder `calculateCO2Savings({ categoryId, distanceKm, isRoutedDistance })`
    d. Inserter immutabelt i `transaction_co2_savings`
    e. Opdaterer `conversations.co2_net_saved_kg` som summary
 
@@ -136,10 +136,11 @@ Admin-siden fremhæver "AFVIGER" hvis kode-konstanten afviger fra DB-værdien.
 
 ## Geocoding
 
-`persistCO2Saving` bruger `geocodeAddress()` fra `lib/hooks.js` (Nominatim API).
+`persistCO2Saving` bruger `geocodeForCO2()` fra `lib/co2/geocoding.js` (Nominatim primær, DAWA postnummer-centroid som fallback).
 Koordinater caches på `institutions.latitude/longitude` efter første opslag.
 
-Haversine-distancen ganges med `ROUTE_BUFFER = 1.3` for at simulere reel rute.
+Faktisk vejafstand hentes via OSRM (`router.project-osrm.org`) — ingen route-buffer nødvendig.
+Fallback: haversine × 1.3 hvis OSRM fejler.
 Ved manglende koordinater bruges `DEFAULT_DISTANCE_KM = 10`.
 
 ---
