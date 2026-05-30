@@ -34,6 +34,7 @@ export function AppProvider({ children }) {
   const [selectedConvId,  setSelectedConvId]  = useState(null);
   const [activeInstName,  setActiveInstName]  = useState(null);
   const [favs,            setFavs]            = useState([]);
+  const [cart,            setCart]            = useState([]);
 
   const effectiveInstitution = adminInst || institution;
 
@@ -81,6 +82,33 @@ export function AppProvider({ children }) {
       return sum + (amInit ? (c.initiator_unread || 0) : (c.owner_unread || 0));
     }, 0);
     setUnreadTotal(total);
+  }
+
+  // ─── Cart ─────────────────────────────────────────────────────────────────────
+  useEffect(() => {
+    try { setCart(JSON.parse(localStorage.getItem('ltb_cart') || '[]')); } catch { setCart([]); }
+  }, []);
+
+  function addToCart(item) {
+    setCart(prev => {
+      if (prev.some(c => c.listingId === item.listingId)) return prev;
+      const next = [...prev, item];
+      try { localStorage.setItem('ltb_cart', JSON.stringify(next)); } catch {}
+      return next;
+    });
+  }
+
+  function removeFromCart(listingId) {
+    setCart(prev => {
+      const next = prev.filter(c => c.listingId !== listingId);
+      try { localStorage.setItem('ltb_cart', JSON.stringify(next)); } catch {}
+      return next;
+    });
+  }
+
+  function clearCart() {
+    setCart([]);
+    try { localStorage.removeItem('ltb_cart'); } catch {}
   }
 
   // ─── Favourites ───────────────────────────────────────────────────────────────
@@ -207,6 +235,7 @@ export function AppProvider({ children }) {
     selectedConvId, setSelectedConvId,
     activeInstName, setActiveInstName,
     favs, toggleFav, setFavs,
+    cart, addToCart, removeFromCart, clearCart,
     effectiveInstitution,
     quickViewListing, setQuickViewListing,
   };

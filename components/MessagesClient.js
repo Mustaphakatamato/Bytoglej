@@ -1100,18 +1100,65 @@ export default function MessagesClient() {
                         const showDate = dateStr !== lastDate;
                         lastDate = dateStr;
                         const prevMine = i>0 && (ctxIsAdmin && adminInstName ? messages[i-1].sender_name === adminInstName : messages[i-1].sender_id === userId);
-                        const grouped = mine === prevMine && !showDate && m.message_type !== 'bid' && messages[i-1]?.message_type !== 'bid' && m.message_type !== 'swap' && messages[i-1]?.message_type !== 'swap' && m.message_type !== 'bundle' && messages[i-1]?.message_type !== 'bundle' && m.message_type !== 'image' && messages[i-1]?.message_type !== 'image';
+                        const grouped = mine === prevMine && !showDate && m.message_type !== 'bid' && messages[i-1]?.message_type !== 'bid' && m.message_type !== 'swap' && messages[i-1]?.message_type !== 'swap' && m.message_type !== 'bundle' && messages[i-1]?.message_type !== 'bundle' && m.message_type !== 'image' && messages[i-1]?.message_type !== 'image' && m.message_type !== 'buy_request' && messages[i-1]?.message_type !== 'buy_request';
                         const isBid = m.message_type === 'bid';
                         const isSwap = m.message_type === 'swap';
                         const isBundle = m.message_type === 'bundle';
                         const isImage = m.message_type === 'image';
+                        const isBuyRequest = m.message_type === 'buy_request';
                         const bundleData = isBundle ? (() => { try { return JSON.parse(m.content); } catch { return null; } })() : null;
                         const swapData = isSwap ? (() => { try { return JSON.parse(m.content); } catch { return null; } })() : null;
                         const imageData = isImage ? (() => { try { return JSON.parse(m.content); } catch { return null; } })() : null;
+                        const buyData = isBuyRequest ? (() => { try { return JSON.parse(m.content); } catch { return null; } })() : null;
                         return (
                           <React.Fragment key={m.id}>
                             {showDate && <div style={{ textAlign:'center', margin:'12px 0 4px', fontSize:11, fontWeight:600, color:INK3, letterSpacing:0.5, fontFamily:FONT }}>{dateStr}</div>}
-                            {isSwap ? (
+                            {isBuyRequest ? (
+                              <div style={{ display:'flex', justifyContent:mine?'flex-end':'flex-start', marginTop:10 }}>
+                                {!mine && <div style={{ width:30, height:30, borderRadius:'50%', background:GREEN_TINT, display:'flex', alignItems:'center', justifyContent:'center', fontSize:12, fontWeight:700, color:PRIMARY, flexShrink:0, marginRight:8, alignSelf:'flex-end', fontFamily:FONT }}>{m.sender_name.charAt(0).toUpperCase()}</div>}
+                                <div style={{ maxWidth:'85%' }}>
+                                  {!mine && <div style={{ fontSize:11, fontWeight:700, color:INK3, marginBottom:3, marginLeft:2, fontFamily:FONT }}>{m.sender_name}</div>}
+                                  <div style={{ background:mine?GREEN_TINT:PAPER3, border:`1.5px solid ${mine?PRIMARY:'rgba(22,34,28,0.12)'}`, borderRadius:16, padding:'14px 16px', minWidth:220 }}>
+                                    <div style={{ display:'flex', alignItems:'center', gap:6, marginBottom:10 }}>
+                                      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke={PRIMARY} strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><circle cx="9" cy="21" r="1"/><circle cx="20" cy="21" r="1"/><path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"/></svg>
+                                      <span style={{ fontSize:11, fontWeight:700, color:PRIMARY, textTransform:'uppercase', letterSpacing:0.6, fontFamily:FONT }}>Købsforespørgsel</span>
+                                      {active?.is_handled && active?.handled_action === 'accepted' && <span style={{ fontSize:11, fontWeight:700, color:PRIMARY, background:'#D1FAE5', padding:'2px 8px', borderRadius:99, fontFamily:FONT, textTransform:'none', letterSpacing:0 }}>Bekræftet</span>}
+                                    </div>
+                                    {buyData?.items?.map((item, ii) => (
+                                      <div key={ii} style={{ display:'flex', alignItems:'center', gap:8, marginBottom:6 }}>
+                                        <span style={{ fontSize:18 }}>{item.emoji || '🧸'}</span>
+                                        <span style={{ fontFamily:FONT, fontSize:13, fontWeight:600, color:INK, flex:1 }}>{item.title}</span>
+                                        {item.price && <span style={{ fontFamily:FONT, fontSize:13, fontWeight:700, color:PRIMARY }}>{item.price} kr.</span>}
+                                      </div>
+                                    ))}
+                                    <div style={{ borderTop:`1px solid rgba(22,34,28,0.1)`, marginTop:8, paddingTop:8, display:'flex', justifyContent:'space-between', alignItems:'center' }}>
+                                      <span style={{ fontFamily:FONT, fontSize:12, color:INK3 }}>Total</span>
+                                      <span style={{ fontFamily:FONT, fontSize:15, fontWeight:800, color:INK }}>{buyData?.totalPrice || 0} kr.</span>
+                                    </div>
+                                    {buyData?.note && <div style={{ marginTop:8, padding:'8px 10px', background:'rgba(22,34,28,0.04)', borderRadius:8, fontFamily:FONT, fontSize:12, color:INK3 }}>{buyData.note}</div>}
+                                    {isOwnerInConv && !mine && !(active?.is_handled) && (
+                                      <button onClick={async () => {
+                                        const confirmMsg = `✅ ${active.owner_name} har bekræftet afhentning af ${buyData?.items?.map(i=>i.title).join(', ')}`;
+                                        const { data: newMsg } = await db.from('chat_messages').insert({ conversation_id: active.id, sender_id: effectiveUserId, sender_name: active.owner_name, content: confirmMsg }).select().single();
+                                        for (const item of (buyData?.items || [])) {
+                                          await db.from('listings').update({ is_sold: true, is_active: false, sold_at: new Date().toISOString(), sold_to: active.initiator_name, sold_to_institution_id: active.initiator_institution_id }).eq('id', item.listingId);
+                                        }
+                                        await db.from('conversations').update({ last_message: confirmMsg, last_message_at: new Date().toISOString(), initiator_unread: (active.initiator_unread||0)+1, is_handled: true, handled_at: new Date().toISOString(), handled_action: 'accepted', deal_completed: true, deal_completed_at: new Date().toISOString(), deal_type: 'køb' }).eq('id', active.id);
+                                        const convWithFallback = active.initiator_institution_id ? active : { ...active, initiator_institution_id: ctxInstId || null };
+                                        persistCO2Saving(convWithFallback, buyData?.items?.[0]?.category || null);
+                                        setMessages(ms => [...ms, ...(newMsg ? [newMsg] : [])]);
+                                        setActive(a => ({ ...a, is_handled: true, handled_action: 'accepted', deal_completed: true }));
+                                      }} style={{ width:'100%', marginTop:12, padding:'11px', borderRadius:99, background:PRIMARY, color:'#fff', border:'none', fontFamily:FONT, fontWeight:700, fontSize:14, cursor:'pointer' }}>
+                                        ✓ Bekræft afhentning
+                                      </button>
+                                    )}
+                                    {isOwnerInConv && !mine && active?.is_handled && active?.handled_action === 'accepted' && (
+                                      <div style={{ marginTop:10, textAlign:'center', fontFamily:FONT, fontSize:12, color:PRIMARY, fontWeight:700 }}>Afhentning bekræftet ✓</div>
+                                    )}
+                                  </div>
+                                </div>
+                              </div>
+                            ) : isSwap ? (
                               <div style={{ display:'flex', justifyContent:mine?'flex-end':'flex-start', marginTop:10 }}>
                                 {!mine && <div style={{ width:30, height:30, borderRadius:'50%', background:GREEN_TINT, display:'flex', alignItems:'center', justifyContent:'center', fontSize:12, fontWeight:700, color:PRIMARY, flexShrink:0, marginRight:8, alignSelf:'flex-end', fontFamily:FONT }}>{m.sender_name.charAt(0).toUpperCase()}</div>}
                                 <div style={{ maxWidth:'78%' }}>

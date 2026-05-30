@@ -11,7 +11,7 @@ const ACCENT2 = '#4361EE';
 
 export default function QuickViewModal({ listing, onClose }) {
   const router = useRouter();
-  const { setActiveListing, setSelectedConvId, showToast } = useApp();
+  const { setActiveListing, setSelectedConvId, showToast, cart, addToCart, removeFromCart } = useApp();
   const { userId, institutionId, institution, userEmail } = useActiveUser();
   const [imgIdx,       setImgIdx]       = useState(0);
   const [saving,       setSaving]       = useState(false);
@@ -136,6 +136,24 @@ export default function QuickViewModal({ listing, onClose }) {
   }
 
   const isOwn = institution && listing.institution_name === institution.name;
+  const inCart = cart?.some(c => c.listingId === listing.id);
+
+  function handleAddToCart(e) {
+    e.stopPropagation();
+    if (inCart) { router.push('/indkøbsvogn'); onClose(); return; }
+    addToCart({
+      listingId: listing.id,
+      listingTitle: listing.title,
+      listingEmoji: listing.emoji || '🧸',
+      listingColor: listing.color || GREEN_TINT,
+      price: listing.price,
+      category: listing.category,
+      images: listing.images || [],
+      ownerInstitutionName: listing.institution_name,
+      ownerId: listing.user_id,
+    });
+    showToast(`"${listing.title}" lagt i kurven 🛒`);
+  }
 
   return (
     <div style={{ position:'fixed', inset:0, background:'rgba(22,34,28,0.65)', zIndex:1000, display:'flex', alignItems:'center', justifyContent:'center', padding:16 }} onClick={mode === 'main' ? onClose : undefined}>
@@ -199,10 +217,17 @@ export default function QuickViewModal({ listing, onClose }) {
               ) : (
                 <div style={{ display:'flex', gap:10, marginBottom:12 }}>
                   {listing.type === 'køb' && (
-                    <button onClick={handleContact} disabled={saving}
-                      style={{ flex:2, padding:'14px', borderRadius:99, background:saving?PAPER3:PRIMARY, color:saving?INK3:'#fff', border:'none', fontFamily:FONT, fontWeight:700, fontSize:15, cursor:saving?'not-allowed':'pointer', transition:'all 0.2s' }}>
-                      {saving ? 'Åbner…' : 'Kontakt sælger'}
-                    </button>
+                    <>
+                      <button onClick={handleAddToCart}
+                        style={{ flex:2, padding:'14px', borderRadius:99, background:inCart?'#16a34a':PRIMARY, color:'#fff', border:'none', fontFamily:FONT, fontWeight:700, fontSize:15, cursor:'pointer', transition:'all 0.2s', display:'flex', alignItems:'center', justifyContent:'center', gap:8 }}>
+                        <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><circle cx="9" cy="21" r="1"/><circle cx="20" cy="21" r="1"/><path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"/></svg>
+                        {inCart ? 'I kurven — gå til kurv →' : 'Læg i kurv'}
+                      </button>
+                      <button onClick={handleContact} disabled={saving}
+                        style={{ flex:1, padding:'14px', borderRadius:99, background:saving?PAPER3:GREEN_TINT, color:saving?INK3:PRIMARY, border:`1.5px solid ${PRIMARY}`, fontFamily:FONT, fontWeight:600, fontSize:13, cursor:saving?'not-allowed':'pointer', transition:'all 0.2s' }}>
+                        {saving ? '…' : 'Skriv til sælger'}
+                      </button>
+                    </>
                   )}
                   {listing.type === 'byd' && (
                     <>

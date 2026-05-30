@@ -600,6 +600,8 @@ function Nav({ pathname, navigate, loggedIn, setLoggedIn, unreadTotal, instituti
   const [scrolled,  setScrolled]  = useState(false);
   const [menuOpen,  setMenuOpen]  = useState(false);
   const [profileOpen, setProfileOpen] = useState(false);
+  const { cart } = useApp();
+  const cartCount = cart?.length || 0;
   const w = useWindowWidth();
   const isMobile = w < 768;
 
@@ -641,6 +643,10 @@ function Nav({ pathname, navigate, loggedIn, setLoggedIn, unreadTotal, instituti
                 <SearchBar transparent={transparent} router={router} />
               </Suspense>
             </div>
+            <button onClick={()=>navigate('/indkøbsvogn')} style={{ flexShrink:0, position:'relative', width:36, height:36, borderRadius:10, background:GREEN_TINT, border:'none', display:'flex', alignItems:'center', justifyContent:'center', cursor:'pointer', padding:0 }}>
+              <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke={PRIMARY} strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><circle cx="9" cy="21" r="1"/><circle cx="20" cy="21" r="1"/><path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"/></svg>
+              {cartCount > 0 && <span style={{ position:'absolute', top:-4, right:-4, background:'#EF476F', color:'#fff', borderRadius:99, fontSize:9, fontWeight:800, minWidth:15, height:15, display:'flex', alignItems:'center', justifyContent:'center', padding:'0 3px', lineHeight:1 }}>{cartCount > 9 ? '9+' : cartCount}</span>}
+            </button>
             <button onClick={()=>setMenuOpen(o=>!o)} style={{ flexShrink:0, width:36, height:36, borderRadius:10, background:menuOpen?PRIMARY:GREEN_TINT, border:'none', display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center', gap:4, cursor:'pointer', padding:0, transition:'background 0.2s' }}>
               <span style={{ display:'block', width:16, height:2, background:menuOpen?'#fff':PRIMARY, borderRadius:2, transition:'all 0.2s', transform: menuOpen?'translateY(6px) rotate(45deg)':'none' }}/>
               <span style={{ display:'block', width:16, height:2, background:menuOpen?'#fff':PRIMARY, borderRadius:2, transition:'all 0.2s', opacity: menuOpen?0:1 }}/>
@@ -664,6 +670,11 @@ function Nav({ pathname, navigate, loggedIn, setLoggedIn, unreadTotal, instituti
             )}
             {loggedIn ? (
               <>
+                <button onClick={()=>navigate('/indkøbsvogn')} style={{ position:'relative', display:'flex', alignItems:'center', gap:5, padding:'8px 12px', fontSize:14, fontWeight:600, color:transparent?'rgba(255,255,255,0.9)':INK2, background:'none', border:'none', cursor:'pointer', borderRadius:8, fontFamily:FONT }}>
+                  <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="9" cy="21" r="1"/><circle cx="20" cy="21" r="1"/><path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"/></svg>
+                  Kurv
+                  {cartCount > 0 && <span style={{ background:'#EF476F', color:'#fff', borderRadius:99, fontSize:11, fontWeight:700, minWidth:18, height:18, display:'flex', alignItems:'center', justifyContent:'center', padding:'0 5px', lineHeight:1 }}>{cartCount > 9 ? '9+' : cartCount}</span>}
+                </button>
                 <Link href="/beskeder" style={{ position:'relative', display:'flex', alignItems:'center', gap:5, padding:'8px 12px', fontSize:14, fontWeight:600, color:transparent?'rgba(255,255,255,0.9)':INK2, textDecoration:'none', borderRadius:8 }}>
                   <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
                   Beskeder
