@@ -152,6 +152,7 @@ export default function DashboardClient() {
   const [reviewForm, setReviewForm] = useState({ description_score:0, contact_score:0, trade_again:'', comment:'' });
   const [reviewSaving, setReviewSaving] = useState(false);
   const [reviewedConvIds, setReviewedConvIds] = useState(new Set());
+  const [myTrustScore, setMyTrustScore] = useState(null);
 
   async function startMatchConversation(match) {
     if (!authUserId) { router.push('/login'); return; }
@@ -262,6 +263,13 @@ export default function DashboardClient() {
       if (!cancelled && inst?.name) {
         const { data: myReviews } = await db.from('transaction_reviews').select('conversation_id').eq('reviewer_institution_name', inst.name);
         if (myReviews) setReviewedConvIds(new Set(myReviews.map(r => r.conversation_id)));
+        const { data: receivedReviews } = await db.from('transaction_reviews')
+          .select('description_score,contact_score,trade_again')
+          .eq('reviewed_institution_name', inst.name);
+        if (receivedReviews && receivedReviews.length >= 3) {
+          const avg = receivedReviews.reduce((s,r) => s + (r.description_score + r.contact_score) / 2, 0) / receivedReviews.length;
+          setMyTrustScore({ pct: Math.round((avg / 3) * 100), count: receivedReviews.length, wouldTradeAgain: Math.round(receivedReviews.filter(r=>r.trade_again==='ja').length / receivedReviews.length * 100) });
+        }
       }
 
       let incoming;
@@ -636,9 +644,18 @@ export default function DashboardClient() {
             </div>
             <input ref={logoRef} type="file" accept="image/*" style={{ display:'none' }} onChange={handleLogoUpload} />
             <div>
-              <h1 style={{ fontFamily:FONT, fontWeight:800, fontSize:isMobile?22:30, letterSpacing:'-0.03em', color:INK }}>
-                {institution?.name || 'Min institution'}
-              </h1>
+              <div style={{ display:'flex', alignItems:'center', gap:10, flexWrap:'wrap' }}>
+                <h1 style={{ fontFamily:FONT, fontWeight:800, fontSize:isMobile?22:30, letterSpacing:'-0.03em', color:INK, margin:0 }}>
+                  {institution?.name || 'Min institution'}
+                </h1>
+                {myTrustScore && (
+                  <div title={`${myTrustScore.count} anmeldelser · ${myTrustScore.wouldTradeAgain}% vil handle igen`} style={{ display:'flex', alignItems:'center', gap:5, background:PRIMARY, borderRadius:99, padding:'3px 10px', cursor:'default' }}>
+                    <span style={{ fontSize:12 }}>⭐</span>
+                    <span style={{ fontFamily:FONT, fontWeight:800, fontSize:13, color:'#fff' }}>{myTrustScore.pct}%</span>
+                    <span style={{ fontFamily:FONT, fontSize:11, color:'rgba(255,255,255,0.75)' }}>· {myTrustScore.count} anm.</span>
+                  </div>
+                )}
+              </div>
               <p style={{ color:INK3, fontSize:13, marginTop:4, display:'flex', alignItems:'center', gap:8, flexWrap:'wrap', fontFamily:FONT }}>
                 <span>{institution ? `${institution.pnr ? `P-nr: ${institution.pnr}` : `CVR: ${institution.cvr}`} · ${institution.city}` : instLoading ? '…' : 'Institution ikke fundet'}</span>
                 {institution?._memberRole && <span style={{ background:GREEN_TINT, color:PRIMARY, borderRadius:99, padding:'2px 10px', fontSize:11, fontWeight:700, fontFamily:FONT }}>Medarbejder</span>}
