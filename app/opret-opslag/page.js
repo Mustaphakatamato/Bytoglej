@@ -438,7 +438,7 @@ export default function OpretOpslagPage() {
                   })()}
                 </div>
 
-                <button onClick={()=>{ if(step1Valid) setStep(2); }} disabled={!step1Valid} style={{ width:'100%', padding:'14px', borderRadius:99, background:step1Valid?PRIMARY:PAPER3, color:step1Valid?'#fff':INK3, border:'none', fontFamily:FONT, fontWeight:700, fontSize:15, cursor:step1Valid?'pointer':'not-allowed', marginTop:4, transition:'all 0.2s' }}>
+                <button onClick={()=>{ if(step1Valid) { setStep(2); window.scrollTo({ top:0, behavior:'instant' }); } }} disabled={!step1Valid} style={{ width:'100%', padding:'14px', borderRadius:99, background:step1Valid?PRIMARY:PAPER3, color:step1Valid?'#fff':INK3, border:'none', fontFamily:FONT, fontWeight:700, fontSize:15, cursor:step1Valid?'pointer':'not-allowed', marginTop:4, transition:'all 0.2s' }}>
                   Næste: Detaljer & billeder →
                 </button>
               </div>
