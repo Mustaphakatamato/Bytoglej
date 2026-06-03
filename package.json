@@ -8,6 +8,7 @@
     "start": "next start"
   },
   "dependencies": {
+    "@google/generative-ai": "^0.24.1",
     "@supabase/supabase-js": "^2",
     "groq-sdk": "^1.2.0",
     "leaflet": "^1.9.4",

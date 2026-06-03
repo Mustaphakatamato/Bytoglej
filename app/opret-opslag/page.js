@@ -62,6 +62,8 @@ export default function OpretOpslagPage() {
 
   const [step, setStep] = useState(1);
   const [saving, setSaving] = useState(false);
+  const [scanning, setScanning] = useState(false);
+  const scanRef = useRef(null);
   const [aiImproving, setAiImproving] = useState(false);
   const [aiSuggestion, setAiSuggestion] = useState(null);
   const [aiApply, setAiApply] = useState({ title: true, description: true });
@@ -215,6 +217,34 @@ export default function OpretOpslagPage() {
     setAiRegenerating(r => ({ ...r, [field]: false }));
   }
 
+  async function handleScanToy(e) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    e.target.value = '';
+    setScanning(true);
+    try {
+      const fd = new FormData();
+      fd.append('image', file);
+      const res = await fetch('/api/scan-toy', { method: 'POST', body: fd });
+      const json = await res.json();
+      if (json.error) { showToast('Scan mislykkedes — prøv igen', 'error'); return; }
+      setForm(f => ({
+        ...f,
+        title: json.title || f.title,
+        category: json.category || f.category,
+        condition: json.condition || f.condition,
+        age_group: json.age_group || f.age_group,
+        description: json.description || f.description,
+      }));
+      // Add image to listing images
+      const preview = URL.createObjectURL(file);
+      setImgFiles(prev => prev.length < 6 ? [file, ...prev] : prev);
+      setImgPreviews(prev => prev.length < 6 ? [preview, ...prev] : prev);
+      showToast('AI har udfyldt felterne — tjek og juster 🎉');
+    } catch { showToast('Scan mislykkedes — prøv igen', 'error'); }
+    setScanning(false);
+  }
+
   function applyAiSuggestion() {
     setForm(f => ({
       ...f,
@@ -340,6 +370,32 @@ export default function OpretOpslagPage() {
           <div style={{ background:'#fff', borderRadius:24, padding:isMobile?'24px 20px':'36px 36px', boxShadow:'0 2px 16px rgba(22,34,28,0.07)', border:`1px solid ${PAPER2}` }}>
             {step === 1 && (
               <div style={{ display:'flex', flexDirection:'column', gap:20 }}>
+
+                {/* AI Scan shortcut */}
+                <input ref={scanRef} type="file" accept="image/*" capture="environment" onChange={handleScanToy} style={{ display:'none' }} />
+                <div onClick={()=>!scanning && scanRef.current?.click()} style={{ border:`2px dashed ${scanning ? PRIMARY : PAPER3}`, borderRadius:16, padding:'18px 20px', textAlign:'center', cursor: scanning ? 'default' : 'pointer', background: scanning ? GREEN_TINT : PAPER, transition:'all 0.15s', display:'flex', flexDirection:'column', alignItems:'center', gap:8 }}
+                  onMouseEnter={e=>{ if(!scanning) e.currentTarget.style.borderColor = PRIMARY; }}
+                  onMouseLeave={e=>{ if(!scanning) e.currentTarget.style.borderColor = PAPER3; }}>
+                  {scanning ? (
+                    <>
+                      <div style={{ width:40, height:40, borderRadius:'50%', background:GREEN_TINT, display:'flex', alignItems:'center', justifyContent:'center', fontSize:22 }}>⏳</div>
+                      <div style={{ fontFamily:FONT, fontWeight:700, fontSize:14, color:PRIMARY }}>Analyserer billede…</div>
+                      <div style={{ fontSize:12, color:INK3, fontFamily:FONT }}>AI udfylder felterne automatisk</div>
+                    </>
+                  ) : (
+                    <>
+                      <div style={{ width:40, height:40, borderRadius:'50%', background:GREEN_TINT, display:'flex', alignItems:'center', justifyContent:'center', fontSize:22 }}>📷</div>
+                      <div style={{ fontFamily:FONT, fontWeight:700, fontSize:14, color:INK }}>Scan legetøj med AI</div>
+                      <div style={{ fontSize:12, color:INK3, fontFamily:FONT }}>Tag et billede — AI udfylder titel, kategori, stand og beskrivelse automatisk</div>
+                    </>
+                  )}
+                </div>
+                <div style={{ display:'flex', alignItems:'center', gap:10 }}>
+                  <div style={{ flex:1, height:1, background:PAPER3 }} />
+                  <span style={{ fontSize:12, color:INK3, fontFamily:FONT, fontWeight:600 }}>eller udfyld manuelt</span>
+                  <div style={{ flex:1, height:1, background:PAPER3 }} />
+                </div>
+
                 <div>
                   <label style={labelStyle}>Opslagstype</label>
                   <div style={{ display:'flex', gap:8, flexWrap:'wrap' }}>
