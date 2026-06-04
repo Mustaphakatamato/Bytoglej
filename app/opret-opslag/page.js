@@ -393,13 +393,23 @@ export default function OpretOpslagPage() {
 
                 {/* AI Scan shortcut */}
                 <input ref={scanRef} type="file" accept="image/*" capture="environment" onChange={handleScanToy} style={{ display:'none' }} />
+                <style>{`
+                  @keyframes spin { to { transform: rotate(360deg); } }
+                  @keyframes pulse { 0%,100% { opacity:1; } 50% { opacity:0.4; } }
+                `}</style>
                 <div onClick={()=>!scanning && scanRef.current?.click()} style={{ border:`2px dashed ${scanning ? PRIMARY : PAPER3}`, borderRadius:16, padding:'18px 20px', textAlign:'center', cursor: scanning ? 'default' : 'pointer', background: scanning ? GREEN_TINT : PAPER, transition:'all 0.15s', display:'flex', flexDirection:'column', alignItems:'center', gap:8 }}
                   onMouseEnter={e=>{ if(!scanning) e.currentTarget.style.borderColor = PRIMARY; }}
                   onMouseLeave={e=>{ if(!scanning) e.currentTarget.style.borderColor = PAPER3; }}>
                   {scanning ? (
                     <>
-                      <div style={{ width:40, height:40, borderRadius:'50%', background:GREEN_TINT, display:'flex', alignItems:'center', justifyContent:'center', fontSize:22 }}>⏳</div>
-                      <div style={{ fontFamily:FONT, fontWeight:700, fontSize:14, color:PRIMARY }}>Analyserer billede…</div>
+                      <div style={{ width:40, height:40, position:'relative', flexShrink:0 }}>
+                        <svg style={{ animation:'spin 0.9s linear infinite', position:'absolute', inset:0 }} width="40" height="40" viewBox="0 0 40 40" fill="none">
+                          <circle cx="20" cy="20" r="17" stroke={PAPER3} strokeWidth="3"/>
+                          <path d="M20 3 A17 17 0 0 1 37 20" stroke={PRIMARY} strokeWidth="3" strokeLinecap="round"/>
+                        </svg>
+                        <div style={{ position:'absolute', inset:0, display:'flex', alignItems:'center', justifyContent:'center', fontSize:18 }}>🔍</div>
+                      </div>
+                      <div style={{ fontFamily:FONT, fontWeight:700, fontSize:14, color:PRIMARY, animation:'pulse 1.4s ease-in-out infinite' }}>Analyserer billede…</div>
                       <div style={{ fontSize:12, color:INK3, fontFamily:FONT }}>AI udfylder felterne automatisk</div>
                     </>
                   ) : (
