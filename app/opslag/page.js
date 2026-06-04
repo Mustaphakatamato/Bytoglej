@@ -364,7 +364,7 @@ function OpslagInner() {
             {followedNames?.length > 0 && (
               <button onClick={() => setShowFollowed(f => !f)}
                 style={{ padding: '7px 16px', borderRadius: 99, border: showFollowed ? 'none' : `1.5px solid ${PAPER3}`, background: showFollowed ? PRIMARY : PAPER2, color: showFollowed ? '#fff' : INK2, fontSize: 13, fontWeight: 700, fontFamily: FONT, transition: 'all 0.15s', cursor: 'pointer', whiteSpace: 'nowrap', display:'flex', alignItems:'center', gap:5 }}>
-                ★ Mine følger {showFollowed && `(${followedNames.length})`}
+                ★ Institutioner jeg følger {showFollowed && `(${followedNames.length})`}
               </button>
             )}
             <div style={{ position: 'relative' }}>
