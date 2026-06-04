@@ -63,6 +63,7 @@ export default function OpretOpslagPage() {
   const [step, setStep] = useState(1);
   const [saving, setSaving] = useState(false);
   const [scanning, setScanning] = useState(false);
+  const [scanError, setScanError] = useState(null);
   const scanRef = useRef(null);
   const [aiImproving, setAiImproving] = useState(false);
   const [aiSuggestion, setAiSuggestion] = useState(null);
@@ -253,18 +254,18 @@ export default function OpretOpslagPage() {
     const file = e.target.files?.[0];
     if (!file) return;
     e.target.value = '';
+    setScanError(null);
     setScanning(true);
     try {
       const compressed = await compressImage(file);
       const safe = await checkImageSafe(compressed);
-      if (!safe) { showToast('Billedet afvist — indeholder personer', 'error'); setScanning(false); return; }
+      if (!safe) { setScanError('Billedet afvist — indeholder personer. Upload et billede uden personer.'); setScanning(false); return; }
       const fd = new FormData();
       fd.append('image', compressed);
       const res = await fetch('/api/scan-toy', { method: 'POST', body: fd });
       const json = await res.json();
       if (json.error) {
-        const msg = res.status === 422 ? json.error : 'Scan mislykkedes — prøv igen';
-        showToast(msg, 'error');
+        setScanError(res.status === 422 ? json.error : 'Scan mislykkedes — prøv igen');
         setScanning(false);
         return;
       }
@@ -276,12 +277,11 @@ export default function OpretOpslagPage() {
         age_group: json.age_group || f.age_group,
         description: json.description || f.description,
       }));
-      // Add image to listing images
       const preview = URL.createObjectURL(file);
       setImgFiles(prev => prev.length < 6 ? [file, ...prev] : prev);
       setImgPreviews(prev => prev.length < 6 ? [preview, ...prev] : prev);
       showToast('AI har udfyldt felterne — tjek og juster 🎉');
-    } catch { showToast('Scan mislykkedes — prøv igen', 'error'); }
+    } catch { setScanError('Scan mislykkedes — prøv igen'); }
     setScanning(false);
   }
 
@@ -441,6 +441,18 @@ export default function OpretOpslagPage() {
                     </>
                   )}
                 </div>
+                {scanError && (
+                  <div style={{ display:'flex', alignItems:'flex-start', gap:8, background:'#FEF2F2', border:'1px solid #FECACA', borderRadius:10, padding:'10px 14px' }}>
+                    <span style={{ fontSize:16, flexShrink:0 }}>⚠️</span>
+                    <div style={{ flex:1 }}>
+                      <div style={{ fontFamily:FONT, fontWeight:700, fontSize:13, color:'#B91C1C', marginBottom:4 }}>Billedet kunne ikke bruges</div>
+                      <div style={{ fontFamily:FONT, fontSize:12, color:'#DC2626', lineHeight:1.5 }}>{scanError}</div>
+                      <button onClick={() => { setScanError(null); scanRef.current?.click(); }} style={{ marginTop:8, background:'#B91C1C', color:'#fff', border:'none', borderRadius:8, padding:'6px 14px', fontSize:12, fontWeight:700, fontFamily:FONT, cursor:'pointer' }}>
+                        Prøv et andet billede
+                      </button>
+                    </div>
+                  </div>
+                )}
                 <div style={{ display:'flex', alignItems:'center', gap:10 }}>
                   <div style={{ flex:1, height:1, background:PAPER3 }} />
                   <span style={{ fontSize:12, color:INK3, fontFamily:FONT, fontWeight:600 }}>eller udfyld manuelt</span>
