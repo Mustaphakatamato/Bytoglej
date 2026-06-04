@@ -202,7 +202,19 @@ export function AppProvider({ children }) {
   }, []);
 
   useEffect(() => {
-    const ch1 = db.channel('rt-listings').on('postgres_changes', { event:'*', schema:'public', table:'listings' }, fetchListings).subscribe();
+    const ch1 = db.channel('rt-listings').on('postgres_changes', { event:'*', schema:'public', table:'listings' }, (payload) => {
+      if (payload.eventType === 'INSERT' && payload.new?.is_active) {
+        setListings(prev => [payload.new, ...prev]);
+      } else if (payload.eventType === 'UPDATE') {
+        if (payload.new?.is_active === false) {
+          setListings(prev => prev.filter(l => l.id !== payload.new.id));
+        } else {
+          setListings(prev => prev.map(l => l.id === payload.new.id ? { ...l, ...payload.new } : l));
+        }
+      } else if (payload.eventType === 'DELETE') {
+        setListings(prev => prev.filter(l => l.id !== payload.old.id));
+      }
+    }).subscribe();
     const ch2 = db.channel('rt-convs-app').on('postgres_changes', { event:'*', schema:'public', table:'conversations' }, async () => {
       const { data:{ user } } = await db.auth.getUser();
       if (user) fetchUnreadRef.current(user.id);
