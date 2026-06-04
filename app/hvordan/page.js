@@ -45,309 +45,142 @@ const STEPS = [
   },
 ];
 
-// ── Bidirectional scroll-scrubbed journey ─────────────────────────────────────
+// ── Scroll-reveal timeline ────────────────────────────────────────────────────
 function JourneySection({ isMobile }) {
-  const sectionRef = useRef(null);
-  const stepRefs = useRef([]);
-  const emojiRefs = useRef([]);
-  const numRefs = useRef([]);
-  const bgRef = useRef(null);
-  const progressBarRef = useRef(null);
-  const dotRefs = useRef([]);
-  const labelRef = useRef(null);
+  const rowRefs = useRef([]);
 
   useEffect(() => {
-    let raf;
-
-    const smooth = t => t < 0.5 ? 2 * t * t : -1 + (4 - 2 * t) * t;
-
-    const update = () => {
-      if (!sectionRef.current) return;
-      const { top, height } = sectionRef.current.getBoundingClientRect();
-      const scrolled = -top;
-      const total = height - window.innerHeight;
-      const progress = Math.max(0, Math.min(0.9999, scrolled / total));
-
-      if (progressBarRef.current) {
-        progressBarRef.current.style.height = `${progress * 100}%`;
-      }
-
-      const n = STEPS.length;
-      const rawActive = progress * n;
-      const baseIdx = Math.min(n - 1, Math.floor(rawActive));
-
-      if (isMobile) {
-        // ── Mobile: continuous vertical strip ──
-        // Step i is centered when progress = i/(n-1).
-        // ty = (i - progress*(n-1)) * viewportHeight
-        // overflow:hidden on the sticky container clips off-screen steps.
-        const vh = window.innerHeight;
-
-        STEPS.forEach((step, i) => {
-          const el = stepRefs.current[i];
-          if (!el) return;
-          const ty = (i - progress * (n - 1)) * vh;
-          el.style.transform = `translateY(${ty}px)`;
-          el.style.opacity = '1';
-        });
-
-        const activeIdx = Math.min(n - 1, Math.round(progress * (n - 1)));
-
-        STEPS.forEach((s, i) => {
-          const dot = dotRefs.current[i];
-          if (dot) {
-            dot.style.background = i === activeIdx ? STEPS[activeIdx].accent : '#ccc';
-            dot.style.width = i === activeIdx ? '20px' : '7px';
+    const observers = rowRefs.current.map((el) => {
+      if (!el) return null;
+      const io = new IntersectionObserver(
+        ([entry]) => {
+          if (entry.isIntersecting) {
+            el.style.opacity = '1';
+            el.style.transform = 'translateY(0)';
+          } else if (entry.boundingClientRect.top > 0) {
+            // Element is below viewport → user scrolled back up → reset so it re-animates
+            el.style.opacity = '0';
+            el.style.transform = 'translateY(52px)';
           }
-        });
+        },
+        { threshold: 0.12, rootMargin: '0px 0px -48px 0px' }
+      );
+      io.observe(el);
+      return io;
+    });
+    return () => observers.forEach(io => io?.disconnect());
+  }, []);
 
-        if (labelRef.current) {
-          labelRef.current.textContent = `${STEPS[activeIdx].label} / 04`;
-          labelRef.current.style.color = STEPS[activeIdx].accent;
-        }
-
-        if (bgRef.current) bgRef.current.style.background = STEPS[activeIdx].bg;
-
-      } else {
-        // ── Desktop: crossfade between steps ──
-        const local = rawActive - Math.floor(rawActive);
-        const xStart = 0.6;
-
-        STEPS.forEach((step, i) => {
-          let opacity, ty;
-
-          if (i === baseIdx) {
-            if (i === n - 1) { opacity = 1; ty = 0; }
-            else {
-              const t = smooth(Math.max(0, (local - xStart) / (1 - xStart)));
-              opacity = 1 - t;
-              ty = -32 * t;
-            }
-          } else if (i === baseIdx + 1) {
-            const t = smooth(Math.max(0, (local - xStart) / (1 - xStart)));
-            opacity = t;
-            ty = 32 * (1 - t);
-          } else {
-            opacity = 0;
-            ty = i < baseIdx ? -32 : 32;
-          }
-
-          const el = stepRefs.current[i];
-          if (el) {
-            el.style.opacity = String(Math.max(0, opacity));
-            el.style.transform = `translateY(${ty}px)`;
-            el.style.pointerEvents = opacity > 0.4 ? 'auto' : 'none';
-          }
-
-          const emojiEl = emojiRefs.current[i];
-          if (emojiEl) {
-            const scale = 0.9 + 0.1 * Math.max(0, opacity);
-            emojiEl.style.opacity = String(Math.max(0, opacity));
-            emojiEl.style.transform = `scale(${scale}) translateY(${ty * 0.5}px)`;
-          }
-
-          const numEl = numRefs.current[i];
-          if (numEl) {
-            numEl.style.opacity = String(Math.max(0, opacity) * 0.12);
-          }
-        });
-
-        if (bgRef.current) bgRef.current.style.background = STEPS[baseIdx].bg;
-      }
-    };
-
-    const onScroll = () => { cancelAnimationFrame(raf); raf = requestAnimationFrame(update); };
-    window.addEventListener('scroll', onScroll, { passive: true });
-    update();
-    return () => { window.removeEventListener('scroll', onScroll); cancelAnimationFrame(raf); };
-  }, [isMobile]);
-
-  // Mobile: n*100vh total → scrollable = (n-1)*100vh → each step gets one full viewport of travel
-  const sectionHeight = isMobile ? `${STEPS.length * 100}vh` : `${STEPS.length * 100 + 30}vh`;
+  // Circle size + padding determines where the center line sits
+  const pad   = isMobile ? 20 : 40;
+  const czSz  = isMobile ? 48 : 56;
+  const lineX = pad + czSz / 2 - 1; // center of circles, minus half line width
 
   return (
-    <div ref={sectionRef} style={{ height: sectionHeight, position: 'relative' }}>
-      {/* Sticky viewport */}
-      <div style={{
-        position: 'sticky', top: 0, height: '100vh', overflow: 'hidden',
-        display: 'flex', alignItems: 'center',
-      }}>
-        {/* Bg color wash */}
-        <div ref={bgRef} style={{
-          position: 'absolute', inset: 0,
-          background: STEPS[0].bg,
-          opacity: 0.22,
-          transition: 'background 0.5s ease',
+    <div style={{ background: PAPER, padding: isMobile ? '72px 0 88px' : '100px 0 120px' }}>
+
+      {/* ── Section header ── */}
+      <div style={{ textAlign: 'center', marginBottom: isMobile ? 60 : 80, padding: '0 24px' }}>
+        <div style={{ display: 'inline-block', background: GREEN_TINT, borderRadius: 999, padding: '5px 16px', fontSize: 11, fontWeight: 700, color: PRIMARY, letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: 16, fontFamily: FONT }}>
+          Sådan virker det
+        </div>
+        <h2 style={{ fontFamily: FONT, fontWeight: 800, fontSize: isMobile ? 30 : 46, letterSpacing: '-0.04em', color: INK, margin: '0 0 12px', lineHeight: 1.05 }}>
+          Rejsen fra støv til glæde
+        </h2>
+        <p style={{ color: INK3, fontSize: isMobile ? 15 : 17, maxWidth: 400, margin: '0 auto', fontFamily: FONT, lineHeight: 1.65 }}>
+          Fire trin. Ingen gebyrer. Bare legetøj der finder et nyt hjem.
+        </p>
+      </div>
+
+      {/* ── Timeline ── */}
+      <div style={{ maxWidth: 760, margin: '0 auto', padding: `0 ${pad}px`, position: 'relative' }}>
+
+        {/* Vertical connecting line */}
+        <div style={{
+          position: 'absolute',
+          left: lineX,
+          top: czSz / 2,
+          bottom: czSz / 2,
+          width: 2,
+          background: PAPER3,
+          borderRadius: 1,
         }} />
 
-        {/* Progress bar (left edge) */}
-        <div style={{ position: 'absolute', left: 0, top: 0, bottom: 0, width: 3, background: PAPER3, zIndex: 10 }}>
-          <div ref={progressBarRef} style={{ width: '100%', height: '0%', background: PRIMARY, borderRadius: 2, transition: 'height 0.05s linear' }} />
-        </div>
-
-        {isMobile ? (
-          /* ── Mobile layout ── */
-          <div style={{ width: '100%', position: 'relative', zIndex: 1, display: 'flex', flexDirection: 'column', height: '100vh' }}>
-
-            {/* Header row: label + step counter */}
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '18px 24px 0' }}>
-              <div style={{ display: 'inline-block', background: GREEN_TINT, borderRadius: 999, padding: '5px 14px', fontSize: 11, fontWeight: 700, color: PRIMARY, letterSpacing: '0.08em', textTransform: 'uppercase', fontFamily: FONT }}>
-                Sådan virker det
+        <div style={{ display: 'flex', flexDirection: 'column', gap: isMobile ? 36 : 48 }}>
+          {STEPS.map((step, i) => (
+            <div
+              key={i}
+              ref={el => rowRefs.current[i] = el}
+              style={{
+                display: 'flex',
+                gap: isMobile ? 20 : 28,
+                alignItems: 'flex-start',
+                opacity: 0,
+                transform: 'translateY(52px)',
+                transition: 'opacity 0.6s cubic-bezier(0.16,1,0.3,1), transform 0.6s cubic-bezier(0.16,1,0.3,1)',
+              }}
+            >
+              {/* Circle on timeline */}
+              <div style={{
+                flexShrink: 0,
+                width: czSz, height: czSz, borderRadius: '50%',
+                background: '#fff',
+                border: `2px solid ${step.accent}`,
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                fontSize: isMobile ? 22 : 24,
+                boxShadow: `0 4px 18px ${step.accent}44`,
+                position: 'relative', zIndex: 2,
+              }}>
+                {step.emoji}
               </div>
-              <div ref={labelRef} style={{ fontFamily: FONT, fontWeight: 700, fontSize: 12, color: STEPS[0].accent, letterSpacing: '0.04em' }}>
-                01 / 04
-              </div>
-            </div>
 
-            {/* Steps — all layered, only active one has opacity:1 */}
-            <div style={{ position: 'relative', flex: 1 }}>
-              {STEPS.map((step, i) => (
-                <div
-                  key={i}
-                  ref={el => stepRefs.current[i] = el}
-                  style={{
-                    position: 'absolute', inset: 0,
-                    display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
-                    padding: '12px 28px 0',
-                    transform: `translateY(${i * 100}vh)`,
-                    opacity: 1,
-                    willChange: 'transform',
-                  }}
-                >
-                  {/* Step number watermark */}
-                  <div style={{
-                    position: 'absolute', top: '4%', right: '6%',
-                    fontFamily: FONT, fontWeight: 800, fontSize: 88,
-                    color: step.accent, lineHeight: 1, userSelect: 'none',
-                    opacity: 0.1, pointerEvents: 'none',
-                  }}>
-                    {step.label}
-                  </div>
+              {/* Card */}
+              <div style={{
+                flex: 1,
+                background: '#fff',
+                borderRadius: isMobile ? 16 : 20,
+                padding: isMobile ? '18px 20px' : '24px 28px',
+                boxShadow: '0 1px 20px rgba(0,0,0,0.06), 0 0 0 1px rgba(0,0,0,0.04)',
+                borderLeft: `3px solid ${step.accent}`,
+                position: 'relative', overflow: 'hidden',
+              }}>
 
-                  {/* Emoji box */}
-                  <div style={{
-                    width: 120, height: 120, borderRadius: 36,
-                    background: step.bg, border: `2.5px solid ${step.accent}44`,
-                    display: 'flex', alignItems: 'center', justifyContent: 'center',
-                    fontSize: 56, marginBottom: 24,
-                    boxShadow: `0 16px 40px ${step.accent}33`,
-                    flexShrink: 0,
-                  }}>
-                    {step.emoji}
-                  </div>
+                {/* Watermark step number */}
+                <div style={{
+                  position: 'absolute', top: -4, right: 12,
+                  fontFamily: FONT, fontWeight: 800,
+                  fontSize: isMobile ? 64 : 80,
+                  color: step.accent, opacity: 0.07,
+                  lineHeight: 1, userSelect: 'none', pointerEvents: 'none',
+                  letterSpacing: '-0.05em',
+                }}>
+                  {step.label}
+                </div>
 
-                  {/* Text */}
-                  <div style={{ textAlign: 'center', maxWidth: 320 }}>
-                    <div style={{ fontFamily: FONT, fontWeight: 800, fontSize: 22, color: INK, letterSpacing: '-0.03em', marginBottom: 10, lineHeight: 1.15 }}>{step.title}</div>
-                    <div style={{ fontSize: 14, color: INK3, lineHeight: 1.65, fontFamily: FONT, marginBottom: 18 }}>{step.desc}</div>
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: 7, alignItems: 'flex-start', maxWidth: 260, margin: '0 auto' }}>
-                      {step.points.map((p, j) => (
-                        <div key={j} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                          <div style={{ width: 6, height: 6, borderRadius: '50%', background: step.accent, flexShrink: 0 }} />
-                          <span style={{ fontSize: 13, color: INK2, fontFamily: FONT, fontWeight: 600 }}>{p}</span>
-                        </div>
-                      ))}
+                <div style={{ fontFamily: FONT, fontWeight: 700, fontSize: 10, color: step.accent, letterSpacing: '0.1em', textTransform: 'uppercase', marginBottom: 6 }}>
+                  Trin {step.label}
+                </div>
+
+                <h3 style={{ fontFamily: FONT, fontWeight: 800, fontSize: isMobile ? 17 : 20, color: INK, letterSpacing: '-0.03em', margin: '0 0 8px', lineHeight: 1.2 }}>
+                  {step.title}
+                </h3>
+
+                <p style={{ fontSize: isMobile ? 13 : 14, color: INK3, lineHeight: 1.65, fontFamily: FONT, margin: '0 0 14px' }}>
+                  {step.desc}
+                </p>
+
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
+                  {step.points.map((p, j) => (
+                    <div key={j} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                      <div style={{ width: 5, height: 5, borderRadius: '50%', background: step.accent, flexShrink: 0 }} />
+                      <span style={{ fontSize: isMobile ? 11 : 12, color: INK2, fontFamily: FONT, fontWeight: 600 }}>{p}</span>
                     </div>
-                  </div>
+                  ))}
                 </div>
-              ))}
+              </div>
             </div>
-
-            {/* Dot indicators */}
-            <div style={{ display: 'flex', justifyContent: 'center', gap: 8, padding: '0 0 24px' }}>
-              {STEPS.map((s, i) => (
-                <div
-                  key={i}
-                  ref={el => dotRefs.current[i] = el}
-                  style={{
-                    width: i === 0 ? '20px' : '7px', height: 7, borderRadius: 4,
-                    background: i === 0 ? STEPS[0].accent : '#ccc',
-                    transition: 'width 0.2s, background 0.2s',
-                  }}
-                />
-              ))}
-            </div>
-          </div>
-        ) : (
-          /* ── Desktop layout ── */
-          <div style={{
-            width: '100%', maxWidth: 1160, margin: '0 auto', padding: '0 64px',
-            display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 80,
-            alignItems: 'center', position: 'relative', zIndex: 1,
-          }}>
-            {/* LEFT: visual panels — all stacked, animated */}
-            <div style={{ position: 'relative', height: 480 }}>
-              {STEPS.map((step, i) => (
-                <div
-                  key={i}
-                  ref={el => emojiRefs.current[i] = el}
-                  style={{
-                    position: 'absolute', inset: 0,
-                    borderRadius: 48, background: step.bg,
-                    border: `2.5px solid ${step.accent}33`,
-                    display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
-                    gap: 16,
-                    boxShadow: `0 24px 80px ${step.accent}33`,
-                    opacity: i === 0 ? 1 : 0,
-                  }}
-                >
-                  <div style={{ fontSize: 110, lineHeight: 1 }}>{step.emoji}</div>
-                  {/* Watermark number */}
-                  <div ref={el => numRefs.current[i] = el} style={{
-                    position: 'absolute', bottom: 20, right: 28,
-                    fontFamily: FONT, fontWeight: 800, fontSize: 120,
-                    color: step.accent, opacity: 0.12, lineHeight: 1,
-                    userSelect: 'none', letterSpacing: '-0.06em',
-                  }}>
-                    {step.label}
-                  </div>
-                  {/* Progress dots inside panel */}
-                  <div style={{ display: 'flex', gap: 8, position: 'absolute', bottom: 24, left: 28 }}>
-                    {STEPS.map((s, j) => (
-                      <div key={j} style={{
-                        width: j === i ? 24 : 6, height: 6, borderRadius: 3,
-                        background: j === i ? step.accent : step.accent + '44',
-                        transition: 'width 0.3s',
-                      }} />
-                    ))}
-                  </div>
-                </div>
-              ))}
-            </div>
-
-            {/* RIGHT: text — all stacked */}
-            <div style={{ position: 'relative' }}>
-              <div style={{ fontFamily: FONT, fontWeight: 700, fontSize: 11, color: PRIMARY, letterSpacing: '0.1em', textTransform: 'uppercase', marginBottom: 16 }}>Sådan virker det</div>
-
-              {STEPS.map((step, i) => (
-                <div
-                  key={i}
-                  ref={el => stepRefs.current[i] = el}
-                  style={{
-                    position: i === 0 ? 'relative' : 'absolute',
-                    top: i === 0 ? undefined : 32,
-                    left: 0, right: 0,
-                    opacity: i === 0 ? 1 : 0,
-                  }}
-                >
-                  <h2 style={{
-                    fontFamily: FONT, fontWeight: 800, fontSize: 40,
-                    color: INK, letterSpacing: '-0.04em', lineHeight: 1.05, margin: '0 0 16px',
-                  }}>{step.title}</h2>
-                  <p style={{ fontSize: 16, color: INK2, lineHeight: 1.7, marginBottom: 28, fontFamily: FONT, maxWidth: 420 }}>{step.desc}</p>
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-                    {step.points.map((p, j) => (
-                      <div key={j} style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                        <div style={{ width: 8, height: 8, borderRadius: '50%', background: step.accent, flexShrink: 0 }} />
-                        <span style={{ fontSize: 14, color: INK2, fontFamily: FONT, fontWeight: 600 }}>{p}</span>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
+          ))}
+        </div>
       </div>
     </div>
   );
@@ -386,7 +219,7 @@ export default function HowItWorksPage() {
         </svg>
       </div>
 
-      {/* ── Scroll-scrubbed journey ── */}
+      {/* ── Scroll-reveal timeline ── */}
       <JourneySection isMobile={isMobile} />
 
       {/* ── Trade types ── */}
