@@ -619,7 +619,13 @@ export default function HomePage() {
   const visibleListings = useFeedListings(ownFiltered, refreshSeed);
 
   if (isMobile) {
-    return <PullToRefresh onRefresh={fetchListings}><MobileHomeFeed listings={visibleListings} loading={loadingListings} /></PullToRefresh>;
+    return (
+      <PullToRefresh onRefresh={fetchListings}>
+        <MobileHomeFeed listings={visibleListings} loading={loadingListings} />
+        <MobileHowSection />
+        <MissionSection />
+      </PullToRefresh>
+    );
   }
 
   function goToInstitution(name) {
@@ -629,8 +635,8 @@ export default function HomePage() {
   return (
     <>
       <HeroSection />
-      <ListingsPreview listings={visibleListings} loading={loadingListings} goToInstitution={goToInstitution} />
       <HowSection />
+      <ListingsPreview listings={visibleListings} loading={loadingListings} goToInstitution={goToInstitution} />
       <TradeTypesStrip />
       <MissionSection />
       <PlatformCO2Stat />
