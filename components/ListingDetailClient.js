@@ -6,6 +6,23 @@ import { PRIMARY, GREEN_DEEP, GREEN_SOFT, GREEN_TINT, PAPER, PAPER2, PAPER3, INK
 
 const FONT = "'Sora', sans-serif";
 import { useWindowWidth } from '@/lib/hooks';
+
+function timeAgo(dateStr) {
+  if (!dateStr) return null;
+  const diff = Date.now() - new Date(dateStr).getTime();
+  const mins = Math.floor(diff / 60000);
+  const hours = Math.floor(diff / 3600000);
+  const days = Math.floor(diff / 86400000);
+  if (mins < 2) return 'Lige nu';
+  if (mins < 60) return `${mins} min. siden`;
+  if (hours < 24) return `${hours} time${hours > 1 ? 'r' : ''} siden`;
+  if (days === 1) return 'I går';
+  if (days < 30) return `${days} dag${days > 1 ? 'e' : ''} siden`;
+  const weeks = Math.floor(days / 7);
+  if (weeks < 8) return `${weeks} uge${weeks > 1 ? 'r' : ''} siden`;
+  const months = Math.floor(days / 30);
+  return `${months} måned${months > 1 ? 'er' : ''} siden`;
+}
 import { useApp, useActiveUser } from '@/providers/AppProvider';
 import { Badge, Btn, Spinner, Modal } from '@/components/ui';
 
@@ -89,6 +106,9 @@ export default function ListingDetailClient() {
   const [existingBid, setExistingBid] = useState(null);
   const [instListings, setInstListings] = useState([]);
   const [favoriters, setFavoriters] = useState([]);
+  const [trustScore,       setTrustScore]       = useState(null);
+  const [shareDropdown,    setShareDropdown]    = useState(false);
+  const [linkCopied,       setLinkCopied]       = useState(false);
 
   useEffect(() => {
     if (!listing) return;
@@ -143,6 +163,18 @@ export default function ListingDetailClient() {
     db.from('listing_favorites').select('institution_name,created_at').eq('listing_id', listing.id).order('created_at', { ascending: false })
       .then(({ data }) => { if (data) setFavoriters(data); });
   }, [listing?.id, isOwn]);
+
+  useEffect(() => {
+    if (!listing?.institution_name) return;
+    db.from('transaction_reviews')
+      .select('description_score, contact_score')
+      .eq('reviewed_institution_name', listing.institution_name)
+      .then(({ data }) => {
+        if (!data || data.length < 3) return;
+        const avg = data.reduce((s,r) => s + (r.description_score + r.contact_score) / 2, 0) / data.length;
+        setTrustScore({ pct: Math.round((avg / 3) * 100), count: data.length });
+      });
+  }, [listing?.institution_name]);
 
   if (!listing) {
     return (
@@ -435,15 +467,6 @@ export default function ListingDetailClient() {
             <p style={{ color:INK3, fontSize:14, marginBottom:16, fontFamily:FONT }}>Opslået af <strong onClick={()=>goToInstitution(listing.institution_name)} style={{ color:PRIMARY, cursor:'pointer', textDecoration:'underline', textDecorationColor:GREEN_SOFT }}>{listing.institution_name}</strong></p>
             <p style={{ color:INK2, lineHeight:1.75, fontSize:15, marginBottom:isMobile?20:32, fontFamily:FONT }}>{listing.description}</p>
             {!isOwn && (
-              <div style={{ background:GREEN_TINT, borderRadius:20, padding:isMobile?18:24, borderLeft:`3px solid ${PRIMARY}`, marginBottom: 16 }}>
-                <h3 style={{ fontFamily:FONT, fontWeight:800, fontSize:18, marginBottom:8, color:INK }}>Kontakt institutionen</h3>
-                <p style={{ fontSize:13, color:INK3, marginBottom:16, lineHeight:1.55, fontFamily:FONT }}>Send en besked direkte til {listing.institution_name} for at aftale nærmere, byde en pris eller foreslå et bytte.</p>
-                <Btn variant="primary" color={PRIMARY} radius={22} onClick={()=>onStartConv && onStartConv(listing)} style={{ padding:'12px 24px', width:'100%', justifyContent:'center', fontSize:15 }}>
-                  💬 Åbn besked
-                </Btn>
-              </div>
-            )}
-            {!isOwn && (
               <div style={{ background:PAPER2, borderRadius:16, padding:'14px 18px', display:'flex', alignItems:'center', gap:14, border:`1px solid ${PAPER3}` }}>
                 <span style={{ fontSize:24, flexShrink:0 }}>📦</span>
                 <div style={{ flex:1 }}>
@@ -509,15 +532,32 @@ export default function ListingDetailClient() {
                 {!isOwn && listing.type==='køb' && <Btn variant="primary" color={PRIMARY} radius={22} onClick={()=>setBuyModal(true)} style={{ justifyContent:'center', padding:'14px', fontSize:15 }}>🏷️ Køb nu — {listing.price} kr.</Btn>}
                 {!isOwn && listing.type==='byd' && <Btn variant="primary" color={ACCENT2} radius={22} onClick={()=>setBidModal(true)} style={{ justifyContent:'center', padding:'14px', fontSize:15 }}>📊 Afgiv bud</Btn>}
                 {!isOwn && listing.type==='byt' && <Btn variant="primary" color={ACCENT} radius={22} onClick={()=>setSwapModal(true)} style={{ justifyContent:'center', padding:'14px', fontSize:15 }}>🔄 Foreslå bytte</Btn>}
+                {!isOwn && (
+                  <button onClick={()=>onStartConv && onStartConv(listing)}
+                    style={{ width:'100%', padding:'13px', borderRadius:22, border:`1.5px solid ${PRIMARY}`, background:'#fff', color:PRIMARY, fontSize:14, fontWeight:700, cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center', gap:6, fontFamily:FONT, transition:'all 0.2s' }}>
+                    💬 Skriv til sælger
+                  </button>
+                )}
                 <button onClick={handleToggleFav} style={{ width:'100%', padding:'13px', borderRadius:22, border:`1.5px solid ${isFav?'#fca5a5':'#e5e5e5'}`, background:isFav?'#fff0f3':'#fff', color:isFav?'#e11d48':'#555', fontSize:14, fontWeight:700, cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center', gap:6, transition:'all 0.2s' }}>
                   {isFav ? '❤️ Gemt' : '🤍 Gem opslag'}
                   {localFavCount > 0 && <span style={{ background:isFav?'#fca5a5':'#eee', color:isFav?'#c0392b':'#888', borderRadius:99, padding:'1px 8px', fontSize:12 }}>{localFavCount}</span>}
                 </button>
-                {(currentUserId || loggedIn) && (
-                  <button onClick={()=>setShareModal(true)} style={{ width:'100%', padding:'13px', borderRadius:22, border:'1.5px solid #e5e5e5', background:'#fff', color:'#555', fontSize:14, fontWeight:700, cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center', gap:6 }}>
-                    📤 Del med medarbejder
+                <div style={{ display:'flex', gap:8 }}>
+                  <button onClick={()=>{ const url = window.location.href; navigator.clipboard.writeText(url).catch(()=>{}); setLinkCopied(true); setTimeout(()=>setLinkCopied(false),2200); }}
+                    style={{ flex:1, padding:'11px 8px', borderRadius:16, border:'1.5px solid #e5e5e5', background:'#fff', color:linkCopied?PRIMARY:'#555', fontSize:12, fontWeight:700, cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center', gap:4, fontFamily:FONT, transition:'all 0.2s' }}>
+                    {linkCopied ? '✓ Kopieret' : '🔗 Kopiér link'}
                   </button>
-                )}
+                  {(currentUserId || loggedIn) && teamMembers.length > 0 && (
+                    <button onClick={()=>setShareModal(true)}
+                      style={{ flex:1, padding:'11px 8px', borderRadius:16, border:'1.5px solid #e5e5e5', background:'#fff', color:'#555', fontSize:12, fontWeight:700, cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center', gap:4, fontFamily:FONT }}>
+                      👥 Del med kollega
+                    </button>
+                  )}
+                  <button onClick={()=>{ window.location.href = `mailto:?subject=${encodeURIComponent(listing.title)}&body=${encodeURIComponent('Kig på dette opslag: ' + window.location.href)}`; }}
+                    style={{ flex:1, padding:'11px 8px', borderRadius:16, border:'1.5px solid #e5e5e5', background:'#fff', color:'#555', fontSize:12, fontWeight:700, cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center', gap:4, fontFamily:FONT }}>
+                    📧 Mail
+                  </button>
+                </div>
               </div>
               <div style={{ borderTop:`1px solid ${PAPER3}`, marginTop:20, paddingTop:16, display:'flex', flexDirection:'column', gap:10 }}>
                 {[['Institution',listing.institution_name,'inst'],['By',listing.city],['Aldersgruppe',listing.age_group],['Stand',listing.condition]].map(([label,val,key],i) => (
@@ -527,6 +567,18 @@ export default function ListingDetailClient() {
                       style={{ fontWeight:600, cursor:key==='inst'?'pointer':'default', color:key==='inst'?PRIMARY:INK2, textDecoration:key==='inst'?'underline':'none', textDecorationColor:GREEN_SOFT }}>{val}</span>
                   </div>
                 ))}
+                {listing.can_ship && (
+                  <div style={{ display:'flex', justifyContent:'space-between', fontSize:13, fontFamily:FONT }}>
+                    <span style={{ color:INK3 }}>Forsendelse</span>
+                    <span style={{ fontWeight:600, color:'#2563EB' }}>📦 Kan sendes</span>
+                  </div>
+                )}
+                {listing.created_at && (
+                  <div style={{ display:'flex', justifyContent:'space-between', fontSize:13, fontFamily:FONT }}>
+                    <span style={{ color:INK3 }}>Opslået</span>
+                    <span style={{ fontWeight:600, color:INK2 }}>{timeAgo(listing.created_at)}</span>
+                  </div>
+                )}
               </div>
             </div>
             <div style={{ background:GREEN_TINT, borderRadius:16, padding:'14px 18px', display:'flex', gap:12, alignItems:'center', borderLeft:`3px solid ${PRIMARY}` }}>
@@ -536,6 +588,18 @@ export default function ListingDetailClient() {
                 <div style={{ fontSize:12, color:INK3, fontFamily:FONT }}>Handler sker sikkert via platformen</div>
               </div>
             </div>
+            {trustScore && (
+              <div style={{ background:PAPER2, borderRadius:16, padding:'14px 18px', marginTop:10, border:`1px solid ${PAPER3}`, display:'flex', alignItems:'center', gap:14 }}>
+                <div style={{ width:46, height:46, borderRadius:12, background:PRIMARY, display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center', flexShrink:0 }}>
+                  <div style={{ fontFamily:FONT, fontWeight:800, fontSize:16, color:'#fff', lineHeight:1 }}>{trustScore.pct}%</div>
+                  <div style={{ fontSize:9, color:'rgba(255,255,255,0.75)', fontFamily:FONT, fontWeight:600 }}>Tillid</div>
+                </div>
+                <div>
+                  <div style={{ fontFamily:FONT, fontWeight:700, fontSize:13, color:INK }}>Tillidsrating</div>
+                  <div style={{ fontSize:12, color:INK3, fontFamily:FONT }}>Baseret på {trustScore.count} anmeldelse{trustScore.count !== 1 ? 'r' : ''}</div>
+                </div>
+              </div>
+            )}
           </div>
         </div>
       </div>
