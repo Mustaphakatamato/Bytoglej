@@ -67,22 +67,15 @@ Brugerens søgning: "${query}"`;
 
     const { keywords = [], categories = [], age_groups = [], max_price } = params;
 
-    // Step 2: Query Supabase with extracted params
+    const validCats = categories.filter(c => CATEGORY_KEYS.includes(c));
+    const validAges = age_groups.filter(a => AGE_GROUPS.includes(a));
+
+    // Step 2: Query Supabase — keywords are the primary filter, category/age are soft signals
     let q = db.from('listings').select('*').eq('is_active', true).neq('type', 'søges');
-
-    if (categories.length > 0) {
-      const validCats = categories.filter(c => CATEGORY_KEYS.includes(c));
-      if (validCats.length > 0) q = q.in('category', validCats);
-    }
-
-    if (age_groups.length > 0) {
-      const validAges = age_groups.filter(a => AGE_GROUPS.includes(a));
-      if (validAges.length > 0) q = q.in('age_group', validAges);
-    }
 
     if (max_price) q = q.lte('price', max_price);
 
-    // Keyword ILIKE search across title + description
+    // Keyword ILIKE search across title + description (only hard filter)
     if (keywords.length > 0) {
       const orParts = keywords.flatMap(kw => [
         `title.ilike.%${kw}%`,
@@ -91,17 +84,19 @@ Brugerens søgning: "${query}"`;
       q = q.or(orParts.join(','));
     }
 
-    q = q.order('created_at', { ascending: false }).limit(40);
+    q = q.order('created_at', { ascending: false }).limit(60);
 
     const { data: listings, error } = await q;
     if (error) return NextResponse.json({ error: error.message }, { status: 500 });
 
-    // Score by how many keywords match title/description
+    // Score: keyword hits (weight 2) + category match (weight 1) + age match (weight 1)
     const scored = (listings || []).map(l => {
       const hay = `${l.title} ${l.description || ''}`.toLowerCase();
-      const score = keywords.filter(kw => hay.includes(kw.toLowerCase())).length;
-      return { ...l, _score: score };
-    }).sort((a, b) => b._score - a._score);
+      const kwScore = keywords.filter(kw => hay.includes(kw.toLowerCase())).length * 2;
+      const catScore = validCats.includes(l.category) ? 1 : 0;
+      const ageScore = validAges.includes(l.age_group) ? 1 : 0;
+      return { ...l, _score: kwScore + catScore + ageScore };
+    }).sort((a, b) => b._score - a._score).slice(0, 40);
 
     return NextResponse.json({
       listings: scored,
