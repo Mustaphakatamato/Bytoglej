@@ -243,7 +243,11 @@ export default function OpretOpslagPage() {
       fd.append('image', file);
       const res = await fetch('/api/scan-toy', { method: 'POST', body: fd });
       const json = await res.json();
-      if (json.error) { console.error('scan-toy fejl:', json.error); showToast('Scan mislykkedes: ' + json.error, 'error'); return; }
+      if (json.error) {
+        const msg = res.status === 422 ? json.error : 'Scan mislykkedes — prøv igen';
+        showToast(msg, 'error');
+        return;
+      }
       setForm(f => ({
         ...f,
         title: json.title || f.title,

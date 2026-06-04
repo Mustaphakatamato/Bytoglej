@@ -24,16 +24,20 @@ export async function POST(req) {
 
     const groq = new Groq({ apiKey: process.env.GROQ_API_KEY });
 
-    const prompt = `Du er en assistent der hjælper med at oprette legetøjsannoncer for danske institutioner.
+    const prompt = `Du er en assistent der hjælper med at oprette annoncer for danske institutioner (vuggestuer, børnehaver, skoler).
 
-Analyser billedet og returner KUN et JSON-objekt (ingen markdown, ingen forklaring) med disse felter:
-- title: kort dansk titel (maks 60 tegn, fx "LEGO Duplo kasse med 80 klodser")
+Tjek FØRST: Er billedet relevant for en institutions-annonce? Relevante ting er: legetøj, spil, puslespil, bøger, børnemøbler, sportsudstyr, musikinstrumenter, kreativt materiale, udendørs legeredskaber, babyudstyr, kostumer — altså ting en institution ville sælge eller bytte.
+
+Hvis billedet IKKE er relevant (fx kropsdele, mad, landskaber, dyr, mennesker, tekst, tilfældige genstande der ikke er legetøj/udstyr) — returner KUN: {"rejected":true,"reason":"Billedet ser ikke ud til at indeholde legetøj eller institutions-udstyr"}
+
+Hvis billedet ER relevant — returner KUN et JSON-objekt med:
+- title: kort dansk titel (maks 60 tegn)
 - category: vælg ÉN nøgle fra: ${CATEGORY_KEYS.join(', ')}
 - condition: vælg ÉN: "Ny", "God stand", "Brugt", "Slidte"
 - age_group: vælg ÉN: "0-2 år", "3-6 år", "6-10 år", "10+ år", "Alle aldre"
-- description: 2-3 sætninger på dansk om legetøjet (stand, indhold, egnethed)
+- description: 2-3 sætninger på dansk om genstanden (stand, indhold, egnethed)
 
-Eksempel: {"title":"LEGO Duplo basiskasse","category":"construction-toys","condition":"God stand","age_group":"3-6 år","description":"Stor kasse med LEGO Duplo klodser i mange farver. Alle klodser er hele og rene. Velegnet til kreativ leg for de mindste."}`;
+Ingen markdown, ingen forklaring — kun JSON.`;
 
     const completion = await groq.chat.completions.create({
       model: 'meta-llama/llama-4-scout-17b-16e-instruct',
@@ -52,6 +56,11 @@ Eksempel: {"title":"LEGO Duplo basiskasse","category":"construction-toys","condi
     if (!jsonMatch) return NextResponse.json({ error: 'Invalid AI response: ' + text }, { status: 500 });
 
     const parsed = JSON.parse(jsonMatch[0]);
+
+    if (parsed.rejected) {
+      return NextResponse.json({ error: parsed.reason || 'Ikke relevant for en institutions-annonce' }, { status: 422 });
+    }
+
     if (!CATEGORY_KEYS.includes(parsed.category)) parsed.category = 'other';
 
     return NextResponse.json(parsed);
