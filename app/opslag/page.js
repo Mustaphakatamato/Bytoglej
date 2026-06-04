@@ -173,7 +173,7 @@ function SøgesCard({ l, onContact }) {
 function OpslagInner() {
   const router = useRouter();
   const urlParams = useSearchParams();
-  const { listings: allListings, loadingListings: loading, fetchListings, refreshSeed, setActiveListing, favs, toggleFav, showToast, loggedIn, setQuickViewListing, realUserId, institution } = useApp();
+  const { listings: allListings, loadingListings: loading, fetchListings, refreshSeed, setActiveListing, favs, toggleFav, showToast, loggedIn, realUserId, institution } = useApp();
   const ownFiltered = allListings.filter(l =>
     l.user_id !== realUserId && !(institution?.name && l.institution_name === institution.name)
   );
@@ -266,7 +266,8 @@ function OpslagInner() {
   }
 
   function handleListingClick(l) {
-    setQuickViewListing(l);
+    setActiveListing(l);
+    router.push('/opslag/detail');
   }
 
   function goToInstitution(name) {
@@ -418,7 +419,8 @@ function OpslagInner() {
               {søgesListings.map(l => (
                 <SøgesCard key={l.id} l={l} onContact={() => {
                   if (!loggedIn) { router.push('/login'); return; }
-                  setQuickViewListing(l);
+                  setActiveListing(l);
+                  router.push('/opslag/detail');
                 }} />
               ))}
             </div>

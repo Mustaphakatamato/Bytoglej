@@ -75,7 +75,7 @@ function ImageGallery({ images, color, emoji }) {
 
 export default function ListingDetailClient() {
   const router = useRouter();
-  const { activeListing: listing, setActiveListing, favs, toggleFav, setSelectedConvId, showToast, loggedIn, setQuickViewListing, isAdmin } = useApp();
+  const { activeListing: listing, setActiveListing, favs, toggleFav, setSelectedConvId, showToast, loggedIn, isAdmin } = useApp();
   const { isAdminView: ctxIsAdmin, adminInstName, institution: ctxInstitution, institutionId: ctxInstId } = useActiveUser();
   const ww = useWindowWidth();
   const isMobile = ww < 768;
@@ -833,7 +833,7 @@ export default function ListingDetailClient() {
               const typeColors = { køb: { bg:'#EEF4FF', text:'#2563EB' }, byt: { bg:'#FFF3E8', text:'#C2551E' }, byd: { bg:'#F5F0FF', text:'#7C3AED' }, gratis: { bg:'#F0FFF4', text:'#15803D' } };
               const tc = typeColors[l.type] || { bg:PAPER3, text:INK3 };
               return (
-                <div key={l.id} onClick={()=>setQuickViewListing?.(l)} style={{ cursor:'pointer', background:PAPER2, borderRadius:16, overflow:'hidden', border:`1px solid ${PAPER3}`, transition:'transform 0.15s, box-shadow 0.15s' }}
+                <div key={l.id} onClick={()=>{ setActiveListing(l); router.push('/opslag/detail'); }} style={{ cursor:'pointer', background:PAPER2, borderRadius:16, overflow:'hidden', border:`1px solid ${PAPER3}`, transition:'transform 0.15s, box-shadow 0.15s' }}
                   onMouseEnter={e=>{ e.currentTarget.style.transform='translateY(-2px)'; e.currentTarget.style.boxShadow='0 6px 20px rgba(22,34,28,0.1)'; }}
                   onMouseLeave={e=>{ e.currentTarget.style.transform=''; e.currentTarget.style.boxShadow=''; }}>
                   <div style={{ height: isMobile ? 120 : 160, background: l.images?.[0] ? '#e8e6e3' : (l.color||'#FFD166'), display:'flex', alignItems:'center', justifyContent:'center', fontSize:isMobile?40:56, overflow:'hidden', position:'relative' }}>
