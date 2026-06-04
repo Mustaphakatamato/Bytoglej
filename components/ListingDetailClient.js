@@ -36,8 +36,8 @@ function ImageGallery({ images, color, emoji }) {
   }
   return (
     <div style={{ marginBottom:20 }}>
-      <div style={{ position:'relative', height:imgH, borderRadius:20, overflow:'hidden', background:'#f0eeeb' }}>
-        <img src={images[active]} alt="" onClick={()=>setLightbox(true)} style={{ width:'100%', height:'100%', objectFit:'cover', display:'block', cursor:'zoom-in' }} />
+      <div style={{ position:'relative', height:imgH, borderRadius:20, overflow:'hidden', background:'#f5f5f5' }}>
+        <img src={images[active]} alt="" onClick={()=>setLightbox(true)} style={{ width:'100%', height:'100%', objectFit:'contain', display:'block', cursor:'zoom-in' }} />
         <div style={{ position:'absolute', bottom:12, right:12, background:'rgba(0,0,0,0.48)', color:'#fff', borderRadius:8, padding:'4px 10px', fontSize:11, fontWeight:600, pointerEvents:'none' }}>🔍 Klik for fuld visning</div>
         {images.length > 1 && <>
           <button onClick={()=>setActive(i=>(i-1+images.length)%images.length)}
@@ -106,6 +106,7 @@ export default function ListingDetailClient() {
   const [existingBid, setExistingBid] = useState(null);
   const [instListings, setInstListings] = useState([]);
   const [favoriters, setFavoriters] = useState([]);
+  const [expandDesc, setExpandDesc] = useState(false);
   const [trustScore,       setTrustScore]       = useState(null);
   const [shareDropdown,    setShareDropdown]    = useState(false);
   const [linkCopied,       setLinkCopied]       = useState(false);
@@ -450,71 +451,38 @@ export default function ListingDetailClient() {
   return (
     <>
     <div style={{ minHeight:'100vh', paddingTop:80, background:PAPER }} className="page-enter">
-      <div style={{ maxWidth:1140, margin:'0 auto', padding:'24px 16px 0' }}>
-        <button onClick={()=>router.push('/opslag')} style={{ background:'none', border:'none', fontSize:14, fontWeight:600, color:INK3, cursor:'pointer', display:'flex', alignItems:'center', gap:6, padding:'8px 0', fontFamily:FONT }}>← Tilbage til markedsplads</button>
+      <div style={{ maxWidth:1140, margin:'0 auto', padding:'16px 16px 0' }}>
+        <button onClick={()=>router.push('/opslag')} style={{ background:'none', border:'none', fontSize:13, fontWeight:600, color:INK3, cursor:'pointer', display:'flex', alignItems:'center', gap:6, padding:'8px 0', fontFamily:FONT }}>← Markedsplads</button>
       </div>
-      <div style={{ maxWidth:1140, margin:'0 auto', padding:isMobile?'16px 16px':'20px 24px' }}>
-        <div style={{ display:'grid', gridTemplateColumns:isMobile?'1fr':'1fr 380px', gap:isMobile?24:40, alignItems:'start' }}>
+      <div style={{ maxWidth:1140, margin:'0 auto', padding: isMobile ? '16px 16px' : '20px 24px' }}>
+        <div style={{ display:'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 420px', gap: isMobile ? 24 : 48, alignItems:'start' }}>
+
+          {/* LEFT: Gallery */}
           <div>
             <ImageGallery images={listing.images} color={listing.color} emoji={listing.emoji} />
-            <div style={{ display:'flex', gap:10, marginBottom:16, flexWrap:'wrap' }}>
-              <Badge type={listing.type} />
-              <span style={{ fontSize:13, color:'#888' }}>📍 {listing.city}</span>
-              <span style={{ fontSize:13, color:'#888' }}>👶 {listing.age_group}</span>
-              <span style={{ fontSize:13, color:listing.condition==='Ny'?PRIMARY:'#888', fontWeight:600 }}>Stand: {listing.condition}</span>
-            </div>
-            <h1 style={{ fontFamily:FONT, fontWeight:800, fontSize:isMobile?24:30, letterSpacing:'-0.03em', marginBottom:8, color:INK }}>{listing.title}</h1>
-            <p style={{ color:INK3, fontSize:14, marginBottom:16, fontFamily:FONT }}>Opslået af <strong onClick={()=>goToInstitution(listing.institution_name)} style={{ color:PRIMARY, cursor:'pointer', textDecoration:'underline', textDecorationColor:GREEN_SOFT }}>{listing.institution_name}</strong></p>
-            <p style={{ color:INK2, lineHeight:1.75, fontSize:15, marginBottom:isMobile?20:32, fontFamily:FONT }}>{listing.description}</p>
-            {!isOwn && (
-              <div style={{ background:PAPER2, borderRadius:16, padding:'14px 18px', display:'flex', alignItems:'center', gap:14, border:`1px solid ${PAPER3}` }}>
-                <span style={{ fontSize:24, flexShrink:0 }}>📦</span>
+            {/* "Dit eget opslag" + rediger on mobile only */}
+            {isOwn && isMobile && (
+              <div style={{ background:GREEN_TINT, borderRadius:16, padding:'14px 18px', marginTop:16 }}>
+                <div style={{ fontFamily:FONT, fontWeight:700, fontSize:13, color:PRIMARY, marginBottom:10, textAlign:'center' }}>Dit eget opslag</div>
+                <button onClick={()=>router.push(`/rediger-opslag/${listing.id}`)} style={{ width:'100%', padding:'11px', borderRadius:14, background:PRIMARY, border:'none', color:'#fff', fontFamily:FONT, fontWeight:700, fontSize:14, cursor:'pointer' }}>Rediger opslag</button>
+              </div>
+            )}
+            {/* Bundttilbud hint (not own, not mobile) */}
+            {!isOwn && !isMobile && (
+              <div style={{ background:PAPER2, borderRadius:14, padding:'12px 16px', display:'flex', alignItems:'center', gap:12, border:`1px solid ${PAPER3}`, marginTop:16 }}>
+                <span style={{ fontSize:22, flexShrink:0 }}>📦</span>
                 <div style={{ flex:1 }}>
-                  <div style={{ fontFamily:FONT, fontWeight:700, fontSize:13, color:INK, marginBottom:3 }}>
-                    Vil du lave et bundttilbud?
-                  </div>
-                  <div style={{ fontSize:12, color:INK3, fontFamily:FONT, lineHeight:1.5 }}>
-                    Gå til{' '}
-                    <strong onClick={()=>goToInstitution(listing.institution_name)} style={{ color:PRIMARY, cursor:'pointer', textDecoration:'underline', textDecorationColor:GREEN_SOFT }}>
-                      {listing.institution_name}s side
-                    </strong>
-                    {' '}for at vælge flere ting på én gang og sende et samlet tilbud.
+                  <div style={{ fontFamily:FONT, fontWeight:700, fontSize:12, color:INK, marginBottom:2 }}>Vil du lave et bundttilbud?</div>
+                  <div style={{ fontSize:11, color:INK3, fontFamily:FONT }}>
+                    Gå til <strong onClick={()=>goToInstitution(listing.institution_name)} style={{ color:PRIMARY, cursor:'pointer' }}>{listing.institution_name}s side</strong> for at vælge flere ting.
                   </div>
                 </div>
-                <button onClick={()=>goToInstitution(listing.institution_name)}
-                  style={{ background:PRIMARY, border:'none', borderRadius:99, padding:'8px 14px', fontSize:12, fontWeight:700, color:'#fff', cursor:'pointer', fontFamily:FONT, whiteSpace:'nowrap', flexShrink:0 }}>
-                  Se side →
-                </button>
+                <button onClick={()=>goToInstitution(listing.institution_name)} style={{ background:PRIMARY, border:'none', borderRadius:99, padding:'7px 12px', fontSize:11, fontWeight:700, color:'#fff', cursor:'pointer', fontFamily:FONT, whiteSpace:'nowrap', flexShrink:0 }}>Se side →</button>
               </div>
             )}
-            {isOwn && (
-              <div style={{ background:GREEN_TINT, borderRadius:20, padding:20, border:`1.5px solid ${GREEN_SOFT}` }}>
-                <div style={{ fontFamily:FONT, fontWeight:800, fontSize:14, color:PRIMARY, marginBottom:12, textAlign:'center' }}>Dit eget opslag</div>
-                <button onClick={()=>router.push(`/rediger-opslag/${listing.id}`)} style={{ width:'100%', padding:'11px', borderRadius:14, background:PRIMARY, border:'none', color:'#fff', fontFamily:FONT, fontWeight:700, fontSize:14, cursor:'pointer', marginBottom: favoriters.length ? 12 : 0 }}>
-                  Rediger opslag
-                </button>
-                {favoriters.length > 0 && (
-                  <div style={{ borderTop:`1px solid ${GREEN_SOFT}`, paddingTop:14, marginTop:4 }}>
-                    <div style={{ fontFamily:FONT, fontWeight:700, fontSize:12, color:PRIMARY, marginBottom:10, display:'flex', alignItems:'center', gap:6 }}>
-                      <span>❤️</span>
-                      <span>{favoriters.length} {favoriters.length === 1 ? 'institution har gemt' : 'institutioner har gemt'} dit opslag</span>
-                    </div>
-                    <div style={{ display:'flex', flexDirection:'column', gap:6 }}>
-                      {favoriters.map((f, i) => (
-                        <div key={i} style={{ display:'flex', alignItems:'center', gap:8 }}>
-                          <div style={{ width:28, height:28, borderRadius:8, background:PRIMARY, display:'flex', alignItems:'center', justifyContent:'center', color:'#fff', fontFamily:FONT, fontWeight:800, fontSize:11, flexShrink:0 }}>
-                            {(f.institution_name||'?').charAt(0).toUpperCase()}
-                          </div>
-                          <span style={{ fontFamily:FONT, fontSize:13, fontWeight:600, color:INK }}>{f.institution_name || 'Ukendt institution'}</span>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                )}
-              </div>
-            )}
+            {/* Admin */}
             {isAdmin && (
-              <div style={{ background:'#FFF7ED', borderRadius:20, padding:20, border:`1.5px solid #FDBA74` }}>
+              <div style={{ background:'#FFF7ED', borderRadius:20, padding:20, border:`1.5px solid #FDBA74`, marginTop:16 }}>
                 <div style={{ fontFamily:FONT, fontWeight:800, fontSize:13, color:'#B45309', marginBottom:12 }}>⚙ Admin</div>
                 <button onClick={() => { setAdminEditForm({ title: listing.title||'', description: listing.description||'', price: listing.price||'', condition: listing.condition||'', is_active: listing.is_active }); setAdminEditModal(true); }}
                   style={{ width:'100%', padding:'11px', borderRadius:14, background:'#B45309', border:'none', color:'#fff', fontFamily:FONT, fontWeight:700, fontSize:14, cursor:'pointer' }}>
@@ -524,83 +492,176 @@ export default function ListingDetailClient() {
             )}
           </div>
 
-          <div style={{ position:isMobile?'static':'sticky', top:96 }}>
-            <div style={{ background:PAPER2, borderRadius:22, padding:28, border:`1px solid ${PAPER3}`, marginBottom:14 }}>
-              {listing.price && <div style={{ fontFamily:FONT, fontWeight:800, fontSize:36, color:PRIMARY, marginBottom:8, letterSpacing:'-0.03em' }}>{listing.price} kr.</div>}
-              {bidCount > 0 && <div style={{ color:INK3, fontSize:13, marginBottom:16, fontFamily:FONT }}><strong style={{ color:SKY }}>{bidCount} bud</strong> afgivet</div>}
-              <div style={{ display:'flex', flexDirection:'column', gap:10 }}>
-                {!isOwn && listing.type==='køb' && <Btn variant="primary" color={PRIMARY} radius={22} onClick={()=>setBuyModal(true)} style={{ justifyContent:'center', padding:'14px', fontSize:15 }}>🏷️ Køb nu — {listing.price} kr.</Btn>}
-                {!isOwn && listing.type==='byd' && <Btn variant="primary" color={ACCENT2} radius={22} onClick={()=>setBidModal(true)} style={{ justifyContent:'center', padding:'14px', fontSize:15 }}>📊 Afgiv bud</Btn>}
-                {!isOwn && listing.type==='byt' && <Btn variant="primary" color={ACCENT} radius={22} onClick={()=>setSwapModal(true)} style={{ justifyContent:'center', padding:'14px', fontSize:15 }}>🔄 Foreslå bytte</Btn>}
-                {!isOwn && (
-                  <button onClick={()=>onStartConv && onStartConv(listing)}
-                    style={{ width:'100%', padding:'13px', borderRadius:22, border:`1.5px solid ${PRIMARY}`, background:'#fff', color:PRIMARY, fontSize:14, fontWeight:700, cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center', gap:6, fontFamily:FONT, transition:'all 0.2s' }}>
-                    💬 Skriv til sælger
-                  </button>
-                )}
-                <button onClick={handleToggleFav} style={{ width:'100%', padding:'13px', borderRadius:22, border:`1.5px solid ${isFav?'#fca5a5':'#e5e5e5'}`, background:isFav?'#fff0f3':'#fff', color:isFav?'#e11d48':'#555', fontSize:14, fontWeight:700, cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center', gap:6, transition:'all 0.2s' }}>
-                  {isFav ? '❤️ Gemt' : '🤍 Gem opslag'}
-                  {localFavCount > 0 && <span style={{ background:isFav?'#fca5a5':'#eee', color:isFav?'#c0392b':'#888', borderRadius:99, padding:'1px 8px', fontSize:12 }}>{localFavCount}</span>}
-                </button>
-                <div style={{ display:'flex', gap:8 }}>
-                  <button onClick={()=>{ const url = window.location.href; navigator.clipboard.writeText(url).catch(()=>{}); setLinkCopied(true); setTimeout(()=>setLinkCopied(false),2200); }}
-                    style={{ flex:1, padding:'11px 8px', borderRadius:16, border:'1.5px solid #e5e5e5', background:'#fff', color:linkCopied?PRIMARY:'#555', fontSize:12, fontWeight:700, cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center', gap:4, fontFamily:FONT, transition:'all 0.2s' }}>
-                    {linkCopied ? '✓ Kopieret' : '🔗 Kopiér link'}
-                  </button>
-                  {(currentUserId || loggedIn) && teamMembers.length > 0 && (
-                    <button onClick={()=>setShareModal(true)}
-                      style={{ flex:1, padding:'11px 8px', borderRadius:16, border:'1.5px solid #e5e5e5', background:'#fff', color:'#555', fontSize:12, fontWeight:700, cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center', gap:4, fontFamily:FONT }}>
-                      👥 Del med kollega
-                    </button>
-                  )}
-                  <button onClick={()=>{ window.location.href = `mailto:?subject=${encodeURIComponent(listing.title)}&body=${encodeURIComponent('Kig på dette opslag: ' + window.location.href)}`; }}
-                    style={{ flex:1, padding:'11px 8px', borderRadius:16, border:'1.5px solid #e5e5e5', background:'#fff', color:'#555', fontSize:12, fontWeight:700, cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center', gap:4, fontFamily:FONT }}>
-                    📧 Mail
-                  </button>
-                </div>
-              </div>
-              <div style={{ borderTop:`1px solid ${PAPER3}`, marginTop:20, paddingTop:16, display:'flex', flexDirection:'column', gap:10 }}>
-                {[['Institution',listing.institution_name,'inst'],['By',listing.city],['Aldersgruppe',listing.age_group],['Stand',listing.condition]].map(([label,val,key],i) => (
-                  <div key={i} style={{ display:'flex', justifyContent:'space-between', fontSize:13, fontFamily:FONT }}>
-                    <span style={{ color:INK3 }}>{label}</span>
-                    <span onClick={key==='inst' ? ()=>goToInstitution(val) : undefined}
-                      style={{ fontWeight:600, cursor:key==='inst'?'pointer':'default', color:key==='inst'?PRIMARY:INK2, textDecoration:key==='inst'?'underline':'none', textDecorationColor:GREEN_SOFT }}>{val}</span>
-                  </div>
-                ))}
-                {listing.can_ship && (
-                  <div style={{ display:'flex', justifyContent:'space-between', fontSize:13, fontFamily:FONT }}>
-                    <span style={{ color:INK3 }}>Forsendelse</span>
-                    <span style={{ fontWeight:600, color:'#2563EB' }}>📦 Kan sendes</span>
-                  </div>
-                )}
-                {listing.created_at && (
-                  <div style={{ display:'flex', justifyContent:'space-between', fontSize:13, fontFamily:FONT }}>
-                    <span style={{ color:INK3 }}>Opslået</span>
-                    <span style={{ fontWeight:600, color:INK2 }}>{timeAgo(listing.created_at)}</span>
-                  </div>
-                )}
-              </div>
+          {/* RIGHT: Info + Actions */}
+          <div style={{ position: isMobile ? 'static' : 'sticky', top: 96 }}>
+            {/* Institution name */}
+            <div style={{ fontSize:12, color:INK3, fontFamily:FONT, marginBottom:8, display:'flex', alignItems:'center', gap:6 }}>
+              <span onClick={()=>goToInstitution(listing.institution_name)} style={{ color:PRIMARY, cursor:'pointer', fontWeight:600, textDecoration:'underline', textDecorationColor:'transparent' }}
+                onMouseEnter={e=>e.target.style.textDecorationColor=PRIMARY} onMouseLeave={e=>e.target.style.textDecorationColor='transparent'}>
+                {listing.institution_name}
+              </span>
+              {listing.city && <span>· {listing.city}</span>}
             </div>
-            <div style={{ background:GREEN_TINT, borderRadius:16, padding:'14px 18px', display:'flex', gap:12, alignItems:'center', borderLeft:`3px solid ${PRIMARY}` }}>
+
+            {/* Title */}
+            <h1 style={{ fontFamily:FONT, fontWeight:800, fontSize: isMobile ? 22 : 28, letterSpacing:'-0.03em', marginBottom:12, color:INK, lineHeight:1.2 }}>{listing.title}</h1>
+
+            {/* Badges */}
+            <div style={{ display:'flex', gap:6, flexWrap:'wrap', marginBottom:16 }}>
+              <Badge type={listing.type} />
+              {listing.condition && <span style={{ background:PAPER2, color:INK2, borderRadius:99, padding:'4px 12px', fontSize:11, fontWeight:700, fontFamily:FONT }}>{listing.condition}</span>}
+              {listing.age_group && <span style={{ background:PAPER2, color:INK3, borderRadius:99, padding:'4px 12px', fontSize:11, fontWeight:600, fontFamily:FONT }}>👶 {listing.age_group}</span>}
+              {listing.can_ship && <span style={{ background:'#EFF6FF', color:'#2563EB', borderRadius:99, padding:'4px 12px', fontSize:11, fontWeight:700, fontFamily:FONT }}>📦 Kan sendes</span>}
+            </div>
+
+            {/* Description with expand */}
+            {listing.description && (
+              <div style={{ marginBottom:16 }}>
+                <p style={{ color:INK2, fontSize:14, lineHeight:1.7, fontFamily:FONT, margin:0,
+                  display: expandDesc ? 'block' : '-webkit-box',
+                  WebkitLineClamp: expandDesc ? undefined : 3,
+                  WebkitBoxOrient: 'vertical',
+                  overflow: expandDesc ? 'visible' : 'hidden',
+                }}>{listing.description}</p>
+                {listing.description.length > 160 && (
+                  <button onClick={()=>setExpandDesc(e=>!e)} style={{ background:'none', border:'none', color:PRIMARY, fontSize:13, fontWeight:700, cursor:'pointer', padding:'4px 0', fontFamily:FONT }}>
+                    {expandDesc ? 'Læs mindre ↑' : 'Læs mere ↓'}
+                  </button>
+                )}
+              </div>
+            )}
+
+            {/* Price */}
+            <div style={{ marginBottom:16 }}>
+              {listing.price
+                ? <div style={{ fontFamily:FONT, fontWeight:800, fontSize:32, color:PRIMARY, letterSpacing:'-0.03em' }}>{listing.price} kr.</div>
+                : listing.type === 'byt' ? <div style={{ fontSize:20, color:CORAL, fontWeight:800, fontFamily:FONT }}>Byttes kun</div>
+                : <div style={{ fontSize:20, color:ACCENT2, fontWeight:800, fontFamily:FONT }}>Afgiv bud</div>}
+              {bidCount > 0 && <div style={{ color:INK3, fontSize:12, fontFamily:FONT, marginTop:4 }}>{bidCount} bud afgivet</div>}
+              {listing.type === 'byd' && listing.min_bid && <div style={{ color:INK3, fontSize:12, fontFamily:FONT }}>Mindstebud: {listing.min_bid} kr.</div>}
+            </div>
+
+            {/* Action buttons */}
+            {!isOwn ? (
+              <div style={{ display:'flex', flexDirection:'column', gap:10, marginBottom:20 }}>
+                {listing.type==='køb' && <Btn variant="primary" color={PRIMARY} radius={22} onClick={()=>setBuyModal(true)} style={{ justifyContent:'center', padding:'15px', fontSize:16 }}>🏷️ Køb nu — {listing.price} kr.</Btn>}
+                {listing.type==='byd' && <Btn variant="primary" color={ACCENT2} radius={22} onClick={()=>setBidModal(true)} style={{ justifyContent:'center', padding:'15px', fontSize:16 }}>📊 Afgiv bud</Btn>}
+                {listing.type==='byt' && <Btn variant="primary" color={ACCENT} radius={22} onClick={()=>setSwapModal(true)} style={{ justifyContent:'center', padding:'15px', fontSize:16 }}>🔄 Foreslå bytte</Btn>}
+                <button onClick={()=>onStartConv && onStartConv(listing)}
+                  style={{ width:'100%', padding:'13px', borderRadius:22, border:`1.5px solid ${PRIMARY}`, background:'#fff', color:PRIMARY, fontSize:14, fontWeight:700, cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center', gap:8, fontFamily:FONT, transition:'all 0.2s' }}>
+                  💬 Skriv til sælger
+                </button>
+              </div>
+            ) : (
+              <div style={{ background:GREEN_TINT, borderRadius:16, padding:'16px 20px', marginBottom:20 }}>
+                <div style={{ fontFamily:FONT, fontWeight:700, fontSize:13, color:PRIMARY, marginBottom:12, textAlign:'center' }}>Dit eget opslag</div>
+                <button onClick={()=>router.push(`/rediger-opslag/${listing.id}`)} style={{ width:'100%', padding:'12px', borderRadius:14, background:PRIMARY, border:'none', color:'#fff', fontFamily:FONT, fontWeight:700, fontSize:14, cursor:'pointer', marginBottom: favoriters.length ? 12 : 0 }}>Rediger opslag</button>
+                {favoriters.length > 0 && (
+                  <div style={{ borderTop:`1px solid ${GREEN_SOFT}`, paddingTop:12, marginTop:4 }}>
+                    <div style={{ fontFamily:FONT, fontWeight:700, fontSize:12, color:PRIMARY, marginBottom:8 }}>❤️ {favoriters.length} {favoriters.length===1?'institution har gemt':'institutioner har gemt'} dit opslag</div>
+                    <div style={{ display:'flex', flexDirection:'column', gap:6 }}>
+                      {favoriters.map((f,i) => (
+                        <div key={i} style={{ display:'flex', alignItems:'center', gap:8 }}>
+                          <div style={{ width:26, height:26, borderRadius:8, background:PRIMARY, display:'flex', alignItems:'center', justifyContent:'center', color:'#fff', fontFamily:FONT, fontWeight:800, fontSize:11, flexShrink:0 }}>{(f.institution_name||'?').charAt(0).toUpperCase()}</div>
+                          <span style={{ fontFamily:FONT, fontSize:12, fontWeight:600, color:INK }}>{f.institution_name||'Ukendt'}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Trust checkmarks */}
+            <div style={{ display:'flex', gap:isMobile?10:16, flexWrap:'wrap', marginBottom:16 }}>
+              {[
+                '✓ CVR-verificeret',
+                '✓ Sikker handel',
+                listing.created_at ? `✓ ${timeAgo(listing.created_at)}` : null,
+              ].filter(Boolean).map((item, i) => (
+                <span key={i} style={{ fontSize:11, color:PRIMARY, fontWeight:700, fontFamily:FONT }}>{item}</span>
+              ))}
+            </div>
+
+            {/* Heart + share */}
+            <div style={{ display:'flex', gap:8, marginBottom:20 }}>
+              <button onClick={handleToggleFav}
+                style={{ flex:2, padding:'11px 8px', borderRadius:16, border:`1.5px solid ${isFav?'#fca5a5':'#e5e5e5'}`, background:isFav?'#fff0f3':'#fff', color:isFav?'#e11d48':'#555', fontSize:13, fontWeight:700, cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center', gap:5, fontFamily:FONT, transition:'all 0.2s' }}>
+                {isFav ? '❤️ Gemt' : '🤍 Gem'}
+                {localFavCount > 0 && <span style={{ background:isFav?'#fca5a5':'#eee', color:isFav?'#c0392b':'#888', borderRadius:99, padding:'1px 7px', fontSize:11 }}>{localFavCount}</span>}
+              </button>
+              <button onClick={()=>{ navigator.clipboard.writeText(window.location.href).catch(()=>{}); setLinkCopied(true); setTimeout(()=>setLinkCopied(false),2200); }}
+                style={{ flex:1, padding:'11px 8px', borderRadius:16, border:'1.5px solid #e5e5e5', background:'#fff', color:linkCopied?PRIMARY:'#555', fontSize:12, fontWeight:700, cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center', gap:4, fontFamily:FONT, transition:'all 0.2s' }}>
+                {linkCopied ? '✓' : '🔗'}
+              </button>
+              {(currentUserId || loggedIn) && teamMembers.length > 0 && (
+                <button onClick={()=>setShareModal(true)}
+                  style={{ flex:1, padding:'11px 8px', borderRadius:16, border:'1.5px solid #e5e5e5', background:'#fff', color:'#555', fontSize:12, fontWeight:700, cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center', gap:4, fontFamily:FONT }}>
+                  👥
+                </button>
+              )}
+              <button onClick={()=>{ window.location.href=`mailto:?subject=${encodeURIComponent(listing.title)}&body=${encodeURIComponent('Kig på dette opslag: '+window.location.href)}`; }}
+                style={{ flex:1, padding:'11px 8px', borderRadius:16, border:'1.5px solid #e5e5e5', background:'#fff', color:'#555', fontSize:12, fontWeight:700, cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center', gap:4, fontFamily:FONT }}>
+                📧
+              </button>
+            </div>
+
+            {/* Metadata box */}
+            <div style={{ background:PAPER2, borderRadius:18, padding:'16px 20px', border:`1px solid ${PAPER3}`, marginBottom:14 }}>
+              {[
+                ['Institution', listing.institution_name, 'inst'],
+                ['By', listing.city],
+                ['Aldersgruppe', listing.age_group],
+                ['Stand', listing.condition],
+                listing.can_ship ? ['Forsendelse', '📦 Kan sendes', 'ship'] : null,
+                listing.created_at ? ['Opslået', timeAgo(listing.created_at)] : null,
+              ].filter(Boolean).map(([label, val, key], i) => (
+                <div key={i} style={{ display:'flex', justifyContent:'space-between', fontSize:13, fontFamily:FONT, padding:'7px 0', borderBottom: i < 4 ? `1px solid ${PAPER3}` : 'none' }}>
+                  <span style={{ color:INK3 }}>{label}</span>
+                  <span onClick={key==='inst' ? ()=>goToInstitution(val) : undefined}
+                    style={{ fontWeight:600, cursor:key==='inst'?'pointer':'default', color: key==='inst' ? PRIMARY : key==='ship' ? '#2563EB' : INK2, textDecoration:key==='inst'?'underline':'none', textDecorationColor:GREEN_SOFT }}>
+                    {val}
+                  </span>
+                </div>
+              ))}
+            </div>
+
+            {/* CVR badge */}
+            <div style={{ background:GREEN_TINT, borderRadius:14, padding:'12px 16px', display:'flex', gap:10, alignItems:'center', borderLeft:`3px solid ${PRIMARY}`, marginBottom: trustScore ? 10 : 0 }}>
               <div style={{ width:8, height:8, borderRadius:'50%', background:PRIMARY, flexShrink:0 }} />
               <div>
-                <div style={{ fontFamily:FONT, fontWeight:700, fontSize:13, color:PRIMARY }}>CVR-verificeret institution</div>
-                <div style={{ fontSize:12, color:INK3, fontFamily:FONT }}>Handler sker sikkert via platformen</div>
+                <div style={{ fontFamily:FONT, fontWeight:700, fontSize:12, color:PRIMARY }}>CVR-verificeret institution</div>
+                <div style={{ fontSize:11, color:INK3, fontFamily:FONT }}>Handler sker sikkert via platformen</div>
               </div>
             </div>
+
+            {/* Trust score */}
             {trustScore && (
-              <div style={{ background:PAPER2, borderRadius:16, padding:'14px 18px', marginTop:10, border:`1px solid ${PAPER3}`, display:'flex', alignItems:'center', gap:14 }}>
-                <div style={{ width:46, height:46, borderRadius:12, background:PRIMARY, display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center', flexShrink:0 }}>
-                  <div style={{ fontFamily:FONT, fontWeight:800, fontSize:16, color:'#fff', lineHeight:1 }}>{trustScore.pct}%</div>
+              <div style={{ background:PAPER2, borderRadius:14, padding:'12px 16px', border:`1px solid ${PAPER3}`, display:'flex', alignItems:'center', gap:12 }}>
+                <div style={{ width:44, height:44, borderRadius:12, background:PRIMARY, display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center', flexShrink:0 }}>
+                  <div style={{ fontFamily:FONT, fontWeight:800, fontSize:15, color:'#fff', lineHeight:1 }}>{trustScore.pct}%</div>
                   <div style={{ fontSize:9, color:'rgba(255,255,255,0.75)', fontFamily:FONT, fontWeight:600 }}>Tillid</div>
                 </div>
                 <div>
                   <div style={{ fontFamily:FONT, fontWeight:700, fontSize:13, color:INK }}>Tillidsrating</div>
-                  <div style={{ fontSize:12, color:INK3, fontFamily:FONT }}>Baseret på {trustScore.count} anmeldelse{trustScore.count !== 1 ? 'r' : ''}</div>
+                  <div style={{ fontSize:11, color:INK3, fontFamily:FONT }}>Baseret på {trustScore.count} anmeldelse{trustScore.count!==1?'r':''}</div>
                 </div>
               </div>
             )}
+
+            {/* Mobile: bundttilbud */}
+            {!isOwn && isMobile && (
+              <div style={{ background:PAPER2, borderRadius:14, padding:'12px 16px', display:'flex', alignItems:'center', gap:12, border:`1px solid ${PAPER3}`, marginTop:14 }}>
+                <span style={{ fontSize:20, flexShrink:0 }}>📦</span>
+                <div style={{ flex:1 }}>
+                  <div style={{ fontFamily:FONT, fontWeight:700, fontSize:12, color:INK, marginBottom:2 }}>Vil du lave et bundttilbud?</div>
+                  <div style={{ fontSize:11, color:INK3, fontFamily:FONT }}>Gå til <strong onClick={()=>goToInstitution(listing.institution_name)} style={{ color:PRIMARY, cursor:'pointer' }}>{listing.institution_name}s side</strong></div>
+                </div>
+                <button onClick={()=>goToInstitution(listing.institution_name)} style={{ background:PRIMARY, border:'none', borderRadius:99, padding:'7px 12px', fontSize:11, fontWeight:700, color:'#fff', cursor:'pointer', fontFamily:FONT, whiteSpace:'nowrap', flexShrink:0 }}>Se →</button>
+              </div>
+            )}
           </div>
+
         </div>
       </div>
 
