@@ -265,6 +265,7 @@ export default function OpretOpslagPage() {
       if (json.error) {
         const msg = res.status === 422 ? json.error : 'Scan mislykkedes — prøv igen';
         showToast(msg, 'error');
+        setScanning(false);
         return;
       }
       setForm(f => ({
