@@ -14,7 +14,7 @@ import { CATEGORIES } from '@/lib/categories';
 
 const FONT = "'Sora', sans-serif";
 
-function GridCard({ l, setQuickViewListing, openEdit, onCopy, toggleActive, toggleReserved, setConfirmDelete, confirmDelete, handleDelete, bulkMode, selected, onToggleSelect }) {
+function GridCard({ l, onOpen, openEdit, onCopy, toggleActive, toggleReserved, setConfirmDelete, confirmDelete, handleDelete, bulkMode, selected, onToggleSelect }) {
   const [imgIdx, setImgIdx] = useState(0);
   const imgs = l.images || [];
   const hasMultiple = imgs.length > 1;
@@ -32,7 +32,7 @@ function GridCard({ l, setQuickViewListing, openEdit, onCopy, toggleActive, togg
 
   return (
     <div onClick={bulkMode ? ()=>onToggleSelect(l.id) : undefined} style={{ border:`2px solid ${selected?PRIMARY:l.is_sold?'#FECACA':l.is_active?'rgba(22,34,28,0.08)':'rgba(22,34,28,0.04)'}`, borderRadius:14, overflow:'hidden', background:selected?GREEN_TINT:l.is_sold?'#FFF5F5':l.is_active?PAPER:'rgba(22,34,28,0.03)', opacity:l.is_active||l.is_sold?1:0.7, cursor:bulkMode?'pointer':'default', transition:'border-color 0.15s, background 0.15s' }}>
-      <div onClick={e=>{ if (bulkMode) return; if (moved.current) { moved.current=false; return; } setQuickViewListing(l); }} style={{ cursor:bulkMode?'pointer':'pointer', position:'relative' }}>
+      <div onClick={e=>{ if (bulkMode) return; if (moved.current) { moved.current=false; return; } onOpen(l); }} style={{ cursor:bulkMode?'pointer':'pointer', position:'relative' }}>
         <div style={{ height:110, background:imgs[imgIdx]?PAPER3:l.color||'#FFD166', position:'relative', overflow:'hidden', display:'flex', alignItems:'center', justifyContent:'center' }}
           onTouchStart={onTouchStart} onTouchEnd={onTouchEnd}>
           {imgs[imgIdx] ? <img src={imgs[imgIdx]} style={{ width:'100%', height:'100%', objectFit:'cover' }} alt="" /> : <span style={{ fontSize:32 }}>{l.emoji||'🧸'}</span>}
@@ -89,7 +89,6 @@ export default function DashboardClient() {
     favs,
     toggleFav,
     setActiveListing,
-    setQuickViewListing,
     setSelectedConvId,
     unreadTotal,
     institution: ctxAppInstitution,
@@ -730,12 +729,12 @@ export default function DashboardClient() {
             ) : listingsView === 'grid' ? (
               <div style={{ display:'grid', gridTemplateColumns:'repeat(2,1fr)', gap:10 }}>
                 {myListings.filter(l=>!l.is_sold).map(l=>(
-                  <GridCard key={l.id} l={l} setQuickViewListing={setQuickViewListing} openEdit={openEdit} onCopy={copyListing} toggleActive={toggleActive} toggleReserved={toggleReserved} setConfirmDelete={setConfirmDelete} confirmDelete={confirmDelete} handleDelete={handleDelete} bulkMode={bulkMode} selected={selectedIds.has(l.id)} onToggleSelect={toggleSelectId} />
+                  <GridCard key={l.id} l={l} onOpen={l=>{ setActiveListing(l); router.push('/opslag/detail'); }} openEdit={openEdit} onCopy={copyListing} toggleActive={toggleActive} toggleReserved={toggleReserved} setConfirmDelete={setConfirmDelete} confirmDelete={confirmDelete} handleDelete={handleDelete} bulkMode={bulkMode} selected={selectedIds.has(l.id)} onToggleSelect={toggleSelectId} />
                 ))}
               </div>
             ) : myListings.filter(l=>!l.is_sold).map(l=>(
               <div key={l.id} onClick={bulkMode?()=>toggleSelectId(l.id):undefined} style={{ border:`1.5px solid ${bulkMode&&selectedIds.has(l.id)?PRIMARY:l.is_sold?'#FECACA':l.is_active?'rgba(22,34,28,0.08)':'rgba(22,34,28,0.04)'}`, borderRadius:14, marginBottom:10, overflow:'hidden', opacity:l.is_active||l.is_sold?1:0.7, background:bulkMode&&selectedIds.has(l.id)?GREEN_TINT:l.is_sold?'#FFF5F5':l.is_active?PAPER:'rgba(22,34,28,0.02)', cursor:bulkMode?'pointer':'default', transition:'border-color 0.15s, background 0.15s' }}>
-                <div onClick={bulkMode?undefined:()=>setQuickViewListing(l)} style={{ display:'flex', alignItems:'center', gap:14, padding:'12px 14px', cursor:bulkMode?'pointer':'pointer' }}>
+                <div onClick={bulkMode?undefined:()=>{ setActiveListing(l); router.push('/opslag/detail'); }} style={{ display:'flex', alignItems:'center', gap:14, padding:'12px 14px', cursor:bulkMode?'pointer':'pointer' }}>
                   {bulkMode && (
                     <div style={{ width:22, height:22, borderRadius:6, border:`2px solid ${selectedIds.has(l.id)?PRIMARY:PAPER3}`, background:selectedIds.has(l.id)?PRIMARY:'#fff', display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0, transition:'all 0.15s' }}>
                       {selectedIds.has(l.id) && <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>}
@@ -797,7 +796,7 @@ export default function DashboardClient() {
               </div>
             ) : favListings.map(l=>(
               <div key={l.id} style={{ display:'flex', alignItems:'center', gap:14, padding:'12px 14px', border:`1px solid rgba(22,34,28,0.08)`, borderRadius:14, marginBottom:10, cursor:'pointer', transition:'border-color 0.15s', background:PAPER }}
-                onClick={()=>setQuickViewListing(l)}
+                onClick={()=>{ setActiveListing(l); router.push('/opslag/detail'); }}
                 onMouseEnter={e=>e.currentTarget.style.borderColor=GREEN_SOFT}
                 onMouseLeave={e=>e.currentTarget.style.borderColor='rgba(22,34,28,0.08)'}>
                 <div style={{ width:48, height:48, borderRadius:10, background:l.images?.[0]?PAPER3:l.color||'#FFD166', display:'flex', alignItems:'center', justifyContent:'center', fontSize:24, flexShrink:0, overflow:'hidden' }}>
@@ -1426,7 +1425,7 @@ export default function DashboardClient() {
             ) : (
               <div style={{ display:'flex', flexDirection:'column', gap:10 }}>
                 {matches.map(m => (
-                  <div key={m.id} onClick={()=>setQuickViewListing(m)} style={{ background:'#fff', borderRadius:14, border:`1.5px solid ${m._score > 0 ? '#DDD6FE' : PAPER2}`, padding:'12px 14px', display:'flex', gap:12, alignItems:'center', cursor:'pointer' }}>
+                  <div key={m.id} onClick={()=>{ setActiveListing(m); router.push('/opslag/detail'); }} style={{ background:'#fff', borderRadius:14, border:`1.5px solid ${m._score > 0 ? '#DDD6FE' : PAPER2}`, padding:'12px 14px', display:'flex', gap:12, alignItems:'center', cursor:'pointer' }}>
                     <div style={{ width:52, height:52, borderRadius:10, background:m.images?.[0]?PAPER3:m.color||GREEN_TINT, display:'flex', alignItems:'center', justifyContent:'center', fontSize:24, flexShrink:0, overflow:'hidden' }}>
                       {m.images?.[0] ? <img src={m.images[0]} style={{ width:'100%', height:'100%', objectFit:'cover' }} alt="" /> : m.emoji||'🧸'}
                     </div>

@@ -86,7 +86,7 @@ function MobileCard({ listing, onClick, favs, toggleFav }) {
 /* ── Mobile home feed (Vinted-style) ──────────────────────── */
 function MobileHomeFeed({ listings, loading }) {
   const router = useRouter();
-  const { setQuickViewListing, favs, toggleFav } = useApp();
+  const { setActiveListing, favs, toggleFav } = useApp();
   const newest = useMemo(() => listings.slice(0, 40), [listings]);
 
   return (
@@ -99,7 +99,7 @@ function MobileHomeFeed({ listings, loading }) {
         {loading
           ? [1,2,3,4,5,6,7,8].map(i => <div key={i} className="skeleton" style={{ aspectRatio: '3/4', borderRadius: 12 }} />)
           : newest.map(l => (
-              <MobileCard key={l.id} listing={l} favs={favs} toggleFav={toggleFav} onClick={() => setQuickViewListing(l)} />
+              <MobileCard key={l.id} listing={l} favs={favs} toggleFav={toggleFav} onClick={() => { setActiveListing(l); router.push('/opslag/detail'); }} />
             ))}
       </div>
     </div>
@@ -291,7 +291,7 @@ function TradeTypesStrip() {
 /* ── Listings preview ─────────────────────────────────────── */
 function ListingsPreview({ listings, loading, goToInstitution }) {
   const router = useRouter();
-  const { setActiveListing, favs, toggleFav, setQuickViewListing } = useApp();
+  const { setActiveListing, favs, toggleFav } = useApp();
   const [filter, setFilter] = useState('alle');
   const w = useWindowWidth();
   const isMobile = w < 640;
@@ -346,7 +346,7 @@ function ListingsPreview({ listings, loading, goToInstitution }) {
             ? [1,2,3,4].map(i => <SkeletonCard key={i} />)
             : shown.map(l => (
                 <ListingCard key={l.id} listing={l} favs={favs} toggleFav={toggleFav}
-                  onClick={() => setQuickViewListing(l)}
+                  onClick={() => { setActiveListing(l); router.push('/opslag/detail'); }}
                   onInstitutionClick={goToInstitution}
                 />
               ))
