@@ -1,6 +1,8 @@
 import Groq from 'groq-sdk';
 import { NextResponse } from 'next/server';
 
+export const maxDuration = 60;
+
 const CATEGORY_KEYS = [
   'books','puzzles','board-games','plush-small','plush-large','wooden-toys',
   'plastic-toys-small','plastic-toys-medium','plastic-toys-large','construction-toys',

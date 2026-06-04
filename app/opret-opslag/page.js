@@ -231,16 +231,35 @@ export default function OpretOpslagPage() {
     setAiRegenerating(r => ({ ...r, [field]: false }));
   }
 
+  function compressImage(file, maxPx = 800, quality = 0.72) {
+    return new Promise(resolve => {
+      const img = new Image();
+      const url = URL.createObjectURL(file);
+      img.onload = () => {
+        URL.revokeObjectURL(url);
+        const scale = Math.min(1, maxPx / Math.max(img.width, img.height));
+        const canvas = document.createElement('canvas');
+        canvas.width = Math.round(img.width * scale);
+        canvas.height = Math.round(img.height * scale);
+        canvas.getContext('2d').drawImage(img, 0, 0, canvas.width, canvas.height);
+        canvas.toBlob(blob => resolve(blob ? new File([blob], file.name, { type: 'image/jpeg' }) : file), 'image/jpeg', quality);
+      };
+      img.onerror = () => { URL.revokeObjectURL(url); resolve(file); };
+      img.src = url;
+    });
+  }
+
   async function handleScanToy(e) {
     const file = e.target.files?.[0];
     if (!file) return;
     e.target.value = '';
     setScanning(true);
     try {
-      const safe = await checkImageSafe(file);
+      const compressed = await compressImage(file);
+      const safe = await checkImageSafe(compressed);
       if (!safe) { showToast('Billedet afvist — indeholder personer', 'error'); setScanning(false); return; }
       const fd = new FormData();
-      fd.append('image', file);
+      fd.append('image', compressed);
       const res = await fetch('/api/scan-toy', { method: 'POST', body: fd });
       const json = await res.json();
       if (json.error) {
