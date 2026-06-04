@@ -47,44 +47,79 @@ const STEPS = [
 
 // ── Scroll-reveal timeline ────────────────────────────────────────────────────
 function JourneySection({ isMobile }) {
-  const rowRefs = useRef([]);
+  const cardRefs = useRef([]);
 
   useEffect(() => {
-    const observers = rowRefs.current.map((el) => {
+    const observers = cardRefs.current.map((el, i) => {
       if (!el) return null;
+      const isEven = i % 2 === 0;
+
+      const resetTransform = isMobile
+        ? 'translateY(88px) scale(0.93)'
+        : `translateX(${isEven ? '-80px' : '80px'}) scale(0.94)`;
+
       const io = new IntersectionObserver(
         ([entry]) => {
           if (entry.isIntersecting) {
             el.style.opacity = '1';
-            el.style.transform = 'translateY(0)';
+            el.style.transform = 'translateY(0) translateX(0) scale(1)';
           } else if (entry.boundingClientRect.top > 0) {
-            // Element is below viewport → user scrolled back up → reset so it re-animates
             el.style.opacity = '0';
-            el.style.transform = 'translateY(52px)';
+            el.style.transform = resetTransform;
           }
         },
-        { threshold: 0.12, rootMargin: '0px 0px -48px 0px' }
+        { threshold: 0.1, rootMargin: '0px 0px -56px 0px' }
       );
       io.observe(el);
       return io;
     });
     return () => observers.forEach(io => io?.disconnect());
-  }, []);
+  }, [isMobile]);
 
-  // Circle size + padding determines where the center line sits
-  const pad   = isMobile ? 20 : 40;
-  const czSz  = isMobile ? 48 : 56;
-  const lineX = pad + czSz / 2 - 1; // center of circles, minus half line width
+  // Shared card content
+  function CardContent({ step, isMobile, isLeft }) {
+    return (
+      <>
+        <div style={{
+          position: 'absolute', top: -6, right: isLeft ? 'auto' : 14, left: isLeft ? 14 : 'auto',
+          fontFamily: FONT, fontWeight: 800,
+          fontSize: isMobile ? 72 : 96,
+          color: step.accent, opacity: 0.07,
+          lineHeight: 1, userSelect: 'none', pointerEvents: 'none',
+          letterSpacing: '-0.05em',
+        }}>
+          {step.label}
+        </div>
+        <div style={{ fontFamily: FONT, fontWeight: 700, fontSize: 10, color: step.accent, letterSpacing: '0.1em', textTransform: 'uppercase', marginBottom: 8 }}>
+          Trin {step.label}
+        </div>
+        <h3 style={{ fontFamily: FONT, fontWeight: 800, fontSize: isMobile ? 18 : 22, color: INK, letterSpacing: '-0.03em', margin: '0 0 10px', lineHeight: 1.15 }}>
+          {step.title}
+        </h3>
+        <p style={{ fontSize: isMobile ? 13 : 14, color: INK3, lineHeight: 1.7, fontFamily: FONT, margin: '0 0 16px' }}>
+          {step.desc}
+        </p>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+          {step.points.map((p, j) => (
+            <div key={j} style={{ display: 'flex', alignItems: 'center', gap: 9 }}>
+              <div style={{ width: 5, height: 5, borderRadius: '50%', background: step.accent, flexShrink: 0 }} />
+              <span style={{ fontSize: isMobile ? 12 : 13, color: INK2, fontFamily: FONT, fontWeight: 600 }}>{p}</span>
+            </div>
+          ))}
+        </div>
+      </>
+    );
+  }
 
   return (
     <div style={{ background: PAPER, padding: isMobile ? '72px 0 88px' : '100px 0 120px' }}>
 
       {/* ── Section header ── */}
-      <div style={{ textAlign: 'center', marginBottom: isMobile ? 60 : 80, padding: '0 24px' }}>
+      <div style={{ textAlign: 'center', marginBottom: isMobile ? 64 : 88, padding: '0 24px' }}>
         <div style={{ display: 'inline-block', background: GREEN_TINT, borderRadius: 999, padding: '5px 16px', fontSize: 11, fontWeight: 700, color: PRIMARY, letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: 16, fontFamily: FONT }}>
           Sådan virker det
         </div>
-        <h2 style={{ fontFamily: FONT, fontWeight: 800, fontSize: isMobile ? 30 : 46, letterSpacing: '-0.04em', color: INK, margin: '0 0 12px', lineHeight: 1.05 }}>
+        <h2 style={{ fontFamily: FONT, fontWeight: 800, fontSize: isMobile ? 30 : 48, letterSpacing: '-0.04em', color: INK, margin: '0 0 14px', lineHeight: 1.05 }}>
           Rejsen fra støv til glæde
         </h2>
         <p style={{ color: INK3, fontSize: isMobile ? 15 : 17, maxWidth: 400, margin: '0 auto', fontFamily: FONT, lineHeight: 1.65 }}>
@@ -92,96 +127,117 @@ function JourneySection({ isMobile }) {
         </p>
       </div>
 
-      {/* ── Timeline ── */}
-      <div style={{ maxWidth: 760, margin: '0 auto', padding: `0 ${pad}px`, position: 'relative' }}>
+      {isMobile ? (
+        /* ── Mobile: left-aligned timeline ── */
+        <div style={{ maxWidth: 520, margin: '0 auto', padding: '0 20px', position: 'relative' }}>
+          {/* Connecting line */}
+          <div style={{ position: 'absolute', left: 43, top: 24, bottom: 24, width: 2, background: PAPER3, borderRadius: 1 }} />
 
-        {/* Vertical connecting line */}
-        <div style={{
-          position: 'absolute',
-          left: lineX,
-          top: czSz / 2,
-          bottom: czSz / 2,
-          width: 2,
-          background: PAPER3,
-          borderRadius: 1,
-        }} />
-
-        <div style={{ display: 'flex', flexDirection: 'column', gap: isMobile ? 36 : 48 }}>
-          {STEPS.map((step, i) => (
-            <div
-              key={i}
-              ref={el => rowRefs.current[i] = el}
-              style={{
-                display: 'flex',
-                gap: isMobile ? 20 : 28,
-                alignItems: 'flex-start',
-                opacity: 0,
-                transform: 'translateY(52px)',
-                transition: 'opacity 0.6s cubic-bezier(0.16,1,0.3,1), transform 0.6s cubic-bezier(0.16,1,0.3,1)',
-              }}
-            >
-              {/* Circle on timeline */}
-              <div style={{
-                flexShrink: 0,
-                width: czSz, height: czSz, borderRadius: '50%',
-                background: '#fff',
-                border: `2px solid ${step.accent}`,
-                display: 'flex', alignItems: 'center', justifyContent: 'center',
-                fontSize: isMobile ? 22 : 24,
-                boxShadow: `0 4px 18px ${step.accent}44`,
-                position: 'relative', zIndex: 2,
-              }}>
-                {step.emoji}
-              </div>
-
-              {/* Card */}
-              <div style={{
-                flex: 1,
-                background: '#fff',
-                borderRadius: isMobile ? 16 : 20,
-                padding: isMobile ? '18px 20px' : '24px 28px',
-                boxShadow: '0 1px 20px rgba(0,0,0,0.06), 0 0 0 1px rgba(0,0,0,0.04)',
-                borderLeft: `3px solid ${step.accent}`,
-                position: 'relative', overflow: 'hidden',
-              }}>
-
-                {/* Watermark step number */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 36 }}>
+            {STEPS.map((step, i) => (
+              <div key={i} style={{ display: 'flex', gap: 20, alignItems: 'flex-start' }}>
+                {/* Circle */}
                 <div style={{
-                  position: 'absolute', top: -4, right: 12,
-                  fontFamily: FONT, fontWeight: 800,
-                  fontSize: isMobile ? 64 : 80,
-                  color: step.accent, opacity: 0.07,
-                  lineHeight: 1, userSelect: 'none', pointerEvents: 'none',
-                  letterSpacing: '-0.05em',
+                  flexShrink: 0, width: 48, height: 48, borderRadius: '50%',
+                  background: '#fff', border: `2px solid ${step.accent}`,
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  fontSize: 22, boxShadow: `0 6px 24px ${step.accent}55`,
+                  position: 'relative', zIndex: 2,
                 }}>
-                  {step.label}
+                  {step.emoji}
                 </div>
-
-                <div style={{ fontFamily: FONT, fontWeight: 700, fontSize: 10, color: step.accent, letterSpacing: '0.1em', textTransform: 'uppercase', marginBottom: 6 }}>
-                  Trin {step.label}
-                </div>
-
-                <h3 style={{ fontFamily: FONT, fontWeight: 800, fontSize: isMobile ? 17 : 20, color: INK, letterSpacing: '-0.03em', margin: '0 0 8px', lineHeight: 1.2 }}>
-                  {step.title}
-                </h3>
-
-                <p style={{ fontSize: isMobile ? 13 : 14, color: INK3, lineHeight: 1.65, fontFamily: FONT, margin: '0 0 14px' }}>
-                  {step.desc}
-                </p>
-
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
-                  {step.points.map((p, j) => (
-                    <div key={j} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                      <div style={{ width: 5, height: 5, borderRadius: '50%', background: step.accent, flexShrink: 0 }} />
-                      <span style={{ fontSize: isMobile ? 11 : 12, color: INK2, fontFamily: FONT, fontWeight: 600 }}>{p}</span>
-                    </div>
-                  ))}
+                {/* Card */}
+                <div
+                  ref={el => cardRefs.current[i] = el}
+                  style={{
+                    flex: 1, background: '#fff',
+                    borderRadius: 16, padding: '18px 20px',
+                    boxShadow: '0 4px 32px rgba(0,0,0,0.09), 0 0 0 1px rgba(0,0,0,0.04)',
+                    borderLeft: `3px solid ${step.accent}`,
+                    position: 'relative', overflow: 'hidden',
+                    opacity: 0, transform: 'translateY(88px) scale(0.93)',
+                    transition: 'opacity 0.7s cubic-bezier(0.16,1,0.3,1), transform 0.7s cubic-bezier(0.16,1,0.3,1)',
+                  }}
+                >
+                  <CardContent step={step} isMobile={true} isLeft={false} />
                 </div>
               </div>
-            </div>
-          ))}
+            ))}
+          </div>
         </div>
-      </div>
+      ) : (
+        /* ── Desktop: alternating zigzag timeline ── */
+        <div style={{ maxWidth: 960, margin: '0 auto', padding: '0 40px', position: 'relative' }}>
+          {/* Vertical center line */}
+          <div style={{
+            position: 'absolute', left: '50%', transform: 'translateX(-50%)',
+            top: 28, bottom: 28, width: 2, background: PAPER3, borderRadius: 1,
+          }} />
+
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 56 }}>
+            {STEPS.map((step, i) => {
+              const isEven = i % 2 === 0;
+              return (
+                <div key={i} style={{ display: 'grid', gridTemplateColumns: '1fr 80px 1fr', alignItems: 'flex-start' }}>
+                  {/* Left slot */}
+                  <div style={{ paddingRight: 40, display: 'flex', justifyContent: 'flex-end' }}>
+                    {isEven && (
+                      <div
+                        ref={el => cardRefs.current[i] = el}
+                        style={{
+                          width: '100%', maxWidth: 400,
+                          background: '#fff', borderRadius: 20,
+                          padding: '28px 32px',
+                          boxShadow: '0 4px 40px rgba(0,0,0,0.09), 0 0 0 1px rgba(0,0,0,0.04)',
+                          borderRight: `3px solid ${step.accent}`,
+                          position: 'relative', overflow: 'hidden',
+                          opacity: 0, transform: 'translateX(-80px) scale(0.94)',
+                          transition: 'opacity 0.75s cubic-bezier(0.16,1,0.3,1), transform 0.75s cubic-bezier(0.16,1,0.3,1)',
+                        }}
+                      >
+                        <CardContent step={step} isMobile={false} isLeft={true} />
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Center: circle */}
+                  <div style={{ display: 'flex', justifyContent: 'center', paddingTop: 10, position: 'relative', zIndex: 2 }}>
+                    <div style={{
+                      width: 56, height: 56, borderRadius: '50%',
+                      background: '#fff', border: `2.5px solid ${step.accent}`,
+                      display: 'flex', alignItems: 'center', justifyContent: 'center',
+                      fontSize: 24, boxShadow: `0 6px 28px ${step.accent}55`,
+                    }}>
+                      {step.emoji}
+                    </div>
+                  </div>
+
+                  {/* Right slot */}
+                  <div style={{ paddingLeft: 40 }}>
+                    {!isEven && (
+                      <div
+                        ref={el => cardRefs.current[i] = el}
+                        style={{
+                          width: '100%', maxWidth: 400,
+                          background: '#fff', borderRadius: 20,
+                          padding: '28px 32px',
+                          boxShadow: '0 4px 40px rgba(0,0,0,0.09), 0 0 0 1px rgba(0,0,0,0.04)',
+                          borderLeft: `3px solid ${step.accent}`,
+                          position: 'relative', overflow: 'hidden',
+                          opacity: 0, transform: 'translateX(80px) scale(0.94)',
+                          transition: 'opacity 0.75s cubic-bezier(0.16,1,0.3,1), transform 0.75s cubic-bezier(0.16,1,0.3,1)',
+                        }}
+                      >
+                        <CardContent step={step} isMobile={false} isLeft={false} />
+                      </div>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
     </div>
   );
 }
