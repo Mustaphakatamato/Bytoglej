@@ -57,7 +57,6 @@ function JourneySection({ isMobile }) {
   useEffect(() => {
     let raf;
 
-    // Ease helper: smooth step between 0 and 1
     const smooth = t => t < 0.5 ? 2 * t * t : -1 + (4 - 2 * t) * t;
 
     const update = () => {
@@ -65,83 +64,73 @@ function JourneySection({ isMobile }) {
       const { top, height } = sectionRef.current.getBoundingClientRect();
       const scrolled = -top;
       const total = height - window.innerHeight;
-      const progress = Math.max(0, Math.min(1, scrolled / total));
+      const progress = Math.max(0, Math.min(0.9999, scrolled / total));
 
-      // Progress bar
       if (progressBarRef.current) {
         progressBarRef.current.style.height = `${progress * 100}%`;
       }
 
+      const n = STEPS.length;
+      // Which step zone we're in (0 to n-1), and how far through it (0 to 1)
+      const rawActive = progress * n;
+      const baseIdx = Math.min(n - 1, Math.floor(rawActive));
+      const local = rawActive - Math.floor(rawActive); // 0→1 within current step zone
+
+      // Crossfade: current step fades out while next fades in — no blank gaps
+      const xStart = 0.6; // crossfade starts at 60% through a zone
+
       STEPS.forEach((step, i) => {
-        const zoneSize = 1 / STEPS.length;
-        const zoneStart = i * zoneSize;
-        const zoneEnd = (i + 1) * zoneSize;
-        // local: 0 → 1 within this step's scroll zone
-        const local = Math.max(0, Math.min(1, (progress - zoneStart) / zoneSize));
+        let opacity, ty;
 
-        // Fade-in zone: local 0→0.2 (entry from below)
-        // Active zone:  local 0.2→0.8
-        // Fade-out zone: local 0.8→1.0 (exit upward) — except last step
-        const isLast = i === STEPS.length - 1;
-        let opacity, translateY, scale;
-
-        if (local < 0.2) {
-          const t = smooth(local / 0.2);
+        if (i === baseIdx) {
+          // Active step — fades out toward end (last step stays)
+          if (i === n - 1) { opacity = 1; ty = 0; }
+          else {
+            const t = smooth(Math.max(0, (local - xStart) / (1 - xStart)));
+            opacity = 1 - t;
+            ty = -32 * t;
+          }
+        } else if (i === baseIdx + 1) {
+          // Next step — fades in while current fades out
+          const t = smooth(Math.max(0, (local - xStart) / (1 - xStart)));
           opacity = t;
-          translateY = 44 * (1 - t);
-          scale = 0.88 + 0.12 * t;
-        } else if (isLast || local < 0.8) {
-          opacity = 1;
-          translateY = 0;
-          scale = 1;
+          ty = 32 * (1 - t);
         } else {
-          const t = smooth((local - 0.8) / 0.2);
-          opacity = 1 - t;
-          translateY = -44 * t;
-          scale = 1 - 0.12 * t;
+          opacity = 0;
+          ty = i < baseIdx ? -32 : 32;
         }
 
         const el = stepRefs.current[i];
         if (el) {
-          el.style.opacity = String(opacity);
-          el.style.transform = `translateY(${translateY}px)`;
-          el.style.pointerEvents = opacity > 0.5 ? 'auto' : 'none';
+          el.style.opacity = String(Math.max(0, opacity));
+          el.style.transform = `translateY(${ty}px)`;
+          el.style.pointerEvents = opacity > 0.4 ? 'auto' : 'none';
         }
 
         const emojiEl = emojiRefs.current[i];
         if (emojiEl) {
-          emojiEl.style.opacity = String(opacity);
-          emojiEl.style.transform = `scale(${scale}) translateY(${translateY * 0.6}px)`;
+          const scale = 0.9 + 0.1 * Math.max(0, opacity);
+          emojiEl.style.opacity = String(Math.max(0, opacity));
+          emojiEl.style.transform = `scale(${scale}) translateY(${ty * 0.5}px)`;
         }
 
         const numEl = numRefs.current[i];
         if (numEl) {
-          numEl.style.opacity = String(opacity * 0.12);
-          numEl.style.transform = `translateX(${(1 - opacity) * -30}px)`;
+          numEl.style.opacity = String(Math.max(0, opacity) * 0.12);
         }
       });
 
-      // Background wash
-      const stepIdx = Math.min(STEPS.length - 1, Math.floor(progress * STEPS.length));
-      if (bgRef.current) {
-        bgRef.current.style.background = STEPS[stepIdx].bg;
-      }
+      const stepIdx = Math.min(n - 1, baseIdx);
+      if (bgRef.current) bgRef.current.style.background = STEPS[stepIdx].bg;
     };
 
-    const onScroll = () => {
-      cancelAnimationFrame(raf);
-      raf = requestAnimationFrame(update);
-    };
-
+    const onScroll = () => { cancelAnimationFrame(raf); raf = requestAnimationFrame(update); };
     window.addEventListener('scroll', onScroll, { passive: true });
     update();
-    return () => {
-      window.removeEventListener('scroll', onScroll);
-      cancelAnimationFrame(raf);
-    };
+    return () => { window.removeEventListener('scroll', onScroll); cancelAnimationFrame(raf); };
   }, []);
 
-  const sectionHeight = isMobile ? `${STEPS.length * 90 + 20}vh` : `${STEPS.length * 100 + 30}vh`;
+  const sectionHeight = isMobile ? `${STEPS.length * 75}vh` : `${STEPS.length * 100 + 30}vh`;
 
   return (
     <div ref={sectionRef} style={{ height: sectionHeight, position: 'relative' }}>
