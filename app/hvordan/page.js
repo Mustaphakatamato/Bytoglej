@@ -53,6 +53,8 @@ function JourneySection({ isMobile }) {
   const numRefs = useRef([]);
   const bgRef = useRef(null);
   const progressBarRef = useRef(null);
+  const dotRefs = useRef([]);
+  const labelRef = useRef(null);
 
   useEffect(() => {
     let raf;
@@ -71,66 +73,108 @@ function JourneySection({ isMobile }) {
       }
 
       const n = STEPS.length;
-      // Which step zone we're in (0 to n-1), and how far through it (0 to 1)
       const rawActive = progress * n;
       const baseIdx = Math.min(n - 1, Math.floor(rawActive));
-      const local = rawActive - Math.floor(rawActive); // 0→1 within current step zone
 
-      // Crossfade: current step fades out while next fades in — no blank gaps
-      const xStart = 0.6; // crossfade starts at 60% through a zone
+      if (isMobile) {
+        // ── Mobile: one step at a time, scroll-zone based ──
+        // Each step owns 1/n of the scroll range; only that step is shown.
+        // Within its zone the step slides up slightly for a parallax feel.
+        const zoneLocal = rawActive - baseIdx; // 0→1 within active zone
 
-      STEPS.forEach((step, i) => {
-        let opacity, ty;
+        STEPS.forEach((step, i) => {
+          const el = stepRefs.current[i];
+          if (!el) return;
 
-        if (i === baseIdx) {
-          // Active step — fades out toward end (last step stays)
-          if (i === n - 1) { opacity = 1; ty = 0; }
-          else {
-            const t = smooth(Math.max(0, (local - xStart) / (1 - xStart)));
-            opacity = 1 - t;
-            ty = -32 * t;
+          if (i === baseIdx) {
+            // Slide in from below when entering (0→0.25), rest, then slide up when exiting (0.75→1)
+            // Last step never exits
+            let ty = 0;
+            if (zoneLocal < 0.25) {
+              ty = 36 * (1 - zoneLocal / 0.25);
+            } else if (zoneLocal > 0.75 && i < n - 1) {
+              ty = -36 * ((zoneLocal - 0.75) / 0.25);
+            }
+            el.style.opacity = '1';
+            el.style.transform = `translateY(${ty}px)`;
+            el.style.pointerEvents = 'auto';
+          } else {
+            el.style.opacity = '0';
+            el.style.transform = 'translateY(0px)';
+            el.style.pointerEvents = 'none';
           }
-        } else if (i === baseIdx + 1) {
-          // Next step — fades in while current fades out
-          const t = smooth(Math.max(0, (local - xStart) / (1 - xStart)));
-          opacity = t;
-          ty = 32 * (1 - t);
-        } else {
-          opacity = 0;
-          ty = i < baseIdx ? -32 : 32;
+
+          // Dot indicators
+          const dot = dotRefs.current[i];
+          if (dot) {
+            dot.style.background = i === baseIdx ? STEPS[baseIdx].accent : '#ccc';
+            dot.style.width = i === baseIdx ? '20px' : '7px';
+          }
+        });
+
+        // Step label
+        if (labelRef.current) {
+          labelRef.current.textContent = `${STEPS[baseIdx].label} / 04`;
+          labelRef.current.style.color = STEPS[baseIdx].accent;
         }
 
-        const el = stepRefs.current[i];
-        if (el) {
-          el.style.opacity = String(Math.max(0, opacity));
-          el.style.transform = `translateY(${ty}px)`;
-          el.style.pointerEvents = opacity > 0.4 ? 'auto' : 'none';
-        }
+        if (bgRef.current) bgRef.current.style.background = STEPS[baseIdx].bg;
 
-        const emojiEl = emojiRefs.current[i];
-        if (emojiEl) {
-          const scale = 0.9 + 0.1 * Math.max(0, opacity);
-          emojiEl.style.opacity = String(Math.max(0, opacity));
-          emojiEl.style.transform = `scale(${scale}) translateY(${ty * 0.5}px)`;
-        }
+      } else {
+        // ── Desktop: crossfade between steps ──
+        const local = rawActive - Math.floor(rawActive);
+        const xStart = 0.6;
 
-        const numEl = numRefs.current[i];
-        if (numEl) {
-          numEl.style.opacity = String(Math.max(0, opacity) * 0.12);
-        }
-      });
+        STEPS.forEach((step, i) => {
+          let opacity, ty;
 
-      const stepIdx = Math.min(n - 1, baseIdx);
-      if (bgRef.current) bgRef.current.style.background = STEPS[stepIdx].bg;
+          if (i === baseIdx) {
+            if (i === n - 1) { opacity = 1; ty = 0; }
+            else {
+              const t = smooth(Math.max(0, (local - xStart) / (1 - xStart)));
+              opacity = 1 - t;
+              ty = -32 * t;
+            }
+          } else if (i === baseIdx + 1) {
+            const t = smooth(Math.max(0, (local - xStart) / (1 - xStart)));
+            opacity = t;
+            ty = 32 * (1 - t);
+          } else {
+            opacity = 0;
+            ty = i < baseIdx ? -32 : 32;
+          }
+
+          const el = stepRefs.current[i];
+          if (el) {
+            el.style.opacity = String(Math.max(0, opacity));
+            el.style.transform = `translateY(${ty}px)`;
+            el.style.pointerEvents = opacity > 0.4 ? 'auto' : 'none';
+          }
+
+          const emojiEl = emojiRefs.current[i];
+          if (emojiEl) {
+            const scale = 0.9 + 0.1 * Math.max(0, opacity);
+            emojiEl.style.opacity = String(Math.max(0, opacity));
+            emojiEl.style.transform = `scale(${scale}) translateY(${ty * 0.5}px)`;
+          }
+
+          const numEl = numRefs.current[i];
+          if (numEl) {
+            numEl.style.opacity = String(Math.max(0, opacity) * 0.12);
+          }
+        });
+
+        if (bgRef.current) bgRef.current.style.background = STEPS[baseIdx].bg;
+      }
     };
 
     const onScroll = () => { cancelAnimationFrame(raf); raf = requestAnimationFrame(update); };
     window.addEventListener('scroll', onScroll, { passive: true });
     update();
     return () => { window.removeEventListener('scroll', onScroll); cancelAnimationFrame(raf); };
-  }, []);
+  }, [isMobile]);
 
-  const sectionHeight = isMobile ? `${STEPS.length * 75}vh` : `${STEPS.length * 100 + 30}vh`;
+  const sectionHeight = isMobile ? `${STEPS.length * 80}vh` : `${STEPS.length * 100 + 30}vh`;
 
   return (
     <div ref={sectionRef} style={{ height: sectionHeight, position: 'relative' }}>
@@ -154,16 +198,20 @@ function JourneySection({ isMobile }) {
 
         {isMobile ? (
           /* ── Mobile layout ── */
-          <div style={{ width: '100%', padding: '0 0 0', position: 'relative', zIndex: 1 }}>
-            {/* Step number pill */}
-            <div style={{ textAlign: 'center', marginBottom: 0 }}>
-              <div style={{ display: 'inline-block', background: GREEN_TINT, borderRadius: 999, padding: '5px 16px', fontSize: 11, fontWeight: 700, color: PRIMARY, letterSpacing: '0.08em', textTransform: 'uppercase', fontFamily: FONT }}>
+          <div style={{ width: '100%', position: 'relative', zIndex: 1, display: 'flex', flexDirection: 'column', height: '100vh' }}>
+
+            {/* Header row: label + step counter */}
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '18px 24px 0' }}>
+              <div style={{ display: 'inline-block', background: GREEN_TINT, borderRadius: 999, padding: '5px 14px', fontSize: 11, fontWeight: 700, color: PRIMARY, letterSpacing: '0.08em', textTransform: 'uppercase', fontFamily: FONT }}>
                 Sådan virker det
+              </div>
+              <div ref={labelRef} style={{ fontFamily: FONT, fontWeight: 700, fontSize: 12, color: STEPS[0].accent, letterSpacing: '0.04em' }}>
+                01 / 04
               </div>
             </div>
 
-            {/* Steps — all layered on top of each other absolutely */}
-            <div style={{ position: 'relative', height: '85vh', display: 'flex', alignItems: 'center' }}>
+            {/* Steps — all layered, only active one has opacity:1 */}
+            <div style={{ position: 'relative', flex: 1 }}>
               {STEPS.map((step, i) => (
                 <div
                   key={i}
@@ -171,40 +219,42 @@ function JourneySection({ isMobile }) {
                   style={{
                     position: 'absolute', inset: 0,
                     display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
-                    padding: '20px 28px',
+                    padding: '12px 28px 0',
                     opacity: i === 0 ? 1 : 0,
+                    willChange: 'transform, opacity',
                   }}
                 >
-                  {/* Emoji */}
-                  <div ref={el => emojiRefs.current[i] = el} style={{
-                    width: 130, height: 130, borderRadius: 40,
-                    background: step.bg, border: `2.5px solid ${step.accent}44`,
-                    display: 'flex', alignItems: 'center', justifyContent: 'center',
-                    fontSize: 60, marginBottom: 28,
-                    boxShadow: `0 16px 48px ${step.accent}44`,
-                  }}>
-                    {step.emoji}
-                  </div>
-
                   {/* Step number watermark */}
-                  <div ref={el => numRefs.current[i] = el} style={{
-                    position: 'absolute', top: '5%', right: '5%',
-                    fontFamily: FONT, fontWeight: 800, fontSize: 100,
+                  <div style={{
+                    position: 'absolute', top: '4%', right: '6%',
+                    fontFamily: FONT, fontWeight: 800, fontSize: 88,
                     color: step.accent, lineHeight: 1, userSelect: 'none',
-                    opacity: 0.12,
+                    opacity: 0.1, pointerEvents: 'none',
                   }}>
                     {step.label}
                   </div>
 
+                  {/* Emoji box */}
+                  <div style={{
+                    width: 120, height: 120, borderRadius: 36,
+                    background: step.bg, border: `2.5px solid ${step.accent}44`,
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    fontSize: 56, marginBottom: 24,
+                    boxShadow: `0 16px 40px ${step.accent}33`,
+                    flexShrink: 0,
+                  }}>
+                    {step.emoji}
+                  </div>
+
                   {/* Text */}
-                  <div style={{ textAlign: 'center', maxWidth: 340 }}>
+                  <div style={{ textAlign: 'center', maxWidth: 320 }}>
                     <div style={{ fontFamily: FONT, fontWeight: 800, fontSize: 22, color: INK, letterSpacing: '-0.03em', marginBottom: 10, lineHeight: 1.15 }}>{step.title}</div>
-                    <div style={{ fontSize: 14, color: INK3, lineHeight: 1.65, fontFamily: FONT, marginBottom: 20 }}>{step.desc}</div>
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: 6, alignItems: 'center' }}>
+                    <div style={{ fontSize: 14, color: INK3, lineHeight: 1.65, fontFamily: FONT, marginBottom: 18 }}>{step.desc}</div>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 7, alignItems: 'flex-start', maxWidth: 260, margin: '0 auto' }}>
                       {step.points.map((p, j) => (
                         <div key={j} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                           <div style={{ width: 6, height: 6, borderRadius: '50%', background: step.accent, flexShrink: 0 }} />
-                          <span style={{ fontSize: 12, color: INK2, fontFamily: FONT, fontWeight: 600 }}>{p}</span>
+                          <span style={{ fontSize: 13, color: INK2, fontFamily: FONT, fontWeight: 600 }}>{p}</span>
                         </div>
                       ))}
                     </div>
@@ -214,9 +264,17 @@ function JourneySection({ isMobile }) {
             </div>
 
             {/* Dot indicators */}
-            <div style={{ display: 'flex', justifyContent: 'center', gap: 8, paddingBottom: 20 }}>
+            <div style={{ display: 'flex', justifyContent: 'center', gap: 8, padding: '0 0 24px' }}>
               {STEPS.map((s, i) => (
-                <div key={i} style={{ width: 8, height: 8, borderRadius: '50%', background: PAPER3 }} />
+                <div
+                  key={i}
+                  ref={el => dotRefs.current[i] = el}
+                  style={{
+                    width: i === 0 ? '20px' : '7px', height: 7, borderRadius: 4,
+                    background: i === 0 ? STEPS[0].accent : '#ccc',
+                    transition: 'width 0.2s, background 0.2s',
+                  }}
+                />
               ))}
             </div>
           </div>
