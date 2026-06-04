@@ -190,6 +190,12 @@ function OpslagInner() {
   const [saveSearchModal, setSaveSearchModal] = useState(false);
   const [saveSearchName, setSaveSearchName] = useState('');
   const [savingSearch, setSavingSearch] = useState(false);
+  const [aiMode, setAiMode] = useState(false);
+  const [aiQuery, setAiQuery] = useState('');
+  const [aiSearching, setAiSearching] = useState(false);
+  const [aiResults, setAiResults] = useState(null);
+  const [aiExplanation, setAiExplanation] = useState('');
+  const aiInputRef = useRef(null);
   const [followedNames, setFollowedNames] = useState(null);
   const [showFollowed, setShowFollowed] = useState(false);
 
@@ -221,7 +227,7 @@ function OpslagInner() {
     });
   }, [listings]);
 
-  const filtered = useMemo(() => {
+  const filteredNormal = useMemo(() => {
     let r = listings.filter(l => {
       if (l.type === 'søges') return false;
       const matchType   = filter === 'alle' || l.type === filter;
@@ -237,6 +243,8 @@ function OpslagInner() {
     if (sort === 'bids')       r = [...r].sort((a,b) => (b.bid_count||0) - (a.bid_count||0));
     return r;
   }, [listings, filter, search, sort, category, subcategory, showFollowed, followedNames]);
+
+  const filtered = aiResults !== null ? aiResults : filteredNormal;
 
   async function handleSaveSearch() {
     if (!saveSearchName.trim()) return;
@@ -280,9 +288,34 @@ function OpslagInner() {
     color: INK2, cursor: 'pointer', appearance: 'none', WebkitAppearance: 'none',
   };
 
+  async function handleAiSearch(e) {
+    e?.preventDefault();
+    if (!aiQuery.trim() || aiSearching) return;
+    setAiSearching(true);
+    setAiResults(null);
+    try {
+      const res = await fetch('/api/ai-search', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ query: aiQuery }),
+      });
+      const json = await res.json();
+      if (json.error) { showToast(json.error, 'error'); }
+      else { setAiResults(json.listings || []); setAiExplanation(json.explanation || ''); }
+    } catch { showToast('AI-søgning mislykkedes — prøv igen', 'error'); }
+    setAiSearching(false);
+  }
+
+  function clearAiSearch() {
+    setAiMode(false);
+    setAiQuery('');
+    setAiResults(null);
+    setAiExplanation('');
+  }
+
   const noFilters = !category && !search && filter === 'alle';
-  const showCategoryBrowser    = isMobile && noFilters && !pendingCategory;
-  const showSubcategoryBrowser = isMobile && noFilters && !!pendingCategory;
+  const showCategoryBrowser    = isMobile && noFilters && !pendingCategory && !aiMode;
+  const showSubcategoryBrowser = isMobile && noFilters && !!pendingCategory && !aiMode;
 
   return (
     <PullToRefresh onRefresh={fetchListings}>
@@ -350,33 +383,68 @@ function OpslagInner() {
               <button onClick={() => { setCategory(''); setSubcategory(''); }} style={{ marginLeft: 4, background: 'none', border: 'none', color: PRIMARY, cursor: 'pointer', fontSize: 13, fontWeight: 800, lineHeight: 1, padding: '0 2px' }}>×</button>
             </div>
           )}
+          {/* AI search bar — shown when aiMode active */}
+          {aiMode && (
+            <form onSubmit={handleAiSearch} style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+              <div style={{ flex: 1, background: '#fff', borderRadius: 99, display: 'flex', alignItems: 'center', padding: '8px 16px', gap: 10, border: `2px solid ${PRIMARY}`, boxShadow: `0 0 0 3px ${PRIMARY}22` }}>
+                <span style={{ fontSize: 16, flexShrink: 0 }}>✨</span>
+                <input
+                  ref={aiInputRef}
+                  value={aiQuery}
+                  onChange={e => setAiQuery(e.target.value)}
+                  placeholder="Beskriv hvad du leder efter… fx 'noget børn kan ride på udendørs'"
+                  style={{ border: 'none', background: 'transparent', outline: 'none', fontSize: 13, fontFamily: FONT, flex: 1, minWidth: 0, color: INK }}
+                  autoFocus
+                />
+                {aiQuery && <button type="button" onClick={() => setAiQuery('')} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 16, color: INK3, padding: 0, lineHeight: 1 }}>×</button>}
+              </div>
+              <button type="submit" disabled={!aiQuery.trim() || aiSearching} style={{ padding: '9px 20px', borderRadius: 99, border: 'none', background: PRIMARY, color: '#fff', fontWeight: 700, fontSize: 13, fontFamily: FONT, cursor: aiQuery.trim() && !aiSearching ? 'pointer' : 'default', opacity: !aiQuery.trim() || aiSearching ? 0.5 : 1, flexShrink: 0, whiteSpace: 'nowrap' }}>
+                {aiSearching ? 'Søger…' : 'Søg'}
+              </button>
+              <button type="button" onClick={clearAiSearch} style={{ padding: '9px 16px', borderRadius: 99, border: `1.5px solid ${PAPER3}`, background: PAPER2, color: INK2, fontWeight: 700, fontSize: 13, fontFamily: FONT, cursor: 'pointer', flexShrink: 0 }}>
+                Annuller
+              </button>
+            </form>
+          )}
+
           <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', alignItems: 'center' }}>
-            <div style={{ display: 'flex', gap: 4 }}>
-              {[{ key: 'alle', label: 'Alle' }, { key: 'køb', label: TYPE_CFG.køb.label }, { key: 'byd', label: TYPE_CFG.byd.label }, { key: 'byt', label: TYPE_CFG.byt.label }].map(({ key, label }) => {
-                const active = filter === key;
-                const tc = key !== 'alle' ? TYPE_CFG[key] : null;
-                return (
-                  <button key={key} onClick={() => setFilter(key)} style={{ padding: '7px 16px', borderRadius: 99, border: active ? 'none' : `1.5px solid ${PAPER3}`, background: active ? (tc ? tc.color : PRIMARY) : PAPER2, color: active ? '#fff' : INK2, fontSize: 13, fontWeight: 700, fontFamily: FONT, transition: 'all 0.15s', cursor: 'pointer', whiteSpace: 'nowrap' }}>
-                    {label}
-                  </button>
-                );
-              })}
-            </div>
-            {followedNames?.length > 0 && (
+            {!aiMode && (
+              <div style={{ display: 'flex', gap: 4 }}>
+                {[{ key: 'alle', label: 'Alle' }, { key: 'køb', label: TYPE_CFG.køb.label }, { key: 'byd', label: TYPE_CFG.byd.label }, { key: 'byt', label: TYPE_CFG.byt.label }].map(({ key, label }) => {
+                  const active = filter === key;
+                  const tc = key !== 'alle' ? TYPE_CFG[key] : null;
+                  return (
+                    <button key={key} onClick={() => setFilter(key)} style={{ padding: '7px 16px', borderRadius: 99, border: active ? 'none' : `1.5px solid ${PAPER3}`, background: active ? (tc ? tc.color : PRIMARY) : PAPER2, color: active ? '#fff' : INK2, fontSize: 13, fontWeight: 700, fontFamily: FONT, transition: 'all 0.15s', cursor: 'pointer', whiteSpace: 'nowrap' }}>
+                      {label}
+                    </button>
+                  );
+                })}
+              </div>
+            )}
+            {!aiMode && followedNames?.length > 0 && (
               <button onClick={() => setShowFollowed(f => !f)}
                 style={{ padding: '7px 16px', borderRadius: 99, border: showFollowed ? 'none' : `1.5px solid ${PAPER3}`, background: showFollowed ? PRIMARY : PAPER2, color: showFollowed ? '#fff' : INK2, fontSize: 13, fontWeight: 700, fontFamily: FONT, transition: 'all 0.15s', cursor: 'pointer', whiteSpace: 'nowrap', display:'flex', alignItems:'center', gap:5 }}>
                 ★ Institutioner jeg følger {showFollowed && `(${followedNames.length})`}
               </button>
             )}
-            <div style={{ position: 'relative' }}>
-              <select value={sort} onChange={e => setSort(e.target.value)} style={selectStyle}>
-                <option value="newest">Nyeste</option>
-                <option value="price-asc">Pris ↑</option>
-                <option value="price-desc">Pris ↓</option>
-                <option value="bids">Flest bud</option>
-              </select>
-              <span style={{ position: 'absolute', right: 10, top: '50%', transform: 'translateY(-50%)', fontSize: 9, color: INK3, pointerEvents: 'none' }}>▼</span>
-            </div>
+            {!aiMode && (
+              <div style={{ position: 'relative' }}>
+                <select value={sort} onChange={e => setSort(e.target.value)} style={selectStyle}>
+                  <option value="newest">Nyeste</option>
+                  <option value="price-asc">Pris ↑</option>
+                  <option value="price-desc">Pris ↓</option>
+                  <option value="bids">Flest bud</option>
+                </select>
+                <span style={{ position: 'absolute', right: 10, top: '50%', transform: 'translateY(-50%)', fontSize: 9, color: INK3, pointerEvents: 'none' }}>▼</span>
+              </div>
+            )}
+            {/* AI search toggle button */}
+            <button
+              onClick={() => { if (aiMode) clearAiSearch(); else { setAiMode(true); setTimeout(() => aiInputRef.current?.focus(), 50); } }}
+              style={{ padding: '7px 16px', borderRadius: 99, border: aiMode ? 'none' : `1.5px solid ${PAPER3}`, background: aiMode ? PRIMARY : PAPER2, color: aiMode ? '#fff' : INK2, fontSize: 13, fontWeight: 700, fontFamily: FONT, cursor: 'pointer', whiteSpace: 'nowrap', display: 'flex', alignItems: 'center', gap: 5, transition: 'all 0.15s', marginLeft: 'auto' }}
+            >
+              ✨ Søg med AI
+            </button>
           </div>
         </div>
       </div>
@@ -386,13 +454,44 @@ function OpslagInner() {
       {isMobile && <div style={{ height: 68 }} />}
 
       {/* ── Main tab switcher ── */}
-      <div style={{ maxWidth:1140, margin:'0 auto', padding: isMobile ? '12px 16px 0' : '16px 24px 0', display:'flex', gap:4 }}>
+      <div style={{ maxWidth:1140, margin:'0 auto', padding: isMobile ? '12px 16px 0' : '16px 24px 0', display:'flex', gap:4, flexWrap: isMobile ? 'wrap' : 'nowrap' }}>
         {[{ key:'opslag', label:'Opslag' }, { key:'søges', label:`Søges (${søgesListings.length})` }].map(({ key, label }) => (
           <button key={key} onClick={() => setMainTab(key)} style={{ padding: isMobile ? '8px 16px' : '9px 20px', borderRadius:99, border:'none', background: mainTab===key ? (key==='søges' ? '#7C3AED' : PRIMARY) : PAPER2, color: mainTab===key ? '#fff' : INK3, fontFamily:FONT, fontWeight:700, fontSize:13, cursor:'pointer', transition:'all 0.15s' }}>
             {key === 'søges' && <span style={{ marginRight:5 }}>🔍</span>}{label}
           </button>
         ))}
+        {/* Mobile AI search */}
+        {isMobile && (
+          <button
+            onClick={() => { if (aiMode) clearAiSearch(); else { setAiMode(true); setTimeout(() => aiInputRef.current?.focus(), 50); } }}
+            style={{ padding: '8px 16px', borderRadius: 99, border: 'none', background: aiMode ? PRIMARY : PAPER2, color: aiMode ? '#fff' : INK2, fontFamily: FONT, fontWeight: 700, fontSize: 13, cursor: 'pointer', transition: 'all 0.15s', display: 'flex', alignItems: 'center', gap: 4 }}
+          >
+            ✨ AI
+          </button>
+        )}
       </div>
+      {/* Mobile AI search bar */}
+      {isMobile && aiMode && (
+        <div style={{ maxWidth: 1140, margin: '0 auto', padding: '8px 16px 0' }}>
+          <form onSubmit={handleAiSearch} style={{ display: 'flex', gap: 8 }}>
+            <div style={{ flex: 1, background: '#fff', borderRadius: 12, display: 'flex', alignItems: 'center', padding: '8px 14px', gap: 8, border: `2px solid ${PRIMARY}`, boxShadow: `0 0 0 3px ${PRIMARY}22` }}>
+              <span style={{ fontSize: 15 }}>✨</span>
+              <input
+                ref={aiInputRef}
+                value={aiQuery}
+                onChange={e => setAiQuery(e.target.value)}
+                placeholder="Beskriv hvad du leder efter…"
+                style={{ border: 'none', background: 'transparent', outline: 'none', fontSize: 13, fontFamily: FONT, flex: 1, minWidth: 0, color: INK }}
+                autoFocus
+              />
+              {aiQuery && <button type="button" onClick={() => setAiQuery('')} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 15, color: INK3, padding: 0, lineHeight: 1 }}>×</button>}
+            </div>
+            <button type="submit" disabled={!aiQuery.trim() || aiSearching} style={{ padding: '8px 16px', borderRadius: 12, border: 'none', background: PRIMARY, color: '#fff', fontWeight: 700, fontSize: 13, fontFamily: FONT, cursor: 'pointer', opacity: !aiQuery.trim() || aiSearching ? 0.5 : 1, flexShrink: 0 }}>
+              {aiSearching ? '…' : 'Søg'}
+            </button>
+          </form>
+        </div>
+      )}
 
       {/* ── Søges tab ── */}
       {mainTab === 'søges' && (
@@ -464,8 +563,22 @@ function OpslagInner() {
           </div>
         )}
 
+        {/* AI results banner */}
+        {aiResults !== null && (
+          <div style={{ marginBottom: 14, background: `${PRIMARY}11`, border: `1.5px solid ${PRIMARY}33`, borderRadius: 12, padding: '10px 16px', display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+            <span style={{ fontSize: 18 }}>✨</span>
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <span style={{ fontFamily: FONT, fontWeight: 700, fontSize: 13, color: PRIMARY }}>{aiExplanation}</span>
+              <span style={{ fontFamily: FONT, fontSize: 12, color: INK3, marginLeft: 8 }}>— {aiResults.length} opslag fundet</span>
+            </div>
+            <button onClick={clearAiSearch} style={{ background: 'none', border: `1.5px solid ${PRIMARY}44`, borderRadius: 99, padding: '4px 12px', fontSize: 12, fontWeight: 700, color: PRIMARY, fontFamily: FONT, cursor: 'pointer', whiteSpace: 'nowrap' }}>
+              × Ryd AI-søgning
+            </button>
+          </div>
+        )}
+
         {/* Desktop: Result count row */}
-        {!isMobile && (
+        {!isMobile && !aiResults && (
         <div style={{ marginBottom: 14, display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 8 }}>
           <p style={{ color: INK3, fontSize: 13, margin: 0, fontFamily: FONT }}>
             {loading ? 'Henter opslag…' : `${filtered.length} opslag`}
