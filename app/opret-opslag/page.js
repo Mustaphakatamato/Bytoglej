@@ -115,13 +115,27 @@ export default function OpretOpslagPage() {
     });
   }, []);
 
+  async function checkImageSafe(file) {
+    try {
+      const fd = new FormData(); fd.append('image', file);
+      const res = await fetch('/api/scan-image', { method: 'POST', body: fd });
+      const json = await res.json();
+      return json.safe !== false;
+    } catch { return true; }
+  }
+
   async function handleFileSelect(e) {
     const files = Array.from(e.target.files || []);
     if (!files.length) return;
     const remaining = 6 - imgFiles.length;
-    const toAdd = files.slice(0, remaining);
-    const newPreviews = toAdd.map(f => URL.createObjectURL(f));
-    setImgFiles(prev => [...prev, ...toAdd]);
+    const candidates = files.slice(0, remaining);
+    const results = await Promise.all(candidates.map(f => checkImageSafe(f)));
+    const safe = candidates.filter((_, i) => results[i]);
+    const rejected = candidates.length - safe.length;
+    if (rejected > 0) showToast(`${rejected} billede${rejected > 1 ? 'r' : ''} afvist — indeholder personer`, 'error');
+    if (!safe.length) { e.target.value = ''; return; }
+    const newPreviews = safe.map(f => URL.createObjectURL(f));
+    setImgFiles(prev => [...prev, ...safe]);
     setImgPreviews(prev => [...prev, ...newPreviews]);
     e.target.value = '';
   }
@@ -223,6 +237,8 @@ export default function OpretOpslagPage() {
     e.target.value = '';
     setScanning(true);
     try {
+      const safe = await checkImageSafe(file);
+      if (!safe) { showToast('Billedet afvist — indeholder personer', 'error'); setScanning(false); return; }
       const fd = new FormData();
       fd.append('image', file);
       const res = await fetch('/api/scan-toy', { method: 'POST', body: fd });
