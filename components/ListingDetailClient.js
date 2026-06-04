@@ -110,6 +110,8 @@ export default function ListingDetailClient() {
   const [trustScore,       setTrustScore]       = useState(null);
   const [shareDropdown,    setShareDropdown]    = useState(false);
   const [linkCopied,       setLinkCopied]       = useState(false);
+  const [isFollowing,      setIsFollowing]      = useState(false);
+  const [followLoading,    setFollowLoading]    = useState(false);
 
   useEffect(() => {
     if (!listing) return;
@@ -176,6 +178,34 @@ export default function ListingDetailClient() {
         setTrustScore({ pct: Math.round((avg / 3) * 100), count: data.length });
       });
   }, [listing?.institution_name]);
+
+  useEffect(() => {
+    if (!listing?.institution_name) return;
+    db.auth.getUser().then(({ data: { user } }) => {
+      if (!user) return;
+      db.from('institution_follows')
+        .select('id')
+        .eq('follower_user_id', user.id)
+        .eq('institution_name', listing.institution_name)
+        .maybeSingle()
+        .then(({ data }) => setIsFollowing(!!data));
+    });
+  }, [listing?.institution_name]);
+
+  async function handleFollow() {
+    const { data: { user } } = await db.auth.getUser();
+    if (!user) { showToast('Log ind for at følge', 'error'); return; }
+    setFollowLoading(true);
+    if (isFollowing) {
+      await db.from('institution_follows').delete().eq('follower_user_id', user.id).eq('institution_name', listing.institution_name);
+      setIsFollowing(false);
+    } else {
+      await db.from('institution_follows').insert({ follower_user_id: user.id, institution_name: listing.institution_name });
+      setIsFollowing(true);
+      showToast(`Du følger nu ${listing.institution_name} ⭐`);
+    }
+    setFollowLoading(false);
+  }
 
   if (!listing) {
     return (
@@ -494,13 +524,19 @@ export default function ListingDetailClient() {
 
           {/* RIGHT: Info + Actions */}
           <div style={{ position: isMobile ? 'static' : 'sticky', top: 96 }}>
-            {/* Institution name */}
-            <div style={{ fontSize:12, color:INK3, fontFamily:FONT, marginBottom:8, display:'flex', alignItems:'center', gap:6 }}>
+            {/* Institution name + follow */}
+            <div style={{ fontSize:12, color:INK3, fontFamily:FONT, marginBottom:8, display:'flex', alignItems:'center', gap:6, flexWrap:'wrap' }}>
               <span onClick={()=>goToInstitution(listing.institution_name)} style={{ color:PRIMARY, cursor:'pointer', fontWeight:600, textDecoration:'underline', textDecorationColor:'transparent' }}
                 onMouseEnter={e=>e.target.style.textDecorationColor=PRIMARY} onMouseLeave={e=>e.target.style.textDecorationColor='transparent'}>
                 {listing.institution_name}
               </span>
               {listing.city && <span>· {listing.city}</span>}
+              {!isOwn && (
+                <button onClick={handleFollow} disabled={followLoading}
+                  style={{ marginLeft:'auto', padding:'3px 10px', borderRadius:99, border:`1.5px solid ${isFollowing ? PRIMARY : '#ccc'}`, background: isFollowing ? GREEN_TINT : '#fff', color: isFollowing ? PRIMARY : INK3, fontSize:11, fontWeight:700, cursor:'pointer', fontFamily:FONT, transition:'all 0.2s', flexShrink:0 }}>
+                  {isFollowing ? '✓ Følger' : '+ Følg'}
+                </button>
+              )}
             </div>
 
             {/* Title */}
