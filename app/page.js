@@ -185,68 +185,165 @@ function HeroSection() {
   );
 }
 
-/* ── How it works ─────────────────────────────────────────── */
-function HowSection() {
-  const router = useRouter();
-  const w = useWindowWidth();
-  const isMobile = w < 640;
+/* ── Journey animation — desktop sticky scroll + mobile slide-in ── */
+const JOURNEY_STEPS = [
+  { emoji: '🧸', bg: '#FFFBEB', accent: '#D97706', n: '01', title: 'Legetøjet samler støv', desc: 'Du har cykler, puslespil eller møbler der ikke bruges. Et andet sted vil de gøre børn glade.' },
+  { emoji: '📸', bg: '#F0FDF4', accent: '#16A34A', n: '02', title: 'Opret et opslag på 2 min.', desc: 'Tag ét billede. AI udfylder titel, kategori og beskrivelse automatisk. Nemmere end en brugtannonce.' },
+  { emoji: '💬', bg: '#EFF6FF', accent: '#2563EB', n: '03', title: 'Institutioner byder og skriver', desc: 'Verificerede børnehaver og skoler kontakter dig direkte. Byd, byt eller sælg — du bestemmer.' },
+  { emoji: '🚀', bg: '#FDF4FF', accent: '#9333EA', n: '04', title: 'Nyt hjem, ny glæde', desc: 'I aftaler pris og afhentning. Legetøjet giver glæde et nyt sted — og du har skabt plads.' },
+];
 
-  const steps = [
-    { n: '01', title: 'Tilmeld din institution', desc: 'Opret en verificeret profil med CVR-nummer. Godkendt på 1–2 hverdage.' },
-    { n: '02', title: 'Opret dine annoncer', desc: 'Upload billeder og beskriv legetøjet. Sæt en pris eller bytteønske.' },
-    { n: '03', title: 'Køb, byt eller byd', desc: 'Find det I mangler og gennemfør sikre handler direkte via platformen.' },
-  ];
+function MobileHowSection() {
+  const [visible, setVisible] = useState(new Set());
+  const refs = useRef([]);
+
+  useEffect(() => {
+    const obs = refs.current.map((el, i) => {
+      if (!el) return null;
+      const o = new IntersectionObserver(([e]) => {
+        if (e.isIntersecting) setVisible(v => new Set([...v, i]));
+      }, { threshold: 0.25 });
+      o.observe(el);
+      return o;
+    });
+    return () => obs.forEach(o => o?.disconnect());
+  }, []);
 
   return (
-    <section style={{ background: PAPER, padding: isMobile ? '72px 20px' : '100px 24px', position: 'relative' }}>
-      <div style={{ maxWidth: 900, margin: '0 auto' }}>
-        <div style={{ textAlign: 'center', marginBottom: isMobile ? 48 : 72 }}>
-          <div style={{ display: 'inline-block', background: GREEN_TINT, borderRadius: 999, padding: '5px 16px', fontSize: 11, fontWeight: 600, color: PRIMARY, letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: 16, fontFamily: FONT }}>
-            Sådan virker det
-          </div>
-          <h2 style={{ fontFamily: FONT, fontWeight: 800, fontSize: isMobile ? 28 : 44, letterSpacing: '-0.04em', color: INK, lineHeight: 1.05 }}>
-            Tre trin.<br /><span style={{ color: PRIMARY }}>Ét fællesskab.</span>
-          </h2>
-        </div>
+    <section style={{ background: PAPER, padding: '60px 0 80px', overflow: 'hidden' }}>
+      <style>{`
+        .hjw-step { opacity: 0; transform: translateX(48px); transition: opacity 0.65s cubic-bezier(0.22,1,0.36,1), transform 0.65s cubic-bezier(0.22,1,0.36,1); }
+        .hjw-step.in { opacity: 1; transform: translateX(0); }
+      `}</style>
 
-        <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : 'repeat(3,1fr)', gap: isMobile ? 40 : 0, position: 'relative' }}>
-          {/* connector line desktop */}
-          {!isMobile && (
-            <div style={{ position: 'absolute', top: 44, left: '16.6%', right: '16.6%', height: 1, background: `linear-gradient(to right, ${GREEN_SOFT}, ${PRIMARY}, ${GREEN_SOFT})`, zIndex: 0 }} />
-          )}
-          {steps.map((s, i) => (
-            <div key={i} style={{ textAlign: isMobile ? 'left' : 'center', padding: isMobile ? 0 : '0 28px', position: 'relative', zIndex: 1, display: isMobile ? 'flex' : 'block', gap: isMobile ? 20 : 0, alignItems: isMobile ? 'flex-start' : 'initial' }}>
-              {/* Step number circle */}
-              <div style={{
-                width: 88, height: 88, borderRadius: '50%',
-                background: PAPER2,
-                border: `2px solid ${GREEN_SOFT}`,
-                display: 'flex', alignItems: 'center', justifyContent: 'center',
-                margin: isMobile ? '0' : '0 auto 24px',
-                flexShrink: 0,
-              }}>
-                <span style={{ fontFamily: FONT, fontWeight: 800, fontSize: 22, color: PRIMARY, letterSpacing: '-0.04em' }}>{s.n}</span>
+      <div style={{ textAlign: 'center', padding: '0 24px 48px' }}>
+        <div style={{ display: 'inline-block', background: GREEN_TINT, borderRadius: 999, padding: '5px 16px', fontSize: 11, fontWeight: 700, color: PRIMARY, letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: 14, fontFamily: FONT }}>Rejsen</div>
+        <h2 style={{ fontFamily: FONT, fontWeight: 800, fontSize: 30, color: INK, letterSpacing: '-0.04em', lineHeight: 1.1, margin: 0 }}>Fra støv<br />til glæde</h2>
+      </div>
+
+      <div style={{ position: 'relative', padding: '0 20px' }}>
+        <div style={{ position: 'absolute', left: 47, top: 20, bottom: 20, width: 2, background: `linear-gradient(to bottom, transparent, ${PRIMARY}55 15%, ${PRIMARY}55 85%, transparent)` }} />
+        {JOURNEY_STEPS.map((s, i) => (
+          <div key={i} ref={el => refs.current[i] = el}
+            className={`hjw-step${visible.has(i) ? ' in' : ''}`}
+            style={{ transitionDelay: `${i * 0.07}s`, display: 'flex', gap: 20, alignItems: 'flex-start', paddingBottom: i < 3 ? 44 : 0 }}>
+            <div style={{ position: 'relative', flexShrink: 0, zIndex: 1 }}>
+              <div style={{ width: 56, height: 56, borderRadius: '50%', background: s.bg, border: `2px solid ${s.accent}44`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 26, boxShadow: `0 6px 20px ${s.accent}33` }}>
+                {s.emoji}
               </div>
-              <div style={{ paddingTop: isMobile ? 8 : 0 }}>
-                <h3 style={{ fontFamily: FONT, fontWeight: 800, fontSize: 18, color: INK, marginBottom: 8, letterSpacing: '-0.02em' }}>{s.title}</h3>
-                <p style={{ fontSize: 14, color: INK3, lineHeight: 1.65, maxWidth: isMobile ? 'none' : 220, margin: isMobile ? 0 : '0 auto' }}>{s.desc}</p>
+              <div style={{ position: 'absolute', top: -5, right: -5, width: 20, height: 20, borderRadius: '50%', background: s.accent, color: '#fff', fontSize: 9, fontWeight: 800, display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: FONT, boxShadow: `0 2px 6px ${s.accent}55` }}>
+                {i + 1}
               </div>
             </div>
-          ))}
-        </div>
-
-        <div style={{ textAlign: 'center', marginTop: isMobile ? 48 : 64 }}>
-          <button onClick={() => router.push('/hvordan')} style={{
-            background: 'none', border: `1.5px solid ${PRIMARY}`, color: PRIMARY,
-            borderRadius: 999, padding: '11px 28px', fontSize: 14, fontWeight: 700,
-            fontFamily: FONT, cursor: 'pointer', letterSpacing: '-0.01em',
-          }}>
-            Læs mere om processen →
-          </button>
-        </div>
+            <div style={{ paddingTop: 10 }}>
+              <div style={{ fontFamily: FONT, fontWeight: 800, fontSize: 16, color: INK, marginBottom: 6 }}>{s.title}</div>
+              <div style={{ fontSize: 13, color: INK3, lineHeight: 1.65, fontFamily: FONT }}>{s.desc}</div>
+            </div>
+          </div>
+        ))}
       </div>
     </section>
   );
+}
+
+function DesktopHowSection() {
+  const sectionRef = useRef(null);
+  const [activeIdx, setActiveIdx] = useState(0);
+  const [prevIdx, setPrevIdx] = useState(0);
+  const [animKey, setAnimKey] = useState(0);
+
+  useEffect(() => {
+    const onScroll = () => {
+      if (!sectionRef.current) return;
+      const { top, height } = sectionRef.current.getBoundingClientRect();
+      const scrolled = -top;
+      const total = height - window.innerHeight;
+      const progress = Math.max(0, Math.min(0.9999, scrolled / total));
+      const idx = Math.min(JOURNEY_STEPS.length - 1, Math.floor(progress * JOURNEY_STEPS.length));
+      setActiveIdx(prev => {
+        if (prev !== idx) { setPrevIdx(prev); setAnimKey(k => k + 1); }
+        return idx;
+      });
+    };
+    window.addEventListener('scroll', onScroll, { passive: true });
+    onScroll();
+    return () => window.removeEventListener('scroll', onScroll);
+  }, []);
+
+  const step = JOURNEY_STEPS[activeIdx];
+
+  return (
+    <div ref={sectionRef} style={{ height: `${JOURNEY_STEPS.length * 100 + 50}vh`, position: 'relative' }}>
+      <style>{`
+        @keyframes hjw-emoji-in { from { opacity:0; transform:scale(0.72) rotate(-8deg); } to { opacity:1; transform:scale(1) rotate(0deg); } }
+        @keyframes hjw-text-in  { from { opacity:0; transform:translateY(22px); } to { opacity:1; transform:translateY(0); } }
+        @keyframes hjw-num-in   { from { opacity:0; transform:translateX(-20px); } to { opacity:0.12; transform:translateX(0); } }
+        .hjw-emoji-anim { animation: hjw-emoji-in 0.55s cubic-bezier(0.22,1,0.36,1) forwards; }
+        .hjw-text-anim  { animation: hjw-text-in  0.5s  cubic-bezier(0.22,1,0.36,1) forwards; animation-delay: 0.05s; opacity:0; }
+        .hjw-num-anim   { animation: hjw-num-in   0.6s  cubic-bezier(0.22,1,0.36,1) forwards; opacity:0; }
+      `}</style>
+
+      <div style={{ position: 'sticky', top: 0, height: '100vh', display: 'flex', alignItems: 'center', background: PAPER, overflow: 'hidden' }}>
+        {/* Subtle bg color wash */}
+        <div style={{ position: 'absolute', inset: 0, background: step.bg, opacity: 0.18, transition: 'background 0.6s ease' }} />
+
+        <div style={{ maxWidth: 1100, margin: '0 auto', width: '100%', padding: '0 64px', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 80, alignItems: 'center', position: 'relative', zIndex: 1 }}>
+
+          {/* LEFT: visual */}
+          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 32 }}>
+            {/* Progress dots */}
+            <div style={{ display: 'flex', gap: 10 }}>
+              {JOURNEY_STEPS.map((s, i) => (
+                <div key={i} style={{ height: 6, borderRadius: 3, background: i === activeIdx ? s.accent : PAPER3, width: i === activeIdx ? 28 : 6, transition: 'all 0.45s cubic-bezier(0.22,1,0.36,1)' }} />
+              ))}
+            </div>
+
+            {/* Emoji circle */}
+            <div key={`emoji-${animKey}`} className="hjw-emoji-anim"
+              style={{ width: 200, height: 200, borderRadius: 56, background: step.bg, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 90, boxShadow: `0 20px 64px ${step.accent}44`, border: `3px solid ${step.accent}22` }}>
+              {step.emoji}
+            </div>
+
+            {/* Big number watermark */}
+            <div key={`num-${animKey}`} className="hjw-num-anim"
+              style={{ fontFamily: FONT, fontWeight: 800, fontSize: 120, color: step.accent, lineHeight: 1, letterSpacing: '-0.06em', userSelect: 'none' }}>
+              {step.n}
+            </div>
+          </div>
+
+          {/* RIGHT: step list */}
+          <div>
+            <div style={{ marginBottom: 48 }}>
+              <div style={{ display: 'inline-block', background: GREEN_TINT, borderRadius: 999, padding: '5px 16px', fontSize: 11, fontWeight: 700, color: PRIMARY, letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: 16, fontFamily: FONT }}>Sådan virker det</div>
+              <h2 style={{ fontFamily: FONT, fontWeight: 800, fontSize: 42, color: INK, letterSpacing: '-0.04em', lineHeight: 1.05, margin: 0 }}>Fra støv<br />til glæde</h2>
+            </div>
+
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+              {JOURNEY_STEPS.map((s, i) => {
+                const isActive = i === activeIdx;
+                return (
+                  <div key={i} style={{ display: 'flex', gap: 14, alignItems: 'flex-start', opacity: isActive ? 1 : 0.3, transform: `translateX(${isActive ? 0 : -10}px)`, transition: 'all 0.45s cubic-bezier(0.22,1,0.36,1)' }}>
+                    <div style={{ width: 44, height: 44, borderRadius: 14, background: isActive ? s.bg : PAPER2, border: `1.5px solid ${isActive ? s.accent + '55' : 'transparent'}`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 20, flexShrink: 0, transition: 'all 0.4s' }}>
+                      {s.emoji}
+                    </div>
+                    <div>
+                      <div style={{ fontFamily: FONT, fontWeight: 800, fontSize: 15, color: isActive ? INK : INK3, marginBottom: isActive ? 4 : 0, transition: 'color 0.3s' }}>{s.title}</div>
+                      <div style={{ fontSize: 13, color: INK3, lineHeight: 1.6, fontFamily: FONT, maxHeight: isActive ? 60 : 0, overflow: 'hidden', opacity: isActive ? 1 : 0, transition: 'max-height 0.45s cubic-bezier(0.22,1,0.36,1), opacity 0.35s' }}>{s.desc}</div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function HowSection() {
+  const w = useWindowWidth();
+  return w < 768 ? <MobileHowSection /> : <DesktopHowSection />;
 }
 
 /* ── Trade types strip ────────────────────────────────────── */
