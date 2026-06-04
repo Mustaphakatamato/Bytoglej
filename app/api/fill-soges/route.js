@@ -35,7 +35,7 @@ Minimum stand (vælg én): ${CONDITIONS.join(', ')}
 
 Returner KUN et JSON-objekt:
 {
-  "title": "Kort, præcis titel startende med 'Søges:' — maks 60 tegn",
+  "title": "Kort, præcis titel — maks 60 tegn, UDEN 'Søges:' foran",
   "description": "2-3 sætninger der beskriver hvad institutionen leder efter, stand-krav, og eventuelle præferencer. Professionel, venlig tone.",
   "category": "en kategori-nøgle fra listen",
   "age_group": "en aldersgruppe fra listen",
@@ -44,7 +44,7 @@ Returner KUN et JSON-objekt:
 }
 
 Regler:
-- title: Altid på dansk, start med "Søges: ", vær specifik
+- title: Altid på dansk, vær specifik, skriv IKKE "Søges:" foran
 - description: Naturlig dansk, inkluder relevante detaljer fra brugerens tekst
 - category: Vælg den mest relevante kategori
 - age_group: Vælg ud fra kontekst, standard "3-6 år" hvis uklart
