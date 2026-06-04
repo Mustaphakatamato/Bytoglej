@@ -392,7 +392,7 @@ export default function OpretOpslagPage() {
               <div style={{ display:'flex', flexDirection:'column', gap:20 }}>
 
                 {/* AI Scan shortcut */}
-                <input ref={scanRef} type="file" accept="image/*" capture="environment" onChange={handleScanToy} style={{ display:'none' }} />
+                <input ref={scanRef} type="file" accept="image/*" onChange={handleScanToy} style={{ display:'none' }} />
                 <style>{`
                   @keyframes spin { to { transform: rotate(360deg); } }
                   @keyframes pulse { 0%,100% { opacity:1; } 50% { opacity:0.4; } }
