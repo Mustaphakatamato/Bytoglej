@@ -77,48 +77,36 @@ function JourneySection({ isMobile }) {
       const baseIdx = Math.min(n - 1, Math.floor(rawActive));
 
       if (isMobile) {
-        // ── Mobile: one step at a time, scroll-zone based ──
-        // Each step owns 1/n of the scroll range; only that step is shown.
-        // Within its zone the step slides up slightly for a parallax feel.
-        const zoneLocal = rawActive - baseIdx; // 0→1 within active zone
+        // ── Mobile: continuous vertical strip ──
+        // Step i is centered when progress = i/(n-1).
+        // ty = (i - progress*(n-1)) * viewportHeight
+        // overflow:hidden on the sticky container clips off-screen steps.
+        const vh = window.innerHeight;
 
         STEPS.forEach((step, i) => {
           const el = stepRefs.current[i];
           if (!el) return;
+          const ty = (i - progress * (n - 1)) * vh;
+          el.style.transform = `translateY(${ty}px)`;
+          el.style.opacity = '1';
+        });
 
-          if (i === baseIdx) {
-            // Slide in from below when entering (0→0.25), rest, then slide up when exiting (0.75→1)
-            // Last step never exits
-            let ty = 0;
-            if (zoneLocal < 0.25) {
-              ty = 36 * (1 - zoneLocal / 0.25);
-            } else if (zoneLocal > 0.75 && i < n - 1) {
-              ty = -36 * ((zoneLocal - 0.75) / 0.25);
-            }
-            el.style.opacity = '1';
-            el.style.transform = `translateY(${ty}px)`;
-            el.style.pointerEvents = 'auto';
-          } else {
-            el.style.opacity = '0';
-            el.style.transform = 'translateY(0px)';
-            el.style.pointerEvents = 'none';
-          }
+        const activeIdx = Math.min(n - 1, Math.round(progress * (n - 1)));
 
-          // Dot indicators
+        STEPS.forEach((s, i) => {
           const dot = dotRefs.current[i];
           if (dot) {
-            dot.style.background = i === baseIdx ? STEPS[baseIdx].accent : '#ccc';
-            dot.style.width = i === baseIdx ? '20px' : '7px';
+            dot.style.background = i === activeIdx ? STEPS[activeIdx].accent : '#ccc';
+            dot.style.width = i === activeIdx ? '20px' : '7px';
           }
         });
 
-        // Step label
         if (labelRef.current) {
-          labelRef.current.textContent = `${STEPS[baseIdx].label} / 04`;
-          labelRef.current.style.color = STEPS[baseIdx].accent;
+          labelRef.current.textContent = `${STEPS[activeIdx].label} / 04`;
+          labelRef.current.style.color = STEPS[activeIdx].accent;
         }
 
-        if (bgRef.current) bgRef.current.style.background = STEPS[baseIdx].bg;
+        if (bgRef.current) bgRef.current.style.background = STEPS[activeIdx].bg;
 
       } else {
         // ── Desktop: crossfade between steps ──
@@ -174,7 +162,8 @@ function JourneySection({ isMobile }) {
     return () => { window.removeEventListener('scroll', onScroll); cancelAnimationFrame(raf); };
   }, [isMobile]);
 
-  const sectionHeight = isMobile ? `${STEPS.length * 80}vh` : `${STEPS.length * 100 + 30}vh`;
+  // Mobile: n*100vh total → scrollable = (n-1)*100vh → each step gets one full viewport of travel
+  const sectionHeight = isMobile ? `${STEPS.length * 100}vh` : `${STEPS.length * 100 + 30}vh`;
 
   return (
     <div ref={sectionRef} style={{ height: sectionHeight, position: 'relative' }}>
@@ -220,8 +209,9 @@ function JourneySection({ isMobile }) {
                     position: 'absolute', inset: 0,
                     display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
                     padding: '12px 28px 0',
-                    opacity: i === 0 ? 1 : 0,
-                    willChange: 'transform, opacity',
+                    transform: `translateY(${i * 100}vh)`,
+                    opacity: 1,
+                    willChange: 'transform',
                   }}
                 >
                   {/* Step number watermark */}
