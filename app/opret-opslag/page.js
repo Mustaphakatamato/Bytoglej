@@ -77,7 +77,7 @@ export default function OpretOpslagPage() {
   const [form, setForm] = useState({
     title:'', type:'køb', price:'', age_group:'3-6 år',
     description:'', condition:'God', emoji:'🧸', color:'#FFD166',
-    tags:[], min_bid:'', category:'', subcategory:'', urgency:'ingen',
+    tags:[], min_bid:'', category:'', subcategory:'', urgency:'ingen', can_ship: false,
   });
 
   useEffect(() => {
@@ -316,6 +316,7 @@ export default function OpretOpslagPage() {
       color: isSøges ? '#F5F0FF' : form.color,
       tags: form.tags || [], images: [], bid_count: 0, is_active: true,
       category: form.category || null, subcategory: form.subcategory || null,
+      can_ship: form.can_ship || false,
     };
     if (form.type==='byd' && form.min_bid) insertData.min_bid = Number(form.min_bid);
     const { data: listing, error } = await db.from('listings').insert(insertData).select().single();
@@ -504,6 +505,22 @@ export default function OpretOpslagPage() {
                     {AGE_GROUPS.map(a => <option key={a}>{a}</option>)}
                   </select>
                 </div>
+
+                {form.type !== 'søges' && (
+                  <div>
+                    <label style={labelStyle}>Forsendelse</label>
+                    <button type="button" onClick={()=>setForm(f=>({...f, can_ship: !f.can_ship}))}
+                      style={{ display:'flex', alignItems:'center', gap:12, width:'100%', padding:'13px 16px', borderRadius:14, border: form.can_ship ? `2px solid ${PRIMARY}` : `2px solid ${PAPER3}`, background: form.can_ship ? GREEN_TINT : PAPER, cursor:'pointer', fontFamily:FONT, transition:'all 0.15s', textAlign:'left' }}>
+                      <div style={{ width:22, height:22, borderRadius:6, border: form.can_ship ? `2px solid ${PRIMARY}` : `2px solid ${PAPER3}`, background: form.can_ship ? PRIMARY : 'transparent', display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0, transition:'all 0.15s' }}>
+                        {form.can_ship && <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>}
+                      </div>
+                      <div>
+                        <div style={{ fontWeight:700, fontSize:14, color: form.can_ship ? PRIMARY : INK }}>📦 Kan sendes</div>
+                        <div style={{ fontSize:12, color:INK3, marginTop:2 }}>Varen kan sendes med post eller pakkeforsendelse</div>
+                      </div>
+                    </button>
+                  </div>
+                )}
 
                 {/* Category picker */}
                 <div>

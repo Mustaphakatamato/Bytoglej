@@ -61,6 +61,7 @@ function MobileListingCard({ l, isFav, onToggleFav, onOpen }) {
           ? <div style={{ fontFamily: FONT, fontWeight: 800, fontSize: 15, color: INK }}>{l.price} kr.</div>
           : <div style={{ fontFamily: FONT, fontWeight: 700, fontSize: 12, color: CORAL }}>Byttes kun</div>}
         {l.condition && <div style={{ fontSize: 11, color: INK3, marginTop: 2 }}>{l.condition}</div>}
+        {l.can_ship && <div style={{ fontSize: 11, color: '#2563EB', fontWeight: 700, marginTop: 2 }}>📦 Kan sendes</div>}
       </div>
     </div>
   );
