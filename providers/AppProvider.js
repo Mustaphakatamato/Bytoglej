@@ -2,6 +2,7 @@
 import React, { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react';
 import { db } from '@/lib/supabase';
 import { ADMIN_EMAIL } from '@/lib/constants';
+import QuickViewModal from '@/components/QuickViewModal';
 import ChatBubble from '@/components/ChatBubble';
 
 // ─── Active User Context ──────────────────────────────────────────────────────
@@ -28,6 +29,7 @@ export function AppProvider({ children }) {
   const [realEmail,       setRealEmail]       = useState(null);
   const [unreadTotal,     setUnreadTotal]     = useState(0);
   const [toast,           setToast]           = useState(null);
+  const [quickViewListing, setQuickViewListing] = useState(null);
   const [activeListing,   setActiveListing]   = useState(null);
   const [selectedConvId,  setSelectedConvId]  = useState(null);
   const [activeInstName,  setActiveInstName]  = useState(null);
@@ -247,12 +249,14 @@ export function AppProvider({ children }) {
     favs, toggleFav, setFavs,
     cart, addToCart, removeFromCart, clearCart,
     effectiveInstitution,
+    quickViewListing, setQuickViewListing,
   };
 
   return (
     <ActiveUserContext.Provider value={activeUserValue}>
       <AppContext.Provider value={appValue}>
         {children}
+        {quickViewListing && <QuickViewModal listing={quickViewListing} onClose={()=>setQuickViewListing(null)} />}
         <ChatBubble />
       </AppContext.Provider>
     </ActiveUserContext.Provider>
