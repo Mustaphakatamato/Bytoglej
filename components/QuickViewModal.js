@@ -178,9 +178,9 @@ export default function QuickViewModal({ listing, onClose }) {
         </button>
 
         {/* Image */}
-        <div style={{ height:240, background:imgs.length ? '#ddd' : (listing.color || GREEN_TINT), position:'relative', borderRadius:'24px 24px 0 0', overflow:'hidden', display:'flex', alignItems:'center', justifyContent:'center' }}>
+        <div style={{ height:260, background: imgs.length ? '#f5f5f5' : (listing.color || GREEN_TINT), position:'relative', borderRadius:'24px 24px 0 0', overflow:'hidden', display:'flex', alignItems:'center', justifyContent:'center' }}>
           {imgs.length
-            ? <img src={imgs[imgIdx]} alt="" style={{ width:'100%', height:'100%', objectFit:'cover' }} />
+            ? <img src={imgs[imgIdx]} alt="" style={{ width:'100%', height:'100%', objectFit:'contain' }} />
             : <span style={{ fontSize:80, opacity:0.3 }}>{listing.emoji || '🧸'}</span>}
           {imgs.length > 1 && (
             <>
@@ -201,6 +201,7 @@ export default function QuickViewModal({ listing, onClose }) {
                 <span style={{ background:tc.bg, color:tc.color, borderRadius:99, padding:'4px 12px', fontSize:11, fontWeight:700, fontFamily:FONT }}>{tc.label}</span>
                 {listing.condition && <span style={{ background:PAPER3, color:INK2, borderRadius:99, padding:'4px 12px', fontSize:11, fontWeight:700, fontFamily:FONT }}>{listing.condition}</span>}
                 {listing.age_group && <span style={{ background:PAPER2, color:INK3, borderRadius:99, padding:'4px 12px', fontSize:11, fontWeight:600, fontFamily:FONT }}>{listing.age_group}</span>}
+                {listing.can_ship && <span style={{ background:'#EFF6FF', color:'#2563EB', borderRadius:99, padding:'4px 12px', fontSize:11, fontWeight:700, fontFamily:FONT }}>📦 Kan sendes</span>}
               </div>
               <h2 style={{ fontFamily:FONT, fontWeight:800, fontSize:20, color:INK, letterSpacing:'-0.03em', marginBottom:8, lineHeight:1.2 }}>{listing.title}</h2>
               <div style={{ marginBottom:12 }}>
