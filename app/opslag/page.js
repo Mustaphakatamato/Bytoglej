@@ -190,6 +190,16 @@ function OpslagInner() {
   const [saveSearchModal, setSaveSearchModal] = useState(false);
   const [saveSearchName, setSaveSearchName] = useState('');
   const [savingSearch, setSavingSearch] = useState(false);
+  const [followedNames, setFollowedNames] = useState(null);
+  const [showFollowed, setShowFollowed] = useState(false);
+
+  useEffect(() => {
+    db.auth.getUser().then(({ data: { user } }) => {
+      if (!user) return;
+      db.from('institution_follows').select('institution_name').eq('follower_user_id', user.id)
+        .then(({ data }) => setFollowedNames(data?.map(r => r.institution_name) || []));
+    });
+  }, []);
 
   // Reactive sync from URL (handles nav SearchBar navigation)
   useEffect(() => {
@@ -218,14 +228,15 @@ function OpslagInner() {
       const matchSearch = !search || l.title.toLowerCase().includes(search.toLowerCase()) || (l.institution_name||'').toLowerCase().includes(search.toLowerCase());
       const matchCategory = !category || l.category === category;
       const matchSubcategory = !subcategory || l.subcategory === subcategory;
-      return matchType && matchSearch && matchCategory && matchSubcategory;
+      const matchFollow = !showFollowed || (followedNames?.includes(l.institution_name));
+      return matchType && matchSearch && matchCategory && matchSubcategory && matchFollow;
     });
     if (sort === 'newest')     { /* order comes from useFeedListings */ }
     if (sort === 'price-asc')  r = [...r].sort((a,b) => (a.price||0) - (b.price||0));
     if (sort === 'price-desc') r = [...r].sort((a,b) => (b.price||0) - (a.price||0));
     if (sort === 'bids')       r = [...r].sort((a,b) => (b.bid_count||0) - (a.bid_count||0));
     return r;
-  }, [listings, filter, search, sort, category, subcategory]);
+  }, [listings, filter, search, sort, category, subcategory, showFollowed, followedNames]);
 
   async function handleSaveSearch() {
     if (!saveSearchName.trim()) return;
@@ -350,6 +361,12 @@ function OpslagInner() {
                 );
               })}
             </div>
+            {followedNames?.length > 0 && (
+              <button onClick={() => setShowFollowed(f => !f)}
+                style={{ padding: '7px 16px', borderRadius: 99, border: showFollowed ? 'none' : `1.5px solid ${PAPER3}`, background: showFollowed ? PRIMARY : PAPER2, color: showFollowed ? '#fff' : INK2, fontSize: 13, fontWeight: 700, fontFamily: FONT, transition: 'all 0.15s', cursor: 'pointer', whiteSpace: 'nowrap', display:'flex', alignItems:'center', gap:5 }}>
+                ★ Mine følger {showFollowed && `(${followedNames.length})`}
+              </button>
+            )}
             <div style={{ position: 'relative' }}>
               <select value={sort} onChange={e => setSort(e.target.value)} style={selectStyle}>
                 <option value="newest">Nyeste</option>

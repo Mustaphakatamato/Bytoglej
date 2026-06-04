@@ -44,6 +44,10 @@ export default function InstitutionPage() {
   const [sendingBundle, setSendingBundle] = useState(false);
   const [myInst, setMyInst] = useState(null);
   const [trustScore, setTrustScore] = useState(null);
+  const [isFollowing, setIsFollowing] = useState(false);
+  const [followCount, setFollowCount] = useState(0);
+  const [followLoading, setFollowLoading] = useState(false);
+  const [currentUserId, setCurrentUserId] = useState(null);
   const ww = useWindowWidth();
   const isMobile = ww < 768;
 
@@ -53,16 +57,39 @@ export default function InstitutionPage() {
       db.from('listings').select('*').eq('institution_name', institutionName).eq('is_active', true).eq('is_sold', false).order('created_at', { ascending: false }),
       db.from('institutions').select('*').eq('name', institutionName).maybeSingle(),
       db.from('transaction_reviews').select('description_score,contact_score,trade_again').eq('reviewed_institution_name', institutionName),
-    ]).then(([{ data: lst }, { data: instData }, { data: reviews }]) => {
+      db.from('institution_follows').select('id', { count: 'exact' }).eq('institution_name', institutionName),
+    ]).then(([{ data: lst }, { data: instData }, { data: reviews }, { count }]) => {
       if (lst) setListings(lst);
       if (instData) setInst(instData);
       if (reviews?.length) {
         const avg = reviews.reduce((s,r) => s + (r.description_score + r.contact_score) / 2, 0) / reviews.length;
         setTrustScore({ pct: Math.round((avg / 3) * 100), count: reviews.length, wouldTradeAgain: Math.round(reviews.filter(r=>r.trade_again==='ja').length / reviews.length * 100) });
       }
+      setFollowCount(count || 0);
       setLoading(false);
     });
+    db.auth.getUser().then(({ data: { user } }) => {
+      if (!user) return;
+      setCurrentUserId(user.id);
+      db.from('institution_follows').select('id').eq('follower_user_id', user.id).eq('institution_name', institutionName).maybeSingle()
+        .then(({ data }) => setIsFollowing(!!data));
+    });
   }, [institutionName]);
+
+  async function handleFollow() {
+    if (!currentUserId) { router.push('/login'); return; }
+    setFollowLoading(true);
+    if (isFollowing) {
+      await db.from('institution_follows').delete().eq('follower_user_id', currentUserId).eq('institution_name', institutionName);
+      setIsFollowing(false);
+      setFollowCount(c => Math.max(0, c - 1));
+    } else {
+      await db.from('institution_follows').insert({ follower_user_id: currentUserId, institution_name: institutionName });
+      setIsFollowing(true);
+      setFollowCount(c => c + 1);
+    }
+    setFollowLoading(false);
+  }
 
   async function enterSelectMode() {
     const { data: { user } } = await db.auth.getUser();
@@ -216,7 +243,7 @@ export default function InstitutionPage() {
                 {inst?.phone && <span>📞 {inst.phone}</span>}
               </div>
             </div>
-            <div style={{ display:'flex', gap:10, flexShrink:0 }}>
+            <div style={{ display:'flex', gap:10, flexShrink:0, flexWrap:'wrap', alignItems:'center' }}>
               {trustScore && (
                 <div style={{ background:PRIMARY, borderRadius:12, padding:'10px 18px', textAlign:'center' }}>
                   <div style={{ fontFamily:"'Nunito',sans-serif", fontWeight:900, fontSize:22, color:'#fff' }}>{trustScore.pct}%</div>
@@ -228,11 +255,18 @@ export default function InstitutionPage() {
                 <div style={{ fontFamily:"'Nunito',sans-serif", fontWeight:900, fontSize:22, color:PRIMARY }}>{listings.length}</div>
                 <div style={{ fontSize:12, color:'#888' }}>aktive opslag</div>
               </div>
+              <div style={{ background: isFollowing ? GREEN_TINT : PAPER2, borderRadius:12, padding:'10px 18px', textAlign:'center' }}>
+                <div style={{ fontFamily:"'Nunito',sans-serif", fontWeight:900, fontSize:22, color:PRIMARY }}>{followCount}</div>
+                <div style={{ fontSize:12, color:'#888' }}>følger</div>
+              </div>
             </div>
           </div>
           <div style={{ marginTop:16, paddingTop:16, borderTop:'1px solid #e8e6e3', display:'flex', gap:10, flexWrap:'wrap' }}>
             <button onClick={handleContact} disabled={contacting} style={{ padding:'11px 24px', borderRadius:99, background:PRIMARY, color:'#fff', border:'none', fontFamily:FONT, fontWeight:700, fontSize:14, cursor:contacting?'not-allowed':'pointer', opacity:contacting?0.7:1, display:'flex', alignItems:'center', gap:8 }}>
               {contacting ? '…' : '💬 Send besked'}
+            </button>
+            <button onClick={handleFollow} disabled={followLoading} style={{ padding:'11px 24px', borderRadius:99, background: isFollowing ? GREEN_TINT : '#fff', color: isFollowing ? PRIMARY : INK2, border:`2px solid ${isFollowing ? PRIMARY : PAPER3}`, fontFamily:FONT, fontWeight:700, fontSize:14, cursor:followLoading?'not-allowed':'pointer', display:'flex', alignItems:'center', gap:8, transition:'all 0.15s' }}>
+              {isFollowing ? '✓ Følger' : '+ Følg'}
             </button>
             {listings.length > 0 && (
               <button onClick={selectMode ? cancelSelect : enterSelectMode} style={{ padding:'11px 24px', borderRadius:99, background:selectMode?PAPER3:'#fff', color:selectMode?INK2:PRIMARY, border:`2px solid ${selectMode?PAPER3:PRIMARY}`, fontFamily:FONT, fontWeight:700, fontSize:14, cursor:'pointer', display:'flex', alignItems:'center', gap:8 }}>
