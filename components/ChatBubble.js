@@ -222,7 +222,7 @@ export default function ChatBubble() {
         <>
         <div onClick={() => setOpen(false)} style={{ position: 'fixed', inset: 0, zIndex: 9997 }} />
         <div style={{
-          position: 'fixed', bottom: panelBottom, right: 20, width: PANEL_W, maxHeight: 500,
+          position: 'fixed', bottom: panelBottom, right: 20, width: PANEL_W, height: 500,
           background: PAPER, borderRadius: 20, zIndex: 9998,
           boxShadow: '0 8px 48px rgba(22,34,28,0.18)', border: `1px solid ${PAPER3}`,
           display: 'flex', flexDirection: 'column', overflow: 'hidden', fontFamily: FONT,
