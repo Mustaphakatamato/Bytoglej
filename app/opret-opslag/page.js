@@ -65,6 +65,9 @@ export default function OpretOpslagPage() {
   const [scanning, setScanning] = useState(false);
   const [scanError, setScanError] = useState(null);
   const scanRef = useRef(null);
+  const [søgesQuery, setSøgesQuery] = useState('');
+  const [søgesFilling, setSøgesFilling] = useState(false);
+  const [søgesFilled, setSøgesFilled] = useState(false);
   const [aiImproving, setAiImproving] = useState(false);
   const [aiSuggestion, setAiSuggestion] = useState(null);
   const [aiApply, setAiApply] = useState({ title: true, description: true });
@@ -285,6 +288,32 @@ export default function OpretOpslagPage() {
     setScanning(false);
   }
 
+  async function handleFillSøges() {
+    if (!søgesQuery.trim()) return;
+    setSøgesFilling(true);
+    try {
+      const res = await fetch('/api/fill-soges', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ query: søgesQuery }),
+      });
+      const json = await res.json();
+      if (json.error) { showToast('AI kunne ikke udfylde — prøv igen', 'error'); }
+      else {
+        setForm(f => ({
+          ...f,
+          title: json.title || f.title,
+          description: json.description || f.description,
+          category: json.category || f.category,
+          age_group: json.age_group || f.age_group,
+          condition: json.condition || f.condition,
+        }));
+        setSøgesFilled(true);
+      }
+    } catch { showToast('AI kunne ikke udfylde — prøv igen', 'error'); }
+    setSøgesFilling(false);
+  }
+
   function applyAiSuggestion() {
     setForm(f => ({
       ...f,
@@ -412,50 +441,97 @@ export default function OpretOpslagPage() {
             {step === 1 && (
               <div style={{ display:'flex', flexDirection:'column', gap:20 }}>
 
-                {/* AI Scan shortcut */}
-                <input ref={scanRef} type="file" accept="image/*" onChange={handleScanToy} style={{ display:'none' }} />
                 <style>{`
                   @keyframes spin { to { transform: rotate(360deg); } }
                   @keyframes pulse { 0%,100% { opacity:1; } 50% { opacity:0.4; } }
                 `}</style>
-                <div onClick={()=>!scanning && scanRef.current?.click()} style={{ border:`2px dashed ${scanning ? PRIMARY : PAPER3}`, borderRadius:16, padding:'18px 20px', textAlign:'center', cursor: scanning ? 'default' : 'pointer', background: scanning ? GREEN_TINT : PAPER, transition:'all 0.15s', display:'flex', flexDirection:'column', alignItems:'center', gap:8 }}
-                  onMouseEnter={e=>{ if(!scanning) e.currentTarget.style.borderColor = PRIMARY; }}
-                  onMouseLeave={e=>{ if(!scanning) e.currentTarget.style.borderColor = PAPER3; }}>
-                  {scanning ? (
-                    <>
-                      <div style={{ width:40, height:40, position:'relative', flexShrink:0 }}>
-                        <svg style={{ animation:'spin 0.9s linear infinite', position:'absolute', inset:0 }} width="40" height="40" viewBox="0 0 40 40" fill="none">
-                          <circle cx="20" cy="20" r="17" stroke={PAPER3} strokeWidth="3"/>
-                          <path d="M20 3 A17 17 0 0 1 37 20" stroke={PRIMARY} strokeWidth="3" strokeLinecap="round"/>
-                        </svg>
-                        <div style={{ position:'absolute', inset:0, display:'flex', alignItems:'center', justifyContent:'center', fontSize:18 }}>🔍</div>
+
+                {/* AI assistant: søges text input OR image scan */}
+                {form.type === 'søges' ? (
+                  <div style={{ background:'#F5F0FF', borderRadius:16, padding:'18px 20px', border:'2px solid #DDD6FE' }}>
+                    <div style={{ display:'flex', alignItems:'center', gap:10, marginBottom:12 }}>
+                      <div style={{ width:36, height:36, borderRadius:'50%', background:'linear-gradient(135deg,#7C3AED,#4F46E5)', display:'flex', alignItems:'center', justifyContent:'center', fontSize:18, flexShrink:0 }}>✨</div>
+                      <div>
+                        <div style={{ fontFamily:FONT, fontWeight:700, fontSize:14, color:'#4C1D95' }}>AI udfylder oplysningerne</div>
+                        <div style={{ fontSize:12, color:'#6D28D9', fontFamily:FONT }}>Beskriv med dine egne ord hvad I leder efter</div>
                       </div>
-                      <div style={{ fontFamily:FONT, fontWeight:700, fontSize:14, color:PRIMARY, animation:'pulse 1.4s ease-in-out infinite' }}>Analyserer billede…</div>
-                      <div style={{ fontSize:12, color:INK3, fontFamily:FONT }}>AI udfylder felterne automatisk</div>
-                    </>
-                  ) : (
-                    <>
-                      <div style={{ width:40, height:40, borderRadius:'50%', background:GREEN_TINT, display:'flex', alignItems:'center', justifyContent:'center', fontSize:22 }}>📷</div>
-                      <div style={{ fontFamily:FONT, fontWeight:700, fontSize:14, color:INK }}>Scan legetøj med AI</div>
-                      <div style={{ fontSize:12, color:INK3, fontFamily:FONT }}>Tag et billede — AI udfylder titel, kategori, stand og beskrivelse automatisk</div>
-                    </>
-                  )}
-                </div>
-                {scanError && (
-                  <div style={{ display:'flex', alignItems:'flex-start', gap:8, background:'#FEF2F2', border:'1px solid #FECACA', borderRadius:10, padding:'10px 14px' }}>
-                    <span style={{ fontSize:16, flexShrink:0 }}>⚠️</span>
-                    <div style={{ flex:1 }}>
-                      <div style={{ fontFamily:FONT, fontWeight:700, fontSize:13, color:'#B91C1C', marginBottom:4 }}>Billedet kunne ikke bruges</div>
-                      <div style={{ fontFamily:FONT, fontSize:12, color:'#DC2626', lineHeight:1.5 }}>{scanError}</div>
-                      <button onClick={() => { setScanError(null); scanRef.current?.click(); }} style={{ marginTop:8, background:'#B91C1C', color:'#fff', border:'none', borderRadius:8, padding:'6px 14px', fontSize:12, fontWeight:700, fontFamily:FONT, cursor:'pointer' }}>
-                        Prøv et andet billede
-                      </button>
                     </div>
+                    <textarea
+                      value={søgesQuery}
+                      onChange={e => { setSøgesQuery(e.target.value); setSøgesFilled(false); }}
+                      placeholder="Fx: Vi mangler et dukkekøkken til vores 3-5 årige. Gerne med tilbehør. Stand skal minimum være god."
+                      rows={3}
+                      style={{ width:'100%', padding:'11px 13px', borderRadius:10, border:'1.5px solid #C4B5FD', fontSize:13, outline:'none', fontFamily:FONT, background:'#fff', color:INK, boxSizing:'border-box', resize:'vertical', lineHeight:1.55 }}
+                    />
+                    {søgesFilled ? (
+                      <div style={{ marginTop:10, display:'flex', alignItems:'center', justifyContent:'space-between', gap:8 }}>
+                        <div style={{ display:'flex', alignItems:'center', gap:6, fontSize:13, fontWeight:700, color:'#059669', fontFamily:FONT }}>
+                          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+                          Felterne er udfyldt — tjek og juster nedenfor
+                        </div>
+                        <button type="button" onClick={() => { setSøgesFilled(false); handleFillSøges(); }}
+                          style={{ fontSize:12, fontWeight:700, color:'#7C3AED', background:'rgba(124,58,237,0.1)', border:'none', borderRadius:99, padding:'5px 12px', cursor:'pointer', fontFamily:FONT }}>
+                          Prøv igen
+                        </button>
+                      </div>
+                    ) : (
+                      <button type="button" onClick={handleFillSøges} disabled={søgesFilling || !søgesQuery.trim()}
+                        style={{ marginTop:10, width:'100%', padding:'11px', borderRadius:99, background: søgesFilling || !søgesQuery.trim() ? '#DDD6FE' : 'linear-gradient(135deg,#7C3AED,#4F46E5)', color: søgesFilling || !søgesQuery.trim() ? '#7C3AED' : '#fff', border:'none', fontFamily:FONT, fontWeight:700, fontSize:14, cursor: søgesFilling || !søgesQuery.trim() ? 'not-allowed' : 'pointer', display:'flex', alignItems:'center', justifyContent:'center', gap:8, transition:'all 0.15s' }}>
+                        {søgesFilling ? (
+                          <>
+                            <svg style={{ animation:'spin 0.9s linear infinite' }} width="16" height="16" viewBox="0 0 40 40" fill="none">
+                              <circle cx="20" cy="20" r="17" stroke="rgba(255,255,255,0.3)" strokeWidth="4"/>
+                              <path d="M20 3 A17 17 0 0 1 37 20" stroke="#fff" strokeWidth="4" strokeLinecap="round"/>
+                            </svg>
+                            AI udfylder…
+                          </>
+                        ) : '✨ AI udfylder resten'}
+                      </button>
+                    )}
                   </div>
+                ) : (
+                  <>
+                    <input ref={scanRef} type="file" accept="image/*" onChange={handleScanToy} style={{ display:'none' }} />
+                    <div onClick={()=>!scanning && scanRef.current?.click()} style={{ border:`2px dashed ${scanning ? PRIMARY : PAPER3}`, borderRadius:16, padding:'18px 20px', textAlign:'center', cursor: scanning ? 'default' : 'pointer', background: scanning ? GREEN_TINT : PAPER, transition:'all 0.15s', display:'flex', flexDirection:'column', alignItems:'center', gap:8 }}
+                      onMouseEnter={e=>{ if(!scanning) e.currentTarget.style.borderColor = PRIMARY; }}
+                      onMouseLeave={e=>{ if(!scanning) e.currentTarget.style.borderColor = PAPER3; }}>
+                      {scanning ? (
+                        <>
+                          <div style={{ width:40, height:40, position:'relative', flexShrink:0 }}>
+                            <svg style={{ animation:'spin 0.9s linear infinite', position:'absolute', inset:0 }} width="40" height="40" viewBox="0 0 40 40" fill="none">
+                              <circle cx="20" cy="20" r="17" stroke={PAPER3} strokeWidth="3"/>
+                              <path d="M20 3 A17 17 0 0 1 37 20" stroke={PRIMARY} strokeWidth="3" strokeLinecap="round"/>
+                            </svg>
+                            <div style={{ position:'absolute', inset:0, display:'flex', alignItems:'center', justifyContent:'center', fontSize:18 }}>🔍</div>
+                          </div>
+                          <div style={{ fontFamily:FONT, fontWeight:700, fontSize:14, color:PRIMARY, animation:'pulse 1.4s ease-in-out infinite' }}>Analyserer billede…</div>
+                          <div style={{ fontSize:12, color:INK3, fontFamily:FONT }}>AI udfylder felterne automatisk</div>
+                        </>
+                      ) : (
+                        <>
+                          <div style={{ width:40, height:40, borderRadius:'50%', background:GREEN_TINT, display:'flex', alignItems:'center', justifyContent:'center', fontSize:22 }}>📷</div>
+                          <div style={{ fontFamily:FONT, fontWeight:700, fontSize:14, color:INK }}>Scan legetøj med AI</div>
+                          <div style={{ fontSize:12, color:INK3, fontFamily:FONT }}>Tag et billede — AI udfylder titel, kategori, stand og beskrivelse automatisk</div>
+                        </>
+                      )}
+                    </div>
+                    {scanError && (
+                      <div style={{ display:'flex', alignItems:'flex-start', gap:8, background:'#FEF2F2', border:'1px solid #FECACA', borderRadius:10, padding:'10px 14px' }}>
+                        <span style={{ fontSize:16, flexShrink:0 }}>⚠️</span>
+                        <div style={{ flex:1 }}>
+                          <div style={{ fontFamily:FONT, fontWeight:700, fontSize:13, color:'#B91C1C', marginBottom:4 }}>Billedet kunne ikke bruges</div>
+                          <div style={{ fontFamily:FONT, fontSize:12, color:'#DC2626', lineHeight:1.5 }}>{scanError}</div>
+                          <button onClick={() => { setScanError(null); scanRef.current?.click(); }} style={{ marginTop:8, background:'#B91C1C', color:'#fff', border:'none', borderRadius:8, padding:'6px 14px', fontSize:12, fontWeight:700, fontFamily:FONT, cursor:'pointer' }}>
+                            Prøv et andet billede
+                          </button>
+                        </div>
+                      </div>
+                    )}
+                  </>
                 )}
                 <div style={{ display:'flex', alignItems:'center', gap:10 }}>
                   <div style={{ flex:1, height:1, background:PAPER3 }} />
-                  <span style={{ fontSize:12, color:INK3, fontFamily:FONT, fontWeight:600 }}>eller udfyld manuelt</span>
+                  <span style={{ fontSize:12, color:INK3, fontFamily:FONT, fontWeight:600 }}>{form.type === 'søges' ? 'eller udfyld manuelt' : 'eller udfyld manuelt'}</span>
                   <div style={{ flex:1, height:1, background:PAPER3 }} />
                 </div>
 
@@ -496,19 +572,6 @@ export default function OpretOpslagPage() {
                   <div>
                     <label style={labelStyle}>Budget (kr.) <span style={{ fontWeight:400, color:INK3 }}>— valgfri, lad stå tom hvis byt</span></label>
                     <input type="number" value={form.price} onChange={e=>setForm({...form,price:e.target.value})} placeholder="Fx 200" min="0" style={inputStyle} />
-                  </div>
-                )}
-                {form.type === 'søges' && (
-                  <div>
-                    <label style={labelStyle}>Hvor hurtigt har I brug for det?</label>
-                    <div style={{ display:'flex', gap:8 }}>
-                      {URGENCY_OPTIONS.map(u => (
-                        <button key={u.key} onClick={()=>setForm({...form,urgency:u.key})}
-                          style={{ flex:1, padding:'10px 6px', borderRadius:12, background:form.urgency===u.key?'#F5F0FF':PAPER2, color:form.urgency===u.key?'#7C3AED':INK3, fontFamily:FONT, fontWeight:700, fontSize:12, border:form.urgency===u.key?'2px solid #7C3AED':'2px solid transparent', cursor:'pointer', transition:'all 0.15s', textAlign:'center' }}>
-                          {u.emoji}<br /><span style={{ fontSize:11 }}>{u.label}</span>
-                        </button>
-                      ))}
-                    </div>
                   </div>
                 )}
 
