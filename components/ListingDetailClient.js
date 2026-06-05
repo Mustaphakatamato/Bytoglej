@@ -112,6 +112,9 @@ export default function ListingDetailClient() {
   const [linkCopied,       setLinkCopied]       = useState(false);
   const [isFollowing,      setIsFollowing]      = useState(false);
   const [followLoading,    setFollowLoading]    = useState(false);
+  const [søgesModal,       setSøgesModal]       = useState(false);
+  const [søgesOffer,       setSøgesOffer]       = useState('');
+  const [søgesSelectedId,  setSøgesSelectedId]  = useState(null);
 
   useEffect(() => {
     if (!listing) return;
@@ -306,6 +309,57 @@ export default function ListingDetailClient() {
 
   function goToInstitution(name) {
     router.push('/institution/' + encodeURIComponent(name));
+  }
+
+  async function handleSøgesMatch() {
+    if (!søgesOffer.trim() && !søgesSelectedId) return;
+    setSaving(true);
+    try {
+      const { data: { user } } = await db.auth.getUser();
+      if (!user) { router.push('/login'); return; }
+      const { data: myInst } = await db.from('institutions').select('id,name').ilike('email', user.email).maybeSingle();
+      const userName = myInst?.name || user.email;
+      const myInstId = myInst?.id || null;
+      const { data: ownerInstData } = await db.from('institutions').select('id,email,name').eq('name', listing.institution_name).maybeSingle();
+      const ownerInstId = ownerInstData?.id || null;
+
+      const { data: existing } = await db.from('conversations')
+        .select('id').eq('listing_id', listing.id)
+        .or(myInstId ? `initiator_institution_id.eq.${myInstId},initiator_id.eq.${user.id}` : `initiator_id.eq.${user.id}`)
+        .maybeSingle();
+
+      let convId = existing?.id;
+      if (!convId) {
+        const { data: conv } = await db.from('conversations').insert({
+          listing_id: listing.id, listing_title: listing.title,
+          listing_emoji: listing.emoji, listing_color: listing.color,
+          listing_image: listing.images?.[0] || null,
+          initiator_id: user.id, initiator_name: userName, initiator_institution_id: myInstId,
+          owner_id: listing.user_id, owner_name: listing.institution_name, owner_institution_id: ownerInstId,
+        }).select().single();
+        convId = conv?.id;
+      }
+
+      if (convId) {
+        const selectedListing = ownListings.find(l => l.id === søgesSelectedId);
+        const msgParts = [];
+        if (selectedListing) msgParts.push(`Hej! Jeg tror jeg har noget der matcher: "${selectedListing.title}"`);
+        if (søgesOffer.trim()) msgParts.push(søgesOffer.trim());
+        const content = msgParts.join('\n\n') || 'Hej! Jeg har noget der måske matcher dit søges-opslag.';
+
+        await db.from('chat_messages').insert({ conversation_id: convId, sender_id: user.id, sender_name: userName, content });
+        await db.from('conversations').update({ last_message: content, last_message_at: new Date().toISOString(), owner_unread: 1 }).eq('id', convId);
+
+        if (ownerInstData?.email && ownerInstData.email.toLowerCase() !== user.email.toLowerCase()) {
+          fetch('/api/notify-message', { method:'POST', headers:{'Content-Type':'application/json'},
+            body: JSON.stringify({ ownerEmail: ownerInstData.email, ownerName: ownerInstData.name, senderName: userName, listingTitle: listing.title, listingEmoji: listing.emoji || '🔍', convId }),
+          }).catch(() => {});
+        }
+        setSøgesModal(false); setSøgesOffer(''); setSøgesSelectedId(null);
+        setSelectedConvId(convId); router.push('/beskeder');
+      }
+    } catch (e) { showToast('Noget gik galt — prøv igen', 'error'); }
+    setSaving(false);
   }
 
   async function handleBuy() {
@@ -583,6 +637,10 @@ export default function ListingDetailClient() {
                 {listing.type==='køb' && <Btn variant="primary" color={PRIMARY} radius={22} onClick={()=>setBuyModal(true)} style={{ justifyContent:'center', padding:'15px', fontSize:16 }}>🏷️ Køb nu — {listing.price} kr.</Btn>}
                 {listing.type==='byd' && <Btn variant="primary" color={ACCENT2} radius={22} onClick={()=>setBidModal(true)} style={{ justifyContent:'center', padding:'15px', fontSize:16 }}>📊 Afgiv bud</Btn>}
                 {listing.type==='byt' && <Btn variant="primary" color={ACCENT} radius={22} onClick={()=>setSwapModal(true)} style={{ justifyContent:'center', padding:'15px', fontSize:16 }}>🔄 Foreslå bytte</Btn>}
+                {listing.type==='søges' && <button onClick={()=>setSøgesModal(true)}
+                  style={{ width:'100%', padding:'15px', borderRadius:22, border:'none', background:'#7C3AED', color:'#fff', fontSize:15, fontWeight:700, cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center', gap:8, fontFamily:FONT, transition:'all 0.2s' }}>
+                  🎯 Jeg har noget der matcher
+                </button>}
                 <button onClick={()=>onStartConv && onStartConv(listing)}
                   style={{ width:'100%', padding:'13px', borderRadius:22, border:`1.5px solid ${PRIMARY}`, background:'#fff', color:PRIMARY, fontSize:14, fontWeight:700, cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center', gap:8, fontFamily:FONT, transition:'all 0.2s' }}>
                   💬 Skriv til sælger
@@ -912,6 +970,51 @@ export default function ListingDetailClient() {
       </Modal>
 
     </div>
+
+    {/* Søges match modal */}
+    <Modal open={søgesModal} onClose={()=>{ setSøgesModal(false); setSøgesOffer(''); setSøgesSelectedId(null); }} title="Jeg har noget der matcher 🎯">
+      <div style={{ display:'flex', flexDirection:'column', gap:16 }}>
+        {ownListings.length > 0 && (
+          <div>
+            <div style={{ fontSize:13, fontWeight:700, color:INK2, fontFamily:FONT, marginBottom:10 }}>Vælg et af dine opslag <span style={{ fontWeight:400, color:INK3 }}>(valgfri)</span></div>
+            <div style={{ display:'flex', flexDirection:'column', gap:8, maxHeight:240, overflowY:'auto' }}>
+              {ownListings.map(l => {
+                const sel = søgesSelectedId === l.id;
+                return (
+                  <div key={l.id} onClick={() => setSøgesSelectedId(sel ? null : l.id)}
+                    style={{ display:'flex', alignItems:'center', gap:12, padding:'10px 14px', borderRadius:14, border:`2px solid ${sel ? '#7C3AED' : PAPER3}`, background: sel ? '#F5F0FF' : PAPER, cursor:'pointer', transition:'all 0.15s' }}>
+                    <div style={{ width:44, height:44, borderRadius:10, overflow:'hidden', flexShrink:0, background: l.color || GREEN_TINT, display:'flex', alignItems:'center', justifyContent:'center', fontSize:22 }}>
+                      {l.images?.[0] ? <img src={l.images[0]} alt="" style={{ width:'100%', height:'100%', objectFit:'cover' }} /> : (l.emoji || '🧸')}
+                    </div>
+                    <div style={{ flex:1, minWidth:0 }}>
+                      <div style={{ fontFamily:FONT, fontWeight:700, fontSize:13, color: sel ? '#4C1D95' : INK, whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis' }}>{l.title}</div>
+                      {l.price && <div style={{ fontSize:12, color: sel ? '#7C3AED' : INK3, fontFamily:FONT }}>{l.price} kr.</div>}
+                    </div>
+                    {sel && <div style={{ width:20, height:20, borderRadius:'50%', background:'#7C3AED', display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0 }}>
+                      <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+                    </div>}
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
+        <div>
+          <label style={{ display:'block', fontSize:13, fontWeight:700, color:INK2, fontFamily:FONT, marginBottom:8 }}>
+            {søgesSelectedId ? 'Tilføj en besked' : 'Skriv hvad du kan tilbyde'} {!søgesSelectedId && <span style={{ color:'#e53e3e' }}>*</span>}
+          </label>
+          <textarea value={søgesOffer} onChange={e => setSøgesOffer(e.target.value)}
+            placeholder={søgesSelectedId ? 'Fx: Den er i rigtig god stand og bruges ikke mere...' : 'Beskriv hvad du har, stand, evt. pris eller byttebetingelser...'}
+            rows={3} style={{ width:'100%', padding:'12px 14px', borderRadius:12, border:`1.5px solid ${PAPER3}`, fontSize:13, outline:'none', fontFamily:FONT, background:'#fff', color:INK, boxSizing:'border-box', resize:'vertical', lineHeight:1.55 }} />
+        </div>
+        <Btn variant="primary" color="#7C3AED" radius={22} onClick={handleSøgesMatch}
+          disabled={saving || (!søgesOffer.trim() && !søgesSelectedId)}
+          style={{ justifyContent:'center', padding:'14px', fontSize:15 }}>
+          {saving ? <><Spinner/>Sender…</> : '🎯 Send til ' + listing.institution_name}
+        </Btn>
+        <Btn variant="ghost" onClick={()=>{ setSøgesModal(false); setSøgesOffer(''); setSøgesSelectedId(null); }} style={{ justifyContent:'center' }}>Annuller</Btn>
+      </div>
+    </Modal>
 
     {/* Admin edit modal */}
     {adminEditModal && adminEditForm && (
