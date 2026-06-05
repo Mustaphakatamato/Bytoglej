@@ -1071,7 +1071,12 @@ export default function MessagesClient() {
                   <div style={{ fontFamily:FONT, fontWeight:800, fontSize: isMobile?16:15, whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis', color:INK }}>{isMobile ? otherName(active) : active.listing_title}</div>
                   <div style={{ fontSize:12, color:INK3, marginTop:1, fontFamily:FONT }}>{isMobile ? active.listing_title : <>med <strong style={{ color:INK }}>{otherName(active)}</strong></>}</div>
                 </div>
-                <button onClick={()=>router.push('/opslag/detail')} style={{ fontSize:12, fontWeight:700, color:PRIMARY, background:GREEN_TINT, border:'none', borderRadius:99, padding:'6px 14px', cursor:'pointer', whiteSpace:'nowrap', fontFamily:FONT }}>Se opslag →</button>
+                <button onClick={async () => {
+                  if (!active.listing_id) return;
+                  const { data } = await db.from('listings').select('*').eq('id', active.listing_id).maybeSingle();
+                  if (data && setActiveListing) setActiveListing(data);
+                  router.push('/opslag/detail');
+                }} style={{ fontSize:12, fontWeight:700, color:PRIMARY, background:GREEN_TINT, border:'none', borderRadius:99, padding:'6px 14px', cursor: active.listing_id ? 'pointer' : 'not-allowed', whiteSpace:'nowrap', fontFamily:FONT, opacity: active.listing_id ? 1 : 0.4 }}>Se opslag →</button>
               </div>
 
               {/* Messages */}
