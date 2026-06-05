@@ -65,6 +65,7 @@ export default function OpretOpslagPage() {
   const [scanning, setScanning] = useState(false);
   const [scanError, setScanError] = useState(null);
   const scanRef = useRef(null);
+  const søgesTextareaRef = useRef(null);
   const [søgesQuery, setSøgesQuery] = useState('');
   const [søgesFilling, setSøgesFilling] = useState(false);
   const [søgesFilled, setSøgesFilled] = useState(false);
@@ -457,12 +458,17 @@ export default function OpretOpslagPage() {
                       </div>
                     </div>
                     <textarea
+                      ref={søgesTextareaRef}
                       value={søgesQuery}
-                      onChange={e => { setSøgesQuery(e.target.value); setSøgesFilled(false); }}
-                      onInput={e => { e.target.style.height = 'auto'; e.target.style.height = e.target.scrollHeight + 'px'; }}
+                      onChange={e => {
+                        setSøgesQuery(e.target.value);
+                        setSøgesFilled(false);
+                        const el = søgesTextareaRef.current;
+                        if (el) { el.style.height = 'auto'; el.style.height = el.scrollHeight + 'px'; }
+                      }}
                       placeholder="Fx: Vi mangler et dukkekøkken til vores 3-5 årige. Gerne med tilbehør. Stand skal minimum være god."
-                      rows={3}
-                      style={{ width:'100%', padding:'11px 13px', borderRadius:10, border:'1.5px solid #C4B5FD', fontSize:13, outline:'none', fontFamily:FONT, background:'#fff', color:INK, boxSizing:'border-box', resize:'none', lineHeight:1.55, overflow:'hidden', minHeight:80 }}
+                      rows={1}
+                      style={{ width:'100%', padding:'11px 13px', borderRadius:10, border:'1.5px solid #C4B5FD', fontSize:13, outline:'none', fontFamily:FONT, background:'#fff', color:INK, boxSizing:'border-box', resize:'none', lineHeight:1.55, overflow:'hidden', minHeight:72 }}
                     />
                     {søgesFilled ? (
                       <div style={{ marginTop:10, display:'flex', alignItems:'center', justifyContent:'space-between', gap:8 }}>
