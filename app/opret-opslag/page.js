@@ -355,7 +355,7 @@ export default function OpretOpslagPage() {
     if (isSøges && listing?.id) {
       await db.from('listings').update({ urgency: form.urgency || 'ingen' }).eq('id', listing.id).then(() => {});
     }
-    if (!isSøges && imgFiles.length > 0) {
+    if (imgFiles.length > 0) {
       const urls = [];
       for (const file of imgFiles) {
         const ext = file.name.split('.').pop().toLowerCase();
@@ -671,9 +671,9 @@ export default function OpretOpslagPage() {
                   {form.type==='søges' && <div style={{ fontSize:11, color:INK3, fontFamily:FONT, marginTop:6 }}>Vi accepterer denne stand eller bedre</div>}
                 </div>
 
-                {form.type !== 'søges' && <div>
+                {true && <div>
                   <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:10 }}>
-                    <label style={{ ...labelStyle, marginBottom:0 }}>Billeder <span style={{ fontWeight:400, color:INK3 }}>(op til 6)</span></label>
+                    <label style={{ ...labelStyle, marginBottom:0 }}>{form.type === 'søges' ? 'Billeder' : 'Billeder'} <span style={{ fontWeight:400, color:INK3 }}>(op til 6 — valgfri)</span></label>
                     {imgFiles.length > 0 && imgFiles.length < 6 && (
                       <button type="button" onClick={()=>fileRef.current?.click()} style={{ fontSize:12, fontWeight:700, color:PRIMARY, background:GREEN_TINT, border:'none', borderRadius:99, padding:'5px 12px', cursor:'pointer', fontFamily:FONT }}>+ Tilføj</button>
                     )}
