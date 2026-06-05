@@ -342,13 +342,25 @@ export default function ListingDetailClient() {
 
       if (convId) {
         const selectedListing = ownListings.find(l => l.id === søgesSelectedId);
-        const msgParts = [];
-        if (selectedListing) msgParts.push(`Hej! Jeg tror jeg har noget der matcher: "${selectedListing.title}"`);
-        if (søgesOffer.trim()) msgParts.push(søgesOffer.trim());
-        const content = msgParts.join('\n\n') || 'Hej! Jeg har noget der måske matcher dit søges-opslag.';
+        let content, msgType;
+        if (selectedListing) {
+          content = JSON.stringify({
+            swap_listing_id: selectedListing.id,
+            swap_title:      selectedListing.title,
+            swap_image:      selectedListing.images?.[0] || null,
+            swap_color:      selectedListing.color || '#FFD166',
+            swap_emoji:      selectedListing.emoji || '🧸',
+            note:            søgesOffer.trim() || null,
+          });
+          msgType = 'swap';
+        } else {
+          content = søgesOffer.trim() || 'Hej! Jeg har noget der måske matcher dit søges-opslag.';
+          msgType = null;
+        }
 
-        await db.from('chat_messages').insert({ conversation_id: convId, sender_id: user.id, sender_name: userName, content });
-        await db.from('conversations').update({ last_message: content, last_message_at: new Date().toISOString(), owner_unread: 1 }).eq('id', convId);
+        await db.from('chat_messages').insert({ conversation_id: convId, sender_id: user.id, sender_name: userName, content, message_type: msgType });
+        const lastMsg = selectedListing ? `Tilbyder: ${selectedListing.title}` : content;
+        await db.from('conversations').update({ last_message: lastMsg, last_message_at: new Date().toISOString(), owner_unread: 1 }).eq('id', convId);
 
         if (ownerInstData?.email && ownerInstData.email.toLowerCase() !== user.email.toLowerCase()) {
           fetch('/api/notify-message', { method:'POST', headers:{'Content-Type':'application/json'},
