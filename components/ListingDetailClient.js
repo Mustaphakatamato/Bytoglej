@@ -115,6 +115,10 @@ export default function ListingDetailClient() {
   const [søgesModal,       setSøgesModal]       = useState(false);
   const [søgesOffer,       setSøgesOffer]       = useState('');
   const [søgesSelectedId,  setSøgesSelectedId]  = useState(null);
+  const [reportModal,      setReportModal]      = useState(false);
+  const [reportReason,     setReportReason]     = useState('');
+  const [reportNote,       setReportNote]       = useState('');
+  const [reportSending,    setReportSending]    = useState(false);
 
   useEffect(() => {
     if (!listing) return;
@@ -711,6 +715,11 @@ export default function ListingDetailClient() {
                 📧
               </button>
             </div>
+            {!isOwn && (
+              <button onClick={()=>setReportModal(true)} style={{ background:'none', border:'none', fontSize:12, color:INK3, cursor:'pointer', fontFamily:FONT, padding:'4px 0', textDecoration:'underline', textDecorationColor:PAPER3, marginBottom:4 }}>
+                Rapportér opslag
+              </button>
+            )}
 
             {/* Metadata box */}
             <div style={{ background:PAPER2, borderRadius:18, padding:'16px 20px', border:`1px solid ${PAPER3}`, marginBottom:14 }}>
@@ -982,6 +991,44 @@ export default function ListingDetailClient() {
       </Modal>
 
     </div>
+
+    {/* Rapport modal */}
+    <Modal open={reportModal} onClose={()=>{ setReportModal(false); setReportReason(''); setReportNote(''); }} title="Rapportér opslag">
+      <div style={{ display:'flex', flexDirection:'column', gap:14 }}>
+        <p style={{ fontSize:13, color:INK3, fontFamily:FONT, margin:0 }}>Hjælp os med at holde platformen tryg. Vi gennemgår alle rapporter.</p>
+        <div>
+          <label style={{ display:'block', fontSize:13, fontWeight:700, color:INK2, fontFamily:FONT, marginBottom:8 }}>Årsag <span style={{ color:'#e53e3e' }}>*</span></label>
+          <div style={{ display:'flex', flexDirection:'column', gap:6 }}>
+            {['Misvisende beskrivelse','Upassende indhold','Forbudt genstand','Spam eller duplikat','Andet'].map(r => (
+              <button key={r} type="button" onClick={()=>setReportReason(r)}
+                style={{ padding:'10px 14px', borderRadius:12, border:`2px solid ${reportReason===r?'#e11d48':'rgba(22,34,28,0.1)'}`, background:reportReason===r?'#FFF0F3':'#fff', color:reportReason===r?'#e11d48':INK2, fontSize:13, fontWeight:reportReason===r?700:500, cursor:'pointer', textAlign:'left', fontFamily:FONT, transition:'all 0.12s' }}>
+                {r}
+              </button>
+            ))}
+          </div>
+        </div>
+        <div>
+          <label style={{ display:'block', fontSize:13, fontWeight:700, color:INK2, fontFamily:FONT, marginBottom:6 }}>Tilføj note <span style={{ fontWeight:400, color:INK3 }}>(valgfri)</span></label>
+          <textarea value={reportNote} onChange={e=>setReportNote(e.target.value)} placeholder="Beskriv problemet kort…" rows={2}
+            style={{ width:'100%', padding:'10px 12px', borderRadius:10, border:`1.5px solid ${PAPER3}`, fontSize:13, outline:'none', fontFamily:FONT, background:'#fff', color:INK, boxSizing:'border-box', resize:'vertical' }} />
+        </div>
+        <Btn variant="primary" color="#e11d48" radius={22} onClick={async()=>{
+          if (!reportReason) return;
+          setReportSending(true);
+          try {
+            const { data:{ user } } = await db.auth.getUser();
+            const { data: inst } = user ? await db.from('institutions').select('name').ilike('email', user.email).maybeSingle() : { data: null };
+            await fetch('/api/report-listing', { method:'POST', headers:{'Content-Type':'application/json'},
+              body: JSON.stringify({ listingId:listing.id, listingTitle:listing.title, reason:reportReason, note:reportNote, reporterName:inst?.name||user?.email||'Ukendt' }) });
+          } catch {}
+          setReportSending(false); setReportModal(false); setReportReason(''); setReportNote('');
+          showToast('Tak — vi kigger på det hurtigst muligt');
+        }} disabled={reportSending||!reportReason} style={{ justifyContent:'center', padding:'13px', fontSize:14 }}>
+          {reportSending ? <><Spinner/>Sender…</> : 'Send rapport'}
+        </Btn>
+        <Btn variant="ghost" onClick={()=>{ setReportModal(false); setReportReason(''); setReportNote(''); }} style={{ justifyContent:'center' }}>Annuller</Btn>
+      </div>
+    </Modal>
 
     {/* Søges match modal */}
     <Modal open={søgesModal} onClose={()=>{ setSøgesModal(false); setSøgesOffer(''); setSøgesSelectedId(null); }} title="Jeg har noget der matcher 🎯">

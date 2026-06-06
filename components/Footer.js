@@ -52,7 +52,10 @@ export default function Footer() {
 
       <div style={{ borderTop: `1px solid ${PAPER3}`, maxWidth: 1140, margin: '0 auto', padding: '18px 24px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 8 }}>
         <span style={{ fontSize: 12, color: INK3 }}>© {year} byt&amp;leg · Alle rettigheder forbeholdes</span>
-        <span style={{ fontSize: 12, color: INK3 }}>Bygget med ♻️ til danske institutioner</span>
+        <div style={{ display: 'flex', gap: 16, alignItems: 'center' }}>
+          <Link href="/privatlivspolitik" style={{ fontSize: 12, color: INK3, textDecoration: 'none' }}>Privatlivspolitik</Link>
+          <span style={{ fontSize: 12, color: INK3 }}>Bygget med ♻️ til danske institutioner</span>
+        </div>
       </div>
     </footer>
   );

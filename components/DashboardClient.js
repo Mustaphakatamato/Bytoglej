@@ -722,9 +722,33 @@ export default function DashboardClient() {
               </div>
             </div>
             {myListings.filter(l=>!l.is_sold).length===0 ? (
-              <div style={{ textAlign:'center', padding:'40px 0' }}>
-                <div style={{ fontFamily:FONT, fontWeight:800, fontSize:48, color:GREEN_SOFT, lineHeight:1, marginBottom:12 }}>0</div>
-                <p style={{ fontSize:14, color:INK3, fontFamily:FONT }}>Ingen opslag endnu — opret dit første!</p>
+              <div style={{ padding:'8px 0 24px' }}>
+                <div style={{ background:`linear-gradient(135deg, ${GREEN_TINT} 0%, #f0fdf4 100%)`, border:`1.5px solid ${GREEN_SOFT}`, borderRadius:16, padding:'28px 24px', marginBottom:20, textAlign:'center' }}>
+                  <div style={{ fontSize:40, marginBottom:12 }}>🎉</div>
+                  <h3 style={{ fontFamily:FONT, fontWeight:800, fontSize:18, color:INK, letterSpacing:'-0.03em', marginBottom:8 }}>Velkommen til byt&amp;leg!</h3>
+                  <p style={{ fontSize:14, color:INK2, fontFamily:FONT, lineHeight:1.6, maxWidth:340, margin:'0 auto 20px' }}>
+                    Du er klar til at komme i gang. Følg de 3 trin nedenfor for at få dit første opslag op og køre.
+                  </p>
+                  <button onClick={()=>router.push('/opret-opslag')} style={{ background:PRIMARY, color:'#fff', border:'none', borderRadius:99, padding:'12px 28px', fontFamily:FONT, fontWeight:700, fontSize:14, cursor:'pointer' }}>
+                    Opret dit første opslag →
+                  </button>
+                </div>
+                <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit, minmax(180px, 1fr))', gap:12 }}>
+                  {[
+                    { step:'1', icon:'📦', title:'Opret et opslag', desc:'Beskriv det legetøj du vil bytte, sælge eller søger. AI hjælper dig med beskrivelsen.' },
+                    { step:'2', icon:'🔍', title:'Find noget at bytte', desc:'Søg i markedspladsen og find legetøj fra andre institutioner i dit område.' },
+                    { step:'3', icon:'💬', title:'Tag kontakt', desc:'Send en besked og aftale en byttehandel direkte med institutionen.' },
+                  ].map(({ step, icon, title, desc }) => (
+                    <div key={step} style={{ background:PAPER2, border:`1px solid ${PAPER3}`, borderRadius:14, padding:'16px 16px 18px', display:'flex', flexDirection:'column', gap:8 }}>
+                      <div style={{ display:'flex', alignItems:'center', gap:8 }}>
+                        <span style={{ background:PRIMARY, color:'#fff', borderRadius:'50%', width:22, height:22, display:'flex', alignItems:'center', justifyContent:'center', fontFamily:FONT, fontWeight:800, fontSize:11, flexShrink:0 }}>{step}</span>
+                        <span style={{ fontSize:20 }}>{icon}</span>
+                      </div>
+                      <div style={{ fontFamily:FONT, fontWeight:700, fontSize:14, color:INK }}>{title}</div>
+                      <div style={{ fontFamily:FONT, fontSize:13, color:INK3, lineHeight:1.55 }}>{desc}</div>
+                    </div>
+                  ))}
+                </div>
               </div>
             ) : listingsView === 'grid' ? (
               <div style={{ display:'grid', gridTemplateColumns:'repeat(2,1fr)', gap:10 }}>
