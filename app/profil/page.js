@@ -2,12 +2,21 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { db } from '@/lib/supabase';
-import { PRIMARY, INK, INK2, INK3, PAPER2, PAPER3 } from '@/lib/constants';
+import { PRIMARY, GREEN_DEEP, INK, INK2, INK3, PAPER2, PAPER3 } from '@/lib/constants';
 import { useWindowWidth, geocodeAddress } from '@/lib/hooks';
 import { useApp } from '@/providers/AppProvider';
 import { Btn, Spinner } from '@/components/ui';
 
 const FONT = "'Sora', sans-serif";
+const INP = { width:'100%', padding:'11px 14px', borderRadius:12, border:'1.5px solid #e5e5e5', fontSize:14, fontFamily:"'Nunito Sans',sans-serif", outline:'none', boxSizing:'border-box' };
+
+const PW_RULES = [
+  { id:'len',   label:'Mindst 8 tegn',              test: p => p.length >= 8 },
+  { id:'upper', label:'Mindst ét stort bogstav',     test: p => /[A-Z]/.test(p) },
+  { id:'lower', label:'Mindst ét lille bogstav',     test: p => /[a-z]/.test(p) },
+  { id:'num',   label:'Mindst ét tal',               test: p => /[0-9]/.test(p) },
+  { id:'spec',  label:'Mindst ét specialtegn (!@#…)',test: p => /[^A-Za-z0-9]/.test(p) },
+];
 
 function SChoiceGroup({ value, onChange, options, primary }) {
   return (
@@ -18,6 +27,19 @@ function SChoiceGroup({ value, onChange, options, primary }) {
           {o}
         </button>
       ))}
+    </div>
+  );
+}
+
+function Modal({ title, icon, onClose, children }) {
+  return (
+    <div style={{ position:'fixed', inset:0, background:'rgba(0,0,0,0.45)', zIndex:1000, display:'flex', alignItems:'center', justifyContent:'center', padding:16 }} onClick={onClose}>
+      <div style={{ background:'#fff', borderRadius:20, padding:'32px 28px', maxWidth:440, width:'100%', boxShadow:'0 8px 40px rgba(0,0,0,0.18)', position:'relative' }} onClick={e=>e.stopPropagation()}>
+        <button onClick={onClose} style={{ position:'absolute', top:16, right:16, background:'#f5f4f2', border:'none', borderRadius:8, width:32, height:32, cursor:'pointer', fontSize:16, color:INK3 }}>✕</button>
+        <div style={{ fontSize:32, marginBottom:12, textAlign:'center' }}>{icon}</div>
+        <h2 style={{ fontFamily:FONT, fontWeight:800, fontSize:20, color:INK, letterSpacing:'-0.03em', marginBottom:20, textAlign:'center' }}>{title}</h2>
+        {children}
+      </div>
     </div>
   );
 }
@@ -45,43 +67,19 @@ export default function ProfilPage() {
   });
   const [saving, setSaving] = useState(false);
 
-  // Email change
-  const [newEmail, setNewEmail] = useState('');
+  // Modals
+  const [showEmailModal, setShowEmailModal] = useState(false);
+  const [showPwModal, setShowPwModal]       = useState(false);
+
+  // Email modal state
+  const [newEmail, setNewEmail]     = useState('');
   const [emailSaving, setEmailSaving] = useState(false);
-  const [emailMsg, setEmailMsg] = useState(null);
+  const [emailMsg, setEmailMsg]     = useState(null);
 
-  // Password change
-  const [pwForm, setPwForm] = useState({ current: '', next: '', confirm: '' });
+  // Password modal state
+  const [pwForm, setPwForm]   = useState({ current:'', next:'', confirm:'' });
   const [pwSaving, setPwSaving] = useState(false);
-  const [pwMsg, setPwMsg] = useState(null);
-
-  async function handleEmailChange() {
-    if (!newEmail || !newEmail.includes('@')) { setEmailMsg({ ok: false, text: 'Indtast en gyldig e-mailadresse.' }); return; }
-    setEmailSaving(true);
-    setEmailMsg(null);
-    const { error } = await db.auth.updateUser({ email: newEmail });
-    setEmailSaving(false);
-    if (error) { setEmailMsg({ ok: false, text: error.message }); return; }
-    setEmailMsg({ ok: true, text: `En bekræftelsesmail er sendt til ${newEmail}. Følg linket i mailen for at gennemføre skiftet.` });
-    setNewEmail('');
-  }
-
-  async function handlePasswordChange() {
-    if (!pwForm.current) { setPwMsg({ ok: false, text: 'Indtast dit nuværende kodeord.' }); return; }
-    if (pwForm.next.length < 8) { setPwMsg({ ok: false, text: 'Nyt kodeord skal være mindst 8 tegn.' }); return; }
-    if (pwForm.next !== pwForm.confirm) { setPwMsg({ ok: false, text: 'De to kodeord stemmer ikke overens.' }); return; }
-    setPwSaving(true);
-    setPwMsg(null);
-    // Verify current password by re-signing in
-    const { data: { user } } = await db.auth.getUser();
-    const { error: signInErr } = await db.auth.signInWithPassword({ email: user.email, password: pwForm.current });
-    if (signInErr) { setPwSaving(false); setPwMsg({ ok: false, text: 'Nuværende kodeord er forkert.' }); return; }
-    const { error } = await db.auth.updateUser({ password: pwForm.next });
-    setPwSaving(false);
-    if (error) { setPwMsg({ ok: false, text: error.message }); return; }
-    setPwMsg({ ok: true, text: 'Kodeord opdateret.' });
-    setPwForm({ current: '', next: '', confirm: '' });
-  }
+  const [pwMsg, setPwMsg]     = useState(null);
 
   function onInstChange(updated) {
     if (adminInst) setAdminInst(updated);
@@ -118,20 +116,63 @@ export default function ProfilPage() {
     router.push('/dashboard');
   }
 
+  async function handleEmailChange() {
+    const trimmed = newEmail.trim().toLowerCase();
+    if (!trimmed || !trimmed.includes('@') || !trimmed.includes('.')) {
+      setEmailMsg({ ok:false, text:'Indtast en gyldig e-mailadresse.' }); return;
+    }
+    if (trimmed === institution?.email?.toLowerCase()) {
+      setEmailMsg({ ok:false, text:'Det er allerede din nuværende e-mail.' }); return;
+    }
+    setEmailSaving(true);
+    setEmailMsg(null);
+    // Check if email already exists in institutions
+    const { data: existing } = await db.from('institutions').select('id').eq('email', trimmed).maybeSingle();
+    if (existing) {
+      setEmailSaving(false);
+      setEmailMsg({ ok:false, text:'Denne e-mailadresse er allerede tilknyttet en konto.' }); return;
+    }
+    const { error } = await db.auth.updateUser({ email: trimmed });
+    setEmailSaving(false);
+    if (error) { setEmailMsg({ ok:false, text: error.message }); return; }
+    setEmailMsg({ ok:true, text:`En bekræftelsesmail er sendt til ${trimmed}. Følg linket for at gennemføre skiftet.` });
+    setNewEmail('');
+  }
+
+  async function handlePasswordChange() {
+    if (!pwForm.current) { setPwMsg({ ok:false, text:'Indtast dit nuværende kodeord.' }); return; }
+    const failed = PW_RULES.filter(r => !r.test(pwForm.next));
+    if (failed.length) { setPwMsg({ ok:false, text:`Kodeordet opfylder ikke kravene: ${failed.map(r=>r.label.toLowerCase()).join(', ')}.` }); return; }
+    if (pwForm.next !== pwForm.confirm) { setPwMsg({ ok:false, text:'De to kodeord stemmer ikke overens.' }); return; }
+    setPwSaving(true);
+    setPwMsg(null);
+    const { data: { user } } = await db.auth.getUser();
+    const { error: signInErr } = await db.auth.signInWithPassword({ email: user.email, password: pwForm.current });
+    if (signInErr) { setPwSaving(false); setPwMsg({ ok:false, text:'Nuværende kodeord er forkert.' }); return; }
+    const { error } = await db.auth.updateUser({ password: pwForm.next });
+    setPwSaving(false);
+    if (error) { setPwMsg({ ok:false, text: error.message }); return; }
+    setPwMsg({ ok:true, text:'Kodeord opdateret.' });
+    setPwForm({ current:'', next:'', confirm:'' });
+  }
+
   const inp = (val, key, ph, type='text') => (
-    <input type={type} value={val} onChange={e=>setForm(f=>({...f,[key]:e.target.value}))} placeholder={ph}
-      style={{ width:'100%', padding:'11px 14px', borderRadius:12, border:'1.5px solid #e5e5e5', fontSize:14, fontFamily:"'Nunito Sans',sans-serif", outline:'none', boxSizing:'border-box' }} />
+    <input type={type} value={val} onChange={e=>setForm(f=>({...f,[key]:e.target.value}))} placeholder={ph} style={INP} />
   );
+
+  const pwRulesMet = PW_RULES.filter(r => r.test(pwForm.next));
 
   return (
     <div style={{ minHeight:'100vh', paddingTop:80, background:'#f8f5f0' }} className="page-enter">
       <div style={{ maxWidth:760, margin:'0 auto', padding:isMobile?'24px 16px':'36px 24px' }}>
         <div style={{ display:'flex', alignItems:'center', gap:16, marginBottom:28 }}>
           <button onClick={()=>router.push('/dashboard')} style={{ background:'#fff', border:'1.5px solid #e5e5e5', borderRadius:12, padding:'8px 16px', fontSize:13, fontWeight:700, cursor:'pointer', display:'flex', alignItems:'center', gap:6 }}>← Tilbage</button>
-          <h1 style={{ fontFamily:"'Sora',sans-serif", fontWeight:900, fontSize:isMobile?22:26, margin:0 }}>Rediger institutionsprofil</h1>
+          <h1 style={{ fontFamily:FONT, fontWeight:900, fontSize:isMobile?22:26, margin:0 }}>Rediger institutionsprofil</h1>
         </div>
 
         <div style={{ background:'#fff', borderRadius:22, padding:isMobile?20:32, boxShadow:'0 2px 12px rgba(0,0,0,0.06)', display:'flex', flexDirection:'column', gap:24 }}>
+
+          {/* CVR info */}
           <div style={{ background:'#f0f9f4', border:'1.5px solid #c6e8d4', borderRadius:14, padding:'14px 18px' }}>
             <div style={{ fontSize:12, color:'#5a9a74', fontWeight:700, marginBottom:4 }}>Fra CVR-registret (kan ikke ændres)</div>
             <div style={{ fontWeight:800, fontSize:16 }}>{institution?.name}</div>
@@ -139,6 +180,7 @@ export default function ProfilPage() {
             {institution?.kommune && <div style={{ fontSize:13, color:'#888', marginTop:2 }}>🏛️ Under: {institution.kommune}</div>}
           </div>
 
+          {/* Om institutionen */}
           <div>
             <div style={{ fontSize:12, fontWeight:700, color:'#aaa', textTransform:'uppercase', letterSpacing:0.8, marginBottom:14 }}>Om institutionen</div>
             <div style={{ display:'flex', flexDirection:'column', gap:12 }}>
@@ -157,6 +199,7 @@ export default function ProfilPage() {
             </div>
           </div>
 
+          {/* Kontaktoplysninger */}
           <div style={{ borderTop:'1px solid #f0eeeb', paddingTop:20 }}>
             <div style={{ fontSize:12, fontWeight:700, color:'#aaa', textTransform:'uppercase', letterSpacing:0.8, marginBottom:14 }}>Kontaktoplysninger</div>
             <div style={{ display:'flex', flexDirection:'column', gap:12 }}>
@@ -172,6 +215,7 @@ export default function ProfilPage() {
             </div>
           </div>
 
+          {/* Institutionsleder */}
           <div style={{ borderTop:'1px solid #f0eeeb', paddingTop:20 }}>
             <div style={{ fontSize:12, fontWeight:700, color:'#aaa', textTransform:'uppercase', letterSpacing:0.8, marginBottom:14 }}>Institutionsleder</div>
             <div style={{ display:'flex', flexDirection:'column', gap:12 }}>
@@ -183,75 +227,38 @@ export default function ProfilPage() {
             </div>
           </div>
 
+          {/* Kontaktperson */}
           <div style={{ borderTop:'1px solid #f0eeeb', paddingTop:20 }}>
             <div style={{ fontSize:12, fontWeight:700, color:'#aaa', textTransform:'uppercase', letterSpacing:0.8, marginBottom:14 }}>Kontaktperson (byt&amp;leg)</div>
             <div><label style={{ display:'block', fontSize:13, fontWeight:700, marginBottom:6 }}>Dit fulde navn</label>{inp(form.contact_name,'contact_name','Fornavn Efternavn')}</div>
           </div>
 
-          {/* Email change */}
+          {/* Kontosikkerhed */}
           <div style={{ borderTop:'1px solid #f0eeeb', paddingTop:20 }}>
-            <div style={{ fontSize:12, fontWeight:700, color:'#aaa', textTransform:'uppercase', letterSpacing:0.8, marginBottom:14 }}>Skift login-e-mail</div>
-            <p style={{ fontSize:13, color:'#888', marginBottom:12, lineHeight:1.55 }}>
-              Din nuværende login-e-mail er <strong style={{ color:INK }}>{institution?.email}</strong>. Efter skift sendes en bekræftelsesmail til den nye adresse.
-            </p>
-            <div style={{ display:'flex', gap:10, alignItems:'flex-start', flexWrap:'wrap' }}>
-              <input
-                type="email"
-                value={newEmail}
-                onChange={e=>setNewEmail(e.target.value)}
-                placeholder="ny@institution.dk"
-                style={{ flex:'1 1 220px', padding:'11px 14px', borderRadius:12, border:'1.5px solid #e5e5e5', fontSize:14, fontFamily:"'Nunito Sans',sans-serif", outline:'none', boxSizing:'border-box' }}
-              />
-              <button
-                onClick={handleEmailChange}
-                disabled={emailSaving || !newEmail}
-                style={{ padding:'11px 20px', borderRadius:12, background:PRIMARY, color:'#fff', border:'none', fontFamily:FONT, fontWeight:700, fontSize:13, cursor:emailSaving||!newEmail?'not-allowed':'pointer', opacity:emailSaving||!newEmail?0.6:1, whiteSpace:'nowrap' }}
-              >
-                {emailSaving ? 'Sender…' : 'Send bekræftelse'}
-              </button>
-            </div>
-            {emailMsg && (
-              <div style={{ marginTop:10, padding:'10px 14px', borderRadius:10, background:emailMsg.ok?'#e8f5ee':'#fff0f0', color:emailMsg.ok?'#2A7D4F':'#c0392b', fontSize:13 }}>
-                {emailMsg.text}
-              </div>
-            )}
-          </div>
-
-          {/* Password change */}
-          <div style={{ borderTop:'1px solid #f0eeeb', paddingTop:20 }}>
-            <div style={{ fontSize:12, fontWeight:700, color:'#aaa', textTransform:'uppercase', letterSpacing:0.8, marginBottom:14 }}>Skift adgangskode</div>
+            <div style={{ fontSize:12, fontWeight:700, color:'#aaa', textTransform:'uppercase', letterSpacing:0.8, marginBottom:14 }}>Kontosikkerhed</div>
             <div style={{ display:'flex', flexDirection:'column', gap:10 }}>
-              {[
-                { key:'current', label:'Nuværende kodeord', ph:'••••••••' },
-                { key:'next',    label:'Nyt kodeord (min. 8 tegn)', ph:'••••••••' },
-                { key:'confirm', label:'Gentag nyt kodeord', ph:'••••••••' },
-              ].map(({ key, label, ph }) => (
-                <div key={key}>
-                  <label style={{ display:'block', fontSize:13, fontWeight:700, marginBottom:6 }}>{label}</label>
-                  <input
-                    type="password"
-                    value={pwForm[key]}
-                    onChange={e=>setPwForm(f=>({...f,[key]:e.target.value}))}
-                    placeholder={ph}
-                    style={{ width:'100%', padding:'11px 14px', borderRadius:12, border:'1.5px solid #e5e5e5', fontSize:14, fontFamily:"'Nunito Sans',sans-serif", outline:'none', boxSizing:'border-box' }}
-                  />
+              <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', padding:'14px 16px', background:PAPER2, borderRadius:14, border:`1px solid ${PAPER3}` }}>
+                <div>
+                  <div style={{ fontFamily:FONT, fontWeight:700, fontSize:14, color:INK }}>Login-e-mail</div>
+                  <div style={{ fontSize:13, color:INK3, marginTop:2 }}>{institution?.email}</div>
                 </div>
-              ))}
-              <button
-                onClick={handlePasswordChange}
-                disabled={pwSaving}
-                style={{ alignSelf:'flex-start', padding:'11px 24px', borderRadius:12, background:PRIMARY, color:'#fff', border:'none', fontFamily:FONT, fontWeight:700, fontSize:13, cursor:pwSaving?'not-allowed':'pointer', opacity:pwSaving?0.6:1 }}
-              >
-                {pwSaving ? 'Gemmer…' : 'Opdatér kodeord'}
-              </button>
-            </div>
-            {pwMsg && (
-              <div style={{ marginTop:10, padding:'10px 14px', borderRadius:10, background:pwMsg.ok?'#e8f5ee':'#fff0f0', color:pwMsg.ok?'#2A7D4F':'#c0392b', fontSize:13 }}>
-                {pwMsg.text}
+                <button onClick={()=>{ setEmailMsg(null); setNewEmail(''); setShowEmailModal(true); }} style={{ padding:'8px 16px', borderRadius:99, background:'#fff', border:`1.5px solid ${PRIMARY}`, color:PRIMARY, fontFamily:FONT, fontWeight:700, fontSize:13, cursor:'pointer' }}>
+                  Skift e-mail
+                </button>
               </div>
-            )}
+              <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', padding:'14px 16px', background:PAPER2, borderRadius:14, border:`1px solid ${PAPER3}` }}>
+                <div>
+                  <div style={{ fontFamily:FONT, fontWeight:700, fontSize:14, color:INK }}>Adgangskode</div>
+                  <div style={{ fontSize:13, color:INK3, marginTop:2 }}>••••••••••••</div>
+                </div>
+                <button onClick={()=>{ setPwMsg(null); setPwForm({current:'',next:'',confirm:''}); setShowPwModal(true); }} style={{ padding:'8px 16px', borderRadius:99, background:'#fff', border:`1.5px solid ${PRIMARY}`, color:PRIMARY, fontFamily:FONT, fontWeight:700, fontSize:13, cursor:'pointer' }}>
+                  Skift kodeord
+                </button>
+              </div>
+            </div>
           </div>
 
+          {/* Bottom actions */}
           <div style={{ borderTop:'1px solid #f0eeeb', paddingTop:20, display:'flex', gap:12 }}>
             <button onClick={()=>router.push('/dashboard')} style={{ flex:1, padding:'13px', borderRadius:14, background:'#f5f4f2', border:'none', fontWeight:700, cursor:'pointer', fontSize:14 }}>Annuller</button>
             <Btn variant="primary" color={PRIMARY} radius={22} onClick={handleSave} disabled={saving} style={{ flex:2, justifyContent:'center', padding:'13px', fontSize:15 }}>
@@ -260,6 +267,98 @@ export default function ProfilPage() {
           </div>
         </div>
       </div>
+
+      {/* Email modal */}
+      {showEmailModal && (
+        <Modal title="Skift login-e-mail" icon="📧" onClose={()=>setShowEmailModal(false)}>
+          <p style={{ fontSize:14, color:INK3, lineHeight:1.6, marginBottom:20, textAlign:'center' }}>
+            Nuværende: <strong style={{ color:INK }}>{institution?.email}</strong><br/>
+            Efter skift sendes en bekræftelsesmail til den nye adresse.
+          </p>
+          <div style={{ display:'flex', flexDirection:'column', gap:12 }}>
+            <input
+              type="email"
+              value={newEmail}
+              onChange={e=>{ setNewEmail(e.target.value); setEmailMsg(null); }}
+              placeholder="ny@institution.dk"
+              style={{ ...INP, fontSize:15 }}
+              autoFocus
+            />
+            {emailMsg && (
+              <div style={{ padding:'10px 14px', borderRadius:10, background:emailMsg.ok?'#e8f5ee':'#fff0f0', color:emailMsg.ok?PRIMARY:'#c0392b', fontSize:13, lineHeight:1.5 }}>
+                {emailMsg.text}
+              </div>
+            )}
+            {!emailMsg?.ok && (
+              <button
+                onClick={handleEmailChange}
+                disabled={emailSaving || !newEmail}
+                style={{ padding:'13px', borderRadius:12, background:PRIMARY, color:'#fff', border:'none', fontFamily:FONT, fontWeight:700, fontSize:14, cursor:emailSaving||!newEmail?'not-allowed':'pointer', opacity:emailSaving||!newEmail?0.6:1 }}
+              >
+                {emailSaving ? 'Tjekker…' : 'Send bekræftelse'}
+              </button>
+            )}
+          </div>
+        </Modal>
+      )}
+
+      {/* Password modal */}
+      {showPwModal && (
+        <Modal title="Skift adgangskode" icon="🔑" onClose={()=>setShowPwModal(false)}>
+          <div style={{ display:'flex', flexDirection:'column', gap:12 }}>
+            {[
+              { key:'current', label:'Nuværende kodeord' },
+              { key:'next',    label:'Nyt kodeord' },
+              { key:'confirm', label:'Gentag nyt kodeord' },
+            ].map(({ key, label }) => (
+              <div key={key}>
+                <label style={{ display:'block', fontSize:13, fontWeight:700, marginBottom:5, color:INK2 }}>{label}</label>
+                <input
+                  type="password"
+                  value={pwForm[key]}
+                  onChange={e=>{ setPwForm(f=>({...f,[key]:e.target.value})); setPwMsg(null); }}
+                  placeholder="••••••••"
+                  style={INP}
+                  autoFocus={key==='current'}
+                />
+              </div>
+            ))}
+
+            {/* Password requirements */}
+            {pwForm.next && (
+              <div style={{ background:'#f8f7f5', borderRadius:10, padding:'12px 14px', display:'flex', flexDirection:'column', gap:6 }}>
+                {PW_RULES.map(r => {
+                  const met = r.test(pwForm.next);
+                  return (
+                    <div key={r.id} style={{ display:'flex', alignItems:'center', gap:8, fontSize:13 }}>
+                      <span style={{ width:16, height:16, borderRadius:'50%', background:met?PRIMARY:'#e5e5e5', display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0 }}>
+                        {met && <svg width="9" height="9" viewBox="0 0 10 8" fill="none"><path d="M1 4l3 3 5-6" stroke="#fff" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/></svg>}
+                      </span>
+                      <span style={{ color:met?PRIMARY:INK3 }}>{r.label}</span>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+
+            {pwMsg && (
+              <div style={{ padding:'10px 14px', borderRadius:10, background:pwMsg.ok?'#e8f5ee':'#fff0f0', color:pwMsg.ok?PRIMARY:'#c0392b', fontSize:13, lineHeight:1.5 }}>
+                {pwMsg.text}
+              </div>
+            )}
+
+            {!pwMsg?.ok && (
+              <button
+                onClick={handlePasswordChange}
+                disabled={pwSaving || pwRulesMet.length < PW_RULES.length}
+                style={{ padding:'13px', borderRadius:12, background:PRIMARY, color:'#fff', border:'none', fontFamily:FONT, fontWeight:700, fontSize:14, cursor:pwSaving||pwRulesMet.length<PW_RULES.length?'not-allowed':'pointer', opacity:pwSaving||pwRulesMet.length<PW_RULES.length?0.6:1 }}
+              >
+                {pwSaving ? 'Gemmer…' : 'Opdatér kodeord'}
+              </button>
+            )}
+          </div>
+        </Modal>
+      )}
     </div>
   );
 }
