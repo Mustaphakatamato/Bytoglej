@@ -1,11 +1,11 @@
 import { NextResponse } from 'next/server';
 import { Resend } from 'resend';
 
-const resend = new Resend(process.env.RESEND_API_KEY);
 const ADMIN_EMAIL = 'mustaphakatamato@live.dk';
 
 export async function POST(req) {
   try {
+    const resend = new Resend(process.env.RESEND_API_KEY);
     const { listingId, listingTitle, reason, note, reporterName } = await req.json();
     if (!listingId || !reason) return NextResponse.json({ error: 'Mangler data' }, { status: 400 });
 
