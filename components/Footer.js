@@ -54,6 +54,7 @@ export default function Footer() {
         <span style={{ fontSize: 12, color: INK3 }}>© {year} byt&amp;leg · Alle rettigheder forbeholdes</span>
         <div style={{ display: 'flex', gap: 16, alignItems: 'center' }}>
           <Link href="/privatlivspolitik" style={{ fontSize: 12, color: INK3, textDecoration: 'none' }}>Privatlivspolitik</Link>
+          <Link href="/vilkaar" style={{ fontSize: 12, color: INK3, textDecoration: 'none' }}>Vilkår</Link>
           <span style={{ fontSize: 12, color: INK3 }}>Bygget med ♻️ til danske institutioner</span>
         </div>
       </div>

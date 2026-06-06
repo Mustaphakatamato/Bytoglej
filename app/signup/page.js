@@ -384,6 +384,11 @@ export default function SignupPage() {
     geocodeAddress(form.address, form.zipcode, form.city).then(coords => {
       if (coords) db.from('institutions').update({ latitude: coords.lat, longitude: coords.lon }).eq('email', form.email.toLowerCase());
     });
+    fetch('/api/welcome-email', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email: form.email.toLowerCase(), contactName: form.contact_name, institutionName: cvrData.name }),
+    }).catch(() => {});
     setSaving(false);
     if (data.user && !data.session) { setNeedsConfirm(true); setStep(5); }
     else { setLoggedIn(true); router.push('/dashboard'); showToast('Velkommen til byt&leg! 🎉'); }

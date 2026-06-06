@@ -511,6 +511,7 @@ export default function MessagesClient() {
         setMessages(ms => [...ms, imgMsg]);
         setTimeout(() => bottomRef.current?.scrollIntoView({ behavior:'smooth' }), 60);
       }
+      notifyRecipient(isInit, senderName, '📷 Billede');
       setSending(false);
       return;
     }
@@ -524,7 +525,28 @@ export default function MessagesClient() {
       setMessages(ms => [...ms, txtMsg]);
       setTimeout(() => bottomRef.current?.scrollIntoView({ behavior:'smooth' }), 60);
     }
+    notifyRecipient(isInit, senderName, content);
     setSending(false);
+  }
+
+  function notifyRecipient(isInit, senderName, messagePreview) {
+    const recipientName = isInit ? active.owner_name : active.initiator_name;
+    if (!recipientName) return;
+    db.from('institutions').select('email,contact_name').ilike('name', recipientName).maybeSingle().then(({ data: inst }) => {
+      if (!inst?.email) return;
+      fetch('/api/notify-message', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          ownerEmail: inst.email,
+          ownerName: inst.contact_name || recipientName,
+          senderName,
+          listingTitle: active.listing_title || 'din samtale',
+          listingEmoji: active.listing_emoji || '💬',
+          convId: active.id,
+        }),
+      }).catch(() => {});
+    });
   }
 
   async function archiveConv(conv, e) {
