@@ -2,10 +2,12 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { db } from '@/lib/supabase';
-import { PRIMARY } from '@/lib/constants';
+import { PRIMARY, INK, INK2, INK3, PAPER2, PAPER3 } from '@/lib/constants';
 import { useWindowWidth, geocodeAddress } from '@/lib/hooks';
 import { useApp } from '@/providers/AppProvider';
 import { Btn, Spinner } from '@/components/ui';
+
+const FONT = "'Sora', sans-serif";
 
 function SChoiceGroup({ value, onChange, options, primary }) {
   return (
@@ -42,6 +44,44 @@ export default function ProfilPage() {
     contact_name:     institution?.contact_name     || '',
   });
   const [saving, setSaving] = useState(false);
+
+  // Email change
+  const [newEmail, setNewEmail] = useState('');
+  const [emailSaving, setEmailSaving] = useState(false);
+  const [emailMsg, setEmailMsg] = useState(null);
+
+  // Password change
+  const [pwForm, setPwForm] = useState({ current: '', next: '', confirm: '' });
+  const [pwSaving, setPwSaving] = useState(false);
+  const [pwMsg, setPwMsg] = useState(null);
+
+  async function handleEmailChange() {
+    if (!newEmail || !newEmail.includes('@')) { setEmailMsg({ ok: false, text: 'Indtast en gyldig e-mailadresse.' }); return; }
+    setEmailSaving(true);
+    setEmailMsg(null);
+    const { error } = await db.auth.updateUser({ email: newEmail });
+    setEmailSaving(false);
+    if (error) { setEmailMsg({ ok: false, text: error.message }); return; }
+    setEmailMsg({ ok: true, text: `En bekræftelsesmail er sendt til ${newEmail}. Følg linket i mailen for at gennemføre skiftet.` });
+    setNewEmail('');
+  }
+
+  async function handlePasswordChange() {
+    if (!pwForm.current) { setPwMsg({ ok: false, text: 'Indtast dit nuværende kodeord.' }); return; }
+    if (pwForm.next.length < 8) { setPwMsg({ ok: false, text: 'Nyt kodeord skal være mindst 8 tegn.' }); return; }
+    if (pwForm.next !== pwForm.confirm) { setPwMsg({ ok: false, text: 'De to kodeord stemmer ikke overens.' }); return; }
+    setPwSaving(true);
+    setPwMsg(null);
+    // Verify current password by re-signing in
+    const { data: { user } } = await db.auth.getUser();
+    const { error: signInErr } = await db.auth.signInWithPassword({ email: user.email, password: pwForm.current });
+    if (signInErr) { setPwSaving(false); setPwMsg({ ok: false, text: 'Nuværende kodeord er forkert.' }); return; }
+    const { error } = await db.auth.updateUser({ password: pwForm.next });
+    setPwSaving(false);
+    if (error) { setPwMsg({ ok: false, text: error.message }); return; }
+    setPwMsg({ ok: true, text: 'Kodeord opdateret.' });
+    setPwForm({ current: '', next: '', confirm: '' });
+  }
 
   function onInstChange(updated) {
     if (adminInst) setAdminInst(updated);
@@ -146,6 +186,70 @@ export default function ProfilPage() {
           <div style={{ borderTop:'1px solid #f0eeeb', paddingTop:20 }}>
             <div style={{ fontSize:12, fontWeight:700, color:'#aaa', textTransform:'uppercase', letterSpacing:0.8, marginBottom:14 }}>Kontaktperson (byt&amp;leg)</div>
             <div><label style={{ display:'block', fontSize:13, fontWeight:700, marginBottom:6 }}>Dit fulde navn</label>{inp(form.contact_name,'contact_name','Fornavn Efternavn')}</div>
+          </div>
+
+          {/* Email change */}
+          <div style={{ borderTop:'1px solid #f0eeeb', paddingTop:20 }}>
+            <div style={{ fontSize:12, fontWeight:700, color:'#aaa', textTransform:'uppercase', letterSpacing:0.8, marginBottom:14 }}>Skift login-e-mail</div>
+            <p style={{ fontSize:13, color:'#888', marginBottom:12, lineHeight:1.55 }}>
+              Din nuværende login-e-mail er <strong style={{ color:INK }}>{institution?.email}</strong>. Efter skift sendes en bekræftelsesmail til den nye adresse.
+            </p>
+            <div style={{ display:'flex', gap:10, alignItems:'flex-start', flexWrap:'wrap' }}>
+              <input
+                type="email"
+                value={newEmail}
+                onChange={e=>setNewEmail(e.target.value)}
+                placeholder="ny@institution.dk"
+                style={{ flex:'1 1 220px', padding:'11px 14px', borderRadius:12, border:'1.5px solid #e5e5e5', fontSize:14, fontFamily:"'Nunito Sans',sans-serif", outline:'none', boxSizing:'border-box' }}
+              />
+              <button
+                onClick={handleEmailChange}
+                disabled={emailSaving || !newEmail}
+                style={{ padding:'11px 20px', borderRadius:12, background:PRIMARY, color:'#fff', border:'none', fontFamily:FONT, fontWeight:700, fontSize:13, cursor:emailSaving||!newEmail?'not-allowed':'pointer', opacity:emailSaving||!newEmail?0.6:1, whiteSpace:'nowrap' }}
+              >
+                {emailSaving ? 'Sender…' : 'Send bekræftelse'}
+              </button>
+            </div>
+            {emailMsg && (
+              <div style={{ marginTop:10, padding:'10px 14px', borderRadius:10, background:emailMsg.ok?'#e8f5ee':'#fff0f0', color:emailMsg.ok?'#2A7D4F':'#c0392b', fontSize:13 }}>
+                {emailMsg.text}
+              </div>
+            )}
+          </div>
+
+          {/* Password change */}
+          <div style={{ borderTop:'1px solid #f0eeeb', paddingTop:20 }}>
+            <div style={{ fontSize:12, fontWeight:700, color:'#aaa', textTransform:'uppercase', letterSpacing:0.8, marginBottom:14 }}>Skift adgangskode</div>
+            <div style={{ display:'flex', flexDirection:'column', gap:10 }}>
+              {[
+                { key:'current', label:'Nuværende kodeord', ph:'••••••••' },
+                { key:'next',    label:'Nyt kodeord (min. 8 tegn)', ph:'••••••••' },
+                { key:'confirm', label:'Gentag nyt kodeord', ph:'••••••••' },
+              ].map(({ key, label, ph }) => (
+                <div key={key}>
+                  <label style={{ display:'block', fontSize:13, fontWeight:700, marginBottom:6 }}>{label}</label>
+                  <input
+                    type="password"
+                    value={pwForm[key]}
+                    onChange={e=>setPwForm(f=>({...f,[key]:e.target.value}))}
+                    placeholder={ph}
+                    style={{ width:'100%', padding:'11px 14px', borderRadius:12, border:'1.5px solid #e5e5e5', fontSize:14, fontFamily:"'Nunito Sans',sans-serif", outline:'none', boxSizing:'border-box' }}
+                  />
+                </div>
+              ))}
+              <button
+                onClick={handlePasswordChange}
+                disabled={pwSaving}
+                style={{ alignSelf:'flex-start', padding:'11px 24px', borderRadius:12, background:PRIMARY, color:'#fff', border:'none', fontFamily:FONT, fontWeight:700, fontSize:13, cursor:pwSaving?'not-allowed':'pointer', opacity:pwSaving?0.6:1 }}
+              >
+                {pwSaving ? 'Gemmer…' : 'Opdatér kodeord'}
+              </button>
+            </div>
+            {pwMsg && (
+              <div style={{ marginTop:10, padding:'10px 14px', borderRadius:10, background:pwMsg.ok?'#e8f5ee':'#fff0f0', color:pwMsg.ok?'#2A7D4F':'#c0392b', fontSize:13 }}>
+                {pwMsg.text}
+              </div>
+            )}
           </div>
 
           <div style={{ borderTop:'1px solid #f0eeeb', paddingTop:20, display:'flex', gap:12 }}>
