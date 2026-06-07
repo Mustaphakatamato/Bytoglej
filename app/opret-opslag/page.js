@@ -85,6 +85,15 @@ export default function OpretOpslagPage() {
     tags:[], min_bid:'', category:'', subcategory:'', urgency:'ingen', can_ship: false,
   });
 
+  // Leveringsvalg
+  const [delivery, setDelivery] = useState({
+    pickup: false,   shipping: false,  custom: false,
+    pickup_address: '', pickup_hours: '', pickup_notes: '',
+    size_category: '', shipping_included: false, custom_notes: '',
+  });
+  const [priceEstimates, setPriceEstimates] = useState(null); // { min, max } DKK
+  const [deliveryDefaultApplied, setDeliveryDefaultApplied] = useState(false);
+
   useEffect(() => {
     db.auth.getUser().then(async ({ data:{ user } }) => {
       if (!user) { router.push('/login'); return; }
@@ -96,6 +105,64 @@ export default function OpretOpslagPage() {
       }
     });
   }, []);
+
+  // Smart defaults for delivery based on category
+  const CATEGORY_DELIVERY = {
+    'books':               { pickup:true, shipping:true,  size:'small'  },
+    'puzzles':             { pickup:true, shipping:true,  size:'small'  },
+    'board-games':         { pickup:true, shipping:true,  size:'medium' },
+    'plush-small':         { pickup:true, shipping:true,  size:'small'  },
+    'plush-large':         { pickup:true, shipping:true,  size:'medium' },
+    'wooden-toys':         { pickup:true, shipping:true,  size:'medium' },
+    'plastic-toys-small':  { pickup:true, shipping:true,  size:'small'  },
+    'plastic-toys-medium': { pickup:true, shipping:true,  size:'medium' },
+    'plastic-toys-large':  { pickup:true, shipping:false, size:'large'  },
+    'construction-toys':   { pickup:true, shipping:true,  size:'large'  },
+    'outdoor-toys':        { pickup:true, shipping:false, custom:true   },
+    'ride-on-toys':        { pickup:true, shipping:false, custom:true   },
+    'electronic-toys':     { pickup:true, shipping:true,  size:'medium' },
+    'children-furniture':  { pickup:true, shipping:false, custom:true   },
+    'baby-equipment':      { pickup:true, shipping:true,  size:'medium' },
+    'musical-instruments': { pickup:true, shipping:true,  size:'medium' },
+    'sports-equipment':    { pickup:true, shipping:false, custom:true   },
+    'costumes-roleplay':   { pickup:true, shipping:true,  size:'medium' },
+    'art-craft-supplies':  { pickup:true, shipping:true,  size:'small'  },
+    'other':               { pickup:true, shipping:false               },
+  };
+
+  useEffect(() => {
+    if (!form.category || deliveryDefaultApplied) return;
+    const d = CATEGORY_DELIVERY[form.category];
+    if (!d) return;
+    setDelivery(prev => ({
+      ...prev,
+      pickup:   d.pickup   ?? prev.pickup,
+      shipping: d.shipping ?? prev.shipping,
+      custom:   d.custom   ?? prev.custom,
+      size_category: d.size || prev.size_category,
+    }));
+    setDeliveryDefaultApplied(true);
+    if (institution?.address) setDelivery(prev => ({ ...prev, pickup_address: institution.address + (institution.zipcode ? `, ${institution.zipcode}` : '') + (institution.city ? ` ${institution.city}` : '') }));
+  }, [form.category]);
+
+  useEffect(() => {
+    if (institution && !delivery.pickup_address) {
+      const addr = [institution.address, institution.zipcode, institution.city].filter(Boolean).join(', ');
+      if (addr) setDelivery(prev => ({ ...prev, pickup_address: addr }));
+    }
+  }, [institution]);
+
+  useEffect(() => {
+    if (!delivery.shipping || !delivery.size_category) { setPriceEstimates(null); return; }
+    db.from('shipmondo_price_cache')
+      .select('price_dkk')
+      .eq('size_category', delivery.size_category)
+      .then(({ data }) => {
+        if (!data?.length) return;
+        const prices = data.map(r => Number(r.price_dkk));
+        setPriceEstimates({ min: Math.min(...prices), max: Math.max(...prices) });
+      });
+  }, [delivery.shipping, delivery.size_category]);
 
   useEffect(() => {
     const fromId = new URLSearchParams(window.location.search).get('from');
@@ -356,6 +423,20 @@ export default function OpretOpslagPage() {
     if (isSøges && listing?.id) {
       await db.from('listings').update({ urgency: form.urgency || 'ingen' }).eq('id', listing.id).then(() => {});
     }
+    // Save delivery/shipping options
+    if (listing?.id && !isSøges && (delivery.pickup || delivery.shipping || delivery.custom)) {
+      await db.from('shipping_options').insert({
+        listing_id: listing.id,
+        allow_pickup: delivery.pickup,
+        allow_shipping: delivery.shipping,
+        allow_custom: delivery.custom,
+        pickup_address: delivery.pickup ? (delivery.pickup_address || null) : null,
+        pickup_hours: delivery.pickup && delivery.pickup_hours ? { text: delivery.pickup_hours } : null,
+        pickup_notes: delivery.pickup ? (delivery.pickup_notes || null) : null,
+        shipping_size_category: delivery.shipping ? (delivery.size_category || null) : null,
+        shipping_included_in_price: delivery.shipping ? delivery.shipping_included : false,
+      });
+    }
     if (imgFiles.length > 0) {
       const urls = [];
       for (const file of imgFiles) {
@@ -390,7 +471,8 @@ export default function OpretOpslagPage() {
   const inputStyle = { width:'100%', padding:'12px 14px', borderRadius:12, border:`1.5px solid ${PAPER3}`, fontSize:14, outline:'none', fontFamily:FONT, background:'#fff', color:INK, boxSizing:'border-box' };
   const labelStyle = { display:'block', fontSize:13, fontWeight:700, marginBottom:7, fontFamily:FONT, color:INK2 };
 
-  const step1Valid = form.title.trim() && (form.type !== 'køb' || form.price);
+  const deliveryValid = form.type === 'søges' || delivery.pickup || delivery.shipping || delivery.custom;
+  const step1Valid = form.title.trim() && (form.type !== 'køb' || form.price) && deliveryValid;
   const step2Valid = form.description.trim();
 
   return (
@@ -591,17 +673,129 @@ export default function OpretOpslagPage() {
 
                 {form.type !== 'søges' && (
                   <div>
-                    <label style={labelStyle}>Forsendelse</label>
-                    <button type="button" onClick={()=>setForm(f=>({...f, can_ship: !f.can_ship}))}
-                      style={{ display:'flex', alignItems:'center', gap:12, width:'100%', padding:'13px 16px', borderRadius:14, border: form.can_ship ? `2px solid ${PRIMARY}` : `2px solid ${PAPER3}`, background: form.can_ship ? GREEN_TINT : PAPER, cursor:'pointer', fontFamily:FONT, transition:'all 0.15s', textAlign:'left' }}>
-                      <div style={{ width:22, height:22, borderRadius:6, border: form.can_ship ? `2px solid ${PRIMARY}` : `2px solid ${PAPER3}`, background: form.can_ship ? PRIMARY : 'transparent', display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0, transition:'all 0.15s' }}>
-                        {form.can_ship && <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>}
+                    <label style={labelStyle}>Levering <span style={{ color:'#e53e3e' }}>*</span> <span style={{ fontWeight:400, color:INK3 }}>— vælg mindst én</span></label>
+                    <div style={{ display:'flex', flexDirection:'column', gap:10 }}>
+
+                      {/* 1: Afhentning */}
+                      <div style={{ borderRadius:14, border:`1.5px solid ${delivery.pickup ? PRIMARY : PAPER3}`, background: delivery.pickup ? GREEN_TINT : '#fff', overflow:'hidden', transition:'all 0.15s' }}>
+                        <button type="button" onClick={()=>setDelivery(d=>({...d, pickup:!d.pickup}))}
+                          style={{ display:'flex', alignItems:'center', gap:12, width:'100%', padding:'13px 16px', background:'transparent', border:'none', cursor:'pointer', textAlign:'left' }}>
+                          <div style={{ width:20, height:20, borderRadius:5, border:`2px solid ${delivery.pickup ? PRIMARY : PAPER3}`, background:delivery.pickup ? PRIMARY : 'transparent', display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0 }}>
+                            {delivery.pickup && <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>}
+                          </div>
+                          <div style={{ flex:1 }}>
+                            <div style={{ fontFamily:FONT, fontWeight:700, fontSize:14, color: delivery.pickup ? PRIMARY : INK }}>📍 Afhentes hos os</div>
+                            <div style={{ fontSize:12, color:INK3, marginTop:1 }}>Køber henter selv — gratis og nemt</div>
+                          </div>
+                        </button>
+                        {delivery.pickup && (
+                          <div style={{ padding:'0 16px 16px', display:'flex', flexDirection:'column', gap:10 }}>
+                            <div>
+                              <label style={{ ...labelStyle, fontSize:12, marginBottom:4 }}>Afhentningsadresse</label>
+                              <input value={delivery.pickup_address} onChange={e=>setDelivery(d=>({...d,pickup_address:e.target.value}))}
+                                placeholder="Fx: Skolevej 12, 8000 Aarhus C" style={{ ...inputStyle, fontSize:13, padding:'9px 12px' }} />
+                            </div>
+                            <div>
+                              <label style={{ ...labelStyle, fontSize:12, marginBottom:4 }}>Åbningstider for afhentning</label>
+                              <input value={delivery.pickup_hours} onChange={e=>setDelivery(d=>({...d,pickup_hours:e.target.value}))}
+                                placeholder="Fx: Hverdage 8-16, aftales i chatten" style={{ ...inputStyle, fontSize:13, padding:'9px 12px' }} />
+                            </div>
+                            <div>
+                              <label style={{ ...labelStyle, fontSize:12, marginBottom:4 }}>Bemærkninger <span style={{ fontWeight:400, color:INK3 }}>(valgfri)</span></label>
+                              <input value={delivery.pickup_notes} onChange={e=>setDelivery(d=>({...d,pickup_notes:e.target.value}))}
+                                placeholder="Fx: Brug indgangen til venstre" style={{ ...inputStyle, fontSize:13, padding:'9px 12px' }} />
+                            </div>
+                          </div>
+                        )}
                       </div>
-                      <div>
-                        <div style={{ fontWeight:700, fontSize:14, color: form.can_ship ? PRIMARY : INK }}>📦 Kan sendes</div>
-                        <div style={{ fontSize:12, color:INK3, marginTop:2 }}>Varen kan sendes med post eller pakkeforsendelse</div>
+
+                      {/* 2: Pakke */}
+                      <div style={{ borderRadius:14, border:`1.5px solid ${delivery.shipping ? '#2563EB' : PAPER3}`, background: delivery.shipping ? '#EFF6FF' : '#fff', overflow:'hidden', transition:'all 0.15s' }}>
+                        <button type="button" onClick={()=>setDelivery(d=>({...d, shipping:!d.shipping}))}
+                          style={{ display:'flex', alignItems:'center', gap:12, width:'100%', padding:'13px 16px', background:'transparent', border:'none', cursor:'pointer', textAlign:'left' }}>
+                          <div style={{ width:20, height:20, borderRadius:5, border:`2px solid ${delivery.shipping ? '#2563EB' : PAPER3}`, background:delivery.shipping ? '#2563EB' : 'transparent', display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0 }}>
+                            {delivery.shipping && <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>}
+                          </div>
+                          <div style={{ flex:1 }}>
+                            <div style={{ fontFamily:FONT, fontWeight:700, fontSize:14, color: delivery.shipping ? '#2563EB' : INK }}>📦 Vi kan sende med pakke</div>
+                            <div style={{ fontSize:12, color:INK3, marginTop:1 }}>PostNord, DAO eller GLS — porto betales af køber eller inkluderet</div>
+                          </div>
+                        </button>
+                        {delivery.shipping && (
+                          <div style={{ padding:'0 16px 16px', display:'flex', flexDirection:'column', gap:12 }}>
+                            <div>
+                              <label style={{ ...labelStyle, fontSize:12, marginBottom:6 }}>Pakkestørrelse</label>
+                              <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:8 }}>
+                                {[
+                                  { key:'small',  label:'Lille',       sub:'op til 2 kg · 35×25×20 cm', ex:'Bøger, puslespil' },
+                                  { key:'medium', label:'Mellem',      sub:'2–5 kg · 50×35×25 cm',      ex:'Bamser, brætspil' },
+                                  { key:'large',  label:'Stor',        sub:'5–15 kg · 60×40×40 cm',     ex:'Kasser med legetøj' },
+                                  { key:'xlarge', label:'Meget stor',  sub:'15–30 kg · 100×60×60 cm',   ex:'Større ting' },
+                                ].map(sz => (
+                                  <button key={sz.key} type="button" onClick={()=>setDelivery(d=>({...d,size_category:sz.key}))}
+                                    style={{ padding:'10px 12px', borderRadius:10, border:`1.5px solid ${delivery.size_category===sz.key?'#2563EB':PAPER3}`, background:delivery.size_category===sz.key?'#EFF6FF':'#fff', cursor:'pointer', textAlign:'left', transition:'all 0.12s' }}>
+                                    <div style={{ fontFamily:FONT, fontWeight:700, fontSize:13, color:delivery.size_category===sz.key?'#2563EB':INK }}>{sz.label}</div>
+                                    <div style={{ fontSize:11, color:INK3, marginTop:2, lineHeight:1.4 }}>{sz.sub}</div>
+                                    <div style={{ fontSize:11, color:INK3, marginTop:1, fontStyle:'italic' }}>{sz.ex}</div>
+                                  </button>
+                                ))}
+                              </div>
+                            </div>
+                            {priceEstimates && (
+                              <div style={{ background:'#DBEAFE', borderRadius:10, padding:'10px 14px', fontSize:13, color:'#1D4ED8', fontFamily:FONT, fontWeight:600 }}>
+                                💡 Estimeret porto: ca. {priceEstimates.min}–{priceEstimates.max} kr. afhængig af transportør
+                              </div>
+                            )}
+                            <div>
+                              <label style={{ ...labelStyle, fontSize:12, marginBottom:6 }}>Porto-håndtering</label>
+                              <div style={{ display:'flex', flexDirection:'column', gap:6 }}>
+                                {[
+                                  { val:false, label:'Køber betaler porto oveni', sub:'Prisen du har sat er ekskl. porto' },
+                                  { val:true,  label:'Inkluderet i prisen',         sub:'Du har lagt porto ind i prisen' },
+                                ].map(opt => (
+                                  <button key={String(opt.val)} type="button" onClick={()=>setDelivery(d=>({...d,shipping_included:opt.val}))}
+                                    style={{ display:'flex', alignItems:'center', gap:10, padding:'10px 14px', borderRadius:10, border:`1.5px solid ${delivery.shipping_included===opt.val?'#2563EB':PAPER3}`, background:delivery.shipping_included===opt.val?'#EFF6FF':'#fff', cursor:'pointer', textAlign:'left' }}>
+                                    <div style={{ width:16, height:16, borderRadius:'50%', border:`2px solid ${delivery.shipping_included===opt.val?'#2563EB':PAPER3}`, background:delivery.shipping_included===opt.val?'#2563EB':'transparent', flexShrink:0 }} />
+                                    <div>
+                                      <div style={{ fontFamily:FONT, fontWeight:700, fontSize:13, color:delivery.shipping_included===opt.val?'#2563EB':INK }}>{opt.label}</div>
+                                      <div style={{ fontSize:11, color:INK3 }}>{opt.sub}</div>
+                                    </div>
+                                  </button>
+                                ))}
+                              </div>
+                            </div>
+                          </div>
+                        )}
                       </div>
-                    </button>
+
+                      {/* 3: Individuel */}
+                      <div style={{ borderRadius:14, border:`1.5px solid ${delivery.custom ? '#D97706' : PAPER3}`, background: delivery.custom ? '#FFFBEB' : '#fff', overflow:'hidden', transition:'all 0.15s' }}>
+                        <button type="button" onClick={()=>setDelivery(d=>({...d, custom:!d.custom}))}
+                          style={{ display:'flex', alignItems:'center', gap:12, width:'100%', padding:'13px 16px', background:'transparent', border:'none', cursor:'pointer', textAlign:'left' }}>
+                          <div style={{ width:20, height:20, borderRadius:5, border:`2px solid ${delivery.custom ? '#D97706' : PAPER3}`, background:delivery.custom ? '#D97706' : 'transparent', display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0 }}>
+                            {delivery.custom && <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>}
+                          </div>
+                          <div style={{ flex:1 }}>
+                            <div style={{ fontFamily:FONT, fontWeight:700, fontSize:14, color: delivery.custom ? '#D97706' : INK }}>🤝 Vi aftaler levering individuelt</div>
+                            <div style={{ fontSize:12, color:INK3, marginTop:1 }}>Mødes halvvejs, I leverer selv, eller andet — aftales i chatten</div>
+                          </div>
+                        </button>
+                        {delivery.custom && (
+                          <div style={{ padding:'0 16px 16px' }}>
+                            <label style={{ ...labelStyle, fontSize:12, marginBottom:4 }}>Beskrivelse <span style={{ fontWeight:400, color:INK3 }}>(valgfri)</span></label>
+                            <input value={delivery.custom_notes} onChange={e=>setDelivery(d=>({...d,custom_notes:e.target.value}))}
+                              placeholder="Fx: Vi kan levere inden for 10 km, eller mødes i Aarhus midtby" style={{ ...inputStyle, fontSize:13, padding:'9px 12px' }} />
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Validering */}
+                      {!delivery.pickup && !delivery.shipping && !delivery.custom && (
+                        <div style={{ fontSize:12, color:'#B91C1C', fontFamily:FONT, fontWeight:600, padding:'6px 2px' }}>
+                          ⚠️ Vælg mindst én leveringsmulighed
+                        </div>
+                      )}
+                    </div>
                   </div>
                 )}
 
