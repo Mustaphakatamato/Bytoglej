@@ -65,6 +65,18 @@ export default function VilkaarPage() {
           <p>byt&amp;leg er i øjeblikket gratis at bruge. Vi forbeholder os retten til at indføre gebyrer i fremtiden med mindst 30 dages varsel til eksisterende brugere.</p>
         </Section>
 
+        <Section title="5a. Pakkelevering og forsendelsestjeneste">
+          <ul style={{ paddingLeft: 20, marginTop: 8 }}>
+            <li style={{ marginBottom: 6 }}>byt&amp;leg tilbyder en integreret pakkeleveringstjeneste via Shipmondo. Tjenesten er valgfri — institutioner kan altid vælge afhentning eller individuel leveringsaftale.</li>
+            <li style={{ marginBottom: 6 }}>Forsendelsesomkostninger afholdes af sælgerinstitutionen og faktureres månedligt.</li>
+            <li style={{ marginBottom: 6 }}>byt&amp;leg agerer som formidler af transportaftalen og er ikke part i transportkontrakten mellem afsender og transportør (PostNord, DAO eller GLS).</li>
+            <li style={{ marginBottom: 6 }}>byt&amp;leg hæfter ikke for forsinkelser, beskadigelse eller tab af pakker under transport. Reklamationer håndteres direkte med den pågældende transportør.</li>
+            <li style={{ marginBottom: 6 }}>Institutioner med aktiv forsendelsestjeneste tildeles en månedlig kreditgrænse. Overskridelse af kreditgrænsen blokerer for yderligere forsendelser indtil næste fakturaperiode.</li>
+            <li style={{ marginBottom: 6 }}>Fakturaer for forsendelser forfalder til betaling inden udgangen af den måned de er udstedt. byt&amp;leg forbeholder sig ret til at suspendere forsendelsestjenesten ved manglende betaling.</li>
+            <li style={{ marginBottom: 6 }}>Priserne for forsendelse er vejledende og kan variere afhængigt af vægt, størrelse og destination. Endelig pris fremgår af fakturaen.</li>
+          </ul>
+        </Section>
+
         <Section title="6. Immaterielle rettigheder">
           <p>Alt indhold på platformen — herunder design, tekst og funktionalitet — tilhører byt&amp;leg. Du beholder rettighederne til det indhold (billeder, tekster) du selv uploader, men giver byt&amp;leg en ikke-eksklusiv licens til at vise det på platformen.</p>
         </Section>
