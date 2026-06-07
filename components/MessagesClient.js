@@ -247,6 +247,7 @@ export default function MessagesClient() {
   const [checkoutDeliveries, setCheckoutDeliveries] = useState({});
   const [shipmentInfo, setShipmentInfo] = useState(null);
   const [confirmingOrder, setConfirmingOrder] = useState(false);
+  const [shipmentLoading, setShipmentLoading] = useState(false);
   const ww = useWindowWidth();
   const isMobile = ww < 768;
 
@@ -387,6 +388,11 @@ export default function MessagesClient() {
       const patch = isInit ? { initiator_unread: 0 } : { owner_unread: 0 };
       await db.from('conversations').update(patch).eq('id', conv.id);
       setConvs(cs => cs.map(c => c.id === conv.id ? { ...c, ...patch } : c));
+    }
+    // Load shipment if one exists for this conversation
+    if (conv.shipment_id) {
+      db.from('shipments').select('tracking_number,tracking_url,label_pdf_url,status,carrier').eq('id', conv.shipment_id).maybeSingle()
+        .then(({ data: s }) => { if (s) setShipmentInfo(s); });
     }
   }
 
@@ -762,11 +768,44 @@ export default function MessagesClient() {
     persistCO2Saving(convWithFallback, active.listing_category || null);
 
     if (isShipping) {
-      fetch('/api/book-shipment', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ conversationId: active.id, listingId: checkoutData.listing_id }),
-      }).catch(() => {});
+      try {
+        const res = await fetch('/api/book-shipment', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            conversation_id: active.id,
+            listing_id: checkoutData.listing_id,
+            delivery_method: 'shipping',
+            buyer_name: active.initiator_name,
+            seller_name: active.owner_name,
+          }),
+        });
+        const result = await res.json();
+        if (result.ok) {
+          const info = {
+            tracking_number: result.tracking_number,
+            tracking_url: result.tracking_url,
+            label_pdf_url: result.label_pdf_url,
+            status: 'booked',
+          };
+          setShipmentInfo(info);
+          const trackingContent = JSON.stringify({
+            type: 'shipment',
+            tracking_number: result.tracking_number,
+            tracking_url: result.tracking_url,
+            label_pdf_url: result.label_pdf_url,
+          });
+          const { data: trackMsg } = await db.from('chat_messages').insert({
+            conversation_id: active.id,
+            sender_id: effUid,
+            sender_name: senderName,
+            content: trackingContent,
+            message_type: 'shipment',
+          }).select().single();
+          if (trackMsg) setMessages(ms => [...ms, trackMsg]);
+          setTimeout(() => bottomRef.current?.scrollIntoView({ behavior:'smooth' }), 60);
+        }
+      } catch {}
     }
   }
 
@@ -1194,18 +1233,20 @@ export default function MessagesClient() {
                         const showDate = dateStr !== lastDate;
                         lastDate = dateStr;
                         const prevMine = i>0 && (ctxIsAdmin && adminInstName ? messages[i-1].sender_name === adminInstName : messages[i-1].sender_id === userId);
-                        const grouped = mine === prevMine && !showDate && m.message_type !== 'bid' && messages[i-1]?.message_type !== 'bid' && m.message_type !== 'swap' && messages[i-1]?.message_type !== 'swap' && m.message_type !== 'bundle' && messages[i-1]?.message_type !== 'bundle' && m.message_type !== 'image' && messages[i-1]?.message_type !== 'image' && m.message_type !== 'buy_request' && messages[i-1]?.message_type !== 'buy_request' && m.message_type !== 'checkout_pending' && messages[i-1]?.message_type !== 'checkout_pending';
+                        const grouped = mine === prevMine && !showDate && m.message_type !== 'bid' && messages[i-1]?.message_type !== 'bid' && m.message_type !== 'swap' && messages[i-1]?.message_type !== 'swap' && m.message_type !== 'bundle' && messages[i-1]?.message_type !== 'bundle' && m.message_type !== 'image' && messages[i-1]?.message_type !== 'image' && m.message_type !== 'buy_request' && messages[i-1]?.message_type !== 'buy_request' && m.message_type !== 'checkout_pending' && messages[i-1]?.message_type !== 'checkout_pending' && m.message_type !== 'shipment' && messages[i-1]?.message_type !== 'shipment';
                         const isBid = m.message_type === 'bid';
                         const isSwap = m.message_type === 'swap';
                         const isBundle = m.message_type === 'bundle';
                         const isImage = m.message_type === 'image';
                         const isBuyRequest = m.message_type === 'buy_request';
                         const isCheckout = m.message_type === 'checkout_pending';
+                        const isShipment = m.message_type === 'shipment';
                         const bundleData = isBundle ? (() => { try { return JSON.parse(m.content); } catch { return null; } })() : null;
                         const swapData = isSwap ? (() => { try { return JSON.parse(m.content); } catch { return null; } })() : null;
                         const imageData = isImage ? (() => { try { return JSON.parse(m.content); } catch { return null; } })() : null;
                         const buyData = isBuyRequest ? (() => { try { return JSON.parse(m.content); } catch { return null; } })() : null;
                         const checkoutData = isCheckout ? (() => { try { return JSON.parse(m.content); } catch { return null; } })() : null;
+                        const shipmentData = isShipment ? (() => { try { return JSON.parse(m.content); } catch { return null; } })() : null;
                         return (
                           <React.Fragment key={m.id}>
                             {showDate && <div style={{ textAlign:'center', margin:'12px 0 4px', fontSize:11, fontWeight:600, color:INK3, letterSpacing:0.5, fontFamily:FONT }}>{dateStr}</div>}
@@ -1269,11 +1310,29 @@ export default function MessagesClient() {
                                             });
                                             const result = await res.json();
                                             if (result.ok) {
-                                              setShipmentInfo({
+                                              const info = {
+                                                tracking_number: result.tracking_number,
+                                                tracking_url: result.tracking_url,
+                                                label_pdf_url: result.label_pdf_url,
+                                                status: 'booked',
+                                              };
+                                              setShipmentInfo(info);
+                                              // Insert tracking message visible to both parties
+                                              const trackingContent = JSON.stringify({
+                                                type: 'shipment',
                                                 tracking_number: result.tracking_number,
                                                 tracking_url: result.tracking_url,
                                                 label_pdf_url: result.label_pdf_url,
                                               });
+                                              const { data: trackMsg } = await db.from('chat_messages').insert({
+                                                conversation_id: active.id,
+                                                sender_id: effUid,
+                                                sender_name: senderName,
+                                                content: trackingContent,
+                                                message_type: 'shipment',
+                                              }).select().single();
+                                              if (trackMsg) setMessages(ms => [...ms, trackMsg]);
+                                              setTimeout(() => bottomRef.current?.scrollIntoView({ behavior:'smooth' }), 60);
                                             }
                                           } catch {}
                                         }
@@ -1606,6 +1665,50 @@ export default function MessagesClient() {
                                   <div style={{ fontSize:10, color:INK3, marginTop:3, textAlign:mine?'right':'left', fontFamily:FONT }}>{d.toLocaleTimeString('da-DK',{hour:'2-digit',minute:'2-digit'})}</div>
                                 </div>
                               </div>
+                            ) : isShipment && shipmentData ? (
+                              <div style={{ margin:'16px 0' }}>
+                                <div style={{ background:GREEN_TINT, border:`2px solid ${PRIMARY}`, borderRadius:16, padding:'16px 18px' }}>
+                                  <div style={{ display:'flex', alignItems:'center', gap:10, marginBottom:12 }}>
+                                    <span style={{ fontSize:22 }}>📦</span>
+                                    <div>
+                                      <div style={{ fontFamily:FONT, fontWeight:800, fontSize:14, color:INK }}>Pakke på vej!</div>
+                                      <div style={{ fontFamily:FONT, fontSize:12, color:INK3, marginTop:1 }}>
+                                        {d.toLocaleTimeString('da-DK',{hour:'2-digit',minute:'2-digit'})} · {d.toLocaleDateString('da-DK',{day:'numeric',month:'short'})}
+                                      </div>
+                                    </div>
+                                  </div>
+                                  {shipmentData.tracking_number && (
+                                    <div style={{ background:'rgba(42,125,79,0.1)', borderRadius:10, padding:'10px 14px', marginBottom:12 }}>
+                                      <div style={{ fontFamily:FONT, fontSize:11, fontWeight:700, color:PRIMARY, textTransform:'uppercase', letterSpacing:0.5, marginBottom:3 }}>Trackingnummer</div>
+                                      <div style={{ fontFamily:FONT, fontSize:16, fontWeight:800, color:INK, letterSpacing:0.5 }}>{shipmentData.tracking_number}</div>
+                                    </div>
+                                  )}
+                                  <div style={{ display:'flex', gap:8, flexWrap:'wrap' }}>
+                                    {shipmentData.tracking_url && (
+                                      <a href={shipmentData.tracking_url} target="_blank" rel="noreferrer"
+                                        style={{ flex:1, display:'flex', alignItems:'center', justifyContent:'center', gap:6, padding:'10px 14px', borderRadius:99, background:PRIMARY, color:'#fff', fontFamily:FONT, fontWeight:700, fontSize:13, textDecoration:'none' }}>
+                                        Følg pakken →
+                                      </a>
+                                    )}
+                                    {shipmentData.label_pdf_url && isOwnerInConv && (
+                                      <a href={shipmentData.label_pdf_url} target="_blank" rel="noreferrer"
+                                        style={{ flex:1, display:'flex', alignItems:'center', justifyContent:'center', gap:6, padding:'10px 14px', borderRadius:99, background:PAPER3, color:INK, fontFamily:FONT, fontWeight:700, fontSize:13, textDecoration:'none', border:`1.5px solid rgba(22,34,28,0.12)` }}>
+                                        🖨️ Print label
+                                      </a>
+                                    )}
+                                  </div>
+                                  {isOwnerInConv && (
+                                    <div style={{ marginTop:12, padding:'10px 12px', background:'rgba(42,125,79,0.07)', borderRadius:10 }}>
+                                      <div style={{ fontFamily:FONT, fontSize:12, fontWeight:700, color:INK, marginBottom:4 }}>Næste skridt som sælger</div>
+                                      <ol style={{ margin:0, paddingLeft:16, fontFamily:FONT, fontSize:12, color:INK2, lineHeight:1.8 }}>
+                                        <li>Print forsendelseslabelen</li>
+                                        <li>Klæb den på pakken</li>
+                                        <li>Aflevér pakken på nærmeste udleveringssted</li>
+                                      </ol>
+                                    </div>
+                                  )}
+                                </div>
+                              </div>
                             ) : (
                               <div style={{ display:'flex', justifyContent:mine?'flex-end':'flex-start', marginTop:grouped?2:10 }}>
                                 {!mine && !grouped && <div style={{ width:30, height:30, borderRadius:'50%', background:GREEN_TINT, display:'flex', alignItems:'center', justifyContent:'center', fontSize:12, fontWeight:700, color:PRIMARY, flexShrink:0, marginRight:8, alignSelf:'flex-end', fontFamily:FONT }}>{m.sender_name.charAt(0).toUpperCase()}</div>}
@@ -1626,34 +1729,32 @@ export default function MessagesClient() {
                 <div ref={bottomRef} />
               </div>
 
-              {/* Shipment label banner */}
-              {shipmentInfo && (
-                <div style={{ borderTop:`2px solid ${PRIMARY}`, background:GREEN_TINT, padding:'14px 16px' }}>
-                  <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', gap:8 }}>
-                    <div>
-                      <div style={{ fontFamily:FONT, fontWeight:700, fontSize:13, color:INK, marginBottom:2 }}>📦 Forsendelse booket</div>
-                      {shipmentInfo.tracking_number && (
-                        <div style={{ fontFamily:FONT, fontSize:12, color:INK3 }}>Trackingnr.: <strong style={{ color:INK }}>{shipmentInfo.tracking_number}</strong></div>
-                      )}
+              {/* Pinned shipment strip — seller only */}
+              {shipmentInfo && (() => {
+                const isOwner = (ctxIsAdmin && adminInstName) ? active?.owner_name === adminInstName : active?.owner_id === userId;
+                if (!isOwner) return null;
+                return (
+                  <div style={{ borderTop:`1.5px solid ${PRIMARY}`, background:GREEN_TINT, padding:'10px 16px', display:'flex', alignItems:'center', gap:10 }}>
+                    <span style={{ fontSize:16 }}>📦</span>
+                    <div style={{ flex:1, minWidth:0 }}>
+                      <div style={{ fontFamily:FONT, fontWeight:700, fontSize:12, color:INK }}>Forsendelse booket</div>
+                      {shipmentInfo.tracking_number && <div style={{ fontFamily:FONT, fontSize:11, color:INK3, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{shipmentInfo.tracking_number}</div>}
                     </div>
-                    <div style={{ display:'flex', gap:8, flexShrink:0 }}>
-                      {shipmentInfo.label_pdf_url && (
-                        <a href={shipmentInfo.label_pdf_url} target="_blank" rel="noreferrer"
-                          style={{ padding:'8px 14px', borderRadius:99, background:PRIMARY, color:'#fff', fontFamily:FONT, fontWeight:700, fontSize:12, textDecoration:'none', whiteSpace:'nowrap' }}>
-                          🖨️ Print label
-                        </a>
-                      )}
-                      {shipmentInfo.tracking_url && (
-                        <a href={shipmentInfo.tracking_url} target="_blank" rel="noreferrer"
-                          style={{ padding:'8px 14px', borderRadius:99, background:PAPER3, color:INK, fontFamily:FONT, fontWeight:700, fontSize:12, textDecoration:'none', whiteSpace:'nowrap' }}>
-                          Følg pakke →
-                        </a>
-                      )}
-                      <button onClick={()=>setShipmentInfo(null)} style={{ background:'none', border:'none', cursor:'pointer', color:INK3, fontSize:16, padding:'4px 6px' }}>✕</button>
-                    </div>
+                    {shipmentInfo.label_pdf_url && (
+                      <a href={shipmentInfo.label_pdf_url} target="_blank" rel="noreferrer"
+                        style={{ padding:'6px 12px', borderRadius:99, background:PRIMARY, color:'#fff', fontFamily:FONT, fontWeight:700, fontSize:11, textDecoration:'none', whiteSpace:'nowrap', flexShrink:0 }}>
+                        🖨️ Print label
+                      </a>
+                    )}
+                    {shipmentInfo.tracking_url && (
+                      <a href={shipmentInfo.tracking_url} target="_blank" rel="noreferrer"
+                        style={{ padding:'6px 12px', borderRadius:99, background:PAPER3, color:INK, fontFamily:FONT, fontWeight:700, fontSize:11, textDecoration:'none', whiteSpace:'nowrap', flexShrink:0, border:`1px solid rgba(22,34,28,0.1)` }}>
+                        Spor →
+                      </a>
+                    )}
                   </div>
-                </div>
-              )}
+                );
+              })()}
 
               {/* Reject bar */}
               {rejectingBid && (
