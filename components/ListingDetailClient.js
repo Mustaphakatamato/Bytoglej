@@ -164,7 +164,10 @@ export default function ListingDetailClient() {
     });
   }, []);
 
-  const isOwn = !!(ctxInstitution && listing?.institution_name?.toLowerCase() === ctxInstitution.name?.toLowerCase());
+  const isOwn = !!(
+    (ctxInstitution && listing?.institution_name?.toLowerCase() === ctxInstitution.name?.toLowerCase()) ||
+    (currentUserId && listing?.user_id === currentUserId)
+  );
 
   useEffect(() => { if (listing) setIsFav(favs?.includes(listing.id) || false); }, [favs, listing?.id]);
 
