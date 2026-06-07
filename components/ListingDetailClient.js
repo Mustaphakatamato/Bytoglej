@@ -266,7 +266,7 @@ export default function ListingDetailClient() {
     const { data: myInst } = await db.from('institutions').select('id,name').ilike('email', user.email).maybeSingle();
     const userName = myInst?.name || user.email;
     const myInstId = myInst?.id || null;
-    if (listing.institution_name === userName) {
+    if (listing.institution_name?.toLowerCase() === userName?.toLowerCase()) {
       showToast('Dette er dit eget opslag.', 'info'); return;
     }
     const { data: ownerInstData } = await db.from('institutions').select('id,email,name').eq('name', listing.institution_name).maybeSingle();
