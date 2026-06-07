@@ -1,364 +1,165 @@
 'use client';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { db } from '@/lib/supabase';
-import { PRIMARY, GREEN_DEEP, INK, INK2, INK3, PAPER2, PAPER3 } from '@/lib/constants';
-import { useWindowWidth, geocodeAddress } from '@/lib/hooks';
-import { useApp } from '@/providers/AppProvider';
-import { Btn, Spinner } from '@/components/ui';
+import { PRIMARY, GREEN_TINT, PAPER, PAPER2, PAPER3, INK, INK2, INK3 } from '@/lib/constants';
+import { useWindowWidth } from '@/lib/hooks';
+import { useApp, useActiveUser } from '@/providers/AppProvider';
 
 const FONT = "'Sora', sans-serif";
-const INP = { width:'100%', padding:'11px 14px', borderRadius:12, border:'1.5px solid #e5e5e5', fontSize:14, fontFamily:"'Nunito Sans',sans-serif", outline:'none', boxSizing:'border-box' };
 
-const PW_RULES = [
-  { id:'len',   label:'Mindst 8 tegn',              test: p => p.length >= 8 },
-  { id:'upper', label:'Mindst ét stort bogstav',     test: p => /[A-Z]/.test(p) },
-  { id:'lower', label:'Mindst ét lille bogstav',     test: p => /[a-z]/.test(p) },
-  { id:'num',   label:'Mindst ét tal',               test: p => /[0-9]/.test(p) },
-  { id:'spec',  label:'Mindst ét specialtegn (!@#…)',test: p => /[^A-Za-z0-9]/.test(p) },
-];
-
-function SChoiceGroup({ value, onChange, options, primary }) {
+function MenuItem({ icon, label, value, onClick, danger }) {
   return (
-    <div style={{ display:'flex', gap:8, flexWrap:'wrap' }}>
-      {options.map(o => (
-        <button key={o} type="button" onClick={()=>onChange(o)}
-          style={{ padding:'9px 16px', borderRadius:20, border:`2px solid ${value===o?primary:'#e5e5e5'}`, background:value===o?primary:'#fff', color:value===o?'#fff':'#444', fontSize:13, fontWeight:600, cursor:'pointer', transition:'all 0.15s' }}>
-          {o}
-        </button>
-      ))}
-    </div>
+    <button onClick={onClick} style={{
+      width:'100%', display:'flex', alignItems:'center', gap:14,
+      padding:'15px 20px', background:'none', border:'none', cursor:'pointer', textAlign:'left',
+      borderBottom:`1px solid ${PAPER3}`,
+    }}>
+      <span style={{ fontSize:18, width:24, textAlign:'center', flexShrink:0 }}>{icon}</span>
+      <span style={{ flex:1, fontFamily:FONT, fontSize:15, fontWeight:600, color: danger ? '#e11d48' : INK }}>{label}</span>
+      {value && <span style={{ fontFamily:FONT, fontSize:13, color:INK3, marginRight:4 }}>{value}</span>}
+      {!danger && <svg width="7" height="12" viewBox="0 0 7 12" fill="none"><path d="M1 1l5 5-5 5" stroke={INK3} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/></svg>}
+    </button>
   );
 }
 
-function Modal({ title, icon, onClose, children }) {
+function MenuSection({ children }) {
   return (
-    <div style={{ position:'fixed', inset:0, background:'rgba(0,0,0,0.45)', zIndex:1000, display:'flex', alignItems:'center', justifyContent:'center', padding:16 }} onClick={onClose}>
-      <div style={{ background:'#fff', borderRadius:20, padding:'32px 28px', maxWidth:440, width:'100%', boxShadow:'0 8px 40px rgba(0,0,0,0.18)', position:'relative' }} onClick={e=>e.stopPropagation()}>
-        <button onClick={onClose} style={{ position:'absolute', top:16, right:16, background:'#f5f4f2', border:'none', borderRadius:8, width:32, height:32, cursor:'pointer', fontSize:16, color:INK3 }}>✕</button>
-        <div style={{ fontSize:32, marginBottom:12, textAlign:'center' }}>{icon}</div>
-        <h2 style={{ fontFamily:FONT, fontWeight:800, fontSize:20, color:INK, letterSpacing:'-0.03em', marginBottom:20, textAlign:'center' }}>{title}</h2>
-        {children}
-      </div>
+    <div style={{ background:'#fff', borderRadius:16, overflow:'hidden', boxShadow:'0 1px 3px rgba(22,34,28,0.06)' }}>
+      {children}
     </div>
   );
 }
 
 export default function ProfilPage() {
   const router = useRouter();
-  const { effectiveInstitution, setInstitution, adminInst, setAdminInst, showToast } = useApp();
-  const institution = effectiveInstitution;
+  const { effectiveInstitution, loggedIn, setLoggedIn } = useApp();
+  const { realUserId, userId, institutionId: ctxInstId, institution: ctxInst } = useActiveUser();
+  const institution = effectiveInstitution || ctxInst;
   const ww = useWindowWidth();
   const isMobile = ww < 768;
 
-  const [form, setForm] = useState({
-    institution_type: institution?.institution_type || '',
-    ownership_type:   institution?.ownership_type   || '',
-    address:          institution?.address          || '',
-    zipcode:          institution?.zipcode          || '',
-    city:             institution?.city             || '',
-    children_count:   institution?.children_count   || '',
-    phone:            institution?.phone            || '',
-    website:          institution?.website          || '',
-    leader_name:      institution?.leader_name      || '',
-    leader_phone:     institution?.leader_phone     || '',
-    leader_email:     institution?.leader_email     || '',
-    contact_name:     institution?.contact_name     || '',
-  });
-  const [saving, setSaving] = useState(false);
+  const [co2Total, setCo2Total] = useState(null);
+  const [tradeCount, setTradeCount] = useState(null);
+  const [pendingCount, setPendingCount] = useState(0);
 
-  // Modals
-  const [showEmailModal, setShowEmailModal] = useState(false);
-  const [showPwModal, setShowPwModal]       = useState(false);
+  useEffect(() => {
+    if (!institution?.id) return;
+    const instId = institution.id;
+    const instName = institution.name;
 
-  // Email modal state
-  const [newEmail, setNewEmail]     = useState('');
-  const [emailSaving, setEmailSaving] = useState(false);
-  const [emailMsg, setEmailMsg]     = useState(null);
-
-  // Password modal state
-  const [pwForm, setPwForm]   = useState({ current:'', next:'', confirm:'' });
-  const [pwSaving, setPwSaving] = useState(false);
-  const [pwMsg, setPwMsg]     = useState(null);
-
-  function onInstChange(updated) {
-    if (adminInst) setAdminInst(updated);
-    else setInstitution(updated);
-  }
-
-  async function handleSave() {
-    if (!institution) { showToast('Ingen institution fundet', 'error'); return; }
-    setSaving(true);
-    const { error } = await db.from('institutions').update({
-      institution_type: form.institution_type,
-      ownership_type:   form.ownership_type,
-      address:          form.address,
-      zipcode:          form.zipcode,
-      city:             form.city,
-      children_count:   Number(form.children_count) || null,
-      phone:            form.phone || null,
-      website:          form.website || null,
-      leader_name:      form.leader_name,
-      leader_phone:     form.leader_phone,
-      leader_email:     form.leader_email,
-      contact_name:     form.contact_name,
-    }).eq('email', institution.email);
-    setSaving(false);
-    if (error) { showToast('Noget gik galt', 'error'); return; }
-    const addrChanged = form.address !== institution.address || form.zipcode !== institution.zipcode || form.city !== institution.city;
-    if (addrChanged) {
-      geocodeAddress(form.address, form.zipcode, form.city).then(coords => {
-        if (coords) db.from('institutions').update({ latitude: coords.lat, longitude: coords.lon }).eq('email', institution.email);
+    // CO2 total
+    db.from('transaction_co2_savings')
+      .select('net_saved_kg')
+      .or(`seller_institution_id.eq.${instId},buyer_institution_id.eq.${instId}`)
+      .then(({ data }) => {
+        if (data?.length) setCo2Total(data.reduce((s, r) => s + (r.net_saved_kg || 0), 0));
       });
-    }
-    onInstChange({ ...institution, ...form, children_count: Number(form.children_count) || null });
-    showToast('Profil opdateret ✓');
-    router.push('/dashboard');
+
+    // Trade count
+    db.from('conversations')
+      .select('id', { count:'exact', head:true })
+      .or(`owner_institution_id.eq.${instId},initiator_institution_id.eq.${instId}`)
+      .eq('deal_completed', true)
+      .then(({ count }) => { if (count !== null) setTradeCount(count); });
+
+    // Pending seller tasks
+    const uid = realUserId || userId;
+    const ownerParts = [`owner_institution_id.eq.${instId}`];
+    if (uid) ownerParts.push(`owner_id.eq.${uid}`);
+    if (instName) ownerParts.push(`owner_name.eq.${instName}`);
+    db.from('conversations')
+      .select('id,is_handled,handled_action,deal_completed,deal_type')
+      .or(ownerParts.join(','))
+      .eq('deal_completed', false)
+      .then(({ data }) => {
+        if (data) setPendingCount(data.filter(c =>
+          (!c.is_handled && c.deal_type === 'køb') ||
+          (c.is_handled && c.handled_action === 'order_confirmed' && !c.deal_completed)
+        ).length);
+      });
+  }, [institution?.id]);
+
+  async function handleLogout() {
+    await db.auth.signOut();
+    setLoggedIn(false);
+    router.push('/');
   }
 
-  async function handleEmailChange() {
-    const trimmed = newEmail.trim().toLowerCase();
-    if (!trimmed || !trimmed.includes('@') || !trimmed.includes('.')) {
-      setEmailMsg({ ok:false, text:'Indtast en gyldig e-mailadresse.' }); return;
-    }
-    if (trimmed === institution?.email?.toLowerCase()) {
-      setEmailMsg({ ok:false, text:'Det er allerede din nuværende e-mail.' }); return;
-    }
-    setEmailSaving(true);
-    setEmailMsg(null);
-    // Check if email already exists in institutions
-    const { data: existing } = await db.from('institutions').select('id').eq('email', trimmed).maybeSingle();
-    if (existing) {
-      setEmailSaving(false);
-      setEmailMsg({ ok:false, text:'Denne e-mailadresse er allerede tilknyttet en konto.' }); return;
-    }
-    const { error } = await db.auth.updateUser({ email: trimmed });
-    setEmailSaving(false);
-    if (error) { setEmailMsg({ ok:false, text: error.message }); return; }
-    setEmailMsg({ ok:true, text:`En bekræftelsesmail er sendt til ${trimmed}. Følg linket for at gennemføre skiftet.` });
-    setNewEmail('');
-  }
-
-  async function handlePasswordChange() {
-    if (!pwForm.current) { setPwMsg({ ok:false, text:'Indtast dit nuværende kodeord.' }); return; }
-    const failed = PW_RULES.filter(r => !r.test(pwForm.next));
-    if (failed.length) { setPwMsg({ ok:false, text:`Kodeordet opfylder ikke kravene: ${failed.map(r=>r.label.toLowerCase()).join(', ')}.` }); return; }
-    if (pwForm.next !== pwForm.confirm) { setPwMsg({ ok:false, text:'De to kodeord stemmer ikke overens.' }); return; }
-    setPwSaving(true);
-    setPwMsg(null);
-    const { data: { user } } = await db.auth.getUser();
-    const { error: signInErr } = await db.auth.signInWithPassword({ email: user.email, password: pwForm.current });
-    if (signInErr) { setPwSaving(false); setPwMsg({ ok:false, text:'Nuværende kodeord er forkert.' }); return; }
-    const { error } = await db.auth.updateUser({ password: pwForm.next });
-    setPwSaving(false);
-    if (error) { setPwMsg({ ok:false, text: error.message }); return; }
-    setPwMsg({ ok:true, text:'Kodeord opdateret.' });
-    setPwForm({ current:'', next:'', confirm:'' });
-  }
-
-  const inp = (val, key, ph, type='text') => (
-    <input type={type} value={val} onChange={e=>setForm(f=>({...f,[key]:e.target.value}))} placeholder={ph} style={INP} />
-  );
-
-  const pwRulesMet = PW_RULES.filter(r => r.test(pwForm.next));
+  const initials = institution?.name?.slice(0, 2).toUpperCase() || '?';
+  const bg = '#F6F2EA';
 
   return (
-    <div style={{ minHeight:'100vh', paddingTop:80, background:'#f8f5f0' }} className="page-enter">
-      <div style={{ maxWidth:760, margin:'0 auto', padding:isMobile?'24px 16px':'36px 24px' }}>
-        <div style={{ display:'flex', alignItems:'center', gap:16, marginBottom:28 }}>
-          <button onClick={()=>router.push('/dashboard')} style={{ background:'#fff', border:'1.5px solid #e5e5e5', borderRadius:12, padding:'8px 16px', fontSize:13, fontWeight:700, cursor:'pointer', display:'flex', alignItems:'center', gap:6 }}>← Tilbage</button>
-          <h1 style={{ fontFamily:FONT, fontWeight:900, fontSize:isMobile?22:26, margin:0 }}>Rediger institutionsprofil</h1>
+    <div style={{ minHeight:'100vh', background:bg, paddingTop:isMobile?60:80, paddingBottom:90 }}>
+      <div style={{ maxWidth:540, margin:'0 auto', padding:isMobile?'0':'0 16px' }}>
+
+        {/* Header */}
+        <div style={{ background:'#fff', padding:'28px 20px 20px', marginBottom:12, boxShadow:'0 1px 3px rgba(22,34,28,0.06)' }}>
+          <div style={{ display:'flex', alignItems:'center', gap:16, marginBottom:16 }}>
+            {institution?.logo_url ? (
+              <img src={institution.logo_url} alt="" style={{ width:60, height:60, borderRadius:'50%', objectFit:'cover', border:`2px solid ${PAPER3}` }} />
+            ) : (
+              <div style={{ width:60, height:60, borderRadius:'50%', background:PRIMARY, display:'flex', alignItems:'center', justifyContent:'center', color:'#fff', fontWeight:800, fontSize:22, fontFamily:FONT, flexShrink:0 }}>
+                {initials}
+              </div>
+            )}
+            <div style={{ flex:1, minWidth:0 }}>
+              <div style={{ fontFamily:FONT, fontWeight:800, fontSize:17, color:INK, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{institution?.name || '—'}</div>
+              <button onClick={() => institution?.name && router.push('/institution/' + encodeURIComponent(institution.name))}
+                style={{ background:'none', border:'none', cursor:'pointer', padding:0, fontFamily:FONT, fontSize:13, color:PRIMARY, fontWeight:600, marginTop:2 }}>
+                Se min profil →
+              </button>
+            </div>
+          </div>
+
+          {/* Stats row */}
+          <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr', gap:8 }}>
+            {[
+              { label:'Handeler', value: tradeCount !== null ? tradeCount : '—', icon:'🔄' },
+              { label:'CO₂ sparet', value: co2Total !== null ? `${co2Total.toFixed(1)} kg` : '—', icon:'🌱' },
+              { label:'Opgaver', value: pendingCount > 0 ? pendingCount : '—', icon:'📋', highlight: pendingCount > 0 },
+            ].map(stat => (
+              <div key={stat.label} style={{ background: stat.highlight ? '#FEF9C3' : PAPER2, borderRadius:12, padding:'10px 8px', textAlign:'center' }}>
+                <div style={{ fontSize:18, marginBottom:2 }}>{stat.icon}</div>
+                <div style={{ fontFamily:FONT, fontWeight:800, fontSize:15, color: stat.highlight ? '#92400E' : INK }}>{stat.value}</div>
+                <div style={{ fontFamily:FONT, fontSize:11, color:INK3, marginTop:1 }}>{stat.label}</div>
+              </div>
+            ))}
+          </div>
         </div>
 
-        <div style={{ background:'#fff', borderRadius:22, padding:isMobile?20:32, boxShadow:'0 2px 12px rgba(0,0,0,0.06)', display:'flex', flexDirection:'column', gap:24 }}>
+        <div style={{ display:'flex', flexDirection:'column', gap:12, padding:isMobile?'0 0 12px':'0 0 12px' }}>
 
-          {/* CVR info */}
-          <div style={{ background:'#f0f9f4', border:'1.5px solid #c6e8d4', borderRadius:14, padding:'14px 18px' }}>
-            <div style={{ fontSize:12, color:'#5a9a74', fontWeight:700, marginBottom:4 }}>Fra CVR-registret (kan ikke ændres)</div>
-            <div style={{ fontWeight:800, fontSize:16 }}>{institution?.name}</div>
-            <div style={{ fontSize:13, color:'#888' }}>{institution?.pnr ? `P-nummer: ${institution.pnr}` : `CVR: ${institution?.cvr}`}</div>
-            {institution?.kommune && <div style={{ fontSize:13, color:'#888', marginTop:2 }}>🏛️ Under: {institution.kommune}</div>}
-          </div>
+          {/* Handel */}
+          <MenuSection>
+            <MenuItem icon="📋" label="Mine handeler" value={pendingCount > 0 ? `${pendingCount} afventer` : undefined} onClick={() => router.push('/mine-handeler')} />
+            <MenuItem icon="🏷️" label="Mine opslag" onClick={() => router.push('/dashboard')} />
+            <MenuItem icon="❤️" label="Favoritopslag" onClick={() => router.push('/?vis=favoritter')} />
+            <MenuItem icon="💬" label="Beskeder" onClick={() => router.push('/beskeder')} />
+          </MenuSection>
 
-          {/* Om institutionen */}
-          <div>
-            <div style={{ fontSize:12, fontWeight:700, color:'#aaa', textTransform:'uppercase', letterSpacing:0.8, marginBottom:14 }}>Om institutionen</div>
-            <div style={{ display:'flex', flexDirection:'column', gap:12 }}>
-              <div>
-                <label style={{ display:'block', fontSize:13, fontWeight:700, marginBottom:6 }}>Institutionstype</label>
-                <SChoiceGroup value={form.institution_type} onChange={v=>setForm(f=>({...f,institution_type:v}))} primary={PRIMARY} options={['Vuggestue','Børnehave','Integreret institution','SFO / KSFO','Andet']} />
-              </div>
-              <div>
-                <label style={{ display:'block', fontSize:13, fontWeight:700, marginBottom:6 }}>Driftsform</label>
-                <SChoiceGroup value={form.ownership_type} onChange={v=>setForm(f=>({...f,ownership_type:v}))} primary={PRIMARY} options={['Offentlig','Privat','Selvejende']} />
-              </div>
-              <div>
-                <label style={{ display:'block', fontSize:13, fontWeight:700, marginBottom:6 }}>Antal indskrevne børn</label>
-                {inp(form.children_count, 'children_count', 'Fx 60', 'number')}
-              </div>
-            </div>
-          </div>
+          {/* Konto */}
+          <MenuSection>
+            <MenuItem icon="✏️" label="Rediger profil" onClick={() => router.push('/profil/rediger')} />
+            <MenuItem icon="🌱" label="Bæredygtighed" onClick={() => router.push('/baeredygtighed')} />
+          </MenuSection>
 
-          {/* Kontaktoplysninger */}
-          <div style={{ borderTop:'1px solid #f0eeeb', paddingTop:20 }}>
-            <div style={{ fontSize:12, fontWeight:700, color:'#aaa', textTransform:'uppercase', letterSpacing:0.8, marginBottom:14 }}>Kontaktoplysninger</div>
-            <div style={{ display:'flex', flexDirection:'column', gap:12 }}>
-              <div style={{ display:'grid', gridTemplateColumns:'1fr 120px', gap:12 }}>
-                <div><label style={{ display:'block', fontSize:13, fontWeight:700, marginBottom:6 }}>Adresse</label>{inp(form.address,'address','')}</div>
-                <div><label style={{ display:'block', fontSize:13, fontWeight:700, marginBottom:6 }}>Postnr.</label>{inp(form.zipcode,'zipcode','')}</div>
-              </div>
-              <div><label style={{ display:'block', fontSize:13, fontWeight:700, marginBottom:6 }}>By</label>{inp(form.city,'city','')}</div>
-              <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:12 }}>
-                <div><label style={{ display:'block', fontSize:13, fontWeight:700, marginBottom:6 }}>Telefon</label>{inp(form.phone,'phone','+45 12 34 56 78')}</div>
-                <div><label style={{ display:'block', fontSize:13, fontWeight:700, marginBottom:6 }}>Hjemmeside</label>{inp(form.website,'website','https://...')}</div>
-              </div>
-            </div>
-          </div>
+          {/* Support */}
+          <MenuSection>
+            <MenuItem icon="❓" label="Hjælp & vejledning" onClick={() => router.push('/hvordan')} />
+            <MenuItem icon="📧" label="Kontakt os" onClick={() => router.push('/kontakt')} />
+          </MenuSection>
 
-          {/* Institutionsleder */}
-          <div style={{ borderTop:'1px solid #f0eeeb', paddingTop:20 }}>
-            <div style={{ fontSize:12, fontWeight:700, color:'#aaa', textTransform:'uppercase', letterSpacing:0.8, marginBottom:14 }}>Institutionsleder</div>
-            <div style={{ display:'flex', flexDirection:'column', gap:12 }}>
-              <div><label style={{ display:'block', fontSize:13, fontWeight:700, marginBottom:6 }}>Fulde navn</label>{inp(form.leader_name,'leader_name','Fornavn Efternavn')}</div>
-              <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:12 }}>
-                <div><label style={{ display:'block', fontSize:13, fontWeight:700, marginBottom:6 }}>Telefon</label>{inp(form.leader_phone,'leader_phone','+45 12 34 56 78')}</div>
-                <div><label style={{ display:'block', fontSize:13, fontWeight:700, marginBottom:6 }}>E-mail</label>{inp(form.leader_email,'leader_email','leder@institution.dk')}</div>
-              </div>
-            </div>
-          </div>
+          {/* Log ud */}
+          <MenuSection>
+            <MenuItem icon="🚪" label="Log ud" danger onClick={handleLogout} />
+          </MenuSection>
 
-          {/* Kontaktperson */}
-          <div style={{ borderTop:'1px solid #f0eeeb', paddingTop:20 }}>
-            <div style={{ fontSize:12, fontWeight:700, color:'#aaa', textTransform:'uppercase', letterSpacing:0.8, marginBottom:14 }}>Kontaktperson (byt&amp;leg)</div>
-            <div><label style={{ display:'block', fontSize:13, fontWeight:700, marginBottom:6 }}>Dit fulde navn</label>{inp(form.contact_name,'contact_name','Fornavn Efternavn')}</div>
-          </div>
-
-          {/* Kontosikkerhed */}
-          <div style={{ borderTop:'1px solid #f0eeeb', paddingTop:20 }}>
-            <div style={{ fontSize:12, fontWeight:700, color:'#aaa', textTransform:'uppercase', letterSpacing:0.8, marginBottom:14 }}>Kontosikkerhed</div>
-            <div style={{ display:'flex', flexDirection:'column', gap:10 }}>
-              <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', padding:'14px 16px', background:PAPER2, borderRadius:14, border:`1px solid ${PAPER3}` }}>
-                <div>
-                  <div style={{ fontFamily:FONT, fontWeight:700, fontSize:14, color:INK }}>Login-e-mail</div>
-                  <div style={{ fontSize:13, color:INK3, marginTop:2 }}>{institution?.email}</div>
-                </div>
-                <button onClick={()=>{ setEmailMsg(null); setNewEmail(''); setShowEmailModal(true); }} style={{ padding:'8px 16px', borderRadius:99, background:'#fff', border:`1.5px solid ${PRIMARY}`, color:PRIMARY, fontFamily:FONT, fontWeight:700, fontSize:13, cursor:'pointer' }}>
-                  Skift e-mail
-                </button>
-              </div>
-              <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', padding:'14px 16px', background:PAPER2, borderRadius:14, border:`1px solid ${PAPER3}` }}>
-                <div>
-                  <div style={{ fontFamily:FONT, fontWeight:700, fontSize:14, color:INK }}>Adgangskode</div>
-                  <div style={{ fontSize:13, color:INK3, marginTop:2 }}>••••••••••••</div>
-                </div>
-                <button onClick={()=>{ setPwMsg(null); setPwForm({current:'',next:'',confirm:''}); setShowPwModal(true); }} style={{ padding:'8px 16px', borderRadius:99, background:'#fff', border:`1.5px solid ${PRIMARY}`, color:PRIMARY, fontFamily:FONT, fontWeight:700, fontSize:13, cursor:'pointer' }}>
-                  Skift kodeord
-                </button>
-              </div>
-            </div>
-          </div>
-
-          {/* Bottom actions */}
-          <div style={{ borderTop:'1px solid #f0eeeb', paddingTop:20, display:'flex', gap:12 }}>
-            <button onClick={()=>router.push('/dashboard')} style={{ flex:1, padding:'13px', borderRadius:14, background:'#f5f4f2', border:'none', fontWeight:700, cursor:'pointer', fontSize:14 }}>Annuller</button>
-            <Btn variant="primary" color={PRIMARY} radius={22} onClick={handleSave} disabled={saving} style={{ flex:2, justifyContent:'center', padding:'13px', fontSize:15 }}>
-              {saving ? <><Spinner/>Gemmer…</> : '✓ Gem oplysninger'}
-            </Btn>
+          <div style={{ textAlign:'center', padding:'8px 0' }}>
+            <span style={{ fontFamily:FONT, fontSize:11, color:INK3 }}>Privatlivspolitik · Vilkår og betingelser</span>
           </div>
         </div>
       </div>
-
-      {/* Email modal */}
-      {showEmailModal && (
-        <Modal title="Skift login-e-mail" icon="📧" onClose={()=>setShowEmailModal(false)}>
-          <p style={{ fontSize:14, color:INK3, lineHeight:1.6, marginBottom:20, textAlign:'center' }}>
-            Nuværende: <strong style={{ color:INK }}>{institution?.email}</strong><br/>
-            Efter skift sendes en bekræftelsesmail til den nye adresse.
-          </p>
-          <div style={{ display:'flex', flexDirection:'column', gap:12 }}>
-            <input
-              type="email"
-              value={newEmail}
-              onChange={e=>{ setNewEmail(e.target.value); setEmailMsg(null); }}
-              placeholder="ny@institution.dk"
-              style={{ ...INP, fontSize:15 }}
-              autoFocus
-            />
-            {emailMsg && (
-              <div style={{ padding:'10px 14px', borderRadius:10, background:emailMsg.ok?'#e8f5ee':'#fff0f0', color:emailMsg.ok?PRIMARY:'#c0392b', fontSize:13, lineHeight:1.5 }}>
-                {emailMsg.text}
-              </div>
-            )}
-            {!emailMsg?.ok && (
-              <button
-                onClick={handleEmailChange}
-                disabled={emailSaving || !newEmail}
-                style={{ padding:'13px', borderRadius:12, background:PRIMARY, color:'#fff', border:'none', fontFamily:FONT, fontWeight:700, fontSize:14, cursor:emailSaving||!newEmail?'not-allowed':'pointer', opacity:emailSaving||!newEmail?0.6:1 }}
-              >
-                {emailSaving ? 'Tjekker…' : 'Send bekræftelse'}
-              </button>
-            )}
-          </div>
-        </Modal>
-      )}
-
-      {/* Password modal */}
-      {showPwModal && (
-        <Modal title="Skift adgangskode" icon="🔑" onClose={()=>setShowPwModal(false)}>
-          <div style={{ display:'flex', flexDirection:'column', gap:12 }}>
-            {[
-              { key:'current', label:'Nuværende kodeord' },
-              { key:'next',    label:'Nyt kodeord' },
-              { key:'confirm', label:'Gentag nyt kodeord' },
-            ].map(({ key, label }) => (
-              <div key={key}>
-                <label style={{ display:'block', fontSize:13, fontWeight:700, marginBottom:5, color:INK2 }}>{label}</label>
-                <input
-                  type="password"
-                  value={pwForm[key]}
-                  onChange={e=>{ setPwForm(f=>({...f,[key]:e.target.value})); setPwMsg(null); }}
-                  placeholder="••••••••"
-                  style={INP}
-                  autoFocus={key==='current'}
-                />
-              </div>
-            ))}
-
-            {/* Password requirements */}
-            {pwForm.next && (
-              <div style={{ background:'#f8f7f5', borderRadius:10, padding:'12px 14px', display:'flex', flexDirection:'column', gap:6 }}>
-                {PW_RULES.map(r => {
-                  const met = r.test(pwForm.next);
-                  return (
-                    <div key={r.id} style={{ display:'flex', alignItems:'center', gap:8, fontSize:13 }}>
-                      <span style={{ width:16, height:16, borderRadius:'50%', background:met?PRIMARY:'#e5e5e5', display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0 }}>
-                        {met && <svg width="9" height="9" viewBox="0 0 10 8" fill="none"><path d="M1 4l3 3 5-6" stroke="#fff" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/></svg>}
-                      </span>
-                      <span style={{ color:met?PRIMARY:INK3 }}>{r.label}</span>
-                    </div>
-                  );
-                })}
-              </div>
-            )}
-
-            {pwMsg && (
-              <div style={{ padding:'10px 14px', borderRadius:10, background:pwMsg.ok?'#e8f5ee':'#fff0f0', color:pwMsg.ok?PRIMARY:'#c0392b', fontSize:13, lineHeight:1.5 }}>
-                {pwMsg.text}
-              </div>
-            )}
-
-            {!pwMsg?.ok && (
-              <button
-                onClick={handlePasswordChange}
-                disabled={pwSaving || pwRulesMet.length < PW_RULES.length}
-                style={{ padding:'13px', borderRadius:12, background:PRIMARY, color:'#fff', border:'none', fontFamily:FONT, fontWeight:700, fontSize:14, cursor:pwSaving||pwRulesMet.length<PW_RULES.length?'not-allowed':'pointer', opacity:pwSaving||pwRulesMet.length<PW_RULES.length?0.6:1 }}
-              >
-                {pwSaving ? 'Gemmer…' : 'Opdatér kodeord'}
-              </button>
-            )}
-          </div>
-        </Modal>
-      )}
     </div>
   );
 }
