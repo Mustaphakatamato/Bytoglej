@@ -21,7 +21,7 @@ export async function POST(req) {
         role: 'user',
         content: [
           { type: 'image_url', image_url: { url: `data:${mimeType};base64,${base64}` } },
-          { type: 'text', text: 'Are there any people, faces, children, or humans visible in this image? Reply with exactly one word: yes or no.' },
+          { type: 'text', text: 'Are there any visible human faces, identifiable people, or children\'s faces in this image? Hands or feet alone do NOT count. Reply with exactly one word: yes or no.' },
         ],
       }],
     });
