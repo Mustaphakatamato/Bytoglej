@@ -1,5 +1,5 @@
 'use client';
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useApp, useActiveUser } from '@/providers/AppProvider';
 import { db } from '@/lib/supabase';
@@ -29,12 +29,22 @@ export default function CartPage() {
   }, [cart]);
 
   // Per-group selected + note state
-  const [selected, setSelected] = useState(() => {
-    const init = {};
-    // all groups selected by default — initialized lazily on first render
-    return init;
-  });
+  const [selected, setSelected] = useState({});
   const [notes, setNotes] = useState({});
+  // Delivery: shipping_options per listingId, and chosen method per group
+  const [shippingOptions, setShippingOptions] = useState({});
+  const [deliveryChoices, setDeliveryChoices] = useState({});
+
+  useEffect(() => {
+    const ids = (cart || []).map(i => i.listingId).filter(Boolean);
+    if (!ids.length) return;
+    db.from('shipping_options').select('*').in('listing_id', ids).then(({ data }) => {
+      if (!data) return;
+      const map = {};
+      for (const so of data) map[so.listing_id] = so;
+      setShippingOptions(map);
+    });
+  }, [cart?.length]);
 
   function isSelected(name) {
     return name in selected ? selected[name] : true; // default: selected
@@ -107,11 +117,13 @@ export default function CartPage() {
 
         if (!convId) continue;
 
+        const groupDelivery = deliveryChoices[group.ownerInstitutionName] || null;
         const buyData = {
           items: group.items.map(i => ({ listingId: i.listingId, title: i.listingTitle, price: i.price, emoji: i.listingEmoji, category: i.category })),
           totalPrice: group.items.reduce((s, i) => s + (i.price || 0), 0),
           note: groupNote,
           buyerName: senderName,
+          delivery_method: groupDelivery,
         };
         const msgText = `Købsforespørgsel: ${group.items.map(i => i.listingTitle).join(', ')} — ${buyData.totalPrice} kr.`;
         await db.from('chat_messages').insert({
@@ -210,6 +222,36 @@ export default function CartPage() {
                   </div>
                 );
               })}
+
+              {/* Delivery method selection */}
+              {(() => {
+                const firstSo = shippingOptions[group.items[0]?.listingId];
+                if (!firstSo) return null;
+                const opts = [];
+                if (firstSo.allow_pickup) opts.push({ key:'pickup', icon:'📍', label:'Afhentes', sub: firstSo.pickup_address || null });
+                if (firstSo.allow_shipping) opts.push({ key:'shipping', icon:'📦', label:'Pakkepost', sub: firstSo.shipping_included_in_price ? 'Porto inkluderet' : 'Porto betales separat' });
+                if (firstSo.allow_custom) opts.push({ key:'custom', icon:'🤝', label:'Aftales', sub: 'I aftaler levering direkte' });
+                if (!opts.length) return null;
+                const chosen = deliveryChoices[name];
+                return (
+                  <div style={{ padding: '0 20px 12px' }}>
+                    <div style={{ fontFamily: FONT, fontWeight: 700, fontSize: 12, color: INK2, marginBottom: 8 }}>Vælg leveringsmetode</div>
+                    <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                      {opts.map(opt => (
+                        <button key={opt.key} onClick={() => setDeliveryChoices(prev => ({ ...prev, [name]: opt.key }))}
+                          style={{ display:'flex', alignItems:'center', gap:6, padding:'8px 12px', borderRadius:12, border:`2px solid ${chosen===opt.key ? PRIMARY : PAPER3}`, background: chosen===opt.key ? GREEN_TINT : '#fff', cursor:'pointer', fontFamily:FONT, fontSize:12, fontWeight:600, color: chosen===opt.key ? PRIMARY : INK2, transition:'all 0.15s' }}>
+                          <span>{opt.icon}</span>
+                          <div style={{ textAlign:'left' }}>
+                            <div>{opt.label}</div>
+                            {opt.sub && <div style={{ fontSize:10, color: chosen===opt.key ? PRIMARY : INK3, fontWeight:400 }}>{opt.sub}</div>}
+                          </div>
+                          {chosen===opt.key && <span style={{ fontSize:12, color:PRIMARY }}>✓</span>}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                );
+              })()}
 
               {/* Per-group note */}
               <div style={{ padding: '12px 20px' }}>
