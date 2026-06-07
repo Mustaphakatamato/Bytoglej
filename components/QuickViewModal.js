@@ -88,6 +88,7 @@ export default function QuickViewModal({ listing, onClose }) {
   }
 
   async function handleContact() {
+    if (isOwn) { showToast('Du kan ikke sende en besked til dig selv', 'error'); return; }
     setSaving(true);
     try {
       const { data: { user } } = await db.auth.getUser();
@@ -149,7 +150,7 @@ export default function QuickViewModal({ listing, onClose }) {
     router.push('/opslag/detail');
   }
 
-  const isOwn = institution && listing.institution_name === institution.name;
+  const isOwn = !!(institution && listing.institution_name?.toLowerCase() === institution.name?.toLowerCase());
   const inCart = cart?.some(c => c.listingId === listing.id);
 
   function handleAddToCart(e) {

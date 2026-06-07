@@ -70,6 +70,10 @@ export default function CartPage() {
       let lastConvId = null;
 
       for (const group of selectedGroups) {
+        if (group.ownerInstitutionName?.toLowerCase() === senderName?.toLowerCase()) {
+          showToast('Du kan ikke købe dine egne opslag', 'error');
+          continue;
+        }
         const groupNote = notes[group.ownerInstitutionName]?.trim() || null;
         const { data: ownerInst } = await db.from('institutions')
           .select('id,email,name')

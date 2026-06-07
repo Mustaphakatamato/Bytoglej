@@ -164,7 +164,7 @@ export default function ListingDetailClient() {
     });
   }, []);
 
-  const isOwn = !!(ctxInstitution && listing?.institution_name === ctxInstitution.name);
+  const isOwn = !!(ctxInstitution && listing?.institution_name?.toLowerCase() === ctxInstitution.name?.toLowerCase());
 
   useEffect(() => { if (listing) setIsFav(favs?.includes(listing.id) || false); }, [favs, listing?.id]);
 
@@ -379,6 +379,7 @@ export default function ListingDetailClient() {
   }
 
   async function handleBuy() {
+    if (isOwn) { showToast('Du kan ikke købe dit eget opslag', 'error'); return; }
     setSaving(true);
     try {
       const { data: { user } } = await db.auth.getUser();
