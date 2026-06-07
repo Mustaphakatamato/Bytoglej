@@ -248,6 +248,8 @@ export default function MessagesClient() {
   const [shipmentInfo, setShipmentInfo] = useState(null);
   const [confirmingOrder, setConfirmingOrder] = useState(false);
   const [shipmentLoading, setShipmentLoading] = useState(false);
+  const [invoiceConfirmed, setInvoiceConfirmed] = useState(false);
+  const [generatingLabel, setGeneratingLabel] = useState(false);
   const ww = useWindowWidth();
   const isMobile = ww < 768;
 
@@ -373,6 +375,7 @@ export default function MessagesClient() {
   async function openConv(conv, updateUrl = true) {
     setActive(conv);
     setShipmentInfo(null);
+    setInvoiceConfirmed(false);
     setSelectedConvId(conv.id);
     if (updateUrl && searchParams.get('conv') !== conv.id) {
       router.push('/beskeder?conv=' + conv.id);
@@ -1273,29 +1276,47 @@ export default function MessagesClient() {
                                       <span style={{ fontFamily:FONT, fontSize:15, fontWeight:800, color:INK }}>{buyData?.totalPrice || 0} kr.</span>
                                     </div>
                                     {buyData?.note && <div style={{ marginTop:8, padding:'8px 10px', background:'rgba(22,34,28,0.04)', borderRadius:8, fontFamily:FONT, fontSize:12, color:INK3 }}>{buyData.note}</div>}
+                                    {/* Step 1: Seller confirms the order */}
                                     {isOwnerInConv && !mine && !(active?.is_handled) && (
                                       <button onClick={async () => {
                                         if (confirmingOrder) return;
                                         setConfirmingOrder(true);
                                         const effUid = realUserId || userId;
                                         const senderName = effectiveSenderName();
-                                        const isShipping = buyData?.delivery_method === 'shipping';
-                                        const actionLabel = isShipping ? 'afsendelse' : 'afhentning';
-                                        const confirmMsg = `✅ ${senderName} har bekræftet ${actionLabel} af ${buyData?.items?.map(i=>i.title).join(', ')}`;
+                                        const confirmMsg = `✅ ${senderName} har bekræftet din ordre — du modtager snart en faktura.`;
                                         const { data: newMsg } = await db.from('chat_messages').insert({ conversation_id: active.id, sender_id: effUid, sender_name: senderName, content: confirmMsg }).select().single();
                                         for (const item of (buyData?.items || [])) {
                                           await db.from('listings').update({ is_sold: true, is_active: false, sold_at: new Date().toISOString(), sold_to: active.initiator_name, sold_to_institution_id: active.initiator_institution_id }).eq('id', item.listingId);
                                         }
                                         const now = new Date().toISOString();
-                                        const convUpd = { last_message: confirmMsg, last_message_at: now, initiator_unread: (active.initiator_unread||0)+1, is_handled: true, handled_at: now, handled_action: 'accepted', deal_completed: true, deal_completed_at: now, deal_type: 'køb' };
+                                        const convUpd = { last_message: confirmMsg, last_message_at: now, initiator_unread: (active.initiator_unread||0)+1, is_handled: true, handled_at: now, handled_action: 'order_confirmed', deal_type: 'køb' };
                                         await db.from('conversations').update(convUpd).eq('id', active.id);
-                                        const convWithFallback = active.initiator_institution_id ? active : { ...active, initiator_institution_id: ctxInstId || null };
-                                        persistCO2Saving(convWithFallback, buyData?.items?.[0]?.category || null);
                                         setMessages(ms => [...ms, ...(newMsg ? [newMsg] : [])]);
                                         setActive(a => ({ ...a, ...convUpd }));
                                         setConvs(cs => cs.map(c => c.id === active.id ? { ...c, ...convUpd } : c));
                                         setConfirmingOrder(false);
-                                        if (isShipping) {
+                                        setTimeout(() => bottomRef.current?.scrollIntoView({ behavior:'smooth' }), 60);
+                                      }} disabled={confirmingOrder} style={{ width:'100%', marginTop:12, padding:'11px', borderRadius:99, background:confirmingOrder?PAPER3:PRIMARY, color:confirmingOrder?INK3:'#fff', border:'none', fontFamily:FONT, fontWeight:700, fontSize:14, cursor:confirmingOrder?'default':'pointer' }}>
+                                        {confirmingOrder ? <span style={{ display:'flex', alignItems:'center', justifyContent:'center', gap:8 }}><Spinner />Bekræfter…</span> : '✅ Bekræft ordre'}
+                                      </button>
+                                    )}
+
+                                    {/* Step 2: Seller generates label — only after order confirmed */}
+                                    {isOwnerInConv && !mine && active?.is_handled && active?.handled_action === 'order_confirmed' && !active?.deal_completed && buyData?.delivery_method === 'shipping' && (
+                                      <div style={{ marginTop:12, paddingTop:12, borderTop:`1px solid rgba(22,34,28,0.1)` }}>
+                                        <div style={{ fontFamily:FONT, fontSize:12, fontWeight:700, color:INK, marginBottom:10 }}>Klar til at sende pakken?</div>
+                                        <label style={{ display:'flex', alignItems:'flex-start', gap:10, cursor:'pointer', marginBottom:12 }}>
+                                          <input type="checkbox" checked={invoiceConfirmed} onChange={e => setInvoiceConfirmed(e.target.checked)}
+                                            style={{ marginTop:2, width:16, height:16, accentColor:PRIMARY, cursor:'pointer', flexShrink:0 }} />
+                                          <span style={{ fontFamily:FONT, fontSize:13, color:INK2, lineHeight:1.5 }}>
+                                            Jeg bekræfter at faktura er sendt eller vil blive sendt til <strong>{active.initiator_name}</strong>
+                                          </span>
+                                        </label>
+                                        <button onClick={async () => {
+                                          if (!invoiceConfirmed || generatingLabel) return;
+                                          setGeneratingLabel(true);
+                                          const effUid = realUserId || userId;
+                                          const senderName = effectiveSenderName();
                                           try {
                                             const res = await fetch('/api/book-shipment', {
                                               method: 'POST',
@@ -1310,39 +1331,55 @@ export default function MessagesClient() {
                                             });
                                             const result = await res.json();
                                             if (result.ok) {
-                                              const info = {
-                                                tracking_number: result.tracking_number,
-                                                tracking_url: result.tracking_url,
-                                                label_pdf_url: result.label_pdf_url,
-                                                status: 'booked',
-                                              };
-                                              setShipmentInfo(info);
-                                              // Insert tracking message visible to both parties
-                                              const trackingContent = JSON.stringify({
-                                                type: 'shipment',
-                                                tracking_number: result.tracking_number,
-                                                tracking_url: result.tracking_url,
-                                                label_pdf_url: result.label_pdf_url,
-                                              });
-                                              const { data: trackMsg } = await db.from('chat_messages').insert({
-                                                conversation_id: active.id,
-                                                sender_id: effUid,
-                                                sender_name: senderName,
-                                                content: trackingContent,
-                                                message_type: 'shipment',
-                                              }).select().single();
+                                              setShipmentInfo({ tracking_number: result.tracking_number, tracking_url: result.tracking_url, label_pdf_url: result.label_pdf_url, status: 'booked' });
+                                              const trackingContent = JSON.stringify({ type: 'shipment', tracking_number: result.tracking_number, tracking_url: result.tracking_url, label_pdf_url: result.label_pdf_url });
+                                              const { data: trackMsg } = await db.from('chat_messages').insert({ conversation_id: active.id, sender_id: effUid, sender_name: senderName, content: trackingContent, message_type: 'shipment' }).select().single();
+                                              const now = new Date().toISOString();
+                                              const convUpd = { last_message: '📦 Forsendelse booket', last_message_at: now, owner_unread: 0, deal_completed: true, deal_completed_at: now };
+                                              await db.from('conversations').update(convUpd).eq('id', active.id);
+                                              const convWithFallback = active.initiator_institution_id ? active : { ...active, initiator_institution_id: ctxInstId || null };
+                                              persistCO2Saving(convWithFallback, buyData?.items?.[0]?.category || null);
                                               if (trackMsg) setMessages(ms => [...ms, trackMsg]);
+                                              setActive(a => ({ ...a, ...convUpd }));
+                                              setConvs(cs => cs.map(c => c.id === active.id ? { ...c, ...convUpd } : c));
                                               setTimeout(() => bottomRef.current?.scrollIntoView({ behavior:'smooth' }), 60);
                                             }
                                           } catch {}
-                                        }
-                                      }} disabled={confirmingOrder} style={{ width:'100%', marginTop:12, padding:'11px', borderRadius:99, background:confirmingOrder?PAPER3:PRIMARY, color:confirmingOrder?INK3:'#fff', border:'none', fontFamily:FONT, fontWeight:700, fontSize:14, cursor:confirmingOrder?'default':'pointer' }}>
-                                        {confirmingOrder ? <span style={{ display:'flex', alignItems:'center', justifyContent:'center', gap:8 }}><Spinner />Bekræfter…</span> : buyData?.delivery_method === 'shipping' ? '📦 Bekræft og book forsendelse' : '✓ Bekræft afhentning'}
-                                      </button>
+                                          setGeneratingLabel(false);
+                                        }} disabled={!invoiceConfirmed || generatingLabel}
+                                          style={{ width:'100%', padding:'11px', borderRadius:99, background:invoiceConfirmed&&!generatingLabel?PRIMARY:PAPER3, color:invoiceConfirmed&&!generatingLabel?'#fff':INK3, border:'none', fontFamily:FONT, fontWeight:700, fontSize:14, cursor:invoiceConfirmed&&!generatingLabel?'pointer':'default' }}>
+                                          {generatingLabel ? <span style={{ display:'flex', alignItems:'center', justifyContent:'center', gap:8 }}><Spinner />Genererer label…</span> : '📦 Generer forsendelseslabel'}
+                                        </button>
+                                      </div>
                                     )}
-                                    {isOwnerInConv && !mine && active?.is_handled && active?.handled_action === 'accepted' && (
+
+                                    {/* Step 2 (pickup): close deal after order confirmed */}
+                                    {isOwnerInConv && !mine && active?.is_handled && active?.handled_action === 'order_confirmed' && !active?.deal_completed && buyData?.delivery_method !== 'shipping' && (
+                                      <div style={{ marginTop:12, paddingTop:12, borderTop:`1px solid rgba(22,34,28,0.1)` }}>
+                                        <button onClick={async () => {
+                                          const effUid = realUserId || userId;
+                                          const senderName = effectiveSenderName();
+                                          const msg = `✅ Afhentning bekræftet af ${senderName}.`;
+                                          const { data: newMsg } = await db.from('chat_messages').insert({ conversation_id: active.id, sender_id: effUid, sender_name: senderName, content: msg }).select().single();
+                                          const now = new Date().toISOString();
+                                          const convUpd = { last_message: msg, last_message_at: now, initiator_unread: (active.initiator_unread||0)+1, deal_completed: true, deal_completed_at: now };
+                                          await db.from('conversations').update(convUpd).eq('id', active.id);
+                                          const convWithFallback = active.initiator_institution_id ? active : { ...active, initiator_institution_id: ctxInstId || null };
+                                          persistCO2Saving(convWithFallback, buyData?.items?.[0]?.category || null);
+                                          if (newMsg) setMessages(ms => [...ms, newMsg]);
+                                          setActive(a => ({ ...a, ...convUpd }));
+                                          setConvs(cs => cs.map(c => c.id === active.id ? { ...c, ...convUpd } : c));
+                                          setTimeout(() => bottomRef.current?.scrollIntoView({ behavior:'smooth' }), 60);
+                                        }} style={{ width:'100%', padding:'11px', borderRadius:99, background:PRIMARY, color:'#fff', border:'none', fontFamily:FONT, fontWeight:700, fontSize:14, cursor:'pointer' }}>
+                                          ✓ Bekræft afhentning og afslut handel
+                                        </button>
+                                      </div>
+                                    )}
+
+                                    {/* Completed state */}
+                                    {isOwnerInConv && !mine && active?.deal_completed && (
                                       <div style={{ marginTop:10, textAlign:'center', fontFamily:FONT, fontSize:12, color:PRIMARY, fontWeight:700 }}>
-                                        {buyData?.delivery_method === 'shipping' ? '📦 Forsendelse bekræftet ✓' : '✓ Afhentning bekræftet'}
+                                        {buyData?.delivery_method === 'shipping' ? '📦 Forsendelse afsendt ✓' : '✓ Handel afsluttet'}
                                       </div>
                                     )}
                                   </div>
