@@ -1231,18 +1231,22 @@ export default function MessagesClient() {
                                     {buyData?.note && <div style={{ marginTop:8, padding:'8px 10px', background:'rgba(22,34,28,0.04)', borderRadius:8, fontFamily:FONT, fontSize:12, color:INK3 }}>{buyData.note}</div>}
                                     {isOwnerInConv && !mine && !(active?.is_handled) && (
                                       <button onClick={async () => {
+                                        const effUid = realUserId || userId;
                                         const isShipping = buyData?.delivery_method === 'shipping';
                                         const actionLabel = isShipping ? 'afsendelse' : 'afhentning';
                                         const confirmMsg = `✅ ${active.owner_name} har bekræftet ${actionLabel} af ${buyData?.items?.map(i=>i.title).join(', ')}`;
-                                        const { data: newMsg } = await db.from('chat_messages').insert({ conversation_id: active.id, sender_id: effectiveUserId, sender_name: active.owner_name, content: confirmMsg }).select().single();
+                                        const { data: newMsg } = await db.from('chat_messages').insert({ conversation_id: active.id, sender_id: effUid, sender_name: active.owner_name, content: confirmMsg }).select().single();
                                         for (const item of (buyData?.items || [])) {
                                           await db.from('listings').update({ is_sold: true, is_active: false, sold_at: new Date().toISOString(), sold_to: active.initiator_name, sold_to_institution_id: active.initiator_institution_id }).eq('id', item.listingId);
                                         }
-                                        await db.from('conversations').update({ last_message: confirmMsg, last_message_at: new Date().toISOString(), initiator_unread: (active.initiator_unread||0)+1, is_handled: true, handled_at: new Date().toISOString(), handled_action: 'accepted', deal_completed: true, deal_completed_at: new Date().toISOString(), deal_type: 'køb' }).eq('id', active.id);
+                                        const now = new Date().toISOString();
+                                        const convUpd = { last_message: confirmMsg, last_message_at: now, initiator_unread: (active.initiator_unread||0)+1, is_handled: true, handled_at: now, handled_action: 'accepted', deal_completed: true, deal_completed_at: now, deal_type: 'køb' };
+                                        await db.from('conversations').update(convUpd).eq('id', active.id);
                                         const convWithFallback = active.initiator_institution_id ? active : { ...active, initiator_institution_id: ctxInstId || null };
                                         persistCO2Saving(convWithFallback, buyData?.items?.[0]?.category || null);
                                         setMessages(ms => [...ms, ...(newMsg ? [newMsg] : [])]);
-                                        setActive(a => ({ ...a, is_handled: true, handled_action: 'accepted', deal_completed: true }));
+                                        setActive(a => ({ ...a, ...convUpd }));
+                                        setConvs(cs => cs.map(c => c.id === active.id ? { ...c, ...convUpd } : c));
                                         // Book shipment if delivery is via package
                                         if (isShipping) {
                                           fetch('/api/book-shipment', {
