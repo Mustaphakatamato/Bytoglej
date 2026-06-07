@@ -141,6 +141,8 @@ export default function DashboardClient() {
   const [myShipments, setMyShipments] = useState([]);
   const [myInvoices, setMyInvoices] = useState([]);
   const [shippingLoading, setShippingLoading] = useState(false);
+  const [pendingOrders, setPendingOrders] = useState([]);
+  const [pendingOrdersLoading, setPendingOrdersLoading] = useState(false);
 
   const isAdmin = !!institution && !institution._memberRole;
   const [listingsView, setListingsView] = useState('list');
@@ -264,6 +266,7 @@ export default function DashboardClient() {
       if (!cancelled) fetchCO2Savings(inst, user.id);
       if (!cancelled) fetchTrades(inst, user.id);
       if (!cancelled && inst?.id) fetchShippingData(inst.id);
+      if (!cancelled) fetchPendingOrders(inst, user.id);
       if (!cancelled && inst?.name) {
         const { data: myReviews } = await db.from('transaction_reviews').select('conversation_id').eq('reviewer_institution_name', inst.name);
         if (myReviews) setReviewedConvIds(new Set(myReviews.map(r => r.conversation_id)));
@@ -357,6 +360,29 @@ export default function DashboardClient() {
     if (shipments) setMyShipments(shipments);
     if (invoices) setMyInvoices(invoices);
     setShippingLoading(false);
+  }
+
+  async function fetchPendingOrders(inst, uid) {
+    setPendingOrdersLoading(true);
+    const instId = inst?.id;
+    const instName = inst?.name;
+    const ownerParts = [];
+    if (instId) ownerParts.push(`owner_institution_id.eq.${instId}`);
+    if (uid) ownerParts.push(`owner_id.eq.${uid}`);
+    if (instName) ownerParts.push(`owner_name.eq.${instName}`);
+    if (!ownerParts.length) { setPendingOrdersLoading(false); return; }
+    const { data } = await db.from('conversations')
+      .select('id,listing_title,listing_emoji,listing_color,initiator_name,is_handled,handled_action,deal_completed,deal_type,delivery_method,last_message_at,shipment_id')
+      .or(ownerParts.join(','))
+      .eq('deal_completed', false)
+      .order('last_message_at', { ascending: false });
+    if (data) setPendingOrders(data.filter(c =>
+      // New unconfirmed order
+      (!c.is_handled && c.deal_type === 'køb') ||
+      // Confirmed but not yet shipped/picked up
+      (c.is_handled && c.handled_action === 'order_confirmed' && !c.deal_completed)
+    ));
+    setPendingOrdersLoading(false);
   }
 
   function openEdit(l) {
@@ -1058,6 +1084,64 @@ export default function DashboardClient() {
           );
         })()}
 
+        {/* Opgaver — pending seller tasks */}
+        {(pendingOrders.length > 0 || pendingOrdersLoading) && (() => {
+          const tasks = pendingOrders.map(c => {
+            const isNew = !c.is_handled;
+            const needsLabel = c.is_handled && c.handled_action === 'order_confirmed' && c.delivery_method === 'shipping';
+            const needsPickup = c.is_handled && c.handled_action === 'order_confirmed' && c.delivery_method !== 'shipping';
+            let label, sublabel, bg, border, dot;
+            if (isNew) {
+              label = 'Ny ordre — afventer bekræftelse';
+              sublabel = 'Gå til samtalen og tryk "Bekræft ordre"';
+              bg = '#FFFBEB'; border = '#FDE68A'; dot = '#F59E0B';
+            } else if (needsLabel) {
+              label = 'Klar til forsendelse';
+              sublabel = 'Bekræft faktura og generer forsendelseslabel';
+              bg = '#EFF6FF'; border = '#BFDBFE'; dot = '#3B82F6';
+            } else {
+              label = 'Afhentning afventer';
+              sublabel = 'Bekræft afhentning og afslut handel';
+              bg = '#F0FDF4'; border = '#BBF7D0'; dot = PRIMARY;
+            }
+            return { c, label, sublabel, bg, border, dot };
+          });
+          return (
+            <div style={{ background:PAPER2, borderRadius:22, padding:isMobile?20:28, border:'1px solid rgba(22,34,28,0.07)', boxShadow:'0 1px 4px rgba(22,34,28,0.06)', marginTop:isMobile?16:24 }}>
+              <div style={{ display:'flex', alignItems:'center', gap:10, marginBottom:20 }}>
+                <h2 style={{ fontFamily:FONT, fontWeight:800, fontSize:18, color:INK, margin:0 }}>📋 Opgaver</h2>
+                <span style={{ background:'#FEF3C7', color:'#92400E', borderRadius:99, padding:'2px 10px', fontSize:12, fontWeight:700, fontFamily:FONT }}>{pendingOrders.length}</span>
+              </div>
+              {pendingOrdersLoading ? (
+                <div style={{ padding:'20px 0', textAlign:'center', color:INK3, fontFamily:FONT, fontSize:13 }}>Indlæser…</div>
+              ) : (
+                <div style={{ display:'flex', flexDirection:'column', gap:10 }}>
+                  {tasks.map(({ c, label, sublabel, bg, border, dot }) => (
+                    <div key={c.id} style={{ background:bg, border:`1.5px solid ${border}`, borderRadius:16, padding:'14px 16px', display:'flex', alignItems:'center', gap:14 }}>
+                      <div style={{ width:10, height:10, borderRadius:'50%', background:dot, flexShrink:0 }} />
+                      <div style={{ flex:1, minWidth:0 }}>
+                        <div style={{ fontFamily:FONT, fontWeight:700, fontSize:14, color:INK, display:'flex', alignItems:'center', gap:8 }}>
+                          <span>{c.listing_emoji || '🧸'}</span>
+                          <span style={{ overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{c.listing_title}</span>
+                        </div>
+                        <div style={{ fontFamily:FONT, fontSize:12, fontWeight:600, color:'#92400E', marginTop:2 }}>{label}</div>
+                        <div style={{ fontFamily:FONT, fontSize:11, color:INK3, marginTop:1 }}>
+                          Fra: {c.initiator_name} · {sublabel}
+                        </div>
+                      </div>
+                      <button
+                        onClick={() => { setSelectedConvId(c.id); router.push('/beskeder?conv=' + c.id); }}
+                        style={{ padding:'9px 16px', borderRadius:99, background:PRIMARY, color:'#fff', border:'none', fontFamily:FONT, fontWeight:700, fontSize:12, cursor:'pointer', whiteSpace:'nowrap', flexShrink:0 }}>
+                        Gå til →
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          );
+        })()}
+
         {/* Shipping section */}
         {(myShipments.length > 0 || myInvoices.length > 0 || shippingLoading) && (() => {
           const inst = institution;
@@ -1109,24 +1193,55 @@ export default function DashboardClient() {
                 <div style={{ display:'flex', flexDirection:'column', gap:8, marginBottom:20 }}>
                   {myShipments.map(s => {
                     const st = statusColors[s.status] || statusColors.pending;
+                    const needsAction = s.status === 'booked' || s.status === 'printed';
+                    const carrierName = s.carrier === 'postnord' ? 'PostNord' : s.carrier === 'dao' ? 'DAO' : s.carrier === 'gls' ? 'GLS' : s.carrier || '';
+                    const steps = s.carrier === 'postnord'
+                      ? ['Print forsendelseslabelen (PDF) — eller skriv blot trackingnummeret tydeligt på pakken', 'Klæb labelen på pakken eller skriv nummeret', 'Aflever pakken på nærmeste PostNord-punkt']
+                      : s.carrier === 'dao'
+                      ? ['Print forsendelseslabelen (PDF)', 'Klæb labelen på pakken', 'Aflever pakken hos nærmeste DAO-agent']
+                      : ['Print forsendelseslabelen (PDF)', 'Klæb labelen på pakken', 'Aflever pakken hos transportørens udleveringssted'];
                     return (
-                      <div key={s.id} style={{ background:'#fff', borderRadius:12, padding:'12px 16px', border:`1px solid ${PAPER3}`, display:'flex', alignItems:'center', gap:12, flexWrap:'wrap' }}>
-                        <div style={{ flex:1, minWidth:0 }}>
-                          <div style={{ fontFamily:FONT, fontWeight:700, fontSize:13, color:INK, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>
-                            {s.conversations?.listing_title || 'Forsendelse'}
+                      <div key={s.id} style={{ background:'#fff', borderRadius:12, border:`1px solid ${needsAction ? '#FDE68A' : PAPER3}`, overflow:'hidden' }}>
+                        <div style={{ padding:'12px 16px', display:'flex', alignItems:'center', gap:12, flexWrap:'wrap' }}>
+                          <div style={{ flex:1, minWidth:0 }}>
+                            <div style={{ fontFamily:FONT, fontWeight:700, fontSize:13, color:INK, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>
+                              {s.conversations?.listing_title || 'Forsendelse'}
+                            </div>
+                            <div style={{ fontSize:11, color:INK3, fontFamily:FONT, marginTop:2 }}>
+                              {s.tracking_number && <><strong style={{ color:INK, letterSpacing:0.3 }}>{s.tracking_number}</strong> · </>}
+                              {carrierName} · {(s.booked_at||'').slice(0,10)}
+                            </div>
                           </div>
-                          <div style={{ fontSize:11, color:INK3, fontFamily:FONT, marginTop:2 }}>
-                            {s.tracking_number && <span>Tracking: {s.tracking_number} · </span>}
-                            {(s.booked_at||'').slice(0,10)}
-                          </div>
+                          <span style={{ background:st.bg, color:st.color, borderRadius:99, padding:'3px 10px', fontSize:11, fontWeight:700, fontFamily:FONT, flexShrink:0 }}>{st.label}</span>
+                          {s.tracking_url && (
+                            <a href={s.tracking_url} target="_blank" rel="noopener noreferrer"
+                              style={{ padding:'5px 12px', borderRadius:99, background:GREEN_TINT, color:PRIMARY, fontSize:11, fontWeight:700, fontFamily:FONT, textDecoration:'none', flexShrink:0 }}>
+                              Spor →
+                            </a>
+                          )}
+                          {s.label_pdf_url && (
+                            <a href={s.label_pdf_url} target="_blank" rel="noopener noreferrer"
+                              style={{ padding:'5px 12px', borderRadius:99, background:PAPER3, color:INK, fontSize:11, fontWeight:700, fontFamily:FONT, textDecoration:'none', flexShrink:0 }}>
+                              🖨️ Label
+                            </a>
+                          )}
                         </div>
-                        <span style={{ background:st.bg, color:st.color, borderRadius:99, padding:'3px 10px', fontSize:11, fontWeight:700, fontFamily:FONT, flexShrink:0 }}>{st.label}</span>
-                        <span style={{ fontFamily:FONT, fontWeight:700, fontSize:13, color:INK, flexShrink:0 }}>{Number(s.total_charged_to_seller_dkk||s.cost_dkk||0).toFixed(0)} kr.</span>
-                        {s.tracking_url && (
-                          <a href={s.tracking_url} target="_blank" rel="noopener noreferrer"
-                            style={{ fontSize:11, color:PRIMARY, fontWeight:700, fontFamily:FONT, textDecoration:'underline', flexShrink:0 }}>
-                            Spor →
-                          </a>
+                        {needsAction && (
+                          <div style={{ borderTop:`1px solid #FEF08A`, background:'#FFFBEB', padding:'12px 16px' }}>
+                            <div style={{ fontFamily:FONT, fontSize:12, fontWeight:700, color:'#92400E', marginBottom:8 }}>
+                              📬 Klar til afsendelse — hvad skal du gøre?
+                            </div>
+                            <ol style={{ margin:0, paddingLeft:18, display:'flex', flexDirection:'column', gap:4 }}>
+                              {steps.map((step, i) => (
+                                <li key={i} style={{ fontFamily:FONT, fontSize:12, color:INK2, lineHeight:1.6 }}>{step}</li>
+                              ))}
+                            </ol>
+                            {s.tracking_number && !s.label_pdf_url && (
+                              <div style={{ marginTop:10, padding:'8px 12px', background:'rgba(42,125,79,0.08)', borderRadius:8, fontFamily:FONT, fontSize:12, color:PRIMARY, fontWeight:600 }}>
+                                💡 PostNord-tip: Skriv <strong>{s.tracking_number}</strong> tydeligt på pakken — du behøver ikke nødvendigvis printe et label.
+                              </div>
+                            )}
+                          </div>
                         )}
                       </div>
                     );
