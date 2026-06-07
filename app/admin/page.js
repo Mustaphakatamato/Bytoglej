@@ -67,6 +67,7 @@ const TABS = [
   { id: 'overview',      label: 'Overblik',      Icon: IconActivity },
   { id: 'institutions',  label: 'Institutioner', Icon: IconBuilding },
   { id: 'listings',      label: 'Opslag',         Icon: IconList },
+  { id: 'shipping',      label: 'Forsendelser',   Icon: () => <span style={{ fontSize:16 }}>📦</span> },
 ];
 
 export default function AdminPage() {
@@ -129,9 +130,17 @@ export default function AdminPage() {
         {tab === 'overview'     && <OverviewTab institutions={allInstitutions} setAdminInst={setAdminInst} adminInst={adminInst} isMobile={isMobile} />}
         {tab === 'institutions' && <InstitutionsTab institutions={allInstitutions} setAdminInst={setAdminInst} adminInst={adminInst} isMobile={isMobile} />}
         {tab === 'listings'     && <ListingsTab allInstitutions={allInstitutions} isMobile={isMobile} />}
+        {tab === 'shipping'     && <ShippingAdminRedirect />}
       </div>
     </div>
   );
+}
+
+// ── Shipping admin redirect ───────────────────────────────────────────────────
+function ShippingAdminRedirect() {
+  const router = useRouter();
+  useEffect(() => { router.push('/admin/shipping'); }, []);
+  return <div style={{ padding:40, textAlign:'center', color:INK3, fontFamily:FONT }}>Åbner forsendelsesadmin…</div>;
 }
 
 // ── Overview tab ─────────────────────────────────────────────────────────────
