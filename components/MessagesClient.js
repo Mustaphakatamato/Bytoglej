@@ -1165,7 +1165,9 @@ export default function MessagesClient() {
                                     {buyData?.note && <div style={{ marginTop:8, padding:'8px 10px', background:'rgba(22,34,28,0.04)', borderRadius:8, fontFamily:FONT, fontSize:12, color:INK3 }}>{buyData.note}</div>}
                                     {isOwnerInConv && !mine && !(active?.is_handled) && (
                                       <button onClick={async () => {
-                                        const confirmMsg = `✅ ${active.owner_name} har bekræftet afhentning af ${buyData?.items?.map(i=>i.title).join(', ')}`;
+                                        const isShipping = buyData?.delivery_method === 'shipping';
+                                        const actionLabel = isShipping ? 'afsendelse' : 'afhentning';
+                                        const confirmMsg = `✅ ${active.owner_name} har bekræftet ${actionLabel} af ${buyData?.items?.map(i=>i.title).join(', ')}`;
                                         const { data: newMsg } = await db.from('chat_messages').insert({ conversation_id: active.id, sender_id: effectiveUserId, sender_name: active.owner_name, content: confirmMsg }).select().single();
                                         for (const item of (buyData?.items || [])) {
                                           await db.from('listings').update({ is_sold: true, is_active: false, sold_at: new Date().toISOString(), sold_to: active.initiator_name, sold_to_institution_id: active.initiator_institution_id }).eq('id', item.listingId);
@@ -1175,8 +1177,22 @@ export default function MessagesClient() {
                                         persistCO2Saving(convWithFallback, buyData?.items?.[0]?.category || null);
                                         setMessages(ms => [...ms, ...(newMsg ? [newMsg] : [])]);
                                         setActive(a => ({ ...a, is_handled: true, handled_action: 'accepted', deal_completed: true }));
+                                        // Book shipment if delivery is via package
+                                        if (isShipping) {
+                                          fetch('/api/book-shipment', {
+                                            method: 'POST',
+                                            headers: { 'Content-Type': 'application/json' },
+                                            body: JSON.stringify({
+                                              conversation_id: active.id,
+                                              listing_id: buyData?.items?.[0]?.listingId || active.listing_id,
+                                              delivery_method: 'shipping',
+                                              buyer_name: active.initiator_name,
+                                              seller_name: active.owner_name,
+                                            }),
+                                          }).catch(() => {});
+                                        }
                                       }} style={{ width:'100%', marginTop:12, padding:'11px', borderRadius:99, background:PRIMARY, color:'#fff', border:'none', fontFamily:FONT, fontWeight:700, fontSize:14, cursor:'pointer' }}>
-                                        ✓ Bekræft afhentning
+                                        {buyData?.delivery_method === 'shipping' ? '📦 Bekræft og book forsendelse' : '✓ Bekræft afhentning'}
                                       </button>
                                     )}
                                     {isOwnerInConv && !mine && active?.is_handled && active?.handled_action === 'accepted' && (
