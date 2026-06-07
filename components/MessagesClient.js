@@ -244,6 +244,7 @@ export default function MessagesClient() {
   const [fullsizeImage,   setFullsizeImage]   = useState(null);
   const [uploadError,     setUploadError]     = useState(null);
   const [bundleAcceptedAt,setBundleAcceptedAt]= useState({});
+  const [checkoutDeliveries, setCheckoutDeliveries] = useState({});
   const ww = useWindowWidth();
   const isMobile = ww < 768;
 
@@ -672,35 +673,98 @@ export default function MessagesClient() {
 
   async function handleAcceptBid(msg) {
     const senderName = effectiveSenderName();
-    await db.from('chat_messages').update({ bid_status: 'accepted' }).eq('id', msg.id);
-    const confirmMsg = `${senderName} har accepteret dit bud på ${msg.bid_amount} kr. for "${active.listing_title}"`;
     const effUid1 = realUserId || userId;
-    await db.from('chat_messages').insert({ conversation_id: active.id, sender_id: effUid1, sender_name: senderName, content: confirmMsg });
+    await db.from('chat_messages').update({ bid_status: 'accepted' }).eq('id', msg.id);
+
+    // Fetch shipping options for checkout step
+    let shippingOptions = null;
     if (active.listing_id) {
-      await db.from('listings').update({
-        is_sold: true, is_active: false,
-        sold_at: new Date().toISOString(),
-        sold_to: active.initiator_name,
-        sold_to_institution_id: active.initiator_institution_id || null,
-      }).eq('id', active.listing_id);
+      const { data: listingData } = await db.from('listings').select('shipping_options').eq('id', active.listing_id).maybeSingle();
+      shippingOptions = listingData?.shipping_options?.[0] || null;
     }
+
+    const checkoutContent = JSON.stringify({
+      listing_id: active.listing_id,
+      listing_title: active.listing_title,
+      deal_type: 'byd',
+      amount: msg.bid_amount,
+      shipping_options: shippingOptions,
+    });
+    const confirmMsg = `✅ ${senderName} har accepteret dit bud på ${msg.bid_amount} kr. — vælg leveringsmetode for at afslutte købet.`;
+    const { data: newMsg } = await db.from('chat_messages').insert({
+      conversation_id: active.id,
+      sender_id: effUid1,
+      sender_name: senderName,
+      content: checkoutContent,
+      message_type: 'checkout_pending',
+    }).select().single();
+
     const now = new Date().toISOString();
     const upd = {
       last_message: confirmMsg, last_message_at: now,
       initiator_unread: (active.initiator_unread||0)+1,
       is_handled: true, handled_at: now, handled_action: 'accepted',
-      deal_completed: true, deal_completed_at: now, deal_type: 'byd',
     };
     await db.from('conversations').update(upd).eq('id', active.id);
     setActive(a => ({ ...a, ...upd }));
     setConvs(cs => cs.map(c => c.id === active.id ? { ...c, ...upd } : c));
-    setMessages(ms => ms.map(m => m.id === msg.id ? { ...m, bid_status: 'accepted' } : m));
-    // Persist CO2 saving non-blockingly after deal is confirmed
-    // Pass ctxInstId as fallback for initiator if conversation was created without institution context
-    const convWithInstFallback = active.initiator_institution_id
-      ? active
-      : { ...active, initiator_institution_id: ctxInstId || null };
-    persistCO2Saving(convWithInstFallback, active.listing_category || null);
+    setMessages(ms => [...ms.map(m => m.id === msg.id ? { ...m, bid_status: 'accepted' } : m), ...(newMsg ? [newMsg] : [])]);
+    setTimeout(() => bottomRef.current?.scrollIntoView({ behavior:'smooth' }), 60);
+  }
+
+  async function handleBuyerCheckout(checkoutMsg, deliveryMethod) {
+    const effUid = realUserId || userId;
+    const checkoutData = (() => { try { return JSON.parse(checkoutMsg.content); } catch { return {}; } })();
+    const isShipping = deliveryMethod === 'shipping';
+
+    await db.from('chat_messages').update({ bid_status: 'checkout_done', bid_note: deliveryMethod }).eq('id', checkoutMsg.id);
+
+    const deliveryLabel = deliveryMethod === 'pickup' ? 'afhentning' : deliveryMethod === 'shipping' ? 'pakke via transportør' : 'aftalt levering';
+    const senderName = active.initiator_name;
+    const confirmContent = `🎉 Handel gennemført! Levering: ${deliveryLabel}`;
+    const { data: confirmMsg } = await db.from('chat_messages').insert({
+      conversation_id: active.id,
+      sender_id: effUid,
+      sender_name: senderName,
+      content: confirmContent,
+    }).select().single();
+
+    if (checkoutData.listing_id) {
+      await db.from('listings').update({
+        is_sold: true, is_active: false,
+        sold_at: new Date().toISOString(),
+        sold_to: active.initiator_name,
+        sold_to_institution_id: active.initiator_institution_id || null,
+      }).eq('id', checkoutData.listing_id);
+    }
+
+    const now = new Date().toISOString();
+    const upd = {
+      last_message: confirmContent, last_message_at: now,
+      owner_unread: (active.owner_unread||0)+1,
+      deal_completed: true, deal_completed_at: now,
+      deal_type: checkoutData.deal_type || 'byd',
+    };
+    await db.from('conversations').update(upd).eq('id', active.id);
+    setActive(a => ({ ...a, ...upd }));
+    setConvs(cs => cs.map(c => c.id === active.id ? { ...c, ...upd } : c));
+    setMessages(ms => [
+      ...ms.map(x => x.id === checkoutMsg.id ? { ...x, bid_status: 'checkout_done', bid_note: deliveryMethod } : x),
+      ...(confirmMsg ? [confirmMsg] : []),
+    ]);
+    setCheckoutDeliveries(prev => { const n={...prev}; delete n[checkoutMsg.id]; return n; });
+    setTimeout(() => bottomRef.current?.scrollIntoView({ behavior:'smooth' }), 60);
+
+    const convWithFallback = active.initiator_institution_id ? active : { ...active, initiator_institution_id: ctxInstId || null };
+    persistCO2Saving(convWithFallback, active.listing_category || null);
+
+    if (isShipping) {
+      fetch('/api/book-shipment', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ conversationId: active.id, listingId: checkoutData.listing_id }),
+      }).catch(() => {});
+    }
   }
 
   async function handleRejectBid() {
@@ -1127,16 +1191,18 @@ export default function MessagesClient() {
                         const showDate = dateStr !== lastDate;
                         lastDate = dateStr;
                         const prevMine = i>0 && (ctxIsAdmin && adminInstName ? messages[i-1].sender_name === adminInstName : messages[i-1].sender_id === userId);
-                        const grouped = mine === prevMine && !showDate && m.message_type !== 'bid' && messages[i-1]?.message_type !== 'bid' && m.message_type !== 'swap' && messages[i-1]?.message_type !== 'swap' && m.message_type !== 'bundle' && messages[i-1]?.message_type !== 'bundle' && m.message_type !== 'image' && messages[i-1]?.message_type !== 'image' && m.message_type !== 'buy_request' && messages[i-1]?.message_type !== 'buy_request';
+                        const grouped = mine === prevMine && !showDate && m.message_type !== 'bid' && messages[i-1]?.message_type !== 'bid' && m.message_type !== 'swap' && messages[i-1]?.message_type !== 'swap' && m.message_type !== 'bundle' && messages[i-1]?.message_type !== 'bundle' && m.message_type !== 'image' && messages[i-1]?.message_type !== 'image' && m.message_type !== 'buy_request' && messages[i-1]?.message_type !== 'buy_request' && m.message_type !== 'checkout_pending' && messages[i-1]?.message_type !== 'checkout_pending';
                         const isBid = m.message_type === 'bid';
                         const isSwap = m.message_type === 'swap';
                         const isBundle = m.message_type === 'bundle';
                         const isImage = m.message_type === 'image';
                         const isBuyRequest = m.message_type === 'buy_request';
+                        const isCheckout = m.message_type === 'checkout_pending';
                         const bundleData = isBundle ? (() => { try { return JSON.parse(m.content); } catch { return null; } })() : null;
                         const swapData = isSwap ? (() => { try { return JSON.parse(m.content); } catch { return null; } })() : null;
                         const imageData = isImage ? (() => { try { return JSON.parse(m.content); } catch { return null; } })() : null;
                         const buyData = isBuyRequest ? (() => { try { return JSON.parse(m.content); } catch { return null; } })() : null;
+                        const checkoutData = isCheckout ? (() => { try { return JSON.parse(m.content); } catch { return null; } })() : null;
                         return (
                           <React.Fragment key={m.id}>
                             {showDate && <div style={{ textAlign:'center', margin:'12px 0 4px', fontSize:11, fontWeight:600, color:INK3, letterSpacing:0.5, fontFamily:FONT }}>{dateStr}</div>}
@@ -1199,6 +1265,71 @@ export default function MessagesClient() {
                                       <div style={{ marginTop:10, textAlign:'center', fontFamily:FONT, fontSize:12, color:PRIMARY, fontWeight:700 }}>Afhentning bekræftet ✓</div>
                                     )}
                                   </div>
+                                </div>
+                              </div>
+                            ) : isCheckout && checkoutData ? (
+                              <div style={{ margin:'10px 0', padding:'0 4px' }}>
+                                <div style={{
+                                  background: m.bid_status === 'checkout_done' ? GREEN_TINT : '#FFFBEB',
+                                  border: `2px solid ${m.bid_status === 'checkout_done' ? PRIMARY : '#FDE68A'}`,
+                                  borderRadius:16, padding:'16px',
+                                }}>
+                                  <div style={{ display:'flex', alignItems:'center', gap:8, marginBottom:12 }}>
+                                    <span style={{ fontSize:18 }}>{m.bid_status === 'checkout_done' ? '✅' : '🛍️'}</span>
+                                    <div>
+                                      <div style={{ fontFamily:FONT, fontWeight:800, fontSize:14, color:INK }}>
+                                        {m.bid_status === 'checkout_done' ? 'Handel gennemført!' : 'Vælg leveringsmetode'}
+                                      </div>
+                                      <div style={{ fontFamily:FONT, fontSize:12, color:INK3, marginTop:1 }}>
+                                        {checkoutData.listing_title} · {checkoutData.deal_type === 'byd' ? `${checkoutData.amount} kr.` : 'Bytte'}
+                                      </div>
+                                    </div>
+                                  </div>
+
+                                  {m.bid_status === 'checkout_done' ? (
+                                    <div style={{ fontFamily:FONT, fontSize:13, color:INK2, fontWeight:600 }}>
+                                      {m.bid_note === 'pickup' ? '📍 Afhentning' : m.bid_note === 'shipping' ? '📦 Pakke via transportør' : '🤝 Aftalt levering'}
+                                    </div>
+                                  ) : isOwnerInConv ? (
+                                    <div style={{ fontFamily:FONT, fontSize:13, color:'#B45309', fontWeight:600, textAlign:'center', padding:'8px 0' }}>
+                                      ⏳ Afventer købers valg af leveringsmetode…
+                                    </div>
+                                  ) : (
+                                    (() => {
+                                      const so = checkoutData.shipping_options;
+                                      const opts = [];
+                                      if (!so) {
+                                        opts.push({ key:'custom', icon:'🤝', label:'Aftalt levering', desc:'Aftales direkte med sælger' });
+                                      } else {
+                                        if (so.allow_pickup) opts.push({ key:'pickup', icon:'📍', label:'Afhentning', desc: so.pickup_address || 'Afhentes hos sælger' });
+                                        if (so.allow_shipping) opts.push({ key:'shipping', icon:'📦', label:'Pakke via transportør', desc: so.shipping_included_in_price ? 'Porto inkluderet i pris' : 'Porto betales separat' });
+                                        if (so.allow_custom) opts.push({ key:'custom', icon:'🤝', label:'Aftalt levering', desc:'Aftales direkte med sælger' });
+                                        if (!opts.length) opts.push({ key:'custom', icon:'🤝', label:'Aftalt levering', desc:'Aftales direkte med sælger' });
+                                      }
+                                      const chosen = checkoutDeliveries[m.id];
+                                      return (
+                                        <div style={{ display:'flex', flexDirection:'column', gap:8 }}>
+                                          {opts.map(o => (
+                                            <button key={o.key} onClick={()=>setCheckoutDeliveries(prev=>({...prev,[m.id]:o.key}))}
+                                              style={{ display:'flex', alignItems:'center', gap:12, padding:'11px 14px', borderRadius:12, border:`2px solid ${chosen===o.key?PRIMARY:'#FDE68A'}`, background:chosen===o.key?GREEN_TINT:'#FFFBEB', cursor:'pointer', textAlign:'left' }}>
+                                              <span style={{ fontSize:18 }}>{o.icon}</span>
+                                              <div style={{ flex:1 }}>
+                                                <div style={{ fontFamily:FONT, fontWeight:700, fontSize:13, color:INK }}>{o.label}</div>
+                                                <div style={{ fontFamily:FONT, fontSize:11, color:INK3, marginTop:1 }}>{o.desc}</div>
+                                              </div>
+                                              {chosen===o.key && <span style={{ color:PRIMARY, fontWeight:800 }}>✓</span>}
+                                            </button>
+                                          ))}
+                                          <button
+                                            onClick={()=>{ if(chosen) handleBuyerCheckout(m, chosen); }}
+                                            disabled={!chosen}
+                                            style={{ padding:'12px', borderRadius:99, background:chosen?PRIMARY:PAPER3, border:'none', color:chosen?'#fff':INK3, fontFamily:FONT, fontWeight:700, fontSize:14, cursor:chosen?'pointer':'default', marginTop:4 }}>
+                                            {chosen ? '✅ Bekræft og afslut handel' : 'Vælg leveringsmetode…'}
+                                          </button>
+                                        </div>
+                                      );
+                                    })()
+                                  )}
                                 </div>
                               </div>
                             ) : isSwap ? (
@@ -1308,15 +1439,37 @@ export default function MessagesClient() {
                                           const senderName = effectiveSenderName();
                                           const effUid = realUserId || userId;
                                           await db.from('chat_messages').update({ bid_status: 'accepted' }).eq('id', m.id);
-                                          const confirmMsg = `✅ ${senderName} har accepteret dit bundttilbud!`;
-                                          const { data: newMsg } = await db.from('chat_messages').insert({ conversation_id: active.id, sender_id: effUid, sender_name: senderName, content: confirmMsg }).select().single();
+
+                                          // Fetch shipping options for checkout
+                                          let shippingOptions = null;
+                                          if (active.listing_id) {
+                                            const { data: ld } = await db.from('listings').select('shipping_options').eq('id', active.listing_id).maybeSingle();
+                                            shippingOptions = ld?.shipping_options?.[0] || null;
+                                          }
+
+                                          const bundleTotal = bundleData?.bundle_items?.reduce((s,i)=>s+(Number(i.price)||0),0)||0;
+                                          const checkoutContent = JSON.stringify({
+                                            listing_id: active.listing_id,
+                                            listing_title: active.listing_title,
+                                            deal_type: 'bundle',
+                                            amount: bundleTotal,
+                                            bundle_items: bundleData?.bundle_items,
+                                            shipping_options: shippingOptions,
+                                          });
+                                          const previewMsg = `✅ ${senderName} har accepteret bundttilbuddet — vælg leveringsmetode for at afslutte.`;
+                                          const { data: newMsg } = await db.from('chat_messages').insert({
+                                            conversation_id: active.id,
+                                            sender_id: effUid,
+                                            sender_name: senderName,
+                                            content: checkoutContent,
+                                            message_type: 'checkout_pending',
+                                          }).select().single();
                                           const now = new Date().toISOString();
-                                          const upd = { last_message: confirmMsg, last_message_at: now, initiator_unread: (active.initiator_unread||0)+1, is_handled: true, handled_at: now, handled_action: 'accepted' };
+                                          const upd = { last_message: previewMsg, last_message_at: now, initiator_unread: (active.initiator_unread||0)+1, is_handled: true, handled_at: now, handled_action: 'accepted' };
                                           await db.from('conversations').update(upd).eq('id', active.id);
                                           setActive(a => ({ ...a, ...upd }));
                                           setConvs(cs => cs.map(c => c.id === active.id ? { ...c, ...upd } : c));
                                           setMessages(ms => [...ms.map(x => x.id === m.id ? { ...x, bid_status: 'accepted' } : x), ...(newMsg ? [newMsg] : [])]);
-                                          setBundleAcceptedAt(prev => ({ ...prev, [m.id]: Date.now() }));
                                           setTimeout(() => bottomRef.current?.scrollIntoView({ behavior:'smooth' }), 60);
                                         }} style={{ flex:1, padding:'8px 16px', borderRadius:99, background:PRIMARY, border:'none', color:'#fff', fontSize:12, fontWeight:700, cursor:'pointer', fontFamily:FONT }}>
                                           Accepter

@@ -75,14 +75,12 @@ function ImageGallery({ images, color, emoji }) {
 
 export default function ListingDetailClient() {
   const router = useRouter();
-  const { activeListing: listing, setActiveListing, favs, toggleFav, setSelectedConvId, showToast, loggedIn, isAdmin } = useApp();
+  const { activeListing: listing, setActiveListing, favs, toggleFav, setSelectedConvId, showToast, loggedIn, isAdmin, addToCart, cart } = useApp();
   const { isAdminView: ctxIsAdmin, adminInstName, institution: ctxInstitution, institutionId: ctxInstId } = useActiveUser();
   const ww = useWindowWidth();
   const isMobile = ww < 768;
 
-  const [buyModal,    setBuyModal]    = useState(false);
-  const [buyStep,     setBuyStep]     = useState(1);
-  const [buyDelivery, setBuyDelivery] = useState(null);
+  const inCart = cart?.some(c => c.listingId === listing?.id);
   const [bidModal,  setBidModal]  = useState(false);
   const [swapModal, setSwapModal] = useState(false);
   const [bidAmount, setBidAmount] = useState('');
@@ -382,56 +380,23 @@ export default function ListingDetailClient() {
     setSaving(false);
   }
 
-  async function handleBuy() {
+  function handleAddToCart() {
     if (isOwn) { showToast('Du kan ikke købe dit eget opslag', 'error'); return; }
-    setSaving(true);
-    try {
-      const { data: { user } } = await db.auth.getUser();
-      const { data: inst } = await db.from('institutions').select('id,name').ilike('email', user.email).maybeSingle();
-      const buyerName = inst?.name || myInstName || user.email;
-      const buyerInstId = inst?.id || ctxInstId || null;
-      const { data: ownerInst } = await db.from('institutions').select('id,email,name').eq('name', listing.institution_name).maybeSingle();
-      const ownerInstId = ownerInst?.id || null;
-      const orFind = buyerInstId
-        ? `initiator_institution_id.eq.${buyerInstId},initiator_id.eq.${user.id}`
-        : `initiator_id.eq.${user.id}`;
-      const { data: existing } = await db.from('conversations').select('id,owner_unread').eq('listing_id', listing.id).or(orFind).maybeSingle();
-      let convId = existing?.id || null;
-      if (!convId) {
-        const { data: conv } = await db.from('conversations').insert({
-          listing_id: listing.id, listing_title: listing.title,
-          listing_emoji: listing.emoji, listing_color: listing.color,
-          listing_image: listing.images?.[0] || null,
-          initiator_id: user.id, initiator_name: buyerName,
-          initiator_institution_id: buyerInstId,
-          owner_id: listing.user_id, owner_name: listing.institution_name,
-          owner_institution_id: ownerInstId,
-        }).select().single();
-        convId = conv?.id;
-      }
-      if (convId) {
-        const buyData = {
-          items: [{ listingId: listing.id, title: listing.title, price: listing.price, emoji: listing.emoji, category: listing.category }],
-          totalPrice: listing.price,
-          buyerName,
-          delivery_method: buyDelivery,
-        };
-        const msgText = `Købsforespørgsel: "${listing.title}" — ${listing.price} kr.`;
-        await db.from('chat_messages').insert({ conversation_id: convId, sender_id: user.id, sender_name: buyerName, content: JSON.stringify(buyData), message_type: 'buy_request' });
-        await db.from('conversations').update({ last_message: msgText, last_message_at: new Date().toISOString(), owner_unread: (existing?.owner_unread||0)+1 }).eq('id', convId);
-        if (!existing && ownerInst?.email && ownerInst.email.toLowerCase() !== user.email.toLowerCase()) {
-          fetch('/api/notify-message', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ ownerEmail: ownerInst.email, ownerName: ownerInst.name, senderName: buyerName, listingTitle: listing.title, listingEmoji: listing.emoji || '🧸', convId }),
-          }).catch(() => {});
-        }
-        if (setSelectedConvId) setSelectedConvId(convId);
-      }
-    } catch {}
-    setSaving(false); setBuyModal(false); setBuyStep(1); setBuyDelivery(null);
-    showToast('Køb bekræftet! Sælger er notificeret via beskeder.');
-    router.push('/beskeder');
+    if (!loggedIn) { router.push('/login'); return; }
+    if (inCart) { router.push('/indkøbsvogn'); return; }
+    addToCart({
+      listingId: listing.id,
+      listingTitle: listing.title,
+      listingEmoji: listing.emoji || '🧸',
+      listingColor: listing.color,
+      price: listing.price,
+      category: listing.category,
+      images: listing.images || [],
+      ownerInstitutionName: listing.institution_name,
+      ownerId: listing.user_id,
+    });
+    showToast(`"${listing.title}" lagt i kurven 🛒`);
+    router.push('/indkøbsvogn');
   }
 
   async function handleBid() {
@@ -667,7 +632,7 @@ export default function ListingDetailClient() {
             {/* Action buttons */}
             {!isOwn ? (
               <div style={{ display:'flex', flexDirection:'column', gap:10, marginBottom:20 }}>
-                {listing.type==='køb' && <Btn variant="primary" color={PRIMARY} radius={22} onClick={()=>setBuyModal(true)} style={{ justifyContent:'center', padding:'15px', fontSize:16 }}>🏷️ Køb nu — {listing.price} kr.</Btn>}
+                {listing.type==='køb' && <Btn variant="primary" color={PRIMARY} radius={22} onClick={handleAddToCart} style={{ justifyContent:'center', padding:'15px', fontSize:16 }}>{inCart ? '🛒 Gå til kurv →' : `🛒 Læg i kurv — ${listing.price} kr.`}</Btn>}
                 {listing.type==='byd' && <Btn variant="primary" color={ACCENT2} radius={22} onClick={()=>setBidModal(true)} style={{ justifyContent:'center', padding:'15px', fontSize:16 }}>📊 Afgiv bud</Btn>}
                 {listing.type==='byt' && <Btn variant="primary" color={ACCENT} radius={22} onClick={()=>setSwapModal(true)} style={{ justifyContent:'center', padding:'15px', fontSize:16 }}>🔄 Foreslå bytte</Btn>}
                 {listing.type==='søges' && <button onClick={()=>setSøgesModal(true)}
@@ -823,71 +788,6 @@ export default function ListingDetailClient() {
 
         </div>
       </div>
-
-      <Modal open={buyModal} onClose={()=>{ setBuyModal(false); setBuyStep(1); setBuyDelivery(null); }} title={buyStep===1?"Køb vare":"Er du sikker?"}>
-        {buyStep===1 ? (
-          <div style={{ display:'flex', flexDirection:'column', gap:16 }}>
-            <div style={{ background:PAPER2, borderRadius:12, padding:16 }}>
-              <div style={{ fontFamily:FONT, fontWeight:700, fontSize:16, color:INK }}>{listing.title}</div>
-              <div style={{ color:INK3, fontSize:13, marginTop:4, fontFamily:FONT }}>{listing.institution_name} · {listing.city}</div>
-            </div>
-            <div style={{ display:'flex', justifyContent:'space-between', fontSize:15, fontWeight:600, fontFamily:FONT }}>
-              <span style={{ color:INK2 }}>Pris</span>
-              <span style={{ color:PRIMARY, fontWeight:800, fontSize:18 }}>{listing.price} kr.</span>
-            </div>
-            {(() => {
-              const so = listing.shipping_options?.[0];
-              if (!so) return <div style={{ background:GREEN_TINT, border:`1px solid ${GREEN_SOFT}`, borderRadius:10, padding:'12px 14px', fontSize:13, color:INK2, fontFamily:FONT }}>Betaling og afhentning aftales direkte med institutionen efter bekræftelse.</div>;
-              const opts = [];
-              if (so.allow_pickup) opts.push({ key:'pickup', icon:'📍', label:'Afhentning', desc: so.pickup_address || 'Afhentes hos sælger' });
-              if (so.allow_shipping) opts.push({ key:'shipping', icon:'📦', label:'Pakke via transportør', desc: so.shipping_included_in_price ? 'Porto inkluderet i pris' : 'Porto betales af sælger' });
-              if (so.allow_custom) opts.push({ key:'custom', icon:'🤝', label:'Aftalt levering', desc: 'Aftales direkte med sælger' });
-              if (!opts.length) return null;
-              return (
-                <div>
-                  <div style={{ fontFamily:FONT, fontWeight:700, fontSize:13, color:INK, marginBottom:8 }}>Vælg leveringsmåde</div>
-                  <div style={{ display:'flex', flexDirection:'column', gap:8 }}>
-                    {opts.map(o => (
-                      <button key={o.key} onClick={()=>setBuyDelivery(o.key)}
-                        style={{ display:'flex', alignItems:'center', gap:12, padding:'12px 14px', borderRadius:12, border:`2px solid ${buyDelivery===o.key?PRIMARY:PAPER3}`, background:buyDelivery===o.key?GREEN_TINT:PAPER2, cursor:'pointer', textAlign:'left', transition:'all 0.15s' }}>
-                        <span style={{ fontSize:20 }}>{o.icon}</span>
-                        <div>
-                          <div style={{ fontFamily:FONT, fontWeight:700, fontSize:14, color:INK }}>{o.label}</div>
-                          <div style={{ fontFamily:FONT, fontSize:12, color:INK3, marginTop:1 }}>{o.desc}</div>
-                        </div>
-                        {buyDelivery===o.key && <span style={{ marginLeft:'auto', color:PRIMARY, fontWeight:800, fontSize:16 }}>✓</span>}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              );
-            })()}
-            <Btn variant="primary" color={PRIMARY} radius={22}
-              onClick={()=>setBuyStep(2)}
-              disabled={!!(listing.shipping_options?.[0] && !buyDelivery)}
-              style={{ justifyContent:'center', padding:'14px', fontSize:15, opacity: listing.shipping_options?.[0] && !buyDelivery ? 0.5 : 1 }}>
-              Fortsæt →
-            </Btn>
-            <Btn variant="ghost" onClick={()=>{ setBuyModal(false); setBuyStep(1); setBuyDelivery(null); }} style={{ justifyContent:'center' }}>Annuller</Btn>
-          </div>
-        ) : (
-          <div style={{ display:'flex', flexDirection:'column', gap:16 }}>
-            <div style={{ background:GREEN_TINT, border:`2px solid ${PRIMARY}`, borderRadius:12, padding:16, textAlign:'center' }}>
-              <div style={{ fontFamily:FONT, fontWeight:800, fontSize:16, color:INK }}>Bekræft køb af</div>
-              <div style={{ fontFamily:FONT, fontWeight:700, fontSize:15, color:PRIMARY, marginTop:4 }}>{listing.title}</div>
-              <div style={{ fontWeight:800, fontSize:22, color:PRIMARY, marginTop:8, fontFamily:FONT }}>{listing.price} kr.</div>
-              <div style={{ color:INK3, fontSize:13, marginTop:4, fontFamily:FONT }}>fra {listing.institution_name}</div>
-            </div>
-            {buyDelivery && <div style={{ background:PAPER2, borderRadius:10, padding:'10px 14px', fontSize:13, color:INK2, fontFamily:FONT, display:'flex', alignItems:'center', gap:8 }}>
-              <span>{buyDelivery==='pickup'?'📍':buyDelivery==='shipping'?'📦':'🤝'}</span>
-              <span><strong>Levering:</strong> {buyDelivery==='pickup'?'Afhentning':buyDelivery==='shipping'?'Pakke via transportør':'Aftalt levering'}</span>
-            </div>}
-            <div style={{ fontSize:13, color:INK3, textAlign:'center', fontFamily:FONT }}>Sælger modtager en besked og kontakter dig for at aftale{buyDelivery==='shipping'?' forsendelse':' betaling og afhentning'}.</div>
-            <Btn variant="primary" color={PRIMARY} radius={22} onClick={handleBuy} disabled={saving} style={{ justifyContent:'center', padding:'14px', fontSize:15 }}>{saving?<><Spinner/>Sender…</>:'✅ Bekræft køb'}</Btn>
-            <Btn variant="ghost" onClick={()=>setBuyStep(1)} style={{ justifyContent:'center' }}>← Tilbage</Btn>
-          </div>
-        )}
-      </Modal>
 
       <Modal open={bidModal} onClose={()=>setBidModal(false)} title="Afgiv bud">
         <div style={{ display:'flex', flexDirection:'column', gap:16 }}>
