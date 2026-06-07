@@ -104,11 +104,19 @@ export default function ListingCard({ listing, onClick, favs, toggleFav, onInsti
               </span>
             );
           })()}
-          {listing.can_ship && (
-            <span style={{ display:'inline-flex', alignItems:'center', gap:3, background:'#EFF6FF', color:'#2563EB', borderRadius:99, padding:'3px 10px', fontSize:11, fontWeight:700, fontFamily:FONT }}>
-              📦 Kan sendes
-            </span>
-          )}
+          {(() => {
+            const so = listing.shipping_options?.[0];
+            if (!so && !listing.can_ship) return null;
+            const badges = [];
+            if (so?.allow_pickup) badges.push({ icon:'📍', label:'Afhentes', bg:'#F0FDF4', color:'#16a34a' });
+            if (so?.allow_shipping || (!so && listing.can_ship)) badges.push({ icon:'📦', label:'Kan sendes', bg:'#EFF6FF', color:'#2563EB' });
+            if (so?.allow_custom) badges.push({ icon:'🤝', label:'Aftalt', bg:'#FEF9C3', color:'#92400e' });
+            return badges.map(b => (
+              <span key={b.label} style={{ display:'inline-flex', alignItems:'center', gap:3, background:b.bg, color:b.color, borderRadius:99, padding:'3px 10px', fontSize:11, fontWeight:700, fontFamily:FONT }}>
+                {b.icon} {b.label}
+              </span>
+            ));
+          })()}
         </div>
 
         <div style={{ fontFamily: FONT, fontWeight: 700, fontSize: 15, color: INK, marginBottom: 4, lineHeight: 1.3 }}>{listing.title}</div>

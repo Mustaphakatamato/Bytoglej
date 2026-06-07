@@ -617,7 +617,15 @@ export default function ListingDetailClient() {
               <Badge type={listing.type} />
               {listing.condition && <span style={{ background:PAPER2, color:INK2, borderRadius:99, padding:'4px 12px', fontSize:11, fontWeight:700, fontFamily:FONT }}>{listing.condition}</span>}
               {listing.age_group && <span style={{ background:PAPER2, color:INK3, borderRadius:99, padding:'4px 12px', fontSize:11, fontWeight:600, fontFamily:FONT }}>👶 {listing.age_group}</span>}
-              {listing.can_ship && <span style={{ background:'#EFF6FF', color:'#2563EB', borderRadius:99, padding:'4px 12px', fontSize:11, fontWeight:700, fontFamily:FONT }}>📦 Kan sendes</span>}
+              {(() => {
+                const so = listing.shipping_options?.[0];
+                if (!so && !listing.can_ship) return null;
+                const badges = [];
+                if (so?.allow_pickup) badges.push({ icon:'📍', label:'Afhentes', bg:'#F0FDF4', color:'#16a34a' });
+                if (so?.allow_shipping || (!so && listing.can_ship)) badges.push({ icon:'📦', label:'Kan sendes', bg:'#EFF6FF', color:'#2563EB' });
+                if (so?.allow_custom) badges.push({ icon:'🤝', label:'Aftalt levering', bg:'#FEF9C3', color:'#92400e' });
+                return badges.map(b => <span key={b.label} style={{ background:b.bg, color:b.color, borderRadius:99, padding:'4px 12px', fontSize:11, fontWeight:700, fontFamily:FONT }}>{b.icon} {b.label}</span>);
+              })()}
             </div>
 
             {/* Description with expand */}
@@ -728,18 +736,45 @@ export default function ListingDetailClient() {
                 ['By', listing.city],
                 ['Aldersgruppe', listing.age_group],
                 ['Stand', listing.condition],
-                listing.can_ship ? ['Forsendelse', '📦 Kan sendes', 'ship'] : null,
                 listing.created_at ? ['Opslået', timeAgo(listing.created_at)] : null,
-              ].filter(Boolean).map(([label, val, key], i) => (
-                <div key={i} style={{ display:'flex', justifyContent:'space-between', fontSize:13, fontFamily:FONT, padding:'7px 0', borderBottom: i < 4 ? `1px solid ${PAPER3}` : 'none' }}>
+              ].filter(Boolean).map(([label, val, key], i, arr) => (
+                <div key={i} style={{ display:'flex', justifyContent:'space-between', fontSize:13, fontFamily:FONT, padding:'7px 0', borderBottom: i < arr.length - 1 ? `1px solid ${PAPER3}` : 'none' }}>
                   <span style={{ color:INK3 }}>{label}</span>
                   <span onClick={key==='inst' ? ()=>goToInstitution(val) : undefined}
-                    style={{ fontWeight:600, cursor:key==='inst'?'pointer':'default', color: key==='inst' ? PRIMARY : key==='ship' ? '#2563EB' : INK2, textDecoration:key==='inst'?'underline':'none', textDecorationColor:GREEN_SOFT }}>
+                    style={{ fontWeight:600, cursor:key==='inst'?'pointer':'default', color: key==='inst' ? PRIMARY : INK2, textDecoration:key==='inst'?'underline':'none', textDecorationColor:GREEN_SOFT }}>
                     {val}
                   </span>
                 </div>
               ))}
             </div>
+
+            {/* Delivery options */}
+            {(() => {
+              const so = listing.shipping_options?.[0];
+              if (!so && !listing.can_ship) return null;
+              const rows = [];
+              if (so?.allow_pickup) rows.push({ icon:'📍', label:'Afhentes', color:'#16a34a', bg:'#F0FDF4', detail: so.pickup_address || null, sub: so.pickup_hours?.text || so.pickup_notes || null });
+              if (so?.allow_shipping || (!so && listing.can_ship)) rows.push({ icon:'📦', label:'Sendes med pakkepost', color:'#2563EB', bg:'#EFF6FF', detail: so?.shipping_size_category ? `Pakkestr.: ${so.shipping_size_category}` : null, sub: so?.shipping_included_in_price ? 'Porto inkluderet i prisen' : 'Porto betales af køber' });
+              if (so?.allow_custom) rows.push({ icon:'🤝', label:'Aftalt levering', color:'#92400e', bg:'#FEF9C3', detail: 'Aftales individuelt', sub: null });
+              if (!rows.length) return null;
+              return (
+                <div style={{ background:PAPER2, borderRadius:18, padding:'16px 20px', border:`1px solid ${PAPER3}`, marginBottom:14 }}>
+                  <div style={{ fontFamily:FONT, fontWeight:700, fontSize:13, color:INK, marginBottom:12 }}>Leveringsmuligheder</div>
+                  <div style={{ display:'flex', flexDirection:'column', gap:10 }}>
+                    {rows.map(r => (
+                      <div key={r.label} style={{ display:'flex', alignItems:'flex-start', gap:10, padding:'10px 12px', background:r.bg, borderRadius:12 }}>
+                        <span style={{ fontSize:18, flexShrink:0, marginTop:1 }}>{r.icon}</span>
+                        <div>
+                          <div style={{ fontFamily:FONT, fontWeight:700, fontSize:13, color:r.color }}>{r.label}</div>
+                          {r.detail && <div style={{ fontSize:12, color:INK3, fontFamily:FONT, marginTop:2 }}>{r.detail}</div>}
+                          {r.sub && <div style={{ fontSize:11, color:INK3, fontFamily:FONT, marginTop:1 }}>{r.sub}</div>}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              );
+            })()}
 
             {/* CVR badge */}
             <div style={{ background:GREEN_TINT, borderRadius:14, padding:'12px 16px', display:'flex', gap:10, alignItems:'center', borderLeft:`3px solid ${PRIMARY}`, marginBottom: trustScore ? 10 : 0 }}>

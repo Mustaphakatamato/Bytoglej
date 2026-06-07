@@ -59,7 +59,7 @@ export function AppProvider({ children }) {
 
   async function fetchListings() {
     setLoadingListings(true);
-    const { data } = await db.from('listings').select('*').eq('is_active', true).order('created_at', { ascending: false });
+    const { data } = await db.from('listings').select('*, shipping_options(*)').eq('is_active', true).order('created_at', { ascending: false });
     if (data) setListings(data);
     setLoadingListings(false);
     setRefreshSeed(s => s + 1);

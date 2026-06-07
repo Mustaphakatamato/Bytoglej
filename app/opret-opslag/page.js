@@ -414,7 +414,7 @@ export default function OpretOpslagPage() {
       color: isSøges ? '#F5F0FF' : form.color,
       tags: form.tags || [], images: [], bid_count: 0, is_active: true,
       category: form.category || null, subcategory: form.subcategory || null,
-      can_ship: form.can_ship || false,
+      can_ship: delivery.shipping || false,
     };
     if (form.type==='byd' && form.min_bid) insertData.min_bid = Number(form.min_bid);
     const { data: listing, error } = await db.from('listings').insert(insertData).select().single();
