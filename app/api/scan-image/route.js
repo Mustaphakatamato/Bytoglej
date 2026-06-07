@@ -21,7 +21,7 @@ export async function POST(req) {
         role: 'user',
         content: [
           { type: 'image_url', image_url: { url: `data:${mimeType};base64,${base64}` } },
-          { type: 'text', text: 'Are there any visible human faces, identifiable people, or children\'s faces in this image? Hands or feet alone do NOT count. Reply with exactly one word: yes or no.' },
+          { type: 'text', text: 'Does this image show a human face or a recognizable portrait of a person? Hands, arms, legs, feet, or cartoon/animal characters do NOT count. Only answer yes if a face is clearly visible. Reply with exactly one word: yes or no.' },
         ],
       }],
     });
