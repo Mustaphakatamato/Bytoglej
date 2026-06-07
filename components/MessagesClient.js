@@ -1081,7 +1081,7 @@ export default function MessagesClient() {
               {/* Chat header */}
               <div style={{ padding: isMobile ? '10px 12px' : '12px 16px', borderBottom:`1px solid rgba(22,34,28,0.08)`, display:'flex', alignItems:'center', gap: isMobile ? 10 : 12, background: isMobile ? PAPER : PAPER2 }}>
                 {isMobile && (
-                  <button onClick={()=>router.back()} style={{ background:'none', border:'none', cursor:'pointer', padding:'6px 4px', flexShrink:0, display:'flex', alignItems:'center', color:INK }}>
+                  <button onClick={()=>{ setActive(null); setMessages([]); router.push('/beskeder'); }} style={{ background:'none', border:'none', cursor:'pointer', padding:'6px 4px', flexShrink:0, display:'flex', alignItems:'center', color:INK }}>
                     <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><line x1="19" y1="12" x2="5" y2="12"/><polyline points="12 19 5 12 12 5"/></svg>
                   </button>
                 )}
