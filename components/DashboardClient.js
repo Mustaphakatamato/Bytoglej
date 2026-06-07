@@ -138,6 +138,10 @@ export default function DashboardClient() {
   const [co2ListOpen, setCo2ListOpen] = useState(false);
   const [co2ModalData, setCo2ModalData] = useState(null);
 
+  const [myShipments, setMyShipments] = useState([]);
+  const [myInvoices, setMyInvoices] = useState([]);
+  const [shippingLoading, setShippingLoading] = useState(false);
+
   const isAdmin = !!institution && !institution._memberRole;
   const [listingsView, setListingsView] = useState('list');
   const [tradesTab, setTradesTab] = useState('all');
@@ -259,6 +263,7 @@ export default function DashboardClient() {
       if (!cancelled) await fetchListingFavoriters(listings);
       if (!cancelled) fetchCO2Savings(inst, user.id);
       if (!cancelled) fetchTrades(inst, user.id);
+      if (!cancelled && inst?.id) fetchShippingData(inst.id);
       if (!cancelled && inst?.name) {
         const { data: myReviews } = await db.from('transaction_reviews').select('conversation_id').eq('reviewer_institution_name', inst.name);
         if (myReviews) setReviewedConvIds(new Set(myReviews.map(r => r.conversation_id)));
@@ -333,6 +338,25 @@ export default function DashboardClient() {
       .or(`seller_institution_id.eq.${inst.id},buyer_institution_id.eq.${inst.id}`)
       .order('calculated_at', { ascending: false });
     if (data) setCo2Savings(data);
+  }
+
+  async function fetchShippingData(instId) {
+    setShippingLoading(true);
+    const [{ data: shipments }, { data: invoices }] = await Promise.all([
+      db.from('shipments')
+        .select('id,status,carrier,size_category,tracking_number,tracking_url,cost_dkk,total_charged_to_seller_dkk,booked_at,delivered_at,conversations(listing_title)')
+        .eq('seller_institution_id', instId)
+        .order('booked_at', { ascending: false })
+        .limit(10),
+      db.from('shipping_invoices')
+        .select('id,invoice_number,period_start,period_end,total_amount_dkk,status,due_date,sent_at')
+        .eq('institution_id', instId)
+        .order('created_at', { ascending: false })
+        .limit(5),
+    ]);
+    if (shipments) setMyShipments(shipments);
+    if (invoices) setMyInvoices(invoices);
+    setShippingLoading(false);
   }
 
   function openEdit(l) {
@@ -1028,6 +1052,109 @@ export default function DashboardClient() {
                       })}
                     </div>
                   )}
+                </>
+              )}
+            </div>
+          );
+        })()}
+
+        {/* Shipping section */}
+        {(myShipments.length > 0 || myInvoices.length > 0 || shippingLoading) && (() => {
+          const inst = institution;
+          const creditLimit = Number(inst?.shipping_credit_limit_dkk || 500);
+          const balance = Number(inst?.shipping_current_balance_dkk || 0);
+          const balancePct = Math.min(100, Math.round((balance / creditLimit) * 100));
+          const statusColors = {
+            pending:    { bg:'#FEF9C3', color:'#92400e', label:'Afventer' },
+            booked:     { bg:'#EFF6FF', color:'#2563EB', label:'Booket' },
+            printed:    { bg:'#F0FDF4', color:'#16a34a', label:'Printet' },
+            in_transit: { bg:'#EFF6FF', color:'#2563EB', label:'I transit' },
+            delivered:  { bg:'#F0FDF4', color:'#16a34a', label:'Leveret ✓' },
+            failed:     { bg:'#FEF2F2', color:'#e11d48', label:'Fejlet' },
+            cancelled:  { bg:'#F3F4F6', color:'#6B7280', label:'Annulleret' },
+          };
+          const invoiceStatusColors = {
+            draft:      { color:'#6B7570', label:'Kladde' },
+            sent:       { color:'#2563EB', label:'Sendt' },
+            paid:       { color:'#16a34a', label:'Betalt ✓' },
+            overdue:    { color:'#e11d48', label:'Overskredet' },
+            cancelled:  { color:'#6B7570', label:'Annulleret' },
+          };
+          return (
+            <div style={{ background:PAPER2, borderRadius:22, padding:isMobile?20:28, border:'1px solid rgba(22,34,28,0.07)', boxShadow:'0 1px 4px rgba(22,34,28,0.06)', marginTop:isMobile?16:24 }}>
+              <h2 style={{ fontFamily:FONT, fontWeight:800, fontSize:18, color:INK, marginBottom:20 }}>📦 Forsendelser</h2>
+
+              {/* Balance widget */}
+              {inst?.shipping_billing_enabled && (
+                <div style={{ background:'#fff', borderRadius:16, padding:'14px 18px', marginBottom:20, border:`1px solid ${PAPER3}` }}>
+                  <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:8 }}>
+                    <div style={{ fontFamily:FONT, fontWeight:700, fontSize:13, color:INK }}>Månedlig kredit</div>
+                    <div style={{ fontFamily:FONT, fontWeight:800, fontSize:14, color: balancePct > 80 ? '#e11d48' : INK }}>
+                      {balance.toFixed(0)} / {creditLimit.toFixed(0)} kr.
+                    </div>
+                  </div>
+                  <div style={{ height:8, background:PAPER3, borderRadius:99, overflow:'hidden' }}>
+                    <div style={{ height:'100%', width:`${balancePct}%`, background: balancePct > 80 ? '#e11d48' : PRIMARY, borderRadius:99, transition:'width 0.5s' }} />
+                  </div>
+                  <div style={{ fontSize:11, color:INK3, fontFamily:FONT, marginTop:6 }}>Nulstilles d. 1. i næste måned · Porto faktureres månedligt</div>
+                </div>
+              )}
+
+              {/* Shipments table */}
+              {shippingLoading ? (
+                <div style={{ padding:'20px 0', textAlign:'center', color:INK3, fontFamily:FONT, fontSize:13 }}>Indlæser…</div>
+              ) : myShipments.length === 0 ? (
+                <div style={{ textAlign:'center', padding:'20px 0', color:INK3, fontFamily:FONT, fontSize:13 }}>Ingen forsendelser endnu — de oprettes automatisk når en handel med pakkelevering bekræftes</div>
+              ) : (
+                <div style={{ display:'flex', flexDirection:'column', gap:8, marginBottom:20 }}>
+                  {myShipments.map(s => {
+                    const st = statusColors[s.status] || statusColors.pending;
+                    return (
+                      <div key={s.id} style={{ background:'#fff', borderRadius:12, padding:'12px 16px', border:`1px solid ${PAPER3}`, display:'flex', alignItems:'center', gap:12, flexWrap:'wrap' }}>
+                        <div style={{ flex:1, minWidth:0 }}>
+                          <div style={{ fontFamily:FONT, fontWeight:700, fontSize:13, color:INK, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>
+                            {s.conversations?.listing_title || 'Forsendelse'}
+                          </div>
+                          <div style={{ fontSize:11, color:INK3, fontFamily:FONT, marginTop:2 }}>
+                            {s.tracking_number && <span>Tracking: {s.tracking_number} · </span>}
+                            {(s.booked_at||'').slice(0,10)}
+                          </div>
+                        </div>
+                        <span style={{ background:st.bg, color:st.color, borderRadius:99, padding:'3px 10px', fontSize:11, fontWeight:700, fontFamily:FONT, flexShrink:0 }}>{st.label}</span>
+                        <span style={{ fontFamily:FONT, fontWeight:700, fontSize:13, color:INK, flexShrink:0 }}>{Number(s.total_charged_to_seller_dkk||s.cost_dkk||0).toFixed(0)} kr.</span>
+                        {s.tracking_url && (
+                          <a href={s.tracking_url} target="_blank" rel="noopener noreferrer"
+                            style={{ fontSize:11, color:PRIMARY, fontWeight:700, fontFamily:FONT, textDecoration:'underline', flexShrink:0 }}>
+                            Spor →
+                          </a>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+
+              {/* Invoices */}
+              {myInvoices.length > 0 && (
+                <>
+                  <div style={{ fontFamily:FONT, fontWeight:700, fontSize:14, color:INK, marginBottom:10 }}>Fakturaer</div>
+                  <div style={{ display:'flex', flexDirection:'column', gap:6 }}>
+                    {myInvoices.map(inv => {
+                      const ist = invoiceStatusColors[inv.status] || invoiceStatusColors.sent;
+                      return (
+                        <div key={inv.id} style={{ background:'#fff', borderRadius:12, padding:'10px 14px', border:`1px solid ${PAPER3}`, display:'flex', alignItems:'center', gap:12, flexWrap:'wrap' }}>
+                          <div style={{ flex:1, minWidth:0 }}>
+                            <div style={{ fontFamily:FONT, fontWeight:700, fontSize:13, color:INK }}>{inv.invoice_number}</div>
+                            <div style={{ fontSize:11, color:INK3, fontFamily:FONT }}>
+                              {inv.period_start} – {inv.period_end} · Forfald: {inv.due_date}
+                            </div>
+                          </div>
+                          <span style={{ fontSize:12, fontWeight:700, color:ist.color, fontFamily:FONT, flexShrink:0 }}>{ist.label}</span>
+                          <span style={{ fontFamily:FONT, fontWeight:800, fontSize:14, color:INK, flexShrink:0 }}>{Number(inv.total_amount_dkk).toFixed(0)} kr.</span>
+                        </div>
+                      );
+                    })}
+                  </div>
                 </>
               )}
             </div>
