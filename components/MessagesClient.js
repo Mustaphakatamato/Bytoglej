@@ -245,6 +245,8 @@ export default function MessagesClient() {
   const [uploadError,     setUploadError]     = useState(null);
   const [bundleAcceptedAt,setBundleAcceptedAt]= useState({});
   const [checkoutDeliveries, setCheckoutDeliveries] = useState({});
+  const [shipmentInfo, setShipmentInfo] = useState(null);
+  const [confirmingOrder, setConfirmingOrder] = useState(false);
   const ww = useWindowWidth();
   const isMobile = ww < 768;
 
@@ -369,6 +371,7 @@ export default function MessagesClient() {
 
   async function openConv(conv, updateUrl = true) {
     setActive(conv);
+    setShipmentInfo(null);
     setSelectedConvId(conv.id);
     if (updateUrl && searchParams.get('conv') !== conv.id) {
       router.push('/beskeder?conv=' + conv.id);
@@ -1231,11 +1234,14 @@ export default function MessagesClient() {
                                     {buyData?.note && <div style={{ marginTop:8, padding:'8px 10px', background:'rgba(22,34,28,0.04)', borderRadius:8, fontFamily:FONT, fontSize:12, color:INK3 }}>{buyData.note}</div>}
                                     {isOwnerInConv && !mine && !(active?.is_handled) && (
                                       <button onClick={async () => {
+                                        if (confirmingOrder) return;
+                                        setConfirmingOrder(true);
                                         const effUid = realUserId || userId;
+                                        const senderName = effectiveSenderName();
                                         const isShipping = buyData?.delivery_method === 'shipping';
                                         const actionLabel = isShipping ? 'afsendelse' : 'afhentning';
-                                        const confirmMsg = `✅ ${active.owner_name} har bekræftet ${actionLabel} af ${buyData?.items?.map(i=>i.title).join(', ')}`;
-                                        const { data: newMsg } = await db.from('chat_messages').insert({ conversation_id: active.id, sender_id: effUid, sender_name: active.owner_name, content: confirmMsg }).select().single();
+                                        const confirmMsg = `✅ ${senderName} har bekræftet ${actionLabel} af ${buyData?.items?.map(i=>i.title).join(', ')}`;
+                                        const { data: newMsg } = await db.from('chat_messages').insert({ conversation_id: active.id, sender_id: effUid, sender_name: senderName, content: confirmMsg }).select().single();
                                         for (const item of (buyData?.items || [])) {
                                           await db.from('listings').update({ is_sold: true, is_active: false, sold_at: new Date().toISOString(), sold_to: active.initiator_name, sold_to_institution_id: active.initiator_institution_id }).eq('id', item.listingId);
                                         }
@@ -1247,26 +1253,38 @@ export default function MessagesClient() {
                                         setMessages(ms => [...ms, ...(newMsg ? [newMsg] : [])]);
                                         setActive(a => ({ ...a, ...convUpd }));
                                         setConvs(cs => cs.map(c => c.id === active.id ? { ...c, ...convUpd } : c));
-                                        // Book shipment if delivery is via package
+                                        setConfirmingOrder(false);
                                         if (isShipping) {
-                                          fetch('/api/book-shipment', {
-                                            method: 'POST',
-                                            headers: { 'Content-Type': 'application/json' },
-                                            body: JSON.stringify({
-                                              conversation_id: active.id,
-                                              listing_id: buyData?.items?.[0]?.listingId || active.listing_id,
-                                              delivery_method: 'shipping',
-                                              buyer_name: active.initiator_name,
-                                              seller_name: active.owner_name,
-                                            }),
-                                          }).catch(() => {});
+                                          try {
+                                            const res = await fetch('/api/book-shipment', {
+                                              method: 'POST',
+                                              headers: { 'Content-Type': 'application/json' },
+                                              body: JSON.stringify({
+                                                conversation_id: active.id,
+                                                listing_id: buyData?.items?.[0]?.listingId || active.listing_id,
+                                                delivery_method: 'shipping',
+                                                buyer_name: active.initiator_name,
+                                                seller_name: senderName,
+                                              }),
+                                            });
+                                            const result = await res.json();
+                                            if (result.ok) {
+                                              setShipmentInfo({
+                                                tracking_number: result.tracking_number,
+                                                tracking_url: result.tracking_url,
+                                                label_pdf_url: result.label_pdf_url,
+                                              });
+                                            }
+                                          } catch {}
                                         }
-                                      }} style={{ width:'100%', marginTop:12, padding:'11px', borderRadius:99, background:PRIMARY, color:'#fff', border:'none', fontFamily:FONT, fontWeight:700, fontSize:14, cursor:'pointer' }}>
-                                        {buyData?.delivery_method === 'shipping' ? '📦 Bekræft og book forsendelse' : '✓ Bekræft afhentning'}
+                                      }} disabled={confirmingOrder} style={{ width:'100%', marginTop:12, padding:'11px', borderRadius:99, background:confirmingOrder?PAPER3:PRIMARY, color:confirmingOrder?INK3:'#fff', border:'none', fontFamily:FONT, fontWeight:700, fontSize:14, cursor:confirmingOrder?'default':'pointer' }}>
+                                        {confirmingOrder ? <span style={{ display:'flex', alignItems:'center', justifyContent:'center', gap:8 }}><Spinner />Bekræfter…</span> : buyData?.delivery_method === 'shipping' ? '📦 Bekræft og book forsendelse' : '✓ Bekræft afhentning'}
                                       </button>
                                     )}
                                     {isOwnerInConv && !mine && active?.is_handled && active?.handled_action === 'accepted' && (
-                                      <div style={{ marginTop:10, textAlign:'center', fontFamily:FONT, fontSize:12, color:PRIMARY, fontWeight:700 }}>Afhentning bekræftet ✓</div>
+                                      <div style={{ marginTop:10, textAlign:'center', fontFamily:FONT, fontSize:12, color:PRIMARY, fontWeight:700 }}>
+                                        {buyData?.delivery_method === 'shipping' ? '📦 Forsendelse bekræftet ✓' : '✓ Afhentning bekræftet'}
+                                      </div>
                                     )}
                                   </div>
                                 </div>
@@ -1607,6 +1625,35 @@ export default function MessagesClient() {
                     })()}
                 <div ref={bottomRef} />
               </div>
+
+              {/* Shipment label banner */}
+              {shipmentInfo && (
+                <div style={{ borderTop:`2px solid ${PRIMARY}`, background:GREEN_TINT, padding:'14px 16px' }}>
+                  <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', gap:8 }}>
+                    <div>
+                      <div style={{ fontFamily:FONT, fontWeight:700, fontSize:13, color:INK, marginBottom:2 }}>📦 Forsendelse booket</div>
+                      {shipmentInfo.tracking_number && (
+                        <div style={{ fontFamily:FONT, fontSize:12, color:INK3 }}>Trackingnr.: <strong style={{ color:INK }}>{shipmentInfo.tracking_number}</strong></div>
+                      )}
+                    </div>
+                    <div style={{ display:'flex', gap:8, flexShrink:0 }}>
+                      {shipmentInfo.label_pdf_url && (
+                        <a href={shipmentInfo.label_pdf_url} target="_blank" rel="noreferrer"
+                          style={{ padding:'8px 14px', borderRadius:99, background:PRIMARY, color:'#fff', fontFamily:FONT, fontWeight:700, fontSize:12, textDecoration:'none', whiteSpace:'nowrap' }}>
+                          🖨️ Print label
+                        </a>
+                      )}
+                      {shipmentInfo.tracking_url && (
+                        <a href={shipmentInfo.tracking_url} target="_blank" rel="noreferrer"
+                          style={{ padding:'8px 14px', borderRadius:99, background:PAPER3, color:INK, fontFamily:FONT, fontWeight:700, fontSize:12, textDecoration:'none', whiteSpace:'nowrap' }}>
+                          Følg pakke →
+                        </a>
+                      )}
+                      <button onClick={()=>setShipmentInfo(null)} style={{ background:'none', border:'none', cursor:'pointer', color:INK3, fontSize:16, padding:'4px 6px' }}>✕</button>
+                    </div>
+                  </div>
+                </div>
+              )}
 
               {/* Reject bar */}
               {rejectingBid && (
