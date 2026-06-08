@@ -121,27 +121,31 @@ export default function MineOpslagPage() {
         }
       }
 
-      // Build query exactly like DashboardClient's fetchMyListings
-      let q = db.from('listings')
-        .select('id,title,emoji,color,images,price,type,is_active,is_sold,is_reserved,created_at')
-        .order('created_at', { ascending: false })
-        .limit(100);
+      const SELECT = 'id,title,emoji,color,images,price,type,is_active,is_sold,is_reserved,created_at';
 
-      if (user.id && inst?.name) {
-        q = q.or(`user_id.eq.${user.id},institution_name.eq.${inst.name}`);
-      } else if (user.id) {
-        q = q.eq('user_id', user.id);
-      } else if (inst?.name) {
-        q = q.eq('institution_name', inst.name);
-      } else {
-        setLoading(false);
-        return;
+      const promises = [];
+      if (user.id) {
+        promises.push(
+          db.from('listings').select(SELECT).eq('user_id', user.id)
+            .order('created_at', { ascending: false }).limit(100)
+        );
       }
+      if (inst?.name) {
+        promises.push(
+          db.from('listings').select(SELECT).ilike('institution_name', inst.name)
+            .order('created_at', { ascending: false }).limit(100)
+        );
+      }
+      if (!promises.length) { setLoading(false); return; }
 
-      const { data } = await q;
+      const results = await Promise.all(promises);
       if (cancelled) return;
 
-      const rows = data || [];
+      const seen = new Set();
+      const rows = results
+        .flatMap(r => r.data || [])
+        .filter(l => { if (seen.has(l.id)) return false; seen.add(l.id); return true; })
+        .sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
       setListings(rows);
 
       // Fetch who liked each listing
