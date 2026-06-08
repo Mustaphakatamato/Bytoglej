@@ -198,7 +198,7 @@ export default function ProfilPage() {
             <MenuItem icon="📋" label="Mine opgaver" badge={pendingCount} onClick={() => router.push('/mine-opgaver')} />
             <MenuItem icon="🔄" label="Mine handler" onClick={() => router.push('/mine-handeler')} />
             <MenuItem icon="💬" label="Beskeder" onClick={() => router.push('/beskeder')} />
-            <MenuItem icon="❤️" label="Favoritopslag" onClick={() => router.push('/?vis=favoritter')} />
+            <MenuItem icon="❤️" label="Favoritopslag" onClick={() => router.push('/favoritter')} />
             <MenuItem icon="🔍" label="Gemte søgninger" onClick={() => router.push('/gemte-soegninger')} />
           </MenuSection>
 
