@@ -92,7 +92,6 @@ export default function MineOpslagPage() {
   const [favoriters, setFavoriters] = useState([]);
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState('Alle');
-  const [debug, setDebug] = useState(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -141,17 +140,6 @@ export default function MineOpslagPage() {
         .filter(l => { if (seen.has(l.id)) return false; seen.add(l.id); return true; })
         .sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
 
-      setDebug({
-        userId: user.id,
-        email: user.email,
-        instName: inst?.name || null,
-        instId: inst?.id || null,
-        byUserId: results[0]?.data?.length ?? 0,
-        byInstName: results[1]?.data?.length ?? 0,
-        total: rows.length,
-        errors: results.map(r => r.error?.message).filter(Boolean),
-      });
-
       setListings(rows);
 
       // Fetch who liked each listing
@@ -199,16 +187,6 @@ export default function MineOpslagPage() {
             + Nyt opslag
           </button>
         </div>
-
-        {debug && (
-          <div style={{ margin:'8px 16px', padding:'10px 14px', background:'#1e1e2e', borderRadius:10, fontFamily:'monospace', fontSize:11, color:'#cdd6f4', lineHeight:1.6 }}>
-            <div>uid: {debug.userId}</div>
-            <div>email: {debug.email}</div>
-            <div>inst: {debug.instName || 'null'} (id: {debug.instId || 'null'})</div>
-            <div>byUserId: {debug.byUserId} · byInstName: {debug.byInstName} · total: {debug.total}</div>
-            {debug.errors.length > 0 && <div style={{ color:'#f38ba8' }}>errors: {debug.errors.join(', ')}</div>}
-          </div>
-        )}
 
         <div style={{ display:'flex', gap:8, padding:'12px 16px', overflowX:'auto' }}>
           {FILTERS.map(f => (

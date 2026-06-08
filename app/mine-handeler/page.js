@@ -68,6 +68,7 @@ export default function MineHandlerPage() {
   const [sold, setSold] = useState([]);
   const [bought, setBought] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [debug, setDebug] = useState(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -109,27 +110,30 @@ export default function MineHandlerPage() {
 
       if (!soldParts.length) { setLoading(false); return; }
 
-      const [{ data: soldData }, { data: boughtData }] = await Promise.all([
-        db.from('conversations')
-          .select('id,listing_title,listing_emoji,listing_color,listing_image,initiator_name,owner_name,is_handled,handled_action,deal_completed,deal_type,delivery_method,last_message_at')
-          .or(soldParts.join(','))
-          .or('is_handled.eq.true,deal_completed.eq.true')
-          .in('deal_type', ['køb','byd','byt','bundle'])
-          .order('last_message_at', { ascending: false })
-          .limit(50),
+      const SELECT = 'id,listing_title,listing_emoji,listing_color,listing_image,initiator_name,owner_name,is_handled,handled_action,deal_completed,deal_type,delivery_method,last_message_at';
 
+      const [{ data: soldData, error: soldErr }, { data: boughtData, error: boughtErr }] = await Promise.all([
         db.from('conversations')
-          .select('id,listing_title,listing_emoji,listing_color,listing_image,initiator_name,owner_name,is_handled,handled_action,deal_completed,deal_type,delivery_method,last_message_at')
-          .or(boughtParts.join(','))
-          .or('is_handled.eq.true,deal_completed.eq.true')
+          .select(SELECT)
+          .or(soldParts.join(','))
           .in('deal_type', ['køb','byd','byt','bundle'])
           .order('last_message_at', { ascending: false })
-          .limit(50),
+          .limit(100),
+
+        boughtParts.length
+          ? db.from('conversations')
+              .select(SELECT)
+              .or(boughtParts.join(','))
+              .in('deal_type', ['køb','byd','byt','bundle'])
+              .order('last_message_at', { ascending: false })
+              .limit(100)
+          : Promise.resolve({ data: [], error: null }),
       ]);
 
       if (!cancelled) {
         setSold(soldData || []);
         setBought(boughtData || []);
+        setDebug({ uid, instId, instName, sold: soldData?.length ?? 0, bought: boughtData?.length ?? 0, soldErr: soldErr?.message, boughtErr: boughtErr?.message });
         setLoading(false);
       }
     }
@@ -151,6 +155,16 @@ export default function MineHandlerPage() {
           </button>
           <h1 style={{ fontFamily:FONT, fontWeight:800, fontSize:18, color:INK, margin:0 }}>Mine handler</h1>
         </div>
+
+        {debug && (
+          <div style={{ margin:'8px 16px 0', padding:'10px 14px', background:'#1e1e2e', borderRadius:10, fontFamily:'monospace', fontSize:11, color:'#cdd6f4', lineHeight:1.6 }}>
+            <div>uid: {debug.uid} · instId: {debug.instId}</div>
+            <div>inst: {debug.instName || 'null'}</div>
+            <div>sold: {debug.sold} · bought: {debug.bought}</div>
+            {debug.soldErr && <div style={{ color:'#f38ba8' }}>soldErr: {debug.soldErr}</div>}
+            {debug.boughtErr && <div style={{ color:'#f38ba8' }}>boughtErr: {debug.boughtErr}</div>}
+          </div>
+        )}
 
         {/* Solgt / Købt tabs */}
         <div style={{ display:'flex', borderBottom:`2px solid ${PAPER3}`, background:'#fff', marginTop:12 }}>

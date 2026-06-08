@@ -94,16 +94,20 @@ export default function ProfilPage() {
         .eq('deal_completed', true)
         .then(({ count }) => { if (!cancelled) setTradeCount(count ?? 0); });
 
-      const listingParts = [];
-      if (instName) listingParts.push(`institution_name.ilike.${instName}`);
-      if (uid) listingParts.push(`user_id.eq.${uid}`);
-      if (listingParts.length) {
-        db.from('listings')
-          .select('id', { count:'exact', head:true })
-          .or(listingParts.join(','))
-          .eq('is_active', true)
-          .eq('is_sold', false)
-          .then(({ count }) => { if (!cancelled) setActiveListingCount(count ?? 0); });
+      const listingQueries = [];
+      if (uid) listingQueries.push(
+        db.from('listings').select('id').eq('user_id', uid).eq('is_active', true).eq('is_sold', false)
+      );
+      if (instName) listingQueries.push(
+        db.from('listings').select('id').ilike('institution_name', instName).eq('is_active', true).eq('is_sold', false)
+      );
+      if (listingQueries.length) {
+        Promise.all(listingQueries).then(results => {
+          if (!cancelled) {
+            const ids = new Set(results.flatMap(r => (r.data || []).map(l => l.id)));
+            setActiveListingCount(ids.size);
+          }
+        });
       }
 
       const ownerParts = [`owner_institution_id.eq.${instId}`];
@@ -199,7 +203,7 @@ export default function ProfilPage() {
 
           <MenuSection>
             <MenuItem icon="✏️" label="Rediger profil" onClick={() => router.push('/profil/rediger')} />
-            <MenuItem icon="🌱" label="Bæredygtighed" value={co2Total !== null ? `${co2Total.toFixed(1)} kg CO₂` : undefined} onClick={() => router.push('/baeredygtighed')} />
+            <MenuItem icon="🌱" label="Bæredygtighed" value={co2Total !== null ? `${co2Total.toFixed(1)} kg CO₂` : undefined} onClick={() => router.push('/baeredygtighed/metode')} />
           </MenuSection>
 
           <MenuSection>
