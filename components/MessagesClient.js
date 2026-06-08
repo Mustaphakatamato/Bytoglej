@@ -1222,9 +1222,13 @@ export default function MessagesClient() {
                       </div>
                     )
                     : (() => {
+                      const myInstId   = ctxInstId || ctxInstitution?.id;
+                      const myInstName = ctxInstitution?.name;
                       const isOwnerInConv = ctxIsAdmin && adminInstName
                         ? active.owner_name === adminInstName
-                        : active.owner_id === userId;
+                        : active.owner_id === userId
+                          || (myInstId   && active.owner_institution_id === myInstId)
+                          || (myInstName && active.owner_name?.toLowerCase() === myInstName?.toLowerCase());
                       let lastDate = null;
                       return messages.map((m, i) => {
                         const effUid = realUserId || userId;
@@ -1768,7 +1772,13 @@ export default function MessagesClient() {
 
               {/* Pinned shipment strip — seller only */}
               {shipmentInfo && (() => {
-                const isOwner = (ctxIsAdmin && adminInstName) ? active?.owner_name === adminInstName : active?.owner_id === userId;
+                const _myInstId   = ctxInstId || ctxInstitution?.id;
+                const _myInstName = ctxInstitution?.name;
+                const isOwner = (ctxIsAdmin && adminInstName)
+                  ? active?.owner_name === adminInstName
+                  : active?.owner_id === userId
+                    || (_myInstId   && active?.owner_institution_id === _myInstId)
+                    || (_myInstName && active?.owner_name?.toLowerCase() === _myInstName?.toLowerCase());
                 if (!isOwner) return null;
                 return (
                   <div style={{ borderTop:`1.5px solid ${PRIMARY}`, background:GREEN_TINT, padding:'10px 16px', display:'flex', alignItems:'center', gap:10 }}>
