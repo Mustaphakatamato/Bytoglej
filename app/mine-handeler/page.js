@@ -68,7 +68,6 @@ export default function MineHandlerPage() {
   const [sold, setSold] = useState([]);
   const [bought, setBought] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [debug, setDebug] = useState(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -133,7 +132,6 @@ export default function MineHandlerPage() {
       if (!cancelled) {
         setSold(soldData || []);
         setBought(boughtData || []);
-        setDebug({ uid, instId, instName, sold: soldData?.length ?? 0, bought: boughtData?.length ?? 0, soldErr: soldErr?.message, boughtErr: boughtErr?.message });
         setLoading(false);
       }
     }
@@ -155,16 +153,6 @@ export default function MineHandlerPage() {
           </button>
           <h1 style={{ fontFamily:FONT, fontWeight:800, fontSize:18, color:INK, margin:0 }}>Mine handler</h1>
         </div>
-
-        {debug && (
-          <div style={{ margin:'8px 16px 0', padding:'10px 14px', background:'#1e1e2e', borderRadius:10, fontFamily:'monospace', fontSize:11, color:'#cdd6f4', lineHeight:1.6 }}>
-            <div>uid: {debug.uid} · instId: {debug.instId}</div>
-            <div>inst: {debug.instName || 'null'}</div>
-            <div>sold: {debug.sold} · bought: {debug.bought}</div>
-            {debug.soldErr && <div style={{ color:'#f38ba8' }}>soldErr: {debug.soldErr}</div>}
-            {debug.boughtErr && <div style={{ color:'#f38ba8' }}>boughtErr: {debug.boughtErr}</div>}
-          </div>
-        )}
 
         {/* Solgt / Købt tabs */}
         <div style={{ display:'flex', borderBottom:`2px solid ${PAPER3}`, background:'#fff', marginTop:12 }}>

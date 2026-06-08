@@ -93,7 +93,7 @@ function BottomNav({ pathname, navigate, loggedIn, unreadTotal }) {
   const isOpslag   = pathname?.startsWith('/opslag');
   const isOpret    = pathname?.startsWith('/opret-opslag');
   const isBeskeder = pathname?.startsWith('/beskeder');
-  const isProfile  = pathname?.startsWith('/profil') || pathname?.startsWith('/mine-opslag') || pathname?.startsWith('/mine-handeler') || pathname?.startsWith('/baeredygtighed');
+  const isProfile  = pathname?.startsWith('/profil') || pathname?.startsWith('/mine-opslag') || pathname?.startsWith('/mine-handeler') || pathname?.startsWith('/mine-opgaver') || pathname?.startsWith('/baeredygtighed') || pathname?.startsWith('/gemte-soegninger');
 
   function tab(label, active, onClick, icon) {
     return (

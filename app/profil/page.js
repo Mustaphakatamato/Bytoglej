@@ -180,7 +180,7 @@ export default function ProfilPage() {
             {[
               { icon:'🏷️', value: activeListingCount ?? '—', label:'Aktive opslag', highlight: false, to:'/mine-opslag' },
               { icon:'🔄', value: tradeCount ?? '—', label:'Handler', highlight: false, to:'/mine-handeler' },
-              { icon:'📋', value: pendingCount, label:'Opgaver', highlight: pendingCount > 0, to:'/mine-handeler' },
+              { icon:'📋', value: pendingCount, label:'Opgaver', highlight: pendingCount > 0, to:'/mine-opgaver' },
             ].map(s => (
               <div key={s.label} onClick={() => router.push(s.to)} style={{ background: s.highlight ? '#FEF9C3' : PAPER2, borderRadius:12, padding:'12px 8px', textAlign:'center', cursor:'pointer' }}>
                 <div style={{ fontSize:20, marginBottom:3 }}>{s.icon}</div>
@@ -195,7 +195,8 @@ export default function ProfilPage() {
 
           <MenuSection>
             <MenuItem icon="🏷️" label="Mine opslag" value={activeListingCount !== null ? `${activeListingCount} aktive` : undefined} onClick={() => router.push('/mine-opslag')} />
-            <MenuItem icon="📋" label="Mine handler" badge={pendingCount} onClick={() => router.push('/mine-handeler')} />
+            <MenuItem icon="📋" label="Mine opgaver" badge={pendingCount} onClick={() => router.push('/mine-opgaver')} />
+            <MenuItem icon="🔄" label="Mine handler" onClick={() => router.push('/mine-handeler')} />
             <MenuItem icon="💬" label="Beskeder" onClick={() => router.push('/beskeder')} />
             <MenuItem icon="❤️" label="Favoritopslag" onClick={() => router.push('/?vis=favoritter')} />
             <MenuItem icon="🔍" label="Gemte søgninger" onClick={() => router.push('/gemte-soegninger')} />
