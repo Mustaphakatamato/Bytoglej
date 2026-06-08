@@ -2,18 +2,16 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { db } from '@/lib/supabase';
-import { PRIMARY, GREEN_TINT, PAPER, PAPER2, PAPER3, INK, INK2, INK3 } from '@/lib/constants';
+import { PRIMARY, GREEN_TINT, PAPER3, INK, INK2, INK3 } from '@/lib/constants';
 import { useWindowWidth } from '@/lib/hooks';
-import { useApp, useActiveUser } from '@/providers/AppProvider';
+import { useApp } from '@/providers/AppProvider';
 import { Spinner } from '@/components/ui';
 
 const FONT = "'Sora', sans-serif";
-
 const STATUS_FILTERS = ['Alle', 'I gang', 'Fuldført'];
 
 function statusOf(conv) {
   if (conv.deal_completed) return 'Fuldført';
-  if (conv.is_handled) return 'I gang';
   return 'I gang';
 }
 
@@ -39,23 +37,18 @@ function OrderCard({ conv, role, onClick }) {
       background:'#fff', border:'none', borderBottom:`1px solid ${PAPER3}`,
       cursor:'pointer', textAlign:'left',
     }}>
-      {/* Emoji */}
       <div style={{ width:44, height:44, borderRadius:10, background: conv.listing_color || GREEN_TINT, display:'flex', alignItems:'center', justifyContent:'center', fontSize:22, flexShrink:0, overflow:'hidden' }}>
         {conv.listing_image
           ? <img src={conv.listing_image} style={{ width:'100%', height:'100%', objectFit:'cover' }} alt="" />
           : conv.listing_emoji || '🧸'}
       </div>
-
       <div style={{ flex:1, minWidth:0 }}>
-        <div style={{ display:'flex', alignItems:'center', gap:8, marginBottom:2 }}>
-          <span style={{ fontFamily:FONT, fontWeight:700, fontSize:14, color:INK, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap', flex:1 }}>{conv.listing_title}</span>
-        </div>
+        <div style={{ fontFamily:FONT, fontWeight:700, fontSize:14, color:INK, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap', marginBottom:2 }}>{conv.listing_title}</div>
         <div style={{ fontFamily:FONT, fontSize:12, color:INK3 }}>
           {role === 'solgt' ? 'Til: ' : 'Fra: '}{otherParty}
           {conv.delivery_method && <span> · {deliveryIcon}</span>}
         </div>
       </div>
-
       <div style={{ display:'flex', flexDirection:'column', alignItems:'flex-end', gap:4, flexShrink:0 }}>
         <span style={{ fontFamily:FONT, fontSize:10, fontWeight:700, background:statusColor.bg, color:statusColor.color, borderRadius:99, padding:'2px 8px' }}>{status}</span>
         <span style={{ fontFamily:FONT, fontSize:11, color:INK3 }}>{relDate(conv.last_message_at)}</span>
@@ -64,11 +57,9 @@ function OrderCard({ conv, role, onClick }) {
   );
 }
 
-export default function MineHandelerPage() {
+export default function MineHandlerPage() {
   const router = useRouter();
   const { effectiveInstitution } = useApp();
-  const { realUserId, userId, institution: ctxInst } = useActiveUser();
-  const institution = effectiveInstitution || ctxInst;
   const ww = useWindowWidth();
   const isMobile = ww < 768;
 
@@ -79,58 +70,86 @@ export default function MineHandelerPage() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    if (!institution?.id) return;
-    load();
-  }, [institution?.id]);
+    let cancelled = false;
 
-  async function load() {
-    setLoading(true);
-    const instId = institution.id;
-    const instName = institution.name;
-    const uid = realUserId || userId;
+    async function boot() {
+      setLoading(true);
 
-    const [{ data: soldData }, { data: boughtData }] = await Promise.all([
-      // Sold = I am the owner
-      db.from('conversations')
-        .select('id,listing_title,listing_emoji,listing_color,listing_image,initiator_name,owner_name,is_handled,handled_action,deal_completed,deal_type,delivery_method,last_message_at')
-        .or([`owner_institution_id.eq.${instId}`, uid ? `owner_id.eq.${uid}` : null, instName ? `owner_name.eq.${instName}` : null].filter(Boolean).join(','))
-        .or('is_handled.eq.true,deal_completed.eq.true')
-        .in('deal_type', ['køb','byd','byt','bundle'])
-        .order('last_message_at', { ascending:false })
-        .limit(50),
+      const { data: { user } } = await db.auth.getUser();
+      if (!user || cancelled) { setLoading(false); return; }
 
-      // Bought = I am the initiator
-      db.from('conversations')
-        .select('id,listing_title,listing_emoji,listing_color,listing_image,initiator_name,owner_name,is_handled,handled_action,deal_completed,deal_type,delivery_method,last_message_at')
-        .or([`initiator_institution_id.eq.${instId}`, uid ? `initiator_id.eq.${uid}` : null, instName ? `initiator_name.eq.${instName}` : null].filter(Boolean).join(','))
-        .or('is_handled.eq.true,deal_completed.eq.true')
-        .in('deal_type', ['køb','byd','byt','bundle'])
-        .order('last_message_at', { ascending:false })
-        .limit(50),
-    ]);
+      let inst = effectiveInstitution || null;
+      if (!inst) {
+        const { data: ownInst } = await db.from('institutions')
+          .select('*').ilike('email', user.email).maybeSingle();
+        if (ownInst) {
+          inst = ownInst;
+        } else {
+          const { data: mem } = await db.from('institution_members')
+            .select('role,institutions(*)').eq('email', user.email).maybeSingle();
+          if (mem?.institutions) inst = { ...mem.institutions, _memberRole: mem.role };
+        }
+      }
 
-    if (soldData) setSold(soldData);
-    if (boughtData) setBought(boughtData);
-    setLoading(false);
-  }
+      if (cancelled) return;
+
+      const uid = user.id;
+      const instId = inst?.id;
+      const instName = inst?.name;
+
+      const soldParts = [];
+      if (instId) soldParts.push(`owner_institution_id.eq.${instId}`);
+      if (uid) soldParts.push(`owner_id.eq.${uid}`);
+      if (instName) soldParts.push(`owner_name.eq.${instName}`);
+
+      const boughtParts = [];
+      if (instId) boughtParts.push(`initiator_institution_id.eq.${instId}`);
+      if (uid) boughtParts.push(`initiator_id.eq.${uid}`);
+      if (instName) boughtParts.push(`initiator_name.eq.${instName}`);
+
+      if (!soldParts.length) { setLoading(false); return; }
+
+      const [{ data: soldData }, { data: boughtData }] = await Promise.all([
+        db.from('conversations')
+          .select('id,listing_title,listing_emoji,listing_color,listing_image,initiator_name,owner_name,is_handled,handled_action,deal_completed,deal_type,delivery_method,last_message_at')
+          .or(soldParts.join(','))
+          .or('is_handled.eq.true,deal_completed.eq.true')
+          .in('deal_type', ['køb','byd','byt','bundle'])
+          .order('last_message_at', { ascending: false })
+          .limit(50),
+
+        db.from('conversations')
+          .select('id,listing_title,listing_emoji,listing_color,listing_image,initiator_name,owner_name,is_handled,handled_action,deal_completed,deal_type,delivery_method,last_message_at')
+          .or(boughtParts.join(','))
+          .or('is_handled.eq.true,deal_completed.eq.true')
+          .in('deal_type', ['køb','byd','byt','bundle'])
+          .order('last_message_at', { ascending: false })
+          .limit(50),
+      ]);
+
+      if (!cancelled) {
+        setSold(soldData || []);
+        setBought(boughtData || []);
+        setLoading(false);
+      }
+    }
+
+    boot();
+    return () => { cancelled = true; };
+  }, [effectiveInstitution?.id]);
 
   const list = tab === 'solgt' ? sold : bought;
   const filtered = filter === 'Alle' ? list : list.filter(c => statusOf(c) === filter);
-
-  function goToConv(id) {
-    router.push('/beskeder?conv=' + id);
-  }
 
   return (
     <div style={{ minHeight:'100vh', background:'#F6F2EA', paddingTop:isMobile?60:80, paddingBottom:90 }}>
       <div style={{ maxWidth:540, margin:'0 auto' }}>
 
-        {/* Header */}
         <div style={{ display:'flex', alignItems:'center', gap:12, padding:'16px 16px 0' }}>
-          <button onClick={() => router.push('/profil')} style={{ background:'none', border:'none', cursor:'pointer', padding:'6px', display:'flex', alignItems:'center' }}>
+          <button onClick={() => router.push('/profil')} style={{ background:'none', border:'none', cursor:'pointer', padding:6, display:'flex', alignItems:'center' }}>
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke={INK} strokeWidth="2.2" strokeLinecap="round"><line x1="19" y1="12" x2="5" y2="12"/><polyline points="12 19 5 12 12 5"/></svg>
           </button>
-          <h1 style={{ fontFamily:FONT, fontWeight:800, fontSize:18, color:INK, margin:0 }}>Mine handeler</h1>
+          <h1 style={{ fontFamily:FONT, fontWeight:800, fontSize:18, color:INK, margin:0 }}>Mine handler</h1>
         </div>
 
         {/* Solgt / Købt tabs */}
@@ -161,7 +180,9 @@ export default function MineHandelerPage() {
             <div style={{ padding:'60px 20px', textAlign:'center' }}>
               <div style={{ fontSize:48, marginBottom:16 }}>📭</div>
               <div style={{ fontFamily:FONT, fontWeight:700, fontSize:16, color:INK, marginBottom:6 }}>
-                {filter === 'Alle' ? `Ingen ${tab === 'solgt' ? 'solgte' : 'købte'} varer endnu` : `Ingen ${filter.toLowerCase()} handeler`}
+                {filter === 'Alle'
+                  ? `Ingen ${tab === 'solgt' ? 'solgte' : 'købte'} varer endnu`
+                  : `Ingen ${filter.toLowerCase()} handler`}
               </div>
               <div style={{ fontFamily:FONT, fontSize:13, color:INK3 }}>
                 {tab === 'solgt' ? 'Når du sælger noget, vises det her' : 'Når du køber noget, vises det her'}
@@ -169,7 +190,8 @@ export default function MineHandelerPage() {
             </div>
           ) : (
             filtered.map(conv => (
-              <OrderCard key={conv.id} conv={conv} role={tab} onClick={() => goToConv(conv.id)} />
+              <OrderCard key={conv.id} conv={conv} role={tab}
+                onClick={() => router.push('/beskeder?conv=' + conv.id)} />
             ))
           )}
         </div>

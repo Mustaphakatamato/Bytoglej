@@ -4,19 +4,21 @@ import { useRouter } from 'next/navigation';
 import { db } from '@/lib/supabase';
 import { PRIMARY, GREEN_TINT, PAPER2, PAPER3, INK, INK2, INK3 } from '@/lib/constants';
 import { useWindowWidth } from '@/lib/hooks';
-import { useApp, useActiveUser } from '@/providers/AppProvider';
+import { useApp } from '@/providers/AppProvider';
 import { Spinner } from '@/components/ui';
 
 const FONT = "'Sora', sans-serif";
 const FILTERS = ['Alle', 'Aktive', 'Inaktive', 'Solgt'];
 
-function ListingCard({ l, onToggleActive, onToggleReserved, onDelete }) {
+function ListingCard({ l, favoriters, onToggleActive, onToggleReserved, onDelete }) {
   const [confirmDelete, setConfirmDelete] = useState(false);
+  const [showLikers, setShowLikers] = useState(false);
   const statusLabel = l.is_sold ? 'Solgt' : l.is_active ? 'Aktiv' : 'Inaktiv';
   const statusColor = l.is_sold
     ? { bg:'#FECACA', color:'#991B1B' }
     : l.is_active ? { bg:'#D1FAE5', color:'#065F46' }
     : { bg:PAPER3, color:INK3 };
+  const likers = favoriters.filter(f => f.listing_id === l.id);
 
   return (
     <div style={{ background:'#fff', borderRadius:14, overflow:'hidden', boxShadow:'0 1px 3px rgba(22,34,28,0.06)', border:`1px solid ${PAPER3}` }}>
@@ -31,12 +33,31 @@ function ListingCard({ l, onToggleActive, onToggleReserved, onDelete }) {
             <span style={{ fontFamily:FONT, fontWeight:700, fontSize:14, color:INK, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap', flex:1 }}>{l.title}</span>
             <span style={{ fontFamily:FONT, fontSize:10, fontWeight:700, background:statusColor.bg, color:statusColor.color, borderRadius:99, padding:'2px 8px', flexShrink:0 }}>{statusLabel}</span>
           </div>
-          <div style={{ fontFamily:FONT, fontSize:12, color:INK3 }}>
-            {l.price ? `${l.price} kr` : 'Byt / Gratis'}
-            {l.is_reserved && !l.is_sold && <span style={{ marginLeft:8, background:'#FEF3C7', color:'#B45309', borderRadius:99, padding:'1px 7px', fontSize:10, fontWeight:700 }}>Reserveret</span>}
+          <div style={{ display:'flex', alignItems:'center', gap:8 }}>
+            <span style={{ fontFamily:FONT, fontSize:12, color:INK3 }}>
+              {l.price ? `${l.price} kr` : 'Byt / Gratis'}
+            </span>
+            {likers.length > 0 && (
+              <button onClick={() => setShowLikers(v => !v)}
+                style={{ background:'none', border:'none', cursor:'pointer', padding:0, fontFamily:FONT, fontSize:12, color:PRIMARY, fontWeight:600, display:'flex', alignItems:'center', gap:3 }}>
+                ❤️ {likers.length} interesseret{likers.length !== 1 ? 'e' : ''}
+              </button>
+            )}
+            {l.is_reserved && !l.is_sold && (
+              <span style={{ background:'#FEF3C7', color:'#B45309', borderRadius:99, padding:'1px 7px', fontSize:10, fontWeight:700 }}>Reserveret</span>
+            )}
           </div>
         </div>
       </div>
+
+      {showLikers && likers.length > 0 && (
+        <div style={{ background:GREEN_TINT, padding:'8px 14px', borderTop:`1px solid ${PAPER3}` }}>
+          <div style={{ fontFamily:FONT, fontSize:12, fontWeight:700, color:PRIMARY, marginBottom:4 }}>Interesserede:</div>
+          {likers.map((f, i) => (
+            <div key={i} style={{ fontFamily:FONT, fontSize:12, color:INK3 }}>· {f.institution_name || 'Ukendt'}</div>
+          ))}
+        </div>
+      )}
 
       {!l.is_sold && (
         <div style={{ display:'flex', gap:6, padding:'0 14px 12px' }}>
@@ -57,7 +78,7 @@ function ListingCard({ l, onToggleActive, onToggleReserved, onDelete }) {
 
       {confirmDelete && (
         <div style={{ background:'#FFF5F5', borderTop:`1px solid #FECACA`, padding:'10px 14px', display:'flex', alignItems:'center', justifyContent:'space-between' }}>
-          <span style={{ fontFamily:FONT, fontSize:13, color:'#B91C1C', fontWeight:600 }}>Er du sikker på du vil slette?</span>
+          <span style={{ fontFamily:FONT, fontSize:13, color:'#B91C1C', fontWeight:600 }}>Er du sikker?</span>
           <div style={{ display:'flex', gap:8 }}>
             <button onClick={() => setConfirmDelete(false)} style={{ background:PAPER3, border:'none', borderRadius:99, padding:'5px 14px', fontSize:12, fontWeight:600, cursor:'pointer', fontFamily:FONT }}>Annuller</button>
             <button onClick={() => onDelete(l.id)} style={{ background:'#e11d48', border:'none', borderRadius:99, padding:'5px 14px', fontSize:12, fontWeight:700, color:'#fff', cursor:'pointer', fontFamily:FONT }}>Slet</button>
@@ -71,11 +92,11 @@ function ListingCard({ l, onToggleActive, onToggleReserved, onDelete }) {
 export default function MineOpslagPage() {
   const router = useRouter();
   const { effectiveInstitution, showToast } = useApp();
-  const { realUserId, userId } = useActiveUser();
   const ww = useWindowWidth();
   const isMobile = ww < 768;
 
   const [listings, setListings] = useState([]);
+  const [favoriters, setFavoriters] = useState([]);
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState('Alle');
 
@@ -83,14 +104,12 @@ export default function MineOpslagPage() {
     let cancelled = false;
 
     async function boot() {
+      // Always get auth user for reliable uid
+      const { data: { user } } = await db.auth.getUser();
+      if (!user || cancelled) { setLoading(false); return; }
+
       let inst = effectiveInstitution || null;
-      let uid = realUserId || userId;
-
       if (!inst) {
-        const { data: { user } } = await db.auth.getUser();
-        if (!user || cancelled) { setLoading(false); return; }
-        uid = user.id;
-
         const { data: ownInst } = await db.from('institutions')
           .select('*').ilike('email', user.email).maybeSingle();
         if (ownInst) {
@@ -102,22 +121,38 @@ export default function MineOpslagPage() {
         }
       }
 
-      const orParts = [];
-      if (inst?.name) orParts.push(`institution_name.ilike.${inst.name}`);
-      if (uid) orParts.push(`user_id.eq.${uid}`);
-
-      if (!orParts.length) { setLoading(false); return; }
-
-      const { data } = await db.from('listings')
+      // Build query exactly like DashboardClient's fetchMyListings
+      let q = db.from('listings')
         .select('id,title,emoji,color,images,price,type,is_active,is_sold,is_reserved,created_at')
-        .or(orParts.join(','))
         .order('created_at', { ascending: false })
         .limit(100);
 
-      if (!cancelled) {
-        setListings(data || []);
+      if (user.id && inst?.name) {
+        q = q.or(`user_id.eq.${user.id},institution_name.eq.${inst.name}`);
+      } else if (user.id) {
+        q = q.eq('user_id', user.id);
+      } else if (inst?.name) {
+        q = q.eq('institution_name', inst.name);
+      } else {
         setLoading(false);
+        return;
       }
+
+      const { data } = await q;
+      if (cancelled) return;
+
+      const rows = data || [];
+      setListings(rows);
+
+      // Fetch who liked each listing
+      if (rows.length) {
+        const { data: favs } = await db.from('listing_favorites')
+          .select('listing_id,institution_name,institution_id,user_id')
+          .in('listing_id', rows.map(l => l.id));
+        if (!cancelled) setFavoriters(favs || []);
+      }
+
+      setLoading(false);
     }
 
     boot();
@@ -149,7 +184,6 @@ export default function MineOpslagPage() {
     <div style={{ minHeight:'100vh', background:'#F6F2EA', paddingTop:isMobile?60:80, paddingBottom:90 }}>
       <div style={{ maxWidth:540, margin:'0 auto' }}>
 
-        {/* Header */}
         <div style={{ display:'flex', alignItems:'center', gap:12, padding:'16px 16px 0' }}>
           <button onClick={() => router.push('/profil')} style={{ background:'none', border:'none', cursor:'pointer', padding:6, display:'flex', alignItems:'center' }}>
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke={INK} strokeWidth="2.2" strokeLinecap="round"><line x1="19" y1="12" x2="5" y2="12"/><polyline points="12 19 5 12 12 5"/></svg>
@@ -161,7 +195,6 @@ export default function MineOpslagPage() {
           </button>
         </div>
 
-        {/* Filter chips */}
         <div style={{ display:'flex', gap:8, padding:'12px 16px', overflowX:'auto' }}>
           {FILTERS.map(f => (
             <button key={f} onClick={() => setFilter(f)}
@@ -171,7 +204,6 @@ export default function MineOpslagPage() {
           ))}
         </div>
 
-        {/* List */}
         <div style={{ padding:'0 16px', display:'flex', flexDirection:'column', gap:10 }}>
           {loading ? (
             <div style={{ padding:'60px 0', textAlign:'center' }}><Spinner /></div>
@@ -193,7 +225,7 @@ export default function MineOpslagPage() {
             </div>
           ) : (
             filtered.map(l => (
-              <ListingCard key={l.id} l={l}
+              <ListingCard key={l.id} l={l} favoriters={favoriters}
                 onToggleActive={toggleActive}
                 onToggleReserved={toggleReserved}
                 onDelete={deleteListing}
