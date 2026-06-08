@@ -10,7 +10,7 @@ import { Spinner } from '@/components/ui';
 const FONT = "'Sora', sans-serif";
 const FILTERS = ['Alle', 'Aktive', 'Inaktive', 'Solgt'];
 
-function ListingCard({ l, favoriters, onToggleActive, onToggleReserved, onDelete }) {
+function ListingCard({ l, favoriters, onToggleActive, onDelete }) {
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [showLikers, setShowLikers] = useState(false);
   const statusLabel = l.is_sold ? 'Solgt' : l.is_active ? 'Aktiv' : 'Inaktiv';
@@ -43,9 +43,6 @@ function ListingCard({ l, favoriters, onToggleActive, onToggleReserved, onDelete
                 ❤️ {likers.length} interesseret{likers.length !== 1 ? 'e' : ''}
               </button>
             )}
-            {l.is_reserved && !l.is_sold && (
-              <span style={{ background:'#FEF3C7', color:'#B45309', borderRadius:99, padding:'1px 7px', fontSize:10, fontWeight:700 }}>Reserveret</span>
-            )}
           </div>
         </div>
       </div>
@@ -64,10 +61,6 @@ function ListingCard({ l, favoriters, onToggleActive, onToggleReserved, onDelete
           <button onClick={() => onToggleActive(l.id, l.is_active)}
             style={{ flex:1, background:l.is_active?'#FEF9C3':'#F0FDF4', border:'none', borderRadius:99, padding:'7px 0', fontSize:12, fontWeight:700, color:l.is_active?'#B45309':'#15803D', cursor:'pointer', fontFamily:FONT }}>
             {l.is_active ? 'Deaktivér' : 'Aktivér'}
-          </button>
-          <button onClick={() => onToggleReserved(l.id, l.is_reserved)}
-            style={{ flex:1, background:l.is_reserved?'#FEF3C7':PAPER2, border:'none', borderRadius:99, padding:'7px 0', fontSize:12, fontWeight:700, color:l.is_reserved?'#B45309':INK3, cursor:'pointer', fontFamily:FONT }}>
-            {l.is_reserved ? 'Frigiv' : 'Reserver'}
           </button>
           <button onClick={() => setConfirmDelete(true)}
             style={{ background:PAPER2, border:'none', borderRadius:99, padding:'7px 12px', fontSize:12, fontWeight:700, color:'#e11d48', cursor:'pointer', fontFamily:FONT }}>
@@ -122,7 +115,7 @@ export default function MineOpslagPage() {
         }
       }
 
-      const SELECT = 'id,title,emoji,color,images,price,type,is_active,is_sold,is_reserved,created_at';
+      const SELECT = 'id,title,emoji,color,images,price,type,is_active,is_sold,created_at';
 
       const promises = [];
       if (user.id) {
@@ -179,11 +172,6 @@ export default function MineOpslagPage() {
   async function toggleActive(id, isActive) {
     await db.from('listings').update({ is_active: !isActive }).eq('id', id);
     setListings(ls => ls.map(l => l.id === id ? { ...l, is_active: !isActive } : l));
-  }
-
-  async function toggleReserved(id, isReserved) {
-    await db.from('listings').update({ is_reserved: !isReserved }).eq('id', id);
-    setListings(ls => ls.map(l => l.id === id ? { ...l, is_reserved: !isReserved } : l));
   }
 
   async function deleteListing(id) {
@@ -254,7 +242,6 @@ export default function MineOpslagPage() {
             filtered.map(l => (
               <ListingCard key={l.id} l={l} favoriters={favoriters}
                 onToggleActive={toggleActive}
-                onToggleReserved={toggleReserved}
                 onDelete={deleteListing}
               />
             ))
