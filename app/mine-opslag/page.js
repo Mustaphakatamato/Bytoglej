@@ -10,7 +10,7 @@ import { Spinner } from '@/components/ui';
 const FONT = "'Sora', sans-serif";
 const FILTERS = ['Alle', 'Aktive', 'Inaktive', 'Solgt'];
 
-function ListingCard({ l, favoriters, onToggleActive, onDelete }) {
+function ListingCard({ l, favoriters, onToggleActive, onDelete, onEdit }) {
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [showLikers, setShowLikers] = useState(false);
   const statusLabel = l.is_sold ? 'Solgt' : l.is_active ? 'Aktiv' : 'Inaktiv';
@@ -58,6 +58,10 @@ function ListingCard({ l, favoriters, onToggleActive, onDelete }) {
 
       {!l.is_sold && (
         <div style={{ display:'flex', gap:6, padding:'0 14px 12px' }}>
+          <button onClick={() => onEdit(l.id)}
+            style={{ flex:1, background:GREEN_TINT, border:`1.5px solid ${PRIMARY}`, borderRadius:99, padding:'7px 0', fontSize:12, fontWeight:700, color:PRIMARY, cursor:'pointer', fontFamily:FONT }}>
+            ✏️ Rediger
+          </button>
           <button onClick={() => onToggleActive(l.id, l.is_active)}
             style={{ flex:1, background:l.is_active?'#FEF9C3':'#F0FDF4', border:'none', borderRadius:99, padding:'7px 0', fontSize:12, fontWeight:700, color:l.is_active?'#B45309':'#15803D', cursor:'pointer', fontFamily:FONT }}>
             {l.is_active ? 'Deaktivér' : 'Aktivér'}
@@ -221,6 +225,7 @@ export default function MineOpslagPage() {
               <ListingCard key={l.id} l={l} favoriters={favoriters}
                 onToggleActive={toggleActive}
                 onDelete={deleteListing}
+                onEdit={id => router.push('/rediger-opslag/' + id)}
               />
             ))
           )}
