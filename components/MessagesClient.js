@@ -1339,7 +1339,7 @@ export default function MessagesClient() {
                                               const trackingContent = JSON.stringify({ type: 'shipment', tracking_number: result.tracking_number, tracking_url: result.tracking_url, label_pdf_url: result.label_pdf_url });
                                               const { data: trackMsg } = await db.from('chat_messages').insert({ conversation_id: active.id, sender_id: effUid, sender_name: senderName, content: trackingContent, message_type: 'shipment' }).select().single();
                                               const now = new Date().toISOString();
-                                              const convUpd = { last_message: '📦 Forsendelse booket', last_message_at: now, owner_unread: 0, deal_completed: true, deal_completed_at: now };
+                                              const convUpd = { last_message: '📦 Label genereret — marker som afsendt i Mine opgaver', last_message_at: now, owner_unread: 0, shipment_id: result.shipment_id, delivery_method: 'shipping' };
                                               await db.from('conversations').update(convUpd).eq('id', active.id);
                                               const convWithFallback = active.initiator_institution_id ? active : { ...active, initiator_institution_id: ctxInstId || null };
                                               persistCO2Saving(convWithFallback, buyData?.items?.[0]?.category || null);

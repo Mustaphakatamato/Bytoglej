@@ -141,6 +141,7 @@ export default function CartPage() {
           last_message: msgText,
           last_message_at: new Date().toISOString(),
           owner_unread: ownerUnread + 1,
+          ...(groupDelivery ? { delivery_method: groupDelivery } : {}),
         }).eq('id', convId);
 
         // Remove sent items from cart
