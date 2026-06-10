@@ -71,29 +71,56 @@ export function AppProvider({ children }) {
   async function loadInstitution(email, userId) {
     const e = email.toLowerCase();
 
-    // Check admin status via DB (not hardcoded email)
-    const adminStatus = await checkIsAdmin(userId);
+    // Check sessionStorage cache first (avoids DB calls on every page refresh)
+    const cacheKey = `ltb_inst_${userId}`;
+    try {
+      const cached = sessionStorage.getItem(cacheKey);
+      if (cached) {
+        const { ts, isAdmin: ca, inst, allInsts } = JSON.parse(cached);
+        if (Date.now() - ts < 5 * 60 * 1000) { // 5-minute TTL
+          if (ca) { setIsAdmin(true); setInstitution(null); if (allInsts) setAllInstitutions(allInsts); }
+          else if (inst) setInstitution(inst);
+          return;
+        }
+      }
+    } catch {}
+
+    // Run admin check + institution lookup in parallel
+    const [adminStatus, instResult] = await Promise.all([
+      checkIsAdmin(userId),
+      db.from('institutions').select('*').ilike('email', e).maybeSingle(),
+    ]);
+
     if (adminStatus) {
       setIsAdmin(true);
       setInstitution(null);
       const { data: all } = await db.from('institutions').select('*').order('name');
       if (all) setAllInstitutions(all);
+      try { sessionStorage.setItem(cacheKey, JSON.stringify({ ts: Date.now(), isAdmin: true, allInsts: all })); } catch {}
       return;
     }
 
-    const { data } = await db.from('institutions').select('*').ilike('email', e).maybeSingle();
-    if (data) {
-      setInstitution(data);
+    if (instResult.data) {
+      setInstitution(instResult.data);
+      try { sessionStorage.setItem(cacheKey, JSON.stringify({ ts: Date.now(), isAdmin: false, inst: instResult.data })); } catch {}
       return;
     }
+
+    // Fallback: check institution_members
     const { data: mem } = await db.from('institution_members').select('role,institutions(*)').ilike('email', e).maybeSingle();
-    if (mem?.institutions) setInstitution({ ...mem.institutions, _memberRole: mem.role });
+    if (mem?.institutions) {
+      const inst = { ...mem.institutions, _memberRole: mem.role };
+      setInstitution(inst);
+      try { sessionStorage.setItem(cacheKey, JSON.stringify({ ts: Date.now(), isAdmin: false, inst })); } catch {}
+    }
   }
+
+  const LISTING_COLS = 'id,title,description,price,original_price,type,condition,age_group,category,subcategory,emoji,color,images,institution_name,user_id,city,fav_count,bid_count,created_at,is_active,is_sold,can_ship,urgency,shipping_options(allow_pickup,allow_shipping,allow_custom)';
 
   async function fetchListings() {
     setLoadingListings(true);
     const { data } = await db.from('listings')
-      .select('*, shipping_options(*)')
+      .select(LISTING_COLS)
       .eq('is_active', true)
       .order('created_at', { ascending: false })
       .range(0, PAGE_SIZE - 1);
@@ -111,7 +138,7 @@ export function AppProvider({ children }) {
     setLoadingMore(true);
     const offset = listingsOffsetRef.current;
     const { data } = await db.from('listings')
-      .select('*, shipping_options(*)')
+      .select(LISTING_COLS)
       .eq('is_active', true)
       .order('created_at', { ascending: false })
       .range(offset, offset + PAGE_SIZE - 1);
@@ -255,6 +282,7 @@ export function AppProvider({ children }) {
         fetchUnread(session.user.id);
         if (event === 'SIGNED_IN') registerPush();
       } else {
+        try { Object.keys(sessionStorage).filter(k => k.startsWith('ltb_inst_')).forEach(k => sessionStorage.removeItem(k)); } catch {}
         setRealUserId(null); setRealEmail(null); setLoggedIn(false);
         setInstitution(null); setUnreadTotal(0); setIsAdmin(false);
         setAdminInst(null); setAllInstitutions([]);
