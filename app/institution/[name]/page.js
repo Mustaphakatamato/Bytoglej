@@ -228,40 +228,42 @@ export default function InstitutionPage() {
 
         {/* Institution header */}
         <div style={{ background:'#fff', borderRadius:22, padding:isMobile?'20px 16px':'28px 32px', boxShadow:'0 2px 12px rgba(0,0,0,0.06)', marginBottom:24 }}>
-          <div style={{ display:'flex', alignItems:'center', gap:16, flexWrap:'wrap' }}>
+          {/* Top row: logo + name */}
+          <div style={{ display:'flex', alignItems:'center', gap:14, marginBottom:14 }}>
             <div style={{ width:60, height:60, borderRadius:16, background:PRIMARY, display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0, overflow:'hidden' }}>
               {inst?.logo_url
                 ? <img src={inst.logo_url} style={{ width:'100%', height:'100%', objectFit:'cover' }} alt="" />
                 : <span style={{ color:'#fff', fontFamily:"'Nunito',sans-serif", fontWeight:900, fontSize:22 }}>{institutionName.charAt(0).toUpperCase()}</span>}
             </div>
             <div style={{ flex:1, minWidth:0 }}>
-              <h1 style={{ fontFamily:"'Nunito',sans-serif", fontWeight:900, fontSize:isMobile?22:28, marginBottom:4 }}>{institutionName}</h1>
-              <div style={{ display:'flex', gap:12, flexWrap:'wrap', fontSize:13, color:'#888' }}>
+              <h1 style={{ fontFamily:"'Nunito',sans-serif", fontWeight:900, fontSize:isMobile?20:28, marginBottom:4, lineHeight:1.2 }}>{institutionName}</h1>
+              <div style={{ display:'flex', gap:10, flexWrap:'wrap', fontSize:12, color:'#888' }}>
                 {inst?.city && <span>📍 {inst.city}</span>}
                 {inst?.institution_type && <span>🏫 {inst.institution_type}</span>}
                 {inst?.ownership_type && <span>🏢 {inst.ownership_type}</span>}
                 {inst?.phone && <span>📞 {inst.phone}</span>}
               </div>
             </div>
-            <div style={{ display:'flex', gap:10, flexShrink:0, flexWrap:'wrap', alignItems:'center' }}>
-              {trustScore && (
-                <div style={{ background:PRIMARY, borderRadius:12, padding:'10px 18px', textAlign:'center' }}>
-                  <div style={{ fontFamily:"'Nunito',sans-serif", fontWeight:900, fontSize:22, color:'#fff' }}>{trustScore.pct}%</div>
-                  <div style={{ fontSize:12, color:'rgba(255,255,255,0.85)' }}>Tillid · {trustScore.count} {trustScore.count===1?'anm.':'anm.'}</div>
-                  {trustScore.wouldTradeAgain >= 50 && <div style={{ fontSize:10, color:'rgba(255,255,255,0.7)', marginTop:2 }}>👍 {trustScore.wouldTradeAgain}% vil handle igen</div>}
-                </div>
-              )}
-              <div style={{ background:'#E8F5EE', borderRadius:12, padding:'10px 18px', textAlign:'center' }}>
-                <div style={{ fontFamily:"'Nunito',sans-serif", fontWeight:900, fontSize:22, color:PRIMARY }}>{listings.length}</div>
-                <div style={{ fontSize:12, color:'#888' }}>aktive opslag</div>
+          </div>
+          {/* Stats row */}
+          <div style={{ display:'grid', gridTemplateColumns: trustScore ? 'repeat(3,1fr)' : 'repeat(2,1fr)', gap:8, marginBottom:14 }}>
+            {trustScore && (
+              <div style={{ background:PRIMARY, borderRadius:12, padding:'10px 12px', textAlign:'center' }}>
+                <div style={{ fontFamily:"'Nunito',sans-serif", fontWeight:900, fontSize:isMobile?18:22, color:'#fff', lineHeight:1 }}>{trustScore.pct}%</div>
+                <div style={{ fontSize:11, color:'rgba(255,255,255,0.85)', marginTop:2 }}>Tillid · {trustScore.count} anm.</div>
+                {trustScore.wouldTradeAgain >= 50 && <div style={{ fontSize:10, color:'rgba(255,255,255,0.7)', marginTop:2 }}>👍 {trustScore.wouldTradeAgain}%</div>}
               </div>
-              <div style={{ background: isFollowing ? GREEN_TINT : PAPER2, borderRadius:12, padding:'10px 18px', textAlign:'center' }}>
-                <div style={{ fontFamily:"'Nunito',sans-serif", fontWeight:900, fontSize:22, color:PRIMARY }}>{followCount}</div>
-                <div style={{ fontSize:12, color:'#888' }}>følger</div>
-              </div>
+            )}
+            <div style={{ background:'#E8F5EE', borderRadius:12, padding:'10px 12px', textAlign:'center' }}>
+              <div style={{ fontFamily:"'Nunito',sans-serif", fontWeight:900, fontSize:isMobile?18:22, color:PRIMARY, lineHeight:1 }}>{listings.length}</div>
+              <div style={{ fontSize:11, color:'#888', marginTop:2 }}>aktive opslag</div>
+            </div>
+            <div style={{ background: isFollowing ? GREEN_TINT : PAPER2, borderRadius:12, padding:'10px 12px', textAlign:'center' }}>
+              <div style={{ fontFamily:"'Nunito',sans-serif", fontWeight:900, fontSize:isMobile?18:22, color:PRIMARY, lineHeight:1 }}>{followCount}</div>
+              <div style={{ fontSize:11, color:'#888', marginTop:2 }}>følger</div>
             </div>
           </div>
-          <div style={{ marginTop:16, paddingTop:16, borderTop:'1px solid #e8e6e3', display:'flex', gap:10, flexWrap:'wrap' }}>
+          <div style={{ borderTop:'1px solid #e8e6e3', paddingTop:14, display:'flex', gap:10, flexWrap:'wrap' }}>
             <button onClick={handleContact} disabled={contacting} style={{ padding:'11px 24px', borderRadius:99, background:PRIMARY, color:'#fff', border:'none', fontFamily:FONT, fontWeight:700, fontSize:14, cursor:contacting?'not-allowed':'pointer', opacity:contacting?0.7:1, display:'flex', alignItems:'center', gap:8 }}>
               {contacting ? '…' : '💬 Send besked'}
             </button>
@@ -293,12 +295,12 @@ export default function InstitutionPage() {
             <p style={{ fontSize:14 }}>Ingen aktive opslag fra {institutionName}</p>
           </div>
         ) : (
-          <div style={{ display:'grid', gridTemplateColumns:isMobile?'repeat(2,1fr)':'repeat(auto-fill,minmax(260px,1fr))', gap:isMobile?12:16, paddingBottom:selectMode&&selected.length>0?100:0 }}>
+          <div style={{ display:'grid', gridTemplateColumns:isMobile?'repeat(2,1fr)':'repeat(auto-fill,minmax(260px,1fr))', gap:isMobile?12:16, paddingBottom: selectMode&&selected.length>0 ? 100 : 80, alignItems:'start' }}>
             {listings.map(l => {
               const isSelected = selected.find(x => x.id === l.id);
               return (
-                <div key={l.id} style={{ position:'relative', cursor:selectMode?'pointer':'default' }}>
-                  <div style={{ transition:'transform 0.12s', transform: isSelected ? 'scale(0.97)' : 'scale(1)', outline: isSelected ? `3px solid ${PRIMARY}` : '3px solid transparent', borderRadius:16, overflow:'hidden' }}>
+                <div key={l.id} style={{ position:'relative', cursor:selectMode?'pointer':'default', display:'flex', flexDirection:'column' }}>
+                  <div style={{ transition:'transform 0.12s', transform: isSelected ? 'scale(0.97)' : 'scale(1)', outline: isSelected ? `3px solid ${PRIMARY}` : '3px solid transparent', borderRadius:16, overflow:'hidden', flex:1 }}>
                     <ListingCard listing={l} favs={favs} toggleFav={selectMode ? ()=>{} : toggleFav}
                       onClick={selectMode ? ()=>toggleSelect(l) : ()=>{ setActiveListing(l); router.push('/opslag/detail'); }} />
                   </div>
