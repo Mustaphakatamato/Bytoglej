@@ -54,7 +54,7 @@ function PreviewCard({ form, imgPreview }) {
 
 export default function OpretOpslagPage() {
   const router = useRouter();
-  const { showToast, fetchListings } = useApp();
+  const { showToast, fetchListings, setInstitution } = useApp();
   const { institution: ctxInstitution, userId: ctxUserId, isAdminView: ctxIsAdmin } = useActiveUser();
   const ww = useWindowWidth();
   const isMobile = ww < 768;
@@ -148,9 +148,18 @@ export default function OpretOpslagPage() {
   }, [form.category]);
 
   useEffect(() => {
-    if (institution && !delivery.pickup_address) {
-      const addr = [institution.address, institution.zipcode, institution.city].filter(Boolean).join(', ');
-      if (addr) setDelivery(prev => ({ ...prev, pickup_address: addr }));
+    if (institution) {
+      const updates = {};
+      if (!delivery.pickup_address) {
+        const addr = [institution.address, institution.zipcode, institution.city].filter(Boolean).join(', ');
+        if (addr) updates.pickup_address = addr;
+      }
+      if (!delivery.pickup_hours && institution.default_pickup_hours)
+        updates.pickup_hours = institution.default_pickup_hours;
+      if (!delivery.pickup_notes && institution.default_pickup_notes)
+        updates.pickup_notes = institution.default_pickup_notes;
+      if (Object.keys(updates).length)
+        setDelivery(prev => ({ ...prev, ...updates }));
     }
   }, [institution]);
 
@@ -716,6 +725,29 @@ export default function OpretOpslagPage() {
                               <input value={delivery.pickup_notes} onChange={e=>setDelivery(d=>({...d,pickup_notes:e.target.value}))}
                                 placeholder="Fx: Brug indgangen til venstre" style={{ ...inputStyle, fontSize:13, padding:'9px 12px' }} />
                             </div>
+                            {/* Save as default / hint to set default */}
+                            {(delivery.pickup_hours || delivery.pickup_notes) &&
+                             (delivery.pickup_hours !== institution?.default_pickup_hours ||
+                              delivery.pickup_notes  !== institution?.default_pickup_notes) ? (
+                              <button type="button" onClick={async () => {
+                                if (!institution?.email) return;
+                                await db.from('institutions').update({
+                                  default_pickup_hours: delivery.pickup_hours || null,
+                                  default_pickup_notes: delivery.pickup_notes || null,
+                                }).eq('email', institution.email);
+                                setInstitution(i => ({ ...i, default_pickup_hours: delivery.pickup_hours || null, default_pickup_notes: delivery.pickup_notes || null }));
+                                showToast('Standard gemt ✓');
+                              }} style={{ display:'flex', alignItems:'center', gap:6, background:GREEN_TINT, border:`1px solid ${PRIMARY}`, borderRadius:99, padding:'6px 14px', fontSize:12, fontWeight:700, color:PRIMARY, cursor:'pointer', fontFamily:FONT, alignSelf:'flex-start' }}>
+                                💾 Sæt som standard til fremtidige opslag
+                              </button>
+                            ) : !institution?.default_pickup_hours ? (
+                              <div style={{ fontSize:12, color:INK3, fontFamily:FONT, display:'flex', alignItems:'center', gap:6 }}>
+                                Ingen standard sat —{' '}
+                                <button type="button" onClick={() => router.push('/profil/rediger')} style={{ background:'none', border:'none', cursor:'pointer', fontSize:12, fontWeight:700, color:PRIMARY, padding:0, fontFamily:FONT }}>
+                                  sæt det i din profil →
+                                </button>
+                              </div>
+                            ) : null}
                           </div>
                         )}
                       </div>
