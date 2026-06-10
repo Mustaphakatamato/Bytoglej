@@ -3,6 +3,7 @@ import React, { createContext, useContext, useState, useEffect, useCallback, use
 import { db } from '@/lib/supabase';
 import { checkIsAdmin } from '@/lib/admin';
 import ChatBubble from '@/components/ChatBubble';
+import FeedbackWidget from '@/components/FeedbackWidget';
 import { authedFetch } from '@/lib/authed-fetch';
 
 const PAGE_SIZE = 60;
@@ -347,6 +348,11 @@ export function AppProvider({ children }) {
       <AppContext.Provider value={appValue}>
         {children}
         <ChatBubble />
+        <FeedbackWidget
+          loggedIn={loggedIn}
+          institutionName={effectiveInstitution?.name || null}
+          userEmail={realEmail}
+        />
       </AppContext.Provider>
     </ActiveUserContext.Provider>
   );
