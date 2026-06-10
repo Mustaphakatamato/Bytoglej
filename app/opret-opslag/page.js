@@ -7,6 +7,7 @@ import { CATEGORIES } from '@/lib/categories';
 import { useWindowWidth } from '@/lib/hooks';
 import { useApp, useActiveUser } from '@/providers/AppProvider';
 import { Spinner } from '@/components/ui';
+import { authedFetch } from '@/lib/authed-fetch';
 
 const FONT = "'Sora', sans-serif"; // ui
 
@@ -201,7 +202,7 @@ export default function OpretOpslagPage() {
   async function checkImageSafe(file) {
     try {
       const fd = new FormData(); fd.append('image', file);
-      const res = await fetch('/api/scan-image', { method: 'POST', body: fd });
+      const res = await authedFetch('/api/scan-image', { method: 'POST', body: fd });
       const json = await res.json();
       return json.safe !== false;
     } catch { return true; }
@@ -290,7 +291,7 @@ export default function OpretOpslagPage() {
   async function handleImprove() {
     setAiImproving(true);
     try {
-      const res = await fetch('/api/improve-listing', {
+      const res = await authedFetch('/api/improve-listing', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ title: form.title, description: form.description, type: form.type, condition: form.condition, age_group: form.age_group, tags: form.tags }),
@@ -305,7 +306,7 @@ export default function OpretOpslagPage() {
   async function handleRegenerate(field) {
     setAiRegenerating(r => ({ ...r, [field]: true }));
     try {
-      const res = await fetch('/api/improve-listing', {
+      const res = await authedFetch('/api/improve-listing', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ title: form.title, description: form.description, type: form.type, condition: form.condition, age_group: form.age_group, tags: form.tags }),
@@ -346,7 +347,7 @@ export default function OpretOpslagPage() {
       if (!safe) { setScanError('Billedet afvist — indeholder personer. Upload et billede uden personer.'); setScanning(false); return; }
       const fd = new FormData();
       fd.append('image', compressed);
-      const res = await fetch('/api/scan-toy', { method: 'POST', body: fd });
+      const res = await authedFetch('/api/scan-toy', { method: 'POST', body: fd });
       const json = await res.json();
       if (json.error) {
         setScanError(res.status === 422 ? json.error : 'Scan mislykkedes — prøv igen');
@@ -374,7 +375,7 @@ export default function OpretOpslagPage() {
     if (!søgesQuery.trim()) return;
     setSøgesFilling(true);
     try {
-      const res = await fetch('/api/fill-soges', {
+      const res = await authedFetch('/api/fill-soges', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ query: søgesQuery }),
@@ -463,12 +464,12 @@ export default function OpretOpslagPage() {
       if (urls.length) await db.from('listings').update({ images: urls }).eq('id', listing.id);
     }
     // Fire-and-forget: saved-search email notifications
-    fetch('/api/match-searches', {
+    authedFetch('/api/match-searches', {
       method:'POST', headers:{'Content-Type':'application/json'},
       body: JSON.stringify({ listingId:listing.id, title:listing.title, type:listing.type, tags:listing.tags||[], city:listing.city, age_group:listing.age_group }),
     }).catch(()=>{});
     // Fire-and-forget: in-app auto-match notifications (both directions)
-    fetch('/api/auto-match-soges', {
+    authedFetch('/api/auto-match-soges', {
       method:'POST', headers:{'Content-Type':'application/json'},
       body: JSON.stringify({
         mode: isSøges ? 'new-søges' : 'new-listing',

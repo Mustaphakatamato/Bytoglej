@@ -6,6 +6,7 @@ import { PRIMARY, GREEN_DEEP, GREEN_TINT, GREEN_SOFT, PAPER, PAPER2, PAPER3, INK
 import { useWindowWidth } from '@/lib/hooks';
 import { useApp } from '@/providers/AppProvider';
 import ListingCard from '@/components/ListingCard';
+import { authedFetch } from '@/lib/authed-fetch';
 
 const FONT = "'Sora', sans-serif";
 
@@ -165,7 +166,7 @@ export default function InstitutionPage() {
       await db.from('conversations').update({ initiator_unread: 0, owner_unread: 1 }).eq('id', conv.id);
 
       if (ownerInst.email && ownerInst.email.toLowerCase() !== user.email.toLowerCase()) {
-        fetch('/api/notify-message', {
+        authedFetch('/api/notify-message', {
           method: 'POST', headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ ownerEmail: ownerInst.email, ownerName: ownerInst.name, senderName: userName, listingTitle: bundleTitle, listingEmoji: '📦', convId: conv.id }),
         }).catch(() => {});
@@ -207,7 +208,7 @@ export default function InstitutionPage() {
         }).select().single();
         convId = conv?.id;
         if (convId && ownerInst.email && ownerInst.email.toLowerCase() !== user.email.toLowerCase()) {
-          fetch('/api/notify-message', {
+          authedFetch('/api/notify-message', {
             method: 'POST', headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ ownerEmail: ownerInst.email, ownerName: ownerInst.name, senderName: userName, listingTitle: institutionName, listingEmoji: '💬', convId }),
           }).catch(() => {});

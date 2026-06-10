@@ -6,6 +6,7 @@ import { db } from '@/lib/supabase';
 import { PRIMARY, GREEN_TINT, GREEN_SOFT, PAPER, PAPER2, PAPER3, INK, INK2, INK3 } from '@/lib/constants';
 import { useWindowWidth } from '@/lib/hooks';
 import { CATEGORIES } from '@/lib/categories';
+import { authedFetch } from '@/lib/authed-fetch';
 
 const FONT = "'Sora', sans-serif";
 
@@ -112,7 +113,7 @@ export default function CartPage() {
           ownerUnread = 0;
 
           if (conv && ownerInst?.email && ownerInst.email.toLowerCase() !== (institution?.email || '').toLowerCase()) {
-            fetch('/api/notify-message', {
+            authedFetch('/api/notify-message', {
               method: 'POST', headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({ ownerEmail: ownerInst.email, ownerName: ownerInst.name, senderName, listingTitle: firstItem.listingTitle, listingEmoji: firstItem.listingEmoji, convId }),
             }).catch(() => {});

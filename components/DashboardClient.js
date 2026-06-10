@@ -8,6 +8,7 @@ import { PRIMARY, GREEN_SOFT, GREEN_TINT, PAPER, PAPER2, PAPER3, INK, INK2, INK3
 import { useWindowWidth, geocodeAddress, relTime } from '@/lib/hooks';
 import { useApp, useActiveUser } from '@/providers/AppProvider';
 import { Badge, Btn, Spinner, Modal, SkeletonDashboardBox } from '@/components/ui';
+import { authedFetch } from '@/lib/authed-fetch';
 import PullToRefresh from '@/components/PullToRefresh';
 import { getCO2Comparison, aggregateSavings } from '@/lib/co2/calculator';
 import { CATEGORIES } from '@/lib/categories';
@@ -550,7 +551,7 @@ export default function DashboardClient() {
       return;
     }
     // Send email via API route
-    const res = await fetch('/api/invite', {
+    const res = await authedFetch('/api/invite', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ token: inv.token, email, institution_name: institution.name, invited_by: institution.name }),

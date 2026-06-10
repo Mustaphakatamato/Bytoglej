@@ -4,6 +4,7 @@ import { useRouter } from 'next/navigation';
 import { db } from '@/lib/supabase';
 import { PRIMARY, GREEN_TINT, GREEN_SOFT, PAPER, PAPER2, PAPER3, INK, INK2, INK3, CORAL, TYPE_CFG } from '@/lib/constants';
 import { useApp, useActiveUser } from '@/providers/AppProvider';
+import { authedFetch } from '@/lib/authed-fetch';
 
 const FONT = "'Sora', sans-serif";
 const ACCENT  = '#F4A261';
@@ -79,7 +80,7 @@ export default function QuickViewModal({ listing, onClose }) {
       owner_institution_id: ownerInst?.id || null,
     }).select().single();
     if (conv && ownerInst?.email && ownerInst.email.toLowerCase() !== user.email.toLowerCase()) {
-      fetch('/api/notify-message', {
+      authedFetch('/api/notify-message', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ ownerEmail: ownerInst.email, ownerName: ownerInst.name, senderName, listingTitle: listing.title, listingEmoji: listing.emoji, convId: conv.id }),
       }).catch(() => {});

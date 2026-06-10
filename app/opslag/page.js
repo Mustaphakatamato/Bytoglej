@@ -10,6 +10,7 @@ import ListingCard from '@/components/ListingCard';
 import PullToRefresh from '@/components/PullToRefresh';
 import { useApp } from '@/providers/AppProvider';
 import { db } from '@/lib/supabase';
+import { authedFetch } from '@/lib/authed-fetch';
 
 const MapContainer = nextDynamic(() => import('@/components/MapView'), { ssr: false });
 
@@ -318,7 +319,7 @@ function OpslagInner() {
     setAiSearching(true);
     setAiResults(null);
     try {
-      const res = await fetch('/api/ai-search', {
+      const res = await authedFetch('/api/ai-search', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ query: aiQuery }),

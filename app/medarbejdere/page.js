@@ -6,6 +6,7 @@ import { PRIMARY, GREEN_TINT, PAPER, PAPER2, PAPER3, INK, INK2, INK3 } from '@/l
 import { useWindowWidth } from '@/lib/hooks';
 import { useApp } from '@/providers/AppProvider';
 import { Spinner } from '@/components/ui';
+import { authedFetch } from '@/lib/authed-fetch';
 
 const FONT = "'Sora', sans-serif";
 
@@ -69,7 +70,7 @@ export default function MedarbejderePage() {
       invited_by: institution.name,
     }).select().single();
     if (invErr) { showToast('Noget gik galt', 'error'); setSaving(false); return; }
-    const res = await fetch('/api/invite', {
+    const res = await authedFetch('/api/invite', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ token: inv.token, email, institution_name: institution.name, invited_by: institution.name }),

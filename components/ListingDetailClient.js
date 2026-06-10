@@ -25,6 +25,7 @@ function timeAgo(dateStr) {
 }
 import { useApp, useActiveUser } from '@/providers/AppProvider';
 import { Badge, Btn, Spinner, Modal } from '@/components/ui';
+import { authedFetch } from '@/lib/authed-fetch';
 
 function ImageGallery({ images, color, emoji }) {
   const [active, setActive] = useState(0);
@@ -296,7 +297,7 @@ export default function ListingDetailClient() {
     }).select().single();
     if (conv) {
       if (ownerInstData?.email && ownerInstData.email.toLowerCase() !== user.email.toLowerCase()) {
-        fetch('/api/notify-message', {
+        authedFetch('/api/notify-message', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
@@ -369,7 +370,7 @@ export default function ListingDetailClient() {
         await db.from('conversations').update({ last_message: lastMsg, last_message_at: new Date().toISOString(), owner_unread: 1 }).eq('id', convId);
 
         if (ownerInstData?.email && ownerInstData.email.toLowerCase() !== user.email.toLowerCase()) {
-          fetch('/api/notify-message', { method:'POST', headers:{'Content-Type':'application/json'},
+          authedFetch('/api/notify-message', { method:'POST', headers:{'Content-Type':'application/json'},
             body: JSON.stringify({ ownerEmail: ownerInstData.email, ownerName: ownerInstData.name, senderName: userName, listingTitle: listing.title, listingEmoji: listing.emoji || '🔍', convId }),
           }).catch(() => {});
         }
@@ -444,7 +445,7 @@ export default function ListingDetailClient() {
         if (newBidMsg) setExistingBid(newBidMsg);
         showToast(`Bud på ${bidAmount} kr. afsendt! 🎉`);
         if (!existing && ownerInst?.email && ownerInst.email.toLowerCase() !== currentUserEmail?.toLowerCase()) {
-          fetch('/api/notify-message', {
+          authedFetch('/api/notify-message', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ ownerEmail: ownerInst.email, ownerName: ownerInst.name, senderName: userName, listingTitle: listing.title, listingEmoji: listing.emoji || '🧸', convId }),

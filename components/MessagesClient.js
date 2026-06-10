@@ -6,6 +6,7 @@ import { PRIMARY, GREEN_SOFT, GREEN_TINT, PAPER, PAPER2, PAPER3, INK, INK3, CORA
 import { useWindowWidth, relTime, haversine, geocodeAddress } from '@/lib/hooks';
 import { useApp, useActiveUser } from '@/providers/AppProvider';
 import { Badge, Btn, Spinner, SkeletonMessageRow } from '@/components/ui';
+import { authedFetch } from '@/lib/authed-fetch';
 import PullToRefresh from '@/components/PullToRefresh';
 import { calculateCO2Savings } from '@/lib/co2/calculator';
 import { geocodeForCO2, getRoutingDistanceKm } from '@/lib/co2/geocoding';
@@ -545,7 +546,7 @@ export default function MessagesClient() {
     if (!recipientName) return;
     db.from('institutions').select('email,contact_name').ilike('name', recipientName).maybeSingle().then(({ data: inst }) => {
       if (!inst?.email) return;
-      fetch('/api/notify-message', {
+      authedFetch('/api/notify-message', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

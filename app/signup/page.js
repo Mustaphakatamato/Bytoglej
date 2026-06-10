@@ -7,6 +7,7 @@ import { db } from '@/lib/supabase';
 import { useApp } from '@/providers/AppProvider';
 import { geocodeAddress, useDebounce } from '@/lib/hooks';
 import { LogoLockup } from '@/components/Logo';
+import { authedFetch } from '@/lib/authed-fetch';
 
 const FONT = "'Sora', sans-serif";
 const CORAL = '#E8593D';
@@ -384,7 +385,7 @@ export default function SignupPage() {
     geocodeAddress(form.address, form.zipcode, form.city).then(coords => {
       if (coords) db.from('institutions').update({ latitude: coords.lat, longitude: coords.lon }).eq('email', form.email.toLowerCase());
     });
-    fetch('/api/welcome-email', {
+    authedFetch('/api/welcome-email', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ email: form.email.toLowerCase(), contactName: form.contact_name, institutionName: cvrData.name }),
