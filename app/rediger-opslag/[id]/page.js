@@ -202,6 +202,12 @@ export default function RedigerOpslagPage() {
     router.push('/profil');
   }
 
+  function scrollTop() {
+    window.scrollTo({ top: 0, behavior: 'instant' });
+    document.documentElement.scrollTop = 0;
+    document.body.scrollTop = 0;
+  }
+
   const inputStyle = { width: '100%', padding: '12px 14px', borderRadius: 12, border: `1.5px solid ${PAPER3}`, fontSize: 14, outline: 'none', fontFamily: FONT, background: '#fff', color: INK, boxSizing: 'border-box' };
   const labelStyle = { display: 'block', fontSize: 13, fontWeight: 700, marginBottom: 7, fontFamily: FONT, color: INK2 };
   const step1Valid = form.title.trim() && (form.type !== 'køb' || form.price);
@@ -232,7 +238,7 @@ export default function RedigerOpslagPage() {
           <div style={{ display: 'flex', alignItems: 'center', gap: 0, marginTop: 28, maxWidth: 320 }}>
             {[{ n: 1, label: 'Basisinfo' }, { n: 2, label: 'Detaljer & billeder' }].map((s, i) => (
               <div key={s.n} style={{ display: 'flex', alignItems: 'center', flex: i < 1 ? 0 : 1 }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: step > s.n ? 'pointer' : 'default' }} onClick={() => { if (step > s.n) setStep(s.n); }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: step > s.n ? 'pointer' : 'default' }} onClick={() => { if (step > s.n) { setStep(s.n); scrollTop(); } }}>
                   <div style={{ width: 28, height: 28, borderRadius: '50%', background: step >= s.n ? '#fff' : 'rgba(255,255,255,0.2)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: FONT, fontWeight: 800, fontSize: 13, color: step >= s.n ? PRIMARY : 'rgba(255,255,255,0.5)', flexShrink: 0, transition: 'all 0.2s' }}>{step > s.n ? '✓' : s.n}</div>
                   <span style={{ fontSize: 12, fontWeight: 600, color: step >= s.n ? 'rgba(255,255,255,0.9)' : 'rgba(255,255,255,0.4)', fontFamily: FONT, whiteSpace: 'nowrap' }}>{s.label}</span>
                 </div>
@@ -323,7 +329,7 @@ export default function RedigerOpslagPage() {
                 })()}
               </div>
 
-              <button onClick={() => { if (step1Valid) setStep(2); }} disabled={!step1Valid} style={{ width: '100%', padding: '14px', borderRadius: 99, background: step1Valid ? PRIMARY : PAPER3, color: step1Valid ? '#fff' : INK3, border: 'none', fontFamily: FONT, fontWeight: 700, fontSize: 15, cursor: step1Valid ? 'pointer' : 'not-allowed', marginTop: 4, transition: 'all 0.2s' }}>
+              <button onClick={() => { if (step1Valid) { setStep(2); scrollTop(); } }} disabled={!step1Valid} style={{ width: '100%', padding: '14px', borderRadius: 99, background: step1Valid ? PRIMARY : PAPER3, color: step1Valid ? '#fff' : INK3, border: 'none', fontFamily: FONT, fontWeight: 700, fontSize: 15, cursor: step1Valid ? 'pointer' : 'not-allowed', marginTop: 4, transition: 'all 0.2s' }}>
                 Næste: Detaljer & billeder →
               </button>
             </div>
@@ -397,7 +403,7 @@ export default function RedigerOpslagPage() {
               </div>
 
               <div style={{ display: 'flex', gap: 10, marginTop: 4 }}>
-                <button onClick={() => setStep(1)} style={{ flex: 1, padding: '13px', borderRadius: 99, background: PAPER2, color: INK2, border: 'none', fontFamily: FONT, fontWeight: 700, fontSize: 14, cursor: 'pointer' }}>
+                <button onClick={() => { setStep(1); scrollTop(); }} style={{ flex: 1, padding: '13px', borderRadius: 99, background: PAPER2, color: INK2, border: 'none', fontFamily: FONT, fontWeight: 700, fontSize: 14, cursor: 'pointer' }}>
                   ← Tilbage
                 </button>
                 <button onClick={handleSave} disabled={saving || !step2Valid} style={{ flex: 2, padding: '13px', borderRadius: 99, background: saving || !step2Valid ? PAPER3 : PRIMARY, color: saving || !step2Valid ? INK3 : '#fff', border: 'none', fontFamily: FONT, fontWeight: 700, fontSize: 15, cursor: saving || !step2Valid ? 'not-allowed' : 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, transition: 'all 0.2s' }}>
