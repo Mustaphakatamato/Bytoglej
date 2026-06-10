@@ -16,12 +16,13 @@ export async function POST(req) {
 
     const completion = await groq.chat.completions.create({
       model: 'meta-llama/llama-4-scout-17b-16e-instruct',
-      max_tokens: 5,
+      max_tokens: 3,
+      temperature: 0,
       messages: [{
         role: 'user',
         content: [
-          { type: 'image_url', image_url: { url: `data:${mimeType};base64,${base64}` } },
-          { type: 'text', text: 'Does this image show a human face or a recognizable portrait of a person? Hands, arms, legs, feet, or cartoon/animal characters do NOT count. Only answer yes if a face is clearly visible. Reply with exactly one word: yes or no.' },
+          { type: 'image_url', image_url: { url: `data:${mimeType};base64,${base64}`, detail: 'low' } },
+          { type: 'text', text: 'Does this image show a human face? Reply yes or no only.' },
         ],
       }],
     });

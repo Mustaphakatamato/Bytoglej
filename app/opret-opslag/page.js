@@ -64,6 +64,7 @@ export default function OpretOpslagPage() {
   const [saving, setSaving] = useState(false);
   const [scanning, setScanning] = useState(false);
   const [scanError, setScanError] = useState(null);
+  const [checkingImages, setCheckingImages] = useState(false);
   const scanRef = useRef(null);
   const søgesTextareaRef = useRef(null);
   const [søgesQuery, setSøgesQuery] = useState('');
@@ -201,7 +202,9 @@ export default function OpretOpslagPage() {
     if (!files.length) return;
     const remaining = 6 - imgFiles.length;
     const candidates = files.slice(0, remaining);
+    setCheckingImages(true);
     const results = await Promise.all(candidates.map(f => checkImageSafe(f)));
+    setCheckingImages(false);
     const safe = candidates.filter((_, i) => results[i]);
     const rejected = candidates.length - safe.length;
     if (rejected > 0) showToast(`${rejected} billede${rejected > 1 ? 'r' : ''} afvist — indeholder personer`, 'error');
@@ -874,21 +877,34 @@ export default function OpretOpslagPage() {
                 {true && <div>
                   <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:10 }}>
                     <label style={{ ...labelStyle, marginBottom:0 }}>{form.type === 'søges' ? 'Billeder' : 'Billeder'} <span style={{ fontWeight:400, color:INK3 }}>(op til 6 — valgfri)</span></label>
-                    {imgFiles.length > 0 && imgFiles.length < 6 && (
+                    {imgFiles.length > 0 && imgFiles.length < 6 && !checkingImages && (
                       <button type="button" onClick={()=>fileRef.current?.click()} style={{ fontSize:12, fontWeight:700, color:PRIMARY, background:GREEN_TINT, border:'none', borderRadius:99, padding:'5px 12px', cursor:'pointer', fontFamily:FONT }}>+ Tilføj</button>
                     )}
+                    {checkingImages && (
+                      <span style={{ display:'flex', alignItems:'center', gap:6, fontSize:12, fontWeight:700, color:PRIMARY, fontFamily:FONT }}><Spinner /> AI tjekker…</span>
+                    )}
                   </div>
-                  <input ref={fileRef} type="file" accept="image/*" multiple onChange={handleFileSelect} style={{ display:'none' }} />
+                  <input ref={fileRef} type="file" accept="image/*" multiple onChange={handleFileSelect} style={{ display:'none' }} disabled={checkingImages} />
                   {imgPreviews.length === 0 ? (
-                    <div onClick={()=>fileRef.current?.click()} style={{ border:`2px dashed ${PAPER3}`, borderRadius:16, padding:'36px 20px', textAlign:'center', cursor:'pointer', background:PAPER, transition:'border-color 0.15s' }}
-                      onMouseEnter={e=>e.currentTarget.style.borderColor=PRIMARY}
-                      onMouseLeave={e=>e.currentTarget.style.borderColor=PAPER3}>
-                      <div style={{ width:52, height:52, borderRadius:'50%', background:GREEN_TINT, display:'flex', alignItems:'center', justifyContent:'center', margin:'0 auto 14px' }}>
-                        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke={PRIMARY} strokeWidth="1.8" strokeLinecap="round"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
-                      </div>
-                      <div style={{ fontSize:14, fontWeight:700, color:INK, marginBottom:4, fontFamily:FONT }}>Klik for at uploade billeder</div>
-                      <div style={{ fontSize:12, color:INK3, fontFamily:FONT }}>JPG, PNG eller WEBP · Maks 6 billeder</div>
-                      <div style={{ fontSize:11, color:INK3, marginTop:4, fontFamily:FONT }}>Billeder med personer bliver automatisk afvist</div>
+                    <div onClick={()=>!checkingImages && fileRef.current?.click()} style={{ border:`2px dashed ${checkingImages ? PRIMARY : PAPER3}`, borderRadius:16, padding:'36px 20px', textAlign:'center', cursor: checkingImages ? 'default' : 'pointer', background: checkingImages ? GREEN_TINT : PAPER, transition:'all 0.15s' }}
+                      onMouseEnter={e=>{ if(!checkingImages) e.currentTarget.style.borderColor=PRIMARY; }}
+                      onMouseLeave={e=>{ if(!checkingImages) e.currentTarget.style.borderColor=PAPER3; }}>
+                      {checkingImages ? (
+                        <div style={{ display:'flex', flexDirection:'column', alignItems:'center', gap:12 }}>
+                          <Spinner />
+                          <div style={{ fontSize:13, fontWeight:700, color:PRIMARY, fontFamily:FONT }}>AI tjekker billeder…</div>
+                          <div style={{ fontSize:11, color:INK3, fontFamily:FONT }}>Analyserer om billederne er sikre at bruge</div>
+                        </div>
+                      ) : (
+                        <>
+                          <div style={{ width:52, height:52, borderRadius:'50%', background:GREEN_TINT, display:'flex', alignItems:'center', justifyContent:'center', margin:'0 auto 14px' }}>
+                            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke={PRIMARY} strokeWidth="1.8" strokeLinecap="round"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
+                          </div>
+                          <div style={{ fontSize:14, fontWeight:700, color:INK, marginBottom:4, fontFamily:FONT }}>Klik for at uploade billeder</div>
+                          <div style={{ fontSize:12, color:INK3, fontFamily:FONT }}>JPG, PNG eller WEBP · Maks 6 billeder</div>
+                          <div style={{ fontSize:11, color:INK3, marginTop:4, fontFamily:FONT }}>Billeder med personer bliver automatisk afvist</div>
+                        </>
+                      )}
                     </div>
                   ) : (
                     <div style={{ display:'grid', gridTemplateColumns:'repeat(3,1fr)', gap:8 }}>
@@ -910,7 +926,9 @@ export default function OpretOpslagPage() {
                         </div>
                       ))}
                       {imgFiles.length < 6 && (
-                        <div onClick={()=>fileRef.current?.click()} style={{ aspectRatio:'1', borderRadius:12, border:`2px dashed ${PAPER3}`, display:'flex', alignItems:'center', justifyContent:'center', cursor:'pointer', background:PAPER, fontSize:28, color:INK3 }}>+</div>
+                        <div onClick={()=>!checkingImages && fileRef.current?.click()} style={{ aspectRatio:'1', borderRadius:12, border:`2px dashed ${checkingImages ? PRIMARY : PAPER3}`, display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center', cursor: checkingImages ? 'default' : 'pointer', background: checkingImages ? GREEN_TINT : PAPER, gap:4 }}>
+                          {checkingImages ? <Spinner /> : <span style={{ fontSize:28, color:INK3 }}>+</span>}
+                        </div>
                       )}
                     </div>
                   )}
