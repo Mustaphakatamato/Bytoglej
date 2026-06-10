@@ -575,7 +575,7 @@ export default function SignupPage() {
               </div>
               <SField label="By"><SInput value={form.city} onChange={e => set('city', e.target.value)} placeholder="Fx København" /></SField>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
-                <SField label="Institutionens telefon"><SInput value={form.inst_phone} onChange={e => set('inst_phone', e.target.value)} placeholder="+45 12 34 56 78" /></SField>
+                <SField label="Institutionens telefon"><SInput value={form.inst_phone} type="tel" onChange={e => set('inst_phone', e.target.value.replace(/[^+\d\s]/g, ''))} placeholder="+45 12 34 56 78" /></SField>
                 <SField label="Antal indskrevne børn"><SInput value={form.children_count} onChange={e => set('children_count', e.target.value)} type="number" placeholder="Fx 60" /></SField>
               </div>
               <SField label="Hjemmeside" hint="(valgfri)"><SInput value={form.website} onChange={e => set('website', e.target.value)} placeholder="https://min-institution.dk" /></SField>
@@ -598,7 +598,7 @@ export default function SignupPage() {
               </div>
               <SField label="Institutionslederens fulde navn"><SInput value={form.leader_name} onChange={e => set('leader_name', e.target.value)} placeholder="Fornavn Efternavn" /></SField>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
-                <SField label="Telefon"><SInput value={form.leader_phone} onChange={e => set('leader_phone', e.target.value)} placeholder="+45 12 34 56 78" /></SField>
+                <SField label="Telefon"><SInput value={form.leader_phone} type="tel" onChange={e => set('leader_phone', e.target.value.replace(/[^+\d\s]/g, ''))} placeholder="+45 12 34 56 78" /></SField>
                 <SField label="E-mail"><SInput value={form.leader_email} onChange={e => set('leader_email', e.target.value)} type="email" placeholder="leder@institution.dk" /></SField>
               </div>
               {authError && (

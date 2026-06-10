@@ -213,7 +213,7 @@ export default function ProfilPage() {
               </div>
               <div><label style={{ display:'block', fontSize:13, fontWeight:700, marginBottom:6 }}>By</label>{inp(form.city,'city','')}</div>
               <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:12 }}>
-                <div><label style={{ display:'block', fontSize:13, fontWeight:700, marginBottom:6 }}>Telefon</label>{inp(form.phone,'phone','+45 12 34 56 78')}</div>
+                <div><label style={{ display:'block', fontSize:13, fontWeight:700, marginBottom:6 }}>Telefon</label><input type="tel" value={form.phone} onChange={e=>setForm(f=>({...f,phone:e.target.value.replace(/[^+\d\s]/g,'')}))} placeholder="+45 12 34 56 78" style={INP} /></div>
                 <div><label style={{ display:'block', fontSize:13, fontWeight:700, marginBottom:6 }}>Hjemmeside</label>{inp(form.website,'website','https://...')}</div>
               </div>
             </div>
@@ -225,7 +225,7 @@ export default function ProfilPage() {
             <div style={{ display:'flex', flexDirection:'column', gap:12 }}>
               <div><label style={{ display:'block', fontSize:13, fontWeight:700, marginBottom:6 }}>Fulde navn</label>{inp(form.leader_name,'leader_name','Fornavn Efternavn')}</div>
               <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:12 }}>
-                <div><label style={{ display:'block', fontSize:13, fontWeight:700, marginBottom:6 }}>Telefon</label>{inp(form.leader_phone,'leader_phone','+45 12 34 56 78')}</div>
+                <div><label style={{ display:'block', fontSize:13, fontWeight:700, marginBottom:6 }}>Telefon</label><input type="tel" value={form.leader_phone} onChange={e=>setForm(f=>({...f,leader_phone:e.target.value.replace(/[^+\d\s]/g,'')}))} placeholder="+45 12 34 56 78" style={INP} /></div>
                 <div><label style={{ display:'block', fontSize:13, fontWeight:700, marginBottom:6 }}>E-mail</label>{inp(form.leader_email,'leader_email','leder@institution.dk')}</div>
               </div>
             </div>
