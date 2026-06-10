@@ -22,7 +22,7 @@ export async function POST(req) {
         role: 'user',
         content: [
           { type: 'image_url', image_url: { url: `data:${mimeType};base64,${base64}`, detail: 'low' } },
-          { type: 'text', text: 'Does this image show a human face or human body (people, persons, children)? Reply yes or no only. Furniture, lamps, toys, tools, food, and other objects are not people — reply no for those.' },
+          { type: 'text', text: 'Does this image show a clearly visible human face, or a person where you can identify who they are? Reply yes or no only. Reply NO for: hands, fingers, arms, legs, feet, partial limbs, blurry people in the background, cartoon characters, toys, games, furniture, equipment, food, nature, buildings, animals, or any object. Reply YES only if there is a clearly recognizable human face or full person that would allow identification.' },
         ],
       }],
     });
