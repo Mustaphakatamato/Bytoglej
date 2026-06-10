@@ -95,7 +95,7 @@ export default function InvitasjonPage() {
 
     // If auto-confirmed (Supabase email confirm disabled), redirect after short delay
     if (signUpData?.session) {
-      setTimeout(() => router.push('/dashboard'), 2000);
+      setTimeout(() => router.push('/profil'), 2000);
     }
   }
 

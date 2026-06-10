@@ -1,8 +1,9 @@
 'use client';
-
-// DashboardPage er lang og importerer koden direkte fra den fælles komponent-fil
-import DashboardClient from '@/components/DashboardClient';
+import { useEffect } from 'react';
+import { useRouter } from 'next/navigation';
 
 export default function DashboardPage() {
-  return <DashboardClient />;
+  const router = useRouter();
+  useEffect(() => { router.replace('/profil'); }, []);
+  return null;
 }

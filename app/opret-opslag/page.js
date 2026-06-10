@@ -54,7 +54,7 @@ function PreviewCard({ form, imgPreview }) {
 
 export default function OpretOpslagPage() {
   const router = useRouter();
-  const { showToast, fetchListings, setInstitution } = useApp();
+  const { showToast, fetchListings, setInstitution: setGlobalInstitution } = useApp();
   const { institution: ctxInstitution, userId: ctxUserId, isAdminView: ctxIsAdmin } = useActiveUser();
   const ww = useWindowWidth();
   const isMobile = ww < 768;
@@ -480,7 +480,7 @@ export default function OpretOpslagPage() {
     fetchListings?.();
     setSaving(false);
     showToast(isSøges ? 'Søges-opslag publiceret! Tjek mulige matches på dit dashboard 🔍' : 'Opslag publiceret! 🎉');
-    router.push('/dashboard');
+    router.push('/profil');
   }
 
   const inputStyle = { width:'100%', padding:'12px 14px', borderRadius:12, border:`1.5px solid ${PAPER3}`, fontSize:14, outline:'none', fontFamily:FONT, background:'#fff', color:INK, boxSizing:'border-box' };
@@ -500,7 +500,7 @@ export default function OpretOpslagPage() {
           <span style={{ fontFamily:FONT, fontWeight:800, fontSize:isMobile?140:240, color:'rgba(255,255,255,0.04)', lineHeight:1, letterSpacing:'-0.05em', userSelect:'none' }}>+</span>
         </div>
         <div style={{ maxWidth:900, margin:'0 auto', padding:'0 24px', position:'relative' }}>
-          <button onClick={()=>router.push('/dashboard')} style={{ background:'rgba(255,255,255,0.12)', border:'none', borderRadius:99, padding:'7px 16px', color:'rgba(255,255,255,0.8)', fontSize:13, fontWeight:600, cursor:'pointer', fontFamily:FONT, marginBottom:20, display:'flex', alignItems:'center', gap:6 }}>
+          <button onClick={()=>router.push('/profil')} style={{ background:'rgba(255,255,255,0.12)', border:'none', borderRadius:99, padding:'7px 16px', color:'rgba(255,255,255,0.8)', fontSize:13, fontWeight:600, cursor:'pointer', fontFamily:FONT, marginBottom:20, display:'flex', alignItems:'center', gap:6 }}>
             ← Tilbage til dashboard
           </button>
           <h1 style={{ fontFamily:FONT, fontWeight:800, fontSize:isMobile?26:36, color:'#fff', letterSpacing:'-0.04em', marginBottom:8, lineHeight:1.1 }}>{copiedFrom ? 'Opret lignende opslag' : 'Opret nyt opslag'}</h1>
@@ -736,6 +736,7 @@ export default function OpretOpslagPage() {
                                   default_pickup_notes: delivery.pickup_notes || null,
                                 }).eq('email', institution.email);
                                 setInstitution(i => ({ ...i, default_pickup_hours: delivery.pickup_hours || null, default_pickup_notes: delivery.pickup_notes || null }));
+                                setGlobalInstitution(i => i ? { ...i, default_pickup_hours: delivery.pickup_hours || null, default_pickup_notes: delivery.pickup_notes || null } : i);
                                 showToast('Standard gemt ✓');
                               }} style={{ display:'flex', alignItems:'center', gap:6, background:GREEN_TINT, border:`1px solid ${PRIMARY}`, borderRadius:99, padding:'6px 14px', fontSize:12, fontWeight:700, color:PRIMARY, cursor:'pointer', fontFamily:FONT, alignSelf:'flex-start' }}>
                                 💾 Sæt som standard til fremtidige opslag

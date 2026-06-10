@@ -34,7 +34,7 @@ export default function LoginPage() {
 
   useEffect(() => {
     db.auth.getSession().then(({ data: { session } }) => {
-      if (session) router.replace('/dashboard');
+      if (session) router.replace('/profil');
     });
   }, []);
 

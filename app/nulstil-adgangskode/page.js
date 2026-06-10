@@ -35,7 +35,7 @@ export default function ResetPasswordPage() {
               <div style={{ fontSize:48, marginBottom:16 }}>✅</div>
               <h1 style={{ fontFamily:"'Sora',sans-serif", fontWeight:900, fontSize:24, marginBottom:10 }}>Kodeord opdateret!</h1>
               <p style={{ color:'#666', fontSize:14, marginBottom:24 }}>Du er nu logget ind med dit nye kodeord.</p>
-              <button onClick={()=>{ setLoggedIn(true); router.push('/dashboard'); }} style={{ background:PRIMARY, color:'#fff', border:'none', borderRadius:22, padding:'12px 28px', fontSize:14, fontWeight:700, cursor:'pointer' }}>
+              <button onClick={()=>{ setLoggedIn(true); router.push('/profil'); }} style={{ background:PRIMARY, color:'#fff', border:'none', borderRadius:22, padding:'12px 28px', fontSize:14, fontWeight:700, cursor:'pointer' }}>
                 Gå til dashboard →
               </button>
             </div>

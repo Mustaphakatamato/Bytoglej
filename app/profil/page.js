@@ -48,6 +48,7 @@ export default function ProfilPage() {
   const [tradeCount, setTradeCount] = useState(null);
   const [activeListingCount, setActiveListingCount] = useState(null);
   const [pendingCount, setPendingCount] = useState(0);
+  const [sentCount, setSentCount] = useState(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -93,6 +94,14 @@ export default function ProfilPage() {
         .or(`owner_institution_id.eq.${instId},initiator_institution_id.eq.${instId}`)
         .eq('deal_completed', true)
         .then(({ count }) => { if (!cancelled) setTradeCount(count ?? 0); });
+
+      // Sendte tilbud og forespørgsler (where we are the initiator/buyer)
+      const sentParts = [`initiator_institution_id.eq.${instId}`];
+      if (uid) sentParts.push(`initiator_id.eq.${uid}`);
+      db.from('conversations')
+        .select('id', { count:'exact', head:true })
+        .or(sentParts.join(','))
+        .then(({ count }) => { if (!cancelled) setSentCount(count ?? 0); });
 
       const listingQueries = [];
       if (uid) listingQueries.push(
@@ -176,10 +185,11 @@ export default function ProfilPage() {
           </div>
 
           {/* Stats */}
-          <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr', gap:8 }}>
+          <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:8 }}>
             {[
               { icon:'🏷️', value: activeListingCount ?? '—', label:'Aktive opslag', highlight: false, to:'/mine-opslag' },
-              { icon:'🔄', value: tradeCount ?? '—', label:'Handler', highlight: false, to:'/mine-handeler' },
+              { icon:'🔄', value: tradeCount ?? '—', label:'Gennemførte handler', highlight: false, to:'/mine-handeler' },
+              { icon:'📤', value: sentCount ?? '—', label:'Sendte forespørgsler', highlight: false, to:'/mine-handeler' },
               { icon:'📋', value: pendingCount, label:'Opgaver', highlight: pendingCount > 0, to:'/mine-opgaver' },
             ].map(s => (
               <div key={s.label} onClick={() => router.push(s.to)} style={{ background: s.highlight ? '#FEF9C3' : PAPER2, borderRadius:12, padding:'12px 8px', textAlign:'center', cursor:'pointer' }}>
@@ -200,6 +210,7 @@ export default function ProfilPage() {
             <MenuItem icon="💬" label="Beskeder" onClick={() => router.push('/beskeder')} />
             <MenuItem icon="❤️" label="Favoritopslag" onClick={() => router.push('/favoritter')} />
             <MenuItem icon="🔍" label="Gemte søgninger" onClick={() => router.push('/gemte-soegninger')} />
+            <MenuItem icon="👥" label="Medarbejdere" onClick={() => router.push('/medarbejdere')} />
           </MenuSection>
 
           <MenuSection>

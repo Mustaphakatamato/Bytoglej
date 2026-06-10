@@ -203,7 +203,7 @@ export default function SignupPage() {
 
   useEffect(() => {
     db.auth.getSession().then(({ data: { session } }) => {
-      if (session) router.replace('/dashboard');
+      if (session) router.replace('/profil');
     });
   }, []);
 
@@ -391,7 +391,7 @@ export default function SignupPage() {
     }).catch(() => {});
     setSaving(false);
     if (data.user && !data.session) { setNeedsConfirm(true); setStep(5); }
-    else { setLoggedIn(true); router.push('/dashboard'); showToast('Velkommen til byt&leg! 🎉'); }
+    else { setLoggedIn(true); router.push('/profil'); showToast('Velkommen til byt&leg! 🎉'); }
   }
 
   const steps = ['CVR / P-nr', 'Om institutionen', 'Leder & kontakt', 'Opret konto'];
@@ -678,7 +678,7 @@ export default function SignupPage() {
                   <h2 style={{ fontFamily: FONT, fontWeight: 900, fontSize: 28, marginBottom: 10, color: INK }}>Velkommen til byt&amp;leg!</h2>
                   <p style={{ color: INK3, fontSize: 15, lineHeight: 1.65, marginBottom: 32, fontFamily: FONT }}>{cvrData?.name} er nu oprettet og verificeret.</p>
                   <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-                    <Btn variant="primary" color={PRIMARY} radius={22} onClick={() => router.push('/dashboard')} style={{ justifyContent: 'center', padding: '13px', fontSize: 14 }}>Gå til dashboard →</Btn>
+                    <Btn variant="primary" color={PRIMARY} radius={22} onClick={() => router.push('/profil')} style={{ justifyContent: 'center', padding: '13px', fontSize: 14 }}>Gå til dashboard →</Btn>
                     <Btn variant="outline" radius={22} onClick={() => router.push('/opslag')} style={{ justifyContent: 'center', padding: '13px', fontSize: 14 }}>Browse opslag</Btn>
                   </div>
                 </>

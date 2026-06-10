@@ -43,12 +43,12 @@ export default function RedigerOpslagPage() {
       const { data: { user } } = await db.auth.getUser();
       if (!user) { router.push('/login'); return; }
       const { data: l } = await db.from('listings').select('*').eq('id', id).single();
-      if (!l) { showToast('Opslag ikke fundet', 'error'); router.push('/dashboard'); return; }
+      if (!l) { showToast('Opslag ikke fundet', 'error'); router.push('/profil'); return; }
       if (l.user_id !== user.id) {
         // Check institution member
         const { data: mem } = await db.from('institution_members').select('institutions(name)').eq('email', user.email).maybeSingle();
         const instName = mem?.institutions?.name;
-        if (l.institution_name !== instName) { showToast('Ingen adgang', 'error'); router.push('/dashboard'); return; }
+        if (l.institution_name !== instName) { showToast('Ingen adgang', 'error'); router.push('/profil'); return; }
       }
       setListing(l);
       setExistingImgs(l.images || []);
@@ -182,7 +182,7 @@ export default function RedigerOpslagPage() {
     if (error) { showToast('Noget gik galt — prøv igen', 'error'); return; }
     fetchListings?.();
     showToast('Opslag opdateret ✓');
-    router.push('/dashboard');
+    router.push('/profil');
   }
 
   const inputStyle = { width: '100%', padding: '12px 14px', borderRadius: 12, border: `1.5px solid ${PAPER3}`, fontSize: 14, outline: 'none', fontFamily: FONT, background: '#fff', color: INK, boxSizing: 'border-box' };
@@ -205,7 +205,7 @@ export default function RedigerOpslagPage() {
           <span style={{ fontFamily: FONT, fontWeight: 800, fontSize: isMobile ? 140 : 240, color: 'rgba(255,255,255,0.04)', lineHeight: 1, letterSpacing: '-0.05em', userSelect: 'none' }}>✎</span>
         </div>
         <div style={{ maxWidth: 900, margin: '0 auto', padding: '0 24px', position: 'relative' }}>
-          <button onClick={() => router.push('/dashboard')} style={{ background: 'rgba(255,255,255,0.12)', border: 'none', borderRadius: 99, padding: '7px 16px', color: 'rgba(255,255,255,0.8)', fontSize: 13, fontWeight: 600, cursor: 'pointer', fontFamily: FONT, marginBottom: 20, display: 'flex', alignItems: 'center', gap: 6 }}>
+          <button onClick={() => router.push('/profil')} style={{ background: 'rgba(255,255,255,0.12)', border: 'none', borderRadius: 99, padding: '7px 16px', color: 'rgba(255,255,255,0.8)', fontSize: 13, fontWeight: 600, cursor: 'pointer', fontFamily: FONT, marginBottom: 20, display: 'flex', alignItems: 'center', gap: 6 }}>
             ← Tilbage til dashboard
           </button>
           <h1 style={{ fontFamily: FONT, fontWeight: 800, fontSize: isMobile ? 26 : 36, color: '#fff', letterSpacing: '-0.04em', marginBottom: 8, lineHeight: 1.1 }}>Rediger opslag</h1>
