@@ -412,6 +412,7 @@ export default function OpretOpslagPage() {
     if (form.type === 'køb' && !String(form.price).trim()) { showToast('Angiv en pris for køb-opslag', 'error'); return; }
     if (!form.description.trim()) { showToast('Tilføj en beskrivelse', 'error'); return; }
     setSaving(true);
+    try {
     const { data:{ user } } = await db.auth.getUser();
     let inst = institution;
     if (!inst && user) {
@@ -479,9 +480,14 @@ export default function OpretOpslagPage() {
       }),
     }).catch(()=>{});
     fetchListings?.();
-    setSaving(false);
     showToast(isSøges ? 'Søges-opslag publiceret! Tjek mulige matches på dit dashboard 🔍' : 'Opslag publiceret! 🎉');
     router.push('/profil');
+    } catch (e) {
+      console.error('handleCreate error:', e);
+      showToast('Noget gik galt — prøv igen', 'error');
+    } finally {
+      setSaving(false);
+    }
   }
 
   function scrollTop() {

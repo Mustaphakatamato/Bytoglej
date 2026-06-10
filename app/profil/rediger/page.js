@@ -1,5 +1,5 @@
 'use client';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { db } from '@/lib/supabase';
 import { PRIMARY, GREEN_DEEP, INK, INK2, INK3, PAPER2, PAPER3 } from '@/lib/constants';
@@ -68,6 +68,26 @@ export default function ProfilPage() {
     default_pickup_notes:  institution?.default_pickup_notes  || '',
   });
   const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    if (!institution) return;
+    setForm({
+      institution_type:      institution.institution_type      || '',
+      ownership_type:        institution.ownership_type        || '',
+      address:               institution.address               || '',
+      zipcode:               institution.zipcode               || '',
+      city:                  institution.city                  || '',
+      children_count:        institution.children_count        || '',
+      phone:                 institution.phone                 || '',
+      website:               institution.website               || '',
+      leader_name:           institution.leader_name           || '',
+      leader_phone:          institution.leader_phone          || '',
+      leader_email:          institution.leader_email          || '',
+      contact_name:          institution.contact_name          || '',
+      default_pickup_hours:  institution.default_pickup_hours  || '',
+      default_pickup_notes:  institution.default_pickup_notes  || '',
+    });
+  }, [institution?.id]);
 
   // Modals
   const [showEmailModal, setShowEmailModal] = useState(false);
