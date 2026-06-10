@@ -43,6 +43,7 @@ export default function ListingCard({ listing, onClick, favs, toggleFav, onInsti
       position: 'relative',
       display: 'flex',
       flexDirection: 'column',
+      height: '100%',
       border: '1px solid rgba(22,34,28,0.06)',
       boxShadow: '0 1px 4px rgba(22,34,28,0.06)',
     }}>

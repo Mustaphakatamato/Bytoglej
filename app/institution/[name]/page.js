@@ -295,12 +295,12 @@ export default function InstitutionPage() {
             <p style={{ fontSize:14 }}>Ingen aktive opslag fra {institutionName}</p>
           </div>
         ) : (
-          <div style={{ display:'grid', gridTemplateColumns:isMobile?'repeat(2,1fr)':'repeat(auto-fill,minmax(260px,1fr))', gap:isMobile?12:16, paddingBottom: selectMode&&selected.length>0 ? 100 : 80, alignItems:'start' }}>
+          <div style={{ display:'grid', gridTemplateColumns:isMobile?'repeat(2,1fr)':'repeat(auto-fill,minmax(260px,1fr))', gap:isMobile?12:16, paddingBottom: selectMode&&selected.length>0 ? 100 : 80 }}>
             {listings.map(l => {
               const isSelected = selected.find(x => x.id === l.id);
               return (
                 <div key={l.id} style={{ position:'relative', cursor:selectMode?'pointer':'default', display:'flex', flexDirection:'column' }}>
-                  <div style={{ transition:'transform 0.12s', transform: isSelected ? 'scale(0.97)' : 'scale(1)', outline: isSelected ? `3px solid ${PRIMARY}` : '3px solid transparent', borderRadius:16, overflow:'hidden', flex:1 }}>
+                  <div style={{ transition:'transform 0.12s', transform: isSelected ? 'scale(0.97)' : 'scale(1)', outline: isSelected ? `3px solid ${PRIMARY}` : '3px solid transparent', borderRadius:16, overflow:'hidden', flex:1, display:'flex', flexDirection:'column' }}>
                     <ListingCard listing={l} favs={favs} toggleFav={selectMode ? ()=>{} : toggleFav}
                       onClick={selectMode ? ()=>toggleSelect(l) : ()=>{ setActiveListing(l); router.push('/opslag/detail'); }} />
                   </div>
