@@ -47,6 +47,64 @@ export default function ProfilPage() {
   const [activeListingCount, setActiveListingCount] = useState(null);
   const [pendingCount, setPendingCount] = useState(0);
   const [sentCount, setSentCount] = useState(null);
+  const [notifPermission, setNotifPermission] = useState('default');
+  const [notifLoading, setNotifLoading] = useState(false);
+
+  useEffect(() => {
+    if (typeof Notification !== 'undefined') setNotifPermission(Notification.permission);
+  }, []);
+
+  async function handleNotifToggle() {
+    if (notifPermission === 'denied') {
+      alert('Push-notifikationer er blokeret i din browser. Gå til browser-indstillinger og tillad notifikationer for bytogleg.dk, og prøv igen.');
+      return;
+    }
+    if (notifPermission === 'granted') {
+      // Unsubscribe
+      setNotifLoading(true);
+      try {
+        const reg = await navigator.serviceWorker.ready;
+        const sub = await reg.pushManager.getSubscription();
+        if (sub) {
+          await sub.unsubscribe();
+          const { data: { session } } = await db.auth.getSession();
+          if (session) {
+            await fetch('/api/push-subscribe', {
+              method: 'DELETE',
+              headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session.access_token}` },
+              body: JSON.stringify({ endpoint: sub.endpoint }),
+            });
+          }
+        }
+        setNotifPermission('default');
+      } catch {}
+      setNotifLoading(false);
+      return;
+    }
+    // Request permission and subscribe
+    setNotifLoading(true);
+    try {
+      const permission = await Notification.requestPermission();
+      setNotifPermission(permission);
+      if (permission !== 'granted') { setNotifLoading(false); return; }
+      const reg = await navigator.serviceWorker.ready;
+      const vapidKey = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY;
+      if (!vapidKey) { setNotifLoading(false); return; }
+      const pad = '='.repeat((4 - vapidKey.length % 4) % 4);
+      const b64 = (vapidKey + pad).replace(/-/g, '+').replace(/_/g, '/');
+      const key = Uint8Array.from([...window.atob(b64)].map(c => c.charCodeAt(0)));
+      const sub = await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: key });
+      const { data: { session } } = await db.auth.getSession();
+      if (session && sub) {
+        await fetch('/api/push-subscribe', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session.access_token}` },
+          body: JSON.stringify({ subscription: sub }),
+        });
+      }
+    } catch {}
+    setNotifLoading(false);
+  }
 
   useEffect(() => {
     let cancelled = false;
@@ -214,6 +272,28 @@ export default function ProfilPage() {
           <MenuSection>
             <MenuItem icon="✏️" label="Rediger profil" onClick={() => router.push('/profil/rediger')} />
             <MenuItem icon="🌱" label="Bæredygtighed" value={co2Total !== null ? `${co2Total.toFixed(1)} kg CO₂` : undefined} onClick={() => router.push('/baeredygtighed/metode')} />
+            {typeof Notification !== 'undefined' && (
+              <button onClick={notifLoading ? undefined : handleNotifToggle} style={{
+                width:'100%', display:'flex', alignItems:'center', gap:14,
+                padding:'15px 20px', background:'none', border:'none', cursor: notifLoading ? 'default' : 'pointer', textAlign:'left',
+                borderBottom:`1px solid ${PAPER3}`,
+              }}>
+                <span style={{ fontSize:18, width:24, textAlign:'center', flexShrink:0 }}>
+                  {notifPermission === 'granted' ? '🔔' : '🔕'}
+                </span>
+                <span style={{ flex:1, fontFamily:FONT, fontSize:15, fontWeight:600, color:INK }}>
+                  {notifLoading ? 'Vent…' : notifPermission === 'granted' ? 'Notifikationer aktiveret' : 'Aktiver notifikationer'}
+                </span>
+                <span style={{
+                  fontFamily:FONT, fontSize:12, fontWeight:700, padding:'3px 10px', borderRadius:99,
+                  background: notifPermission === 'granted' ? '#dcfce7' : notifPermission === 'denied' ? '#fee2e2' : PAPER2,
+                  color: notifPermission === 'granted' ? '#16a34a' : notifPermission === 'denied' ? '#dc2626' : INK3,
+                  flexShrink:0,
+                }}>
+                  {notifPermission === 'granted' ? 'Til' : notifPermission === 'denied' ? 'Blokeret' : 'Fra'}
+                </span>
+              </button>
+            )}
           </MenuSection>
 
           <MenuSection>
