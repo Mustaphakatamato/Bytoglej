@@ -6,13 +6,13 @@ import { PRIMARY, GREEN_SOFT, GREEN_TINT, PAPER, PAPER2, PAPER3, INK, INK3, CORA
 import { useWindowWidth, relTime, haversine, geocodeAddress } from '@/lib/hooks';
 import { useApp, useActiveUser } from '@/providers/AppProvider';
 import { Badge, Btn, Spinner, SkeletonMessageRow } from '@/components/ui';
+import { checkIsAdmin } from '@/lib/admin';
 import PullToRefresh from '@/components/PullToRefresh';
 import { calculateCO2Savings } from '@/lib/co2/calculator';
 import { geocodeForCO2, getRoutingDistanceKm } from '@/lib/co2/geocoding';
 
 const FONT = "'Sora', sans-serif";
 const INK2 = '#3A473D';
-const ADMIN_EMAIL = 'mustaphakatamato@live.dk';
 
 function ConvSwipeRow({ children, enabled, onSwipeLeft, onSwipeRight, leftBg, rightBg, leftLabel, rightLabel }) {
   const [offset, setOffset] = useState(0);
@@ -141,11 +141,12 @@ function LoginInline({ onLogin }) {
   async function handleLogin(e) {
     e.preventDefault();
     setLoading(true); setError(null);
-    const { error } = await db.auth.signInWithPassword({ email, password: pass });
+    const { data: authData, error } = await db.auth.signInWithPassword({ email, password: pass });
     setLoading(false);
     if (error) { setError('Forkert adgangskode — prøv igen'); return; }
     setLoggedIn(true);
-    if (email.trim().toLowerCase() === ADMIN_EMAIL.toLowerCase()) { router.push('/admin'); return; }
+    const isAdminUser = await checkIsAdmin(authData?.user?.id);
+    if (isAdminUser) { router.push('/admin'); return; }
     onLogin?.();
   }
 

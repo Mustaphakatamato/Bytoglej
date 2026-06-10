@@ -6,7 +6,6 @@ import { db } from '@/lib/supabase';
 import { PRIMARY, GREEN_TINT, GREEN_SOFT, PAPER, PAPER2, PAPER3, INK, INK2, INK3 } from '@/lib/constants';
 
 const FONT = "'Sora', sans-serif";
-const ADMIN_EMAIL = 'mustaphakatamato@live.dk';
 
 const STATUS_STYLES = {
   pending:    { bg:'#FEF9C3', color:'#92400e', label:'Afventer' },
@@ -27,7 +26,7 @@ const INV_STATUS = {
 
 export default function AdminShippingPage() {
   const router = useRouter();
-  const { isAdmin, realEmail } = useApp();
+  const { isAdmin } = useApp();
   const [loading, setLoading] = useState(true);
   const [shipments, setShipments] = useState([]);
   const [invoices, setInvoices] = useState([]);
@@ -38,9 +37,9 @@ export default function AdminShippingPage() {
   const [tab, setTab] = useState('shipments');
 
   useEffect(() => {
-    if (realEmail && realEmail !== ADMIN_EMAIL) { router.push('/dashboard'); return; }
-    loadAll();
-  }, [realEmail]);
+    if (isAdmin === false) { router.push('/dashboard'); return; }
+    if (isAdmin) loadAll();
+  }, [isAdmin]);
 
   async function loadAll() {
     setLoading(true);

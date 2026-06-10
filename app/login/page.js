@@ -6,7 +6,7 @@ import { useWindowWidth } from '@/lib/hooks';
 import { Spinner } from '@/components/ui';
 import { db } from '@/lib/supabase';
 import { useApp } from '@/providers/AppProvider';
-import { ADMIN_EMAIL } from '@/lib/constants';
+import { checkIsAdmin } from '@/lib/admin';
 import { LogoLockup } from '@/components/Logo';
 
 const FONT = "'Sora', sans-serif";
@@ -73,11 +73,12 @@ export default function LoginPage() {
   async function handleLogin(e) {
     e.preventDefault();
     setLoading(true); setError(null);
-    const { error } = await db.auth.signInWithPassword({ email, password: pass });
+    const { data: authData, error } = await db.auth.signInWithPassword({ email, password: pass });
     setLoading(false);
     if (error) { setError('Forkert adgangskode — prøv igen'); return; }
     setLoggedIn(true);
-    router.push(email.trim().toLowerCase() === ADMIN_EMAIL.toLowerCase() ? '/admin' : '/dashboard');
+    const isAdmin = await checkIsAdmin(authData?.user?.id);
+    router.push(isAdmin ? '/admin' : '/dashboard');
   }
 
   const inputStyle = {

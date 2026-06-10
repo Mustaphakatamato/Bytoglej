@@ -1,7 +1,7 @@
 'use client';
 import React, { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react';
 import { db } from '@/lib/supabase';
-import { ADMIN_EMAIL } from '@/lib/constants';
+import { checkIsAdmin } from '@/lib/admin';
 import ChatBubble from '@/components/ChatBubble';
 
 // ─── Active User Context ──────────────────────────────────────────────────────
@@ -36,11 +36,12 @@ export function AppProvider({ children }) {
 
   const effectiveInstitution = adminInst || institution;
 
-  async function loadInstitution(email) {
+  async function loadInstitution(email, userId) {
     const e = email.toLowerCase();
 
-    // Platform admin — no institution binding, neutral start
-    if (e === ADMIN_EMAIL.toLowerCase()) {
+    // Check admin status via DB (not hardcoded email)
+    const adminStatus = await checkIsAdmin(userId);
+    if (adminStatus) {
       setIsAdmin(true);
       setInstitution(null);
       const { data: all } = await db.from('institutions').select('*').order('name');
@@ -179,7 +180,7 @@ export function AppProvider({ children }) {
         setRealUserId(session.user.id);
         setRealEmail(session.user.email);
         setLoggedIn(true);
-        loadInstitution(session.user.email);
+        loadInstitution(session.user.email, session.user.id);
         fetchUnread(session.user.id);
       }
     });
@@ -188,7 +189,7 @@ export function AppProvider({ children }) {
         setRealUserId(session.user.id);
         setRealEmail(session.user.email);
         setLoggedIn(true);
-        loadInstitution(session.user.email);
+        loadInstitution(session.user.email, session.user.id);
         fetchUnread(session.user.id);
       } else {
         setRealUserId(null); setRealEmail(null); setLoggedIn(false);

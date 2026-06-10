@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { Resend } from 'resend';
 
-const ADMIN_EMAIL = 'mustaphakatamato@live.dk';
+const ADMIN_NOTIFICATION_EMAIL = process.env.ADMIN_NOTIFICATION_EMAIL || 'mustaphakatamato@live.dk';
 
 export async function POST(req) {
   try {
@@ -11,7 +11,7 @@ export async function POST(req) {
 
     await resend.emails.send({
       from: 'byt&leg <noreply@bytogleg.dk>',
-      to: ADMIN_EMAIL,
+      to: ADMIN_NOTIFICATION_EMAIL,
       subject: `Rapporteret opslag: ${listingTitle || listingId}`,
       html: `
         <div style="font-family:sans-serif;max-width:560px;margin:0 auto">

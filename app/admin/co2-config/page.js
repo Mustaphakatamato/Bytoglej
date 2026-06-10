@@ -5,12 +5,14 @@ import { db } from '@/lib/supabase';
 import { PRIMARY, GREEN_SOFT, GREEN_TINT, PAPER, PAPER2, PAPER3, INK, INK2, INK3 } from '@/lib/constants';
 import { EMISSION_FACTORS, METHODOLOGY_VERSION } from '@/lib/co2/emission-factors';
 import { Spinner } from '@/components/ui';
+import { checkIsAdmin } from '@/lib/admin';
+import { useApp } from '@/providers/AppProvider';
 
 const FONT = "'Sora', sans-serif";
-const ADMIN_EMAIL = 'mustaphakatamato@gmail.com';
 
 export default function Co2ConfigPage() {
   const router = useRouter();
+  const { realEmail } = useApp();
   const [authed, setAuthed] = useState(false);
   const [loading, setLoading] = useState(true);
   const [factors, setFactors] = useState([]);
@@ -25,8 +27,10 @@ export default function Co2ConfigPage() {
   const [creatingVersion, setCreatingVersion] = useState(false);
 
   useEffect(() => {
-    db.auth.getUser().then(({ data: { user } }) => {
-      if (user?.email !== ADMIN_EMAIL) { router.push('/dashboard'); return; }
+    db.auth.getUser().then(async ({ data: { user } }) => {
+      if (!user) { router.push('/dashboard'); return; }
+      const admin = await checkIsAdmin(user.id);
+      if (!admin) { router.push('/dashboard'); return; }
       setAuthed(true);
       fetchAll();
     });
@@ -60,7 +64,7 @@ export default function Co2ConfigPage() {
       table_name: 'co2_emission_factors',
       record_id: editRow.id,
       action: 'update',
-      changed_by: ADMIN_EMAIL,
+      changed_by: realEmail || 'admin',
       reason: editReason,
       old_value: { co2_kg_per_unit: old?.co2_kg_per_unit },
       new_value: { co2_kg_per_unit: newVal },
@@ -78,7 +82,7 @@ export default function Co2ConfigPage() {
       table_name: 'co2_methodology_versions',
       record_id: version,
       action: 'version_activated',
-      changed_by: ADMIN_EMAIL,
+      changed_by: realEmail || 'admin',
       reason: `Version ${version} aktiveret manuelt`,
       old_value: null,
       new_value: { version, activated_at: new Date().toISOString() },
@@ -100,7 +104,7 @@ export default function Co2ConfigPage() {
       table_name: 'co2_methodology_versions',
       record_id: newVersion.version.trim(),
       action: 'insert',
-      changed_by: ADMIN_EMAIL,
+      changed_by: realEmail || 'admin',
       reason: newVersion.reason,
       old_value: null,
       new_value: { version: newVersion.version.trim() },
