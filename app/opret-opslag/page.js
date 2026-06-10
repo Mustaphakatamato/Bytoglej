@@ -72,6 +72,7 @@ export default function OpretOpslagPage() {
   const [søgesFilled, setSøgesFilled] = useState(false);
   const [aiImproving, setAiImproving] = useState(false);
   const [aiSuggestion, setAiSuggestion] = useState(null);
+  const [aiFilledFields, setAiFilledFields] = useState({ title: false, description: false });
   const [aiApply, setAiApply] = useState({ title: true, description: true });
   const [aiRegenerating, setAiRegenerating] = useState({ title: false, description: false });
   const [institution, setInstitution] = useState(ctxInstitution || null);
@@ -351,6 +352,7 @@ export default function OpretOpslagPage() {
         age_group: json.age_group || f.age_group,
         description: json.description || f.description,
       }));
+      setAiFilledFields({ title: !!json.title, description: !!json.description });
       const preview = URL.createObjectURL(file);
       setImgFiles(prev => prev.length < 6 ? [file, ...prev] : prev);
       setImgPreviews(prev => prev.length < 6 ? [preview, ...prev] : prev);
@@ -379,6 +381,7 @@ export default function OpretOpslagPage() {
           age_group: json.age_group || f.age_group,
           condition: json.condition || f.condition,
         }));
+        setAiFilledFields({ title: !!json.title, description: !!json.description });
         setSøgesFilled(true);
       }
     } catch { showToast('AI kunne ikke udfylde — prøv igen', 'error'); }
@@ -645,7 +648,12 @@ export default function OpretOpslagPage() {
 
                 <div>
                   <label style={labelStyle}>Titel <span style={{ color:'#e53e3e' }}>*</span></label>
-                  <input value={form.title} onChange={e=>setForm({...form,title:e.target.value})} placeholder="Fx: LEGO Duplo stor kasse, 120 klodser" style={inputStyle} />
+                  <input value={form.title} onChange={e=>{ setForm({...form,title:e.target.value}); setAiFilledFields(f=>({...f,title:false})); }} placeholder="Fx: LEGO Duplo stor kasse, 120 klodser" style={inputStyle} />
+                  {aiFilledFields.title && (
+                    <div style={{ fontSize:11, color:'#7C3AED', fontFamily:FONT, marginTop:5, display:'flex', alignItems:'center', gap:4 }}>
+                      ✨ AI-forslag — tjek og tilpas teksten efter behov
+                    </div>
+                  )}
                 </div>
 
                 {form.type === 'køb' && (
@@ -857,11 +865,16 @@ export default function OpretOpslagPage() {
                       </button>
                     )}
                   </div>
-                  <textarea value={form.description} onChange={e=>setForm({...form,description:e.target.value})}
+                  <textarea value={form.description} onChange={e=>{ setForm({...form,description:e.target.value}); setAiFilledFields(f=>({...f,description:false})); }}
                     placeholder={form.type==='søges'
                       ? 'Beskriv hvad I leder efter, stand-krav, og hvad I evt. tilbyder i bytte…'
                       : 'Beskriv legetøjets stand, hvad der medfølger, mål, begrundelse for salg osv.'}
                     rows={4} style={{ ...inputStyle, resize:'vertical', minHeight:100 }} />
+                  {aiFilledFields.description && (
+                    <div style={{ fontSize:11, color:'#7C3AED', fontFamily:FONT, marginTop:5, display:'flex', alignItems:'center', gap:4 }}>
+                      ✨ AI-forslag — tjek og tilpas teksten efter behov
+                    </div>
+                  )}
                 </div>
 
                 <div>

@@ -22,13 +22,13 @@ export async function POST(req) {
         role: 'user',
         content: [
           { type: 'image_url', image_url: { url: `data:${mimeType};base64,${base64}`, detail: 'low' } },
-          { type: 'text', text: 'Does this image show a human face? Reply yes or no only.' },
+          { type: 'text', text: 'Does this image show a human face or human body (people, persons, children)? Reply yes or no only. Furniture, lamps, toys, tools, food, and other objects are not people — reply no for those.' },
         ],
       }],
     });
 
     const text = completion.choices[0].message.content.toLowerCase().trim();
-    const hasPeople = text.includes('yes');
+    const hasPeople = text.startsWith('yes');
     return NextResponse.json({ safe: !hasPeople });
   } catch (e) {
     console.error('scan-image error:', e.message);
