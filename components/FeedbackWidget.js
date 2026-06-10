@@ -18,6 +18,7 @@ export default function FeedbackWidget({ loggedIn, institutionName, userEmail })
   const [sending, setSending]   = useState(false);
   const [sent, setSent]         = useState(false);
   const [isFirst, setIsFirst]   = useState(false);
+  const [error, setError]       = useState(null);
 
   // Auto-open on first login
   useEffect(() => {
@@ -43,6 +44,13 @@ export default function FeedbackWidget({ loggedIn, institutionName, userEmail })
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ category, message, institutionName, userEmail }),
       });
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setError(json.error || json.detail || 'Noget gik galt — prøv igen');
+        setSending(false);
+        return;
+      }
+      setError(null);
       setSent(true);
       setTimeout(() => {
         setOpen(false);
@@ -51,8 +59,8 @@ export default function FeedbackWidget({ loggedIn, institutionName, userEmail })
         setCategory('general');
         setIsFirst(false);
       }, 2200);
-    } catch {
-      setSending(false);
+    } catch (e) {
+      setError('Kunne ikke sende — tjek din internetforbindelse');
     }
     setSending(false);
   }
@@ -198,6 +206,11 @@ export default function FeedbackWidget({ loggedIn, institutionName, userEmail })
                 >
                   {sending ? 'Sender…' : 'Send feedback'}
                 </button>
+                {error && (
+                  <div style={{ marginTop: 10, padding: '8px 12px', background: '#fee2e2', borderRadius: 10, fontSize: 12, color: '#dc2626', fontFamily: FONT }}>
+                    ⚠️ {error}
+                  </div>
+                )}
               </div>
             )}
           </div>

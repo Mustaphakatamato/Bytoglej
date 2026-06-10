@@ -7,6 +7,11 @@ export async function POST(req) {
     const { category, message, institutionName, userEmail } = await req.json();
     if (!message?.trim()) return NextResponse.json({ error: 'Besked mangler' }, { status: 400 });
 
+    if (!process.env.RESEND_API_KEY) {
+      console.error('[feedback] RESEND_API_KEY er ikke sat');
+      return NextResponse.json({ error: 'E-mail ikke konfigureret (RESEND_API_KEY mangler)' }, { status: 500 });
+    }
+
     const to = process.env.ADMIN_NOTIFICATION_EMAIL || 'mustaphakatamato@gmail.com';
     const categoryLabel = { bug: '🐛 Fejl/bug', suggestion: '💡 Forslag', general: '⭐ Generel feedback' }[category] || category;
 
@@ -36,7 +41,8 @@ export async function POST(req) {
 
     if (!res.ok) {
       const detail = await res.text();
-      return NextResponse.json({ error: 'E-mail fejlede', detail }, { status: 502 });
+      console.error('[feedback] Resend fejl:', res.status, detail);
+      return NextResponse.json({ error: `Resend fejlede (${res.status})`, detail }, { status: 502 });
     }
     return NextResponse.json({ success: true });
   } catch (e) {
