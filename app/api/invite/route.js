@@ -48,7 +48,7 @@ function emailHtml(institutionName, invitedBy, inviteUrl) {
   <div style="max-width:560px;margin:48px auto 32px;background:#FDFAF4;border-radius:20px;overflow:hidden;border:1px solid rgba(22,34,28,0.08);box-shadow:0 4px 24px rgba(22,34,28,0.07);">
     <div style="background:linear-gradient(160deg,#1B4332 0%,#2D6A4F 100%);padding:40px;text-align:center;">
       <span style="display:inline-block;background:rgba(255,255,255,0.13);border-radius:14px;padding:10px 22px;color:#fff;font-size:24px;font-weight:800;letter-spacing:-0.04em;">byt<span style="opacity:0.6">&amp;</span>leg.</span>
-      <p style="color:rgba(255,255,255,0.65);margin:16px 0 0;font-size:14px;letter-spacing:0.02em;">Danmarks legetøjsbytsemarkeds for institutioner</p>
+      <p style="color:rgba(255,255,255,0.65);margin:16px 0 0;font-size:14px;letter-spacing:0.02em;">Danmarks legetøjsbyttemarked for institutioner</p>
     </div>
     <div style="padding:40px;">
       <h1 style="font-size:26px;font-weight:800;color:#16221C;margin:0 0 16px;letter-spacing:-0.03em;">Du er inviteret!</h1>

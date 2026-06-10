@@ -1,13 +1,11 @@
 'use client';
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { PRIMARY, GREEN_TINT, GREEN_SOFT, PAPER2, INK, INK3, CORAL, TYPE_CFG, CONDITION_COLORS } from '@/lib/constants';
+import { PRIMARY, GREEN_TINT, GREEN_SOFT, PAPER2, INK, INK3, CORAL, TYPE_CFG, CONDITION_COLORS, FONT } from '@/lib/constants';
 import { CATEGORIES } from '@/lib/categories';
 import { db } from '@/lib/supabase';
 
 import { useApp } from '@/providers/AppProvider';
-
-const FONT = "'Sora', sans-serif";
 
 export default function ListingCard({ listing, onClick, favs, toggleFav, onInstitutionClick }) {
   const router = useRouter();

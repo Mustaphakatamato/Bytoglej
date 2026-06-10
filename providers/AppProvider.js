@@ -3,6 +3,35 @@ import React, { createContext, useContext, useState, useEffect, useCallback, use
 import { db } from '@/lib/supabase';
 import { checkIsAdmin } from '@/lib/admin';
 import ChatBubble from '@/components/ChatBubble';
+import { authedFetch } from '@/lib/authed-fetch';
+
+const PAGE_SIZE = 60;
+
+function urlBase64ToUint8Array(base64) {
+  const pad = '='.repeat((4 - base64.length % 4) % 4);
+  const b64 = (base64 + pad).replace(/-/g, '+').replace(/_/g, '/');
+  return Uint8Array.from([...window.atob(b64)].map(c => c.charCodeAt(0)));
+}
+
+async function registerPush() {
+  if (!process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY) return;
+  if (!('serviceWorker' in navigator) || !('PushManager' in window)) return;
+  try {
+    const reg = await navigator.serviceWorker.ready;
+    const existing = await reg.pushManager.getSubscription();
+    const sub = existing || await reg.pushManager.subscribe({
+      userVisibleOnly: true,
+      applicationServerKey: urlBase64ToUint8Array(process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY),
+    });
+    if (sub) {
+      authedFetch('/api/push-subscribe', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ subscription: sub }),
+      }).catch(() => {});
+    }
+  } catch {}
+}
 
 // ─── Active User Context ──────────────────────────────────────────────────────
 export const ActiveUserContext = createContext({
@@ -24,6 +53,9 @@ export function AppProvider({ children }) {
   const [listings,        setListings]        = useState([]);
   const [refreshSeed,     setRefreshSeed]     = useState(0);
   const [loadingListings, setLoadingListings] = useState(true);
+  const [loadingMore,     setLoadingMore]     = useState(false);
+  const [hasMore,         setHasMore]         = useState(true);
+  const listingsOffsetRef = useRef(0);
   const [realUserId,      setRealUserId]      = useState(null);
   const [realEmail,       setRealEmail]       = useState(null);
   const [unreadTotal,     setUnreadTotal]     = useState(0);
@@ -60,10 +92,39 @@ export function AppProvider({ children }) {
 
   async function fetchListings() {
     setLoadingListings(true);
-    const { data } = await db.from('listings').select('*, shipping_options(*)').eq('is_active', true).order('created_at', { ascending: false });
-    if (data) setListings(data);
+    const { data } = await db.from('listings')
+      .select('*, shipping_options(*)')
+      .eq('is_active', true)
+      .order('created_at', { ascending: false })
+      .range(0, PAGE_SIZE - 1);
+    if (data) {
+      setListings(data);
+      setHasMore(data.length === PAGE_SIZE);
+      listingsOffsetRef.current = data.length;
+    }
     setLoadingListings(false);
     setRefreshSeed(s => s + 1);
+  }
+
+  async function loadMoreListings() {
+    if (!hasMore || loadingMore) return;
+    setLoadingMore(true);
+    const offset = listingsOffsetRef.current;
+    const { data } = await db.from('listings')
+      .select('*, shipping_options(*)')
+      .eq('is_active', true)
+      .order('created_at', { ascending: false })
+      .range(offset, offset + PAGE_SIZE - 1);
+    if (data) {
+      setListings(prev => {
+        const existingIds = new Set(prev.map(l => l.id));
+        const fresh = data.filter(l => !existingIds.has(l.id));
+        return [...prev, ...fresh];
+      });
+      setHasMore(data.length === PAGE_SIZE);
+      listingsOffsetRef.current = offset + data.length;
+    }
+    setLoadingMore(false);
   }
 
   async function fetchUnread(userId) {
@@ -182,6 +243,7 @@ export function AppProvider({ children }) {
         setLoggedIn(true);
         loadInstitution(session.user.email, session.user.id);
         fetchUnread(session.user.id);
+        registerPush();
       }
     });
     const { data: { subscription } } = db.auth.onAuthStateChange((event, session) => {
@@ -191,6 +253,7 @@ export function AppProvider({ children }) {
         setLoggedIn(true);
         loadInstitution(session.user.email, session.user.id);
         fetchUnread(session.user.id);
+        if (event === 'SIGNED_IN') registerPush();
       } else {
         setRealUserId(null); setRealEmail(null); setLoggedIn(false);
         setInstitution(null); setUnreadTotal(0); setIsAdmin(false);
@@ -239,6 +302,7 @@ export function AppProvider({ children }) {
     isAdmin, adminInst, setAdminInst,
     allInstitutions,
     listings, loadingListings, fetchListings, refreshSeed,
+    loadMoreListings, hasMore, loadingMore,
     realUserId, realEmail,
     unreadTotal, fetchUnread,
     toast, setToast, showToast,

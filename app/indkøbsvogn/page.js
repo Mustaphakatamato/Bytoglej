@@ -3,12 +3,10 @@ import { useState, useMemo, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useApp, useActiveUser } from '@/providers/AppProvider';
 import { db } from '@/lib/supabase';
-import { PRIMARY, GREEN_TINT, GREEN_SOFT, PAPER, PAPER2, PAPER3, INK, INK2, INK3 } from '@/lib/constants';
+import { PRIMARY, GREEN_TINT, GREEN_SOFT, PAPER, PAPER2, PAPER3, INK, INK2, INK3, FONT } from '@/lib/constants';
 import { useWindowWidth } from '@/lib/hooks';
 import { CATEGORIES } from '@/lib/categories';
 import { authedFetch } from '@/lib/authed-fetch';
-
-const FONT = "'Sora', sans-serif";
 
 export default function CartPage() {
   const router = useRouter();

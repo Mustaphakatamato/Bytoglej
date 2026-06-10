@@ -2,13 +2,11 @@
 import { useState, useEffect, useRef } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 import { db } from '@/lib/supabase';
-import { PRIMARY, GREEN_DEEP, GREEN_SOFT, GREEN_TINT, PAPER, PAPER2, PAPER3, INK, INK2, INK3, CORAL, TYPE_CFG, CONDITIONS, AGE_GROUPS } from '@/lib/constants';
+import { PRIMARY, GREEN_DEEP, GREEN_SOFT, GREEN_TINT, PAPER, PAPER2, PAPER3, INK, INK2, INK3, CORAL, TYPE_CFG, CONDITIONS, AGE_GROUPS, FONT } from '@/lib/constants';
 import { CATEGORIES } from '@/lib/categories';
 import { useWindowWidth } from '@/lib/hooks';
 import { useApp } from '@/providers/AppProvider';
 import { Spinner } from '@/components/ui';
-
-const FONT = "'Sora', sans-serif";
 
 export default function RedigerOpslagPage() {
   const router = useRouter();

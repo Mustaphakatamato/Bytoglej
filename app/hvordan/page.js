@@ -1,10 +1,8 @@
 'use client';
 import { useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
-import { PRIMARY, GREEN_DEEP, GREEN_SOFT, GREEN_TINT, INK, INK2, INK3, PAPER, PAPER2, PAPER3 } from '@/lib/constants';
+import { PRIMARY, GREEN_DEEP, GREEN_SOFT, GREEN_TINT, INK, INK2, INK3, PAPER, PAPER2, PAPER3, FONT } from '@/lib/constants';
 import { useWindowWidth } from '@/lib/hooks';
-
-const FONT = "'Sora', sans-serif";
 
 const STEPS = [
   {

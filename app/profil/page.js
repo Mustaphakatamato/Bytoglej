@@ -2,12 +2,10 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { db } from '@/lib/supabase';
-import { PRIMARY, GREEN_TINT, PAPER2, PAPER3, INK, INK3 } from '@/lib/constants';
+import { PRIMARY, GREEN_TINT, PAPER2, PAPER3, INK, INK3, FONT } from '@/lib/constants';
 import { useWindowWidth } from '@/lib/hooks';
 import { useApp, useActiveUser } from '@/providers/AppProvider';
 import { Spinner } from '@/components/ui';
-
-const FONT = "'Sora', sans-serif";
 
 function MenuItem({ icon, label, value, badge, onClick, danger }) {
   return (

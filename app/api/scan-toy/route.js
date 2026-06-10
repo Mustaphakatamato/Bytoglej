@@ -14,13 +14,13 @@ const CATEGORY_KEYS = [
 export async function POST(req) {
   if (!await requireAuth(req)) return UNAUTHORIZED();
   if (!process.env.GROQ_API_KEY) {
-    return NextResponse.json({ error: 'GROQ_API_KEY not configured' }, { status: 500 });
+    return NextResponse.json({ error: 'AI-scanning er ikke konfigureret' }, { status: 500 });
   }
 
   try {
     const formData = await req.formData();
     const file = formData.get('image');
-    if (!file) return NextResponse.json({ error: 'No image' }, { status: 400 });
+    if (!file) return NextResponse.json({ error: 'Intet billede' }, { status: 400 });
 
     const bytes = await file.arrayBuffer();
     const base64 = Buffer.from(bytes).toString('base64');
@@ -57,7 +57,7 @@ Ingen markdown, ingen forklaring — kun JSON.`;
 
     const text = completion.choices[0].message.content.trim();
     const jsonMatch = text.match(/\{[\s\S]*\}/);
-    if (!jsonMatch) return NextResponse.json({ error: 'Invalid AI response: ' + text }, { status: 500 });
+    if (!jsonMatch) return NextResponse.json({ error: 'Ugyldigt AI-svar — prøv igen' }, { status: 500 });
 
     const parsed = JSON.parse(jsonMatch[0]);
 
@@ -70,6 +70,6 @@ Ingen markdown, ingen forklaring — kun JSON.`;
     return NextResponse.json(parsed);
   } catch (e) {
     console.error('scan-toy error:', e.message);
-    return NextResponse.json({ error: e.message }, { status: 500 });
+    return NextResponse.json({ error: 'Noget gik galt — prøv igen' }, { status: 500 });
   }
 }

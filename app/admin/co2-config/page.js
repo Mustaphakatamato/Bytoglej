@@ -2,13 +2,11 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { db } from '@/lib/supabase';
-import { PRIMARY, GREEN_SOFT, GREEN_TINT, PAPER, PAPER2, PAPER3, INK, INK2, INK3 } from '@/lib/constants';
+import { PRIMARY, GREEN_SOFT, GREEN_TINT, PAPER, PAPER2, PAPER3, INK, INK2, INK3, FONT } from '@/lib/constants';
 import { EMISSION_FACTORS, METHODOLOGY_VERSION } from '@/lib/co2/emission-factors';
 import { Spinner } from '@/components/ui';
 import { checkIsAdmin } from '@/lib/admin';
 import { useApp } from '@/providers/AppProvider';
-
-const FONT = "'Sora', sans-serif";
 
 export default function Co2ConfigPage() {
   const router = useRouter();

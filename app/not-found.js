@@ -1,8 +1,6 @@
 'use client';
 import Link from 'next/link';
-import { PRIMARY, GREEN_DEEP, PAPER, INK, INK3 } from '@/lib/constants';
-
-const FONT = "'Sora', sans-serif";
+import { PRIMARY, GREEN_DEEP, PAPER, INK, INK3, FONT } from '@/lib/constants';
 
 export default function NotFound() {
   return (

@@ -1,7 +1,7 @@
 'use client';
 import { useState, useEffect } from 'react';
+import { FONT } from '@/lib/constants';
 
-const FONT = "'Sora', sans-serif";
 const PRIMARY = '#2A7D4F';
 const PAPER2  = '#ECE6DA';
 const INK     = '#16221C';

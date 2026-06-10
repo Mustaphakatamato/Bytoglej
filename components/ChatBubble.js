@@ -2,11 +2,10 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
 import { db } from '@/lib/supabase';
-import { PRIMARY, GREEN_TINT, PAPER, PAPER2, PAPER3, INK, INK3, CORAL } from '@/lib/constants';
+import { PRIMARY, GREEN_TINT, PAPER, PAPER2, PAPER3, INK, INK3, CORAL, FONT } from '@/lib/constants';
 import { useApp, useActiveUser } from '@/providers/AppProvider';
 import { useWindowWidth } from '@/lib/hooks';
 
-const FONT = "'Sora', sans-serif";
 const PANEL_W = 320;
 
 export default function ChatBubble() {

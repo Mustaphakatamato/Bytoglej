@@ -3,9 +3,7 @@ import { useState, useEffect } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { db } from '@/lib/supabase';
-import { PRIMARY, GREEN_DEEP, GREEN_SOFT, GREEN_TINT, PAPER, PAPER2, PAPER3, INK, INK2, INK3, CORAL } from '@/lib/constants';
-
-const FONT = "'Sora', sans-serif";
+import { PRIMARY, GREEN_DEEP, GREEN_SOFT, GREEN_TINT, PAPER, PAPER2, PAPER3, INK, INK2, INK3, CORAL, FONT } from '@/lib/constants';
 
 function pwStrength(p) {
   return {

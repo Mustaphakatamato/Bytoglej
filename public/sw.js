@@ -143,12 +143,6 @@ async function staleWhileRevalidate(request, cacheName) {
 }
 
 // ── Push notifications ────────────────────────────────────────
-// TODO: Wire up backend push subscription here.
-//   1. Generate VAPID key pair (web-push library or https://vapidkeys.com)
-//   2. Store publicKey in env var NEXT_PUBLIC_VAPID_PUBLIC_KEY
-//   3. On client: subscribe via PushManager.subscribe({ userVisibleOnly: true, applicationServerKey })
-//   4. POST subscription object to /api/push-subscribe
-//   5. Backend sends push via web-push library using VAPID private key
 self.addEventListener('push', e => {
   const data = e.data?.json().catch?.(() => null) ?? null;
   const title = data?.title ?? 'Byt&Leg';

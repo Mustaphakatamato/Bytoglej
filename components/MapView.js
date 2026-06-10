@@ -1,8 +1,7 @@
 'use client';
 import { useEffect, useRef, useState } from 'react';
-import { PRIMARY, INK, INK3, PAPER, PAPER2, PAPER3, GREEN_TINT, GREEN_DEEP, TYPE_CFG } from '@/lib/constants';
+import { PRIMARY, INK, INK3, PAPER, PAPER2, PAPER3, GREEN_TINT, GREEN_DEEP, TYPE_CFG, FONT } from '@/lib/constants';
 
-const FONT = "'Sora', sans-serif";
 const MARKER_COLOR = PRIMARY;
 
 const TILES = {

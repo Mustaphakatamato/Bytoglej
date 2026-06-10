@@ -2,7 +2,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { db } from '@/lib/supabase';
-import { PRIMARY, GREEN_SOFT, GREEN_TINT, PAPER, PAPER2, PAPER3, INK, INK3, CORAL } from '@/lib/constants';
+import { PRIMARY, GREEN_SOFT, GREEN_TINT, PAPER, PAPER2, PAPER3, INK, INK3, CORAL, FONT } from '@/lib/constants';
 import { useWindowWidth, relTime, haversine, geocodeAddress } from '@/lib/hooks';
 import { useApp, useActiveUser } from '@/providers/AppProvider';
 import { Badge, Btn, Spinner, SkeletonMessageRow } from '@/components/ui';
@@ -10,8 +10,6 @@ import { authedFetch } from '@/lib/authed-fetch';
 import PullToRefresh from '@/components/PullToRefresh';
 import { calculateCO2Savings } from '@/lib/co2/calculator';
 import { geocodeForCO2, getRoutingDistanceKm } from '@/lib/co2/geocoding';
-
-const FONT = "'Sora', sans-serif";
 const INK2 = '#3A473D';
 
 function ConvSwipeRow({ children, enabled, onSwipeLeft, onSwipeRight, leftBg, rightBg, leftLabel, rightLabel }) {

@@ -2,7 +2,7 @@
 import { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import nextDynamic from 'next/dynamic';
-import { PRIMARY, GREEN_DEEP, GREEN_SOFT, GREEN_TINT, PAPER, PAPER2, PAPER3, INK, INK2, INK3, CORAL, TYPE_CFG, URGENCY_OPTIONS } from '@/lib/constants';
+import { PRIMARY, GREEN_DEEP, GREEN_SOFT, GREEN_TINT, PAPER, PAPER2, PAPER3, INK, INK2, INK3, CORAL, TYPE_CFG, URGENCY_OPTIONS, FONT } from '@/lib/constants';
 import { CATEGORIES } from '@/lib/categories';
 import { useWindowWidth, useFeedListings } from '@/lib/hooks';
 import { Btn, SkeletonCard, SkeletonMobileCard } from '@/components/ui';
@@ -13,8 +13,6 @@ import { db } from '@/lib/supabase';
 import { authedFetch } from '@/lib/authed-fetch';
 
 const MapContainer = nextDynamic(() => import('@/components/MapView'), { ssr: false });
-
-const FONT = "'Sora', sans-serif";
 
 function MobileListingCard({ l, isFav, onToggleFav, onOpen }) {
   const [imgIdx, setImgIdx] = useState(0);
@@ -197,7 +195,16 @@ function SøgesCard({ l, onContact }) {
 function OpslagInner() {
   const router = useRouter();
   const urlParams = useSearchParams();
-  const { listings: allListings, loadingListings: loading, fetchListings, refreshSeed, setActiveListing, favs, toggleFav, showToast, loggedIn, realUserId, institution } = useApp();
+  const { listings: allListings, loadingListings: loading, fetchListings, refreshSeed, setActiveListing, favs, toggleFav, showToast, loggedIn, realUserId, institution, loadMoreListings, hasMore, loadingMore } = useApp();
+  const sentinelRef = useRef(null);
+  useEffect(() => {
+    if (!sentinelRef.current) return;
+    const obs = new IntersectionObserver(entries => {
+      if (entries[0].isIntersecting) loadMoreListings();
+    }, { rootMargin: '200px' });
+    obs.observe(sentinelRef.current);
+    return () => obs.disconnect();
+  }, [loadMoreListings]);
   const ownFiltered = allListings.filter(l =>
     l.user_id !== realUserId && !(institution?.name && l.institution_name === institution.name)
   );
@@ -672,6 +679,12 @@ function OpslagInner() {
             {filtered.map(l => (
               <ListingCard key={l.id} listing={l} favs={favs} toggleFav={toggleFav} onClick={() => handleListingClick(l)} onInstitutionClick={goToInstitution} />
             ))}
+          </div>
+        )}
+        {/* Infinite scroll sentinel */}
+        {!loading && hasMore && (
+          <div ref={sentinelRef} style={{ height: 1, marginTop: 32 }}>
+            {loadingMore && <div style={{ textAlign: 'center', padding: '16px 0', color: INK3, fontSize: 14, fontFamily: FONT }}>Henter flere opslag…</div>}
           </div>
         )}
       </div>

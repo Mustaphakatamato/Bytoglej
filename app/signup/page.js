@@ -1,15 +1,13 @@
 'use client';
 import { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
-import { PRIMARY, GREEN_TINT, GREEN_SOFT, GREEN_DEEP, PAPER, PAPER2, PAPER3, INK, INK2, INK3 } from '@/lib/constants';
+import { PRIMARY, GREEN_TINT, GREEN_SOFT, GREEN_DEEP, PAPER, PAPER2, PAPER3, INK, INK2, INK3, FONT } from '@/lib/constants';
 import { Btn, Spinner } from '@/components/ui';
 import { db } from '@/lib/supabase';
 import { useApp } from '@/providers/AppProvider';
 import { geocodeAddress, useDebounce } from '@/lib/hooks';
 import { LogoLockup } from '@/components/Logo';
 import { authedFetch } from '@/lib/authed-fetch';
-
-const FONT = "'Sora', sans-serif";
 const CORAL = '#E8593D';
 
 function SField({ label, hint, children }) {

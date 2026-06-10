@@ -1,7 +1,5 @@
 import Link from 'next/link';
-import { PRIMARY, GREEN_DEEP, PAPER, PAPER2, PAPER3, INK, INK2, INK3 } from '@/lib/constants';
-
-const FONT = "'Sora', sans-serif";
+import { PRIMARY, GREEN_DEEP, PAPER, PAPER2, PAPER3, INK, INK2, INK3, FONT } from '@/lib/constants';
 
 export const metadata = { title: 'Privatlivspolitik — byt&leg', description: 'Læs om hvordan byt&leg behandler dine data.' };
 

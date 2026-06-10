@@ -1,5 +1,7 @@
 import { NextResponse } from 'next/server';
+import { createClient } from '@supabase/supabase-js';
 import { requireAuth, UNAUTHORIZED } from '@/lib/api-auth';
+import { sendPushToUser } from '@/lib/push';
 
 export async function POST(req) {
   if (!await requireAuth(req)) return UNAUTHORIZED();
@@ -31,6 +33,26 @@ export async function POST(req) {
     if (!res.ok) {
       const body = await res.text();
       return NextResponse.json({ error: 'E-mail kunne ikke sendes', detail: body }, { status: 502 });
+    }
+
+    // Send push notification to recipient (fire-and-forget)
+    if (process.env.SUPABASE_SERVICE_ROLE_KEY && process.env.VAPID_PRIVATE_KEY) {
+      try {
+        const adminSupa = createClient(
+          process.env.NEXT_PUBLIC_SUPABASE_URL,
+          process.env.SUPABASE_SERVICE_ROLE_KEY,
+          { auth: { persistSession: false } }
+        );
+        const { data: { users } } = await adminSupa.auth.admin.listUsers({ perPage: 1000 });
+        const owner = users?.find(u => u.email?.toLowerCase() === ownerEmail.toLowerCase());
+        if (owner?.id) {
+          sendPushToUser(owner.id, {
+            title: `${senderName} har sendt dig en besked`,
+            body: `${listingEmoji || ''} ${listingTitle}`.trim(),
+            url: '/beskeder',
+          });
+        }
+      } catch {}
     }
 
     return NextResponse.json({ success: true });

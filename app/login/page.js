@@ -1,14 +1,12 @@
 'use client';
 import { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
-import { PRIMARY, GREEN_DEEP, GREEN_SOFT, PAPER, PAPER2, PAPER3, INK, INK2, INK3 } from '@/lib/constants';
+import { PRIMARY, GREEN_DEEP, GREEN_SOFT, PAPER, PAPER2, PAPER3, INK, INK2, INK3, FONT } from '@/lib/constants';
 import { useWindowWidth } from '@/lib/hooks';
 import { Spinner } from '@/components/ui';
 import { db } from '@/lib/supabase';
 import { useApp } from '@/providers/AppProvider';
 import { LogoLockup } from '@/components/Logo';
-
-const FONT = "'Sora', sans-serif";
 
 const TRUST_POINTS = [
   'CVR-verificerede institutioner',

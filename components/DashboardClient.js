@@ -4,7 +4,7 @@ import { useState, useEffect, useRef, useCallback } from 'react';
 import { createPortal } from 'react-dom';
 import { useRouter } from 'next/navigation';
 import { db } from '@/lib/supabase';
-import { PRIMARY, GREEN_SOFT, GREEN_TINT, PAPER, PAPER2, PAPER3, INK, INK2, INK3, CORAL, TYPE_CFG, CONDITIONS, AGE_GROUPS, LISTING_TAGS } from '@/lib/constants';
+import { PRIMARY, GREEN_SOFT, GREEN_TINT, PAPER, PAPER2, PAPER3, INK, INK2, INK3, CORAL, TYPE_CFG, CONDITIONS, AGE_GROUPS, LISTING_TAGS, FONT } from '@/lib/constants';
 import { useWindowWidth, geocodeAddress, relTime } from '@/lib/hooks';
 import { useApp, useActiveUser } from '@/providers/AppProvider';
 import { Badge, Btn, Spinner, Modal, SkeletonDashboardBox } from '@/components/ui';
@@ -12,8 +12,6 @@ import { authedFetch } from '@/lib/authed-fetch';
 import PullToRefresh from '@/components/PullToRefresh';
 import { getCO2Comparison, aggregateSavings } from '@/lib/co2/calculator';
 import { CATEGORIES } from '@/lib/categories';
-
-const FONT = "'Sora', sans-serif";
 
 function GridCard({ l, onOpen, openEdit, onCopy, toggleActive, toggleReserved, setConfirmDelete, confirmDelete, handleDelete, bulkMode, selected, onToggleSelect }) {
   const [imgIdx, setImgIdx] = useState(0);

@@ -1,9 +1,7 @@
 'use client';
 import { useEffect } from 'react';
 import Link from 'next/link';
-import { PRIMARY, PAPER, INK, INK3 } from '@/lib/constants';
-
-const FONT = "'Sora', sans-serif";
+import { PRIMARY, PAPER, INK, INK3, FONT } from '@/lib/constants';
 
 export default function GlobalError({ error, reset }) {
   useEffect(() => { console.error(error); }, [error]);

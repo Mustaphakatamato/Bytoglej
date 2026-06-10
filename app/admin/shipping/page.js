@@ -3,9 +3,7 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useApp } from '@/providers/AppProvider';
 import { db } from '@/lib/supabase';
-import { PRIMARY, GREEN_TINT, GREEN_SOFT, PAPER, PAPER2, PAPER3, INK, INK2, INK3 } from '@/lib/constants';
-
-const FONT = "'Sora', sans-serif";
+import { PRIMARY, GREEN_TINT, GREEN_SOFT, PAPER, PAPER2, PAPER3, INK, INK2, INK3, FONT } from '@/lib/constants';
 
 const STATUS_STYLES = {
   pending:    { bg:'#FEF9C3', color:'#92400e', label:'Afventer' },

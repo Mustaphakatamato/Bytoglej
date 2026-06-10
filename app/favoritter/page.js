@@ -2,12 +2,10 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { db } from '@/lib/supabase';
-import { PRIMARY, GREEN_TINT, PAPER3, INK, INK3 } from '@/lib/constants';
+import { PRIMARY, GREEN_TINT, PAPER3, INK, INK3, FONT } from '@/lib/constants';
 import { useWindowWidth } from '@/lib/hooks';
 import { useApp } from '@/providers/AppProvider';
 import { Spinner } from '@/components/ui';
-
-const FONT = "'Sora', sans-serif";
 
 function ListingCard({ l, isFav, onToggle, onOpen }) {
   const typeLabels = { køb:'Til salg', byt:'Byttes', byd:'Afgiv bud', søges:'Søges' };

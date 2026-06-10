@@ -3,12 +3,10 @@ import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { useApp, useActiveUser } from '@/providers/AppProvider';
 import { db } from '@/lib/supabase';
-import { PRIMARY, GREEN_TINT, INK, INK2, INK3, PAPER, PAPER2, PAPER3 } from '@/lib/constants';
+import { PRIMARY, GREEN_TINT, INK, INK2, INK3, PAPER, PAPER2, PAPER3, FONT } from '@/lib/constants';
 import { CATEGORIES } from '@/lib/categories';
 import { useWindowWidth } from '@/lib/hooks';
 import { useState, useEffect, useRef, useMemo, Suspense } from 'react';
-
-const FONT = "'Sora', sans-serif";
 
 function Mark09({ size = 36, bg = PRIMARY }) {
   const r = Math.round(size * 0.18);

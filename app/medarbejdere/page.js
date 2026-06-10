@@ -2,13 +2,11 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { db } from '@/lib/supabase';
-import { PRIMARY, GREEN_TINT, PAPER, PAPER2, PAPER3, INK, INK2, INK3 } from '@/lib/constants';
+import { PRIMARY, GREEN_TINT, PAPER, PAPER2, PAPER3, INK, INK2, INK3, FONT } from '@/lib/constants';
 import { useWindowWidth } from '@/lib/hooks';
 import { useApp } from '@/providers/AppProvider';
 import { Spinner } from '@/components/ui';
 import { authedFetch } from '@/lib/authed-fetch';
-
-const FONT = "'Sora', sans-serif";
 
 export default function MedarbejderePage() {
   const router = useRouter();

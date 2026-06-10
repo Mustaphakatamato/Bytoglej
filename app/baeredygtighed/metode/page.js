@@ -1,10 +1,8 @@
 'use client';
 import { useRouter } from 'next/navigation';
 import { useWindowWidth } from '@/lib/hooks';
-import { PRIMARY, GREEN_DEEP, GREEN_SOFT, GREEN_TINT, PAPER, PAPER2, INK, INK2, INK3 } from '@/lib/constants';
+import { PRIMARY, GREEN_DEEP, GREEN_SOFT, GREEN_TINT, PAPER, PAPER2, INK, INK2, INK3, FONT } from '@/lib/constants';
 import { EMISSION_FACTORS, METHODOLOGY_VERSION } from '@/lib/co2/emission-factors';
-
-const FONT = "'Sora', sans-serif";
 
 const SOURCES = [
   { id: 'S1', ref: 'Robertson, K. & Klimas, C. (2022). "A life cycle assessment of the environmental impact of children\'s toys." Sustainable Production and Consumption, ScienceDirect.', url: 'https://www.sciencedirect.com/science/article/abs/pii/S2352550922000550' },

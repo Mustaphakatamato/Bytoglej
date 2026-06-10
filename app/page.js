@@ -2,7 +2,7 @@
 // v2
 import { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
-import { PRIMARY, GREEN_DEEP, GREEN_SOFT, GREEN_TINT, PAPER, PAPER2, PAPER3, INK, INK2, INK3, CORAL, SKY, TYPE_CFG } from '@/lib/constants';
+import { PRIMARY, GREEN_DEEP, GREEN_SOFT, GREEN_TINT, PAPER, PAPER2, PAPER3, INK, INK2, INK3, CORAL, SKY, TYPE_CFG, FONT } from '@/lib/constants';
 import { useWindowWidth, useDebounce, useFeedListings } from '@/lib/hooks';
 import { SkeletonCard } from '@/components/ui';
 import ListingCard from '@/components/ListingCard';
@@ -11,8 +11,6 @@ import { useApp } from '@/providers/AppProvider';
 import { db } from '@/lib/supabase';
 import { getCO2Comparison } from '@/lib/co2/calculator';
 import { LogoLockup } from '@/components/Logo';
-
-const FONT = "'Sora', sans-serif";
 
 /* ── Compact mobile listing card (Vinted-style) ───────────── */
 function MobileCard({ listing, onClick, favs, toggleFav }) {

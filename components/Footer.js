@@ -1,7 +1,5 @@
 import Link from 'next/link';
-import { PRIMARY, INK, INK3, PAPER2, PAPER3 } from '@/lib/constants';
-
-const FONT = "'Sora', sans-serif";
+import { PRIMARY, INK, INK3, PAPER2, PAPER3, FONT } from '@/lib/constants';
 
 const LINK_STYLE = { display: 'block', fontSize: 14, color: INK3, textDecoration: 'none', marginBottom: 9 };
 const HEAD_STYLE = { fontSize: 11, fontWeight: 700, color: INK3, textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 14 };

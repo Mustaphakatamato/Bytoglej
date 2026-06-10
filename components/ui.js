@@ -1,10 +1,8 @@
 'use client';
 import { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
-import { PRIMARY, INK, INK2, INK3, PAPER, PAPER2, PAPER3, TYPE_CFG, CONDITION_COLORS } from '@/lib/constants';
+import { PRIMARY, INK, INK2, INK3, PAPER, PAPER2, PAPER3, TYPE_CFG, CONDITION_COLORS, FONT } from '@/lib/constants';
 import { useWindowWidth } from '@/lib/hooks';
-
-const FONT = "'Sora', sans-serif";
 
 export function Badge({ type }) {
   const c = TYPE_CFG[type] || {};

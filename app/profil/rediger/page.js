@@ -2,12 +2,10 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { db } from '@/lib/supabase';
-import { PRIMARY, GREEN_DEEP, INK, INK2, INK3, PAPER2, PAPER3 } from '@/lib/constants';
+import { PRIMARY, GREEN_DEEP, INK, INK2, INK3, PAPER2, PAPER3, FONT } from '@/lib/constants';
 import { useWindowWidth, geocodeAddress } from '@/lib/hooks';
 import { useApp } from '@/providers/AppProvider';
 import { Btn, Spinner } from '@/components/ui';
-
-const FONT = "'Sora', sans-serif";
 const INP = { width:'100%', padding:'11px 14px', borderRadius:12, border:'1.5px solid #e5e5e5', fontSize:14, fontFamily:"'Nunito Sans',sans-serif", outline:'none', boxSizing:'border-box' };
 
 const PW_RULES = [
