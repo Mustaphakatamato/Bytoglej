@@ -80,6 +80,16 @@ function CategoryBrowser({ onSelect }) {
   return (
     <div style={{ padding: '8px 8px 24px' }}>
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+        <button onClick={() => onSelect('')} style={{
+          background: '#fff', border: '1px solid rgba(22,34,28,0.07)',
+          borderRadius: 16, padding: '20px 16px', height: 96,
+          display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between',
+          cursor: 'pointer', boxShadow: '0 1px 4px rgba(22,34,28,0.05)',
+          fontFamily: FONT, textAlign: 'left', gridColumn: '1 / -1',
+        }}>
+          <span style={{ fontWeight: 700, fontSize: 14, color: INK, lineHeight: 1.25, flex: 1 }}>Alle kategorier</span>
+          <span style={{ fontSize: 36, lineHeight: 1, flexShrink: 0, marginLeft: 4, alignSelf: 'flex-end' }}>🧸</span>
+        </button>
         {CATEGORIES.map(cat => (
           <button key={cat.key} onClick={() => onSelect(cat.key)} style={{
             background: '#fff', border: '1px solid rgba(22,34,28,0.07)',
@@ -194,6 +204,7 @@ function OpslagInner() {
   const [category, setCategory] = useState('');
   const [subcategory, setSubcategory] = useState('');
   const [pendingCategory, setPendingCategory] = useState('');
+  const [browserDismissed, setBrowserDismissed] = useState(false);
   const [viewMode, setViewMode] = useState('list');
   const [saveSearchModal, setSaveSearchModal] = useState(false);
   const [saveSearchName, setSaveSearchName] = useState('');
@@ -322,7 +333,7 @@ function OpslagInner() {
   }
 
   const noFilters = !category && !search && filter === 'alle';
-  const showCategoryBrowser    = isMobile && noFilters && !pendingCategory && !aiMode;
+  const showCategoryBrowser    = isMobile && noFilters && !pendingCategory && !aiMode && !browserDismissed;
   const showSubcategoryBrowser = isMobile && noFilters && !!pendingCategory && !aiMode;
 
   return (
@@ -537,7 +548,10 @@ function OpslagInner() {
 
       {/* ── Category browser (mobile, no filters active) ── */}
       {mainTab === 'opslag' && showCategoryBrowser && (
-        <CategoryBrowser onSelect={cat => { setPendingCategory(cat); window.scrollTo({ top: 0, behavior: 'instant' }); }} />
+        <CategoryBrowser onSelect={cat => {
+          if (cat === '') { setBrowserDismissed(true); window.scrollTo({ top: 0, behavior: 'instant' }); }
+          else { setPendingCategory(cat); window.scrollTo({ top: 0, behavior: 'instant' }); }
+        }} />
       )}
 
       {/* ── Subcategory browser (mobile) ── */}
@@ -557,7 +571,7 @@ function OpslagInner() {
         {/* Mobile: back button + breadcrumb */}
         {isMobile && (
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '0 6px 10px', borderBottom: `1px solid ${PAPER2}`, marginBottom: 12 }}>
-            <button onClick={() => { setCategory(''); setSubcategory(''); setPendingCategory(''); router.push('/opslag'); }} style={{ background: 'none', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6, color: PRIMARY, fontFamily: FONT, fontWeight: 700, fontSize: 14, padding: 0 }}>
+            <button onClick={() => { setCategory(''); setSubcategory(''); setPendingCategory(''); setBrowserDismissed(false); router.push('/opslag'); }} style={{ background: 'none', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6, color: PRIMARY, fontFamily: FONT, fontWeight: 700, fontSize: 14, padding: 0 }}>
               <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke={PRIMARY} strokeWidth="2.5" strokeLinecap="round"><path d="M15 18l-6-6 6-6"/></svg>
               {(() => {
                 const catObj = CATEGORIES.find(c => c.key === category);
@@ -594,7 +608,7 @@ function OpslagInner() {
           </p>
           <div style={{ display:'flex', gap:10, alignItems:'center' }}>
             {(filter !== 'alle' || search || category || subcategory) && (
-              <button onClick={() => { setFilter('alle'); setCategory(''); setSubcategory(''); setPendingCategory(''); router.push('/opslag'); }} style={{ fontSize: 12, fontWeight: 600, color: PRIMARY, background: 'none', border: 'none', cursor: 'pointer', fontFamily: FONT, padding: 0 }}>
+              <button onClick={() => { setFilter('alle'); setCategory(''); setSubcategory(''); setPendingCategory(''); setBrowserDismissed(false); router.push('/opslag'); }} style={{ fontSize: 12, fontWeight: 600, color: PRIMARY, background: 'none', border: 'none', cursor: 'pointer', fontFamily: FONT, padding: 0 }}>
                 Nulstil filtre
               </button>
             )}
@@ -626,7 +640,7 @@ function OpslagInner() {
             <div style={{ fontFamily: FONT, fontWeight: 800, fontSize: isMobile ? 60 : 96, color: GREEN_SOFT, lineHeight: 1, letterSpacing: '-0.05em', marginBottom: 12, userSelect: 'none' }}>0</div>
             <div style={{ fontFamily: FONT, fontWeight: 800, fontSize: isMobile ? 20 : 26, color: INK, marginBottom: 8, letterSpacing: '-0.03em' }}>Ingen opslag fundet</div>
             <p style={{ fontSize: 15, color: INK3, marginBottom: 28 }}>Prøv at ændre eller nulstille dine filtre</p>
-            <button onClick={() => { setFilter('alle'); setCategory(''); setSubcategory(''); setPendingCategory(''); router.push('/opslag'); }} style={{
+            <button onClick={() => { setFilter('alle'); setCategory(''); setSubcategory(''); setPendingCategory(''); setBrowserDismissed(false); router.push('/opslag'); }} style={{
               background: 'none', border: `1.5px solid ${PRIMARY}`, color: PRIMARY,
               borderRadius: 99, padding: '10px 24px', fontSize: 14, fontWeight: 700,
               fontFamily: FONT, cursor: 'pointer',
