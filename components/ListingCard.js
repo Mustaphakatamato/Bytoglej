@@ -128,7 +128,12 @@ export default function ListingCard({ listing, onClick, favs, toggleFav, onInsti
 
         <div style={{ marginTop: 'auto' }}>
           {listing.price
-            ? <div style={{ fontFamily: FONT, fontWeight: 800, fontSize: 17, color: PRIMARY, marginBottom: 4 }}>{listing.price} kr.</div>
+            ? <div style={{ marginBottom:4 }}>
+                {listing.original_price && listing.original_price > listing.price && (
+                  <span style={{ fontFamily:FONT, fontWeight:700, fontSize:13, color:INK3, textDecoration:'line-through', marginRight:6 }}>{listing.original_price} kr.</span>
+                )}
+                <span style={{ fontFamily:FONT, fontWeight:800, fontSize:17, color: listing.original_price && listing.original_price > listing.price ? '#e11d48' : PRIMARY }}>{listing.price} kr.</span>
+              </div>
             : <div style={{ fontSize: 13, color: CORAL, fontWeight: 700, marginBottom: 4, fontFamily: FONT }}>Byttes kun</div>
           }
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>

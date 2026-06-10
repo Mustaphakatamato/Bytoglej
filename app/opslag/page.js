@@ -58,7 +58,12 @@ function MobileListingCard({ l, isFav, onToggleFav, onOpen }) {
       <div style={{ padding: '8px 10px 10px' }}>
         <div style={{ fontFamily: FONT, fontWeight: 700, fontSize: 13, color: INK, lineHeight: 1.3, marginBottom: 4, overflow: 'hidden', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical' }}>{l.title}</div>
         {l.price
-          ? <div style={{ fontFamily: FONT, fontWeight: 800, fontSize: 15, color: INK }}>{l.price} kr.</div>
+          ? <div style={{ display:'flex', alignItems:'baseline', gap:5, flexWrap:'wrap' }}>
+              {l.original_price && l.original_price > l.price && (
+                <span style={{ fontFamily:FONT, fontWeight:700, fontSize:12, color:INK3, textDecoration:'line-through' }}>{l.original_price} kr.</span>
+              )}
+              <span style={{ fontFamily:FONT, fontWeight:800, fontSize:15, color: l.original_price && l.original_price > l.price ? '#e11d48' : INK }}>{l.price} kr.</span>
+            </div>
           : <div style={{ fontFamily: FONT, fontWeight: 700, fontSize: 12, color: CORAL }}>Byttes kun</div>}
         {l.condition && <div style={{ fontSize: 11, color: INK3, marginTop: 2 }}>{l.condition}</div>}
         {(() => {

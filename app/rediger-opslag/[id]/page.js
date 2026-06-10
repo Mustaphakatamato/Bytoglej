@@ -162,10 +162,24 @@ export default function RedigerOpslagPage() {
 
     const allImages = [...existingImgs, ...uploadedUrls];
 
+    const newPrice = form.type === 'køb' ? Number(form.price) || null : null;
+    const oldPrice = listing?.price || null;
+    const storedOriginal = listing?.original_price || null;
+    let originalPrice;
+    if (newPrice && oldPrice && newPrice < oldPrice) {
+      // Price reduced — store the previous price as original (only if not already discounted)
+      originalPrice = storedOriginal || oldPrice;
+    } else if (!newPrice || !storedOriginal || newPrice >= storedOriginal) {
+      // Price raised back or cleared — remove discount indicator
+      originalPrice = null;
+    } else {
+      originalPrice = storedOriginal;
+    }
+
     const { error } = await db.from('listings').update({
       title: form.title,
       type: form.type,
-      price: form.type === 'køb' ? Number(form.price) || null : null,
+      price: newPrice,
       age_group: form.age_group,
       description: form.description,
       condition: form.condition,
@@ -176,6 +190,7 @@ export default function RedigerOpslagPage() {
       category: form.category || null,
       subcategory: form.subcategory || null,
       images: allImages,
+      original_price: originalPrice,
     }).eq('id', id);
 
     setSaving(false);

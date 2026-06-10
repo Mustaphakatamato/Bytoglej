@@ -622,7 +622,17 @@ export default function ListingDetailClient() {
             {/* Price */}
             <div style={{ marginBottom:16 }}>
               {listing.price
-                ? <div style={{ fontFamily:FONT, fontWeight:800, fontSize:32, color:PRIMARY, letterSpacing:'-0.03em' }}>{listing.price} kr.</div>
+                ? <div>
+                    {listing.original_price && listing.original_price > listing.price && (
+                      <div style={{ display:'flex', alignItems:'center', gap:8, marginBottom:4 }}>
+                        <span style={{ fontFamily:FONT, fontWeight:700, fontSize:18, color:INK3, textDecoration:'line-through' }}>{listing.original_price} kr.</span>
+                        <span style={{ fontFamily:FONT, fontWeight:700, fontSize:12, background:'#FEE2E2', color:'#e11d48', borderRadius:99, padding:'2px 8px' }}>
+                          -{Math.round((1 - listing.price / listing.original_price) * 100)}%
+                        </span>
+                      </div>
+                    )}
+                    <div style={{ fontFamily:FONT, fontWeight:800, fontSize:32, color: listing.original_price && listing.original_price > listing.price ? '#e11d48' : PRIMARY, letterSpacing:'-0.03em' }}>{listing.price} kr.</div>
+                  </div>
                 : listing.type === 'byt' ? <div style={{ fontSize:20, color:CORAL, fontWeight:800, fontFamily:FONT }}>Byttes kun</div>
                 : <div style={{ fontSize:20, color:ACCENT2, fontWeight:800, fontFamily:FONT }}>Afgiv bud</div>}
               {bidCount > 0 && <div style={{ color:INK3, fontSize:12, fontFamily:FONT, marginTop:4 }}>{bidCount} bud afgivet</div>}

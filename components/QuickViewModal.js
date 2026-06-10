@@ -214,7 +214,13 @@ export default function QuickViewModal({ listing, onClose }) {
               </div>
               <h2 style={{ fontFamily:FONT, fontWeight:800, fontSize:20, color:INK, letterSpacing:'-0.03em', marginBottom:8, lineHeight:1.2 }}>{listing.title}</h2>
               <div style={{ marginBottom:12 }}>
-                {listing.price ? <span style={{ fontFamily:FONT, fontWeight:800, fontSize:22, color:PRIMARY }}>{listing.price} kr.</span>
+                {listing.price
+                  ? <span style={{ display:'inline-flex', alignItems:'baseline', gap:6, flexWrap:'wrap' }}>
+                      {listing.original_price && listing.original_price > listing.price && (
+                        <span style={{ fontFamily:FONT, fontWeight:700, fontSize:15, color:INK3, textDecoration:'line-through' }}>{listing.original_price} kr.</span>
+                      )}
+                      <span style={{ fontFamily:FONT, fontWeight:800, fontSize:22, color: listing.original_price && listing.original_price > listing.price ? '#e11d48' : PRIMARY }}>{listing.price} kr.</span>
+                    </span>
                   : listing.type === 'byt' ? <span style={{ fontSize:15, color:CORAL, fontWeight:700, fontFamily:FONT }}>Byttes kun</span>
                   : <span style={{ fontSize:15, color:ACCENT2, fontWeight:700, fontFamily:FONT }}>Afgiv bud</span>}
                 {listing.type === 'byd' && listing.min_bid && <span style={{ fontSize:12, color:INK3, marginLeft:8, fontFamily:FONT }}>Mindstebud: {listing.min_bid} kr.</span>}
