@@ -27,6 +27,8 @@ export default function NavWrapper() {
   const { loggedIn, setLoggedIn, unreadTotal, isAdmin, toast, setToast } = useApp();
   const { institution } = useActiveUser();
   const pathname = usePathname();
+
+  if (pathname?.startsWith('/admin')) return null;
   const router = useRouter();
   const w = useWindowWidth();
   const isMobile = w < 768;

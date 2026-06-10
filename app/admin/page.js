@@ -1,8 +1,8 @@
 'use client';
 import { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
-import { useApp } from '@/providers/AppProvider';
 import { db } from '@/lib/supabase';
+import { checkIsAdmin } from '@/lib/admin';
 import {
   PRIMARY, GREEN_SOFT, GREEN_TINT,
   PAPER, PAPER2, PAPER3,
@@ -48,6 +48,9 @@ function IconMail() {
 function IconChevron({ open }) {
   return <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" style={{ transform: open ? 'rotate(180deg)' : 'none', transition: 'transform 0.2s' }}><polyline points="6 9 12 15 18 9"/></svg>;
 }
+function IconLogout() {
+  return <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>;
+}
 
 function Stat({ label, value, color = PRIMARY, icon }) {
   return (
@@ -70,40 +73,196 @@ const TABS = [
   { id: 'shipping',      label: 'Forsendelser',   Icon: () => <span style={{ fontSize:16 }}>📦</span> },
 ];
 
+// ── Login form ────────────────────────────────────────────────────────────────
+
+function LoginForm({ email, setEmail, password, setPassword, onSubmit, error, loading }) {
+  return (
+    <div style={{ minHeight: '100vh', background: '#0F1F17', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20 }}>
+      <div style={{ width: '100%', maxWidth: 380 }}>
+        <div style={{ textAlign: 'center', marginBottom: 40 }}>
+          <div style={{ display: 'inline-flex', flexDirection: 'column', alignItems: 'center', gap: 12 }}>
+            <div style={{ width: 56, height: 56, borderRadius: 16, background: PRIMARY, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2.5" strokeLinecap="round"><circle cx="12" cy="12" r="3"/><path d="M19.07 4.93a10 10 0 010 14.14"/><path d="M4.93 4.93a10 10 0 000 14.14"/></svg>
+            </div>
+            <div style={{ fontFamily: FONT, fontWeight: 800, fontSize: 22, color: '#fff', letterSpacing: '-0.04em' }}>byt&amp;leg admin</div>
+            <div style={{ fontFamily: FONT, fontSize: 13, color: 'rgba(255,255,255,0.35)' }}>Intern administration</div>
+          </div>
+        </div>
+
+        <form onSubmit={onSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+          <div>
+            <label style={{ display: 'block', fontFamily: FONT, fontSize: 11, fontWeight: 700, color: 'rgba(255,255,255,0.45)', marginBottom: 6, textTransform: 'uppercase', letterSpacing: '0.06em' }}>E-mail</label>
+            <input
+              type="email"
+              value={email}
+              onChange={e => setEmail(e.target.value)}
+              placeholder="admin@bytogleg.dk"
+              autoComplete="email"
+              required
+              style={{ width: '100%', padding: '13px 16px', background: 'rgba(255,255,255,0.07)', border: '1.5px solid rgba(255,255,255,0.12)', borderRadius: 12, color: '#fff', fontFamily: FONT, fontSize: 15, outline: 'none', boxSizing: 'border-box' }}
+            />
+          </div>
+          <div>
+            <label style={{ display: 'block', fontFamily: FONT, fontSize: 11, fontWeight: 700, color: 'rgba(255,255,255,0.45)', marginBottom: 6, textTransform: 'uppercase', letterSpacing: '0.06em' }}>Kodeord</label>
+            <input
+              type="password"
+              value={password}
+              onChange={e => setPassword(e.target.value)}
+              placeholder="••••••••"
+              autoComplete="current-password"
+              required
+              style={{ width: '100%', padding: '13px 16px', background: 'rgba(255,255,255,0.07)', border: '1.5px solid rgba(255,255,255,0.12)', borderRadius: 12, color: '#fff', fontFamily: FONT, fontSize: 15, outline: 'none', boxSizing: 'border-box' }}
+            />
+          </div>
+          {error && (
+            <div style={{ fontFamily: FONT, fontSize: 13, color: '#EF4444', textAlign: 'center', background: 'rgba(239,68,68,0.1)', borderRadius: 8, padding: '10px 14px' }}>
+              {error}
+            </div>
+          )}
+          <button
+            type="submit"
+            disabled={loading}
+            style={{ marginTop: 4, padding: '14px', borderRadius: 12, background: PRIMARY, border: 'none', color: '#fff', fontFamily: FONT, fontWeight: 700, fontSize: 15, cursor: loading ? 'not-allowed' : 'pointer', opacity: loading ? 0.7 : 1 }}
+          >
+            {loading ? 'Logger ind…' : 'Log ind'}
+          </button>
+        </form>
+      </div>
+    </div>
+  );
+}
+
+// ── Admin page ────────────────────────────────────────────────────────────────
+
 export default function AdminPage() {
-  const { isAdmin, allInstitutions, setAdminInst, adminInst } = useApp();
-  const router = useRouter();
+  const [authState, setAuthState] = useState('checking');
+  const [adminUser, setAdminUser] = useState(null);
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [loginError, setLoginError] = useState('');
+  const [loginLoading, setLoginLoading] = useState(false);
   const [tab, setTab] = useState('overview');
+  const [allInstitutions, setAllInstitutions] = useState([]);
+  const [adminInst, setAdminInst] = useState(null);
   const w = useWindowWidth();
   const isMobile = w < 768;
 
-  useEffect(() => {
-    if (isAdmin === false) router.replace('/');
-  }, [isAdmin]);
+  useEffect(() => { checkAuth(); }, []);
 
-  if (!isAdmin) {
+  async function checkAuth() {
+    const { data: { session } } = await db.auth.getSession();
+    if (!session?.user) { setAuthState('login'); return; }
+    const isAdm = await checkIsAdmin(session.user.id);
+    if (isAdm) {
+      setAdminUser(session.user);
+      setAuthState('authenticated');
+      fetchInstitutions();
+    } else {
+      setAuthState('denied');
+    }
+  }
+
+  async function fetchInstitutions() {
+    const { data } = await db.from('institutions').select('*').order('name');
+    if (data) setAllInstitutions(data);
+  }
+
+  async function handleLogin(e) {
+    e.preventDefault();
+    setLoginLoading(true);
+    setLoginError('');
+    const { data, error } = await db.auth.signInWithPassword({ email, password });
+    if (error) {
+      setLoginError('Forkert e-mail eller kodeord');
+      setLoginLoading(false);
+      return;
+    }
+    const isAdm = await checkIsAdmin(data.user.id);
+    if (!isAdm) {
+      await db.auth.signOut();
+      setLoginError('Denne konto har ikke admin-adgang');
+      setLoginLoading(false);
+      return;
+    }
+    setAdminUser(data.user);
+    setAuthState('authenticated');
+    fetchInstitutions();
+    setLoginLoading(false);
+  }
+
+  async function handleLogout() {
+    await db.auth.signOut();
+    setAuthState('login');
+    setAdminUser(null);
+    setAllInstitutions([]);
+    setAdminInst(null);
+    setEmail('');
+    setPassword('');
+  }
+
+  if (authState === 'checking') {
     return (
-      <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: PAPER }}>
-        <span style={{ fontFamily: FONT, color: INK3, fontSize: 15 }}>Kontrollerer adgang…</span>
+      <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#0F1F17' }}>
+        <span style={{ fontFamily: FONT, color: 'rgba(255,255,255,0.4)', fontSize: 15 }}>Kontrollerer adgang…</span>
       </div>
     );
   }
 
+  if (authState === 'denied') {
+    return (
+      <div style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', background: '#0F1F17', gap: 12 }}>
+        <div style={{ fontFamily: FONT, fontWeight: 800, fontSize: 20, color: '#EF4444' }}>Ingen adgang</div>
+        <div style={{ fontFamily: FONT, fontSize: 14, color: 'rgba(255,255,255,0.4)' }}>Denne konto er ikke administrator</div>
+        <button
+          onClick={async () => { await db.auth.signOut(); setAuthState('login'); }}
+          style={{ marginTop: 8, padding: '10px 24px', background: PRIMARY, color: '#fff', border: 'none', borderRadius: 99, fontFamily: FONT, fontWeight: 700, fontSize: 14, cursor: 'pointer' }}
+        >
+          Prøv igen
+        </button>
+      </div>
+    );
+  }
+
+  if (authState === 'login') {
+    return (
+      <LoginForm
+        email={email} setEmail={setEmail}
+        password={password} setPassword={setPassword}
+        onSubmit={handleLogin}
+        error={loginError}
+        loading={loginLoading}
+      />
+    );
+  }
+
   return (
-    <div style={{ minHeight: '100vh', background: PAPER, paddingTop: isMobile ? 84 : 104 }}>
-      <div style={{ maxWidth: 1200, margin: '0 auto', padding: isMobile ? '0 16px 32px' : '0 20px 32px' }}>
-        {/* Header */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 20 }}>
-          <div style={{ width: 40, height: 40, borderRadius: 12, background: GREEN_TINT, display: 'flex', alignItems: 'center', justifyContent: 'center', color: PRIMARY, flexShrink: 0 }}>
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><circle cx="12" cy="12" r="3"/><path d="M19.07 4.93a10 10 0 010 14.14"/><path d="M4.93 4.93a10 10 0 000 14.14"/></svg>
+    <div style={{ minHeight: '100vh', background: PAPER }}>
+      {/* Admin header */}
+      <header style={{ position: 'sticky', top: 0, zIndex: 100, background: '#0F1F17', borderBottom: '1px solid rgba(255,255,255,0.07)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: isMobile ? '0 16px' : '0 28px', height: 60 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+          <div style={{ width: 30, height: 30, borderRadius: 8, background: PRIMARY, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2.5" strokeLinecap="round"><circle cx="12" cy="12" r="3"/><path d="M19.07 4.93a10 10 0 010 14.14"/><path d="M4.93 4.93a10 10 0 000 14.14"/></svg>
           </div>
           <div>
-            <h1 style={{ fontFamily: FONT, fontWeight: 800, fontSize: isMobile ? 22 : 26, color: INK, margin: 0, letterSpacing: '-0.04em' }}>Platform admin</h1>
-            <p style={{ fontFamily: FONT, fontSize: 12, color: INK3, margin: 0 }}>byt&amp;leg intern administration</p>
+            <div style={{ fontFamily: FONT, fontWeight: 800, fontSize: 14, color: '#fff', letterSpacing: '-0.03em', lineHeight: 1.2 }}>byt&amp;leg admin</div>
+            {adminUser && <div style={{ fontFamily: FONT, fontSize: 11, color: 'rgba(255,255,255,0.35)', lineHeight: 1.2 }}>{adminUser.email}</div>}
           </div>
         </div>
+        <button
+          onClick={handleLogout}
+          style={{ background: 'rgba(255,255,255,0.08)', border: 'none', color: 'rgba(255,255,255,0.6)', borderRadius: 8, padding: isMobile ? '7px 10px' : '7px 14px', fontFamily: FONT, fontWeight: 600, fontSize: 13, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6 }}
+        >
+          <IconLogout />
+          {!isMobile && 'Log ud'}
+        </button>
+      </header>
 
-        {/* Active impersonation banner */}
+      <div style={{ maxWidth: 1200, margin: '0 auto', padding: isMobile ? '0 16px 32px' : '0 24px 32px' }}>
+        <div style={{ padding: isMobile ? '20px 0 16px' : '28px 0 20px' }}>
+          <h1 style={{ fontFamily: FONT, fontWeight: 800, fontSize: isMobile ? 22 : 26, color: INK, margin: 0, letterSpacing: '-0.04em' }}>Platform admin</h1>
+          <p style={{ fontFamily: FONT, fontSize: 12, color: INK3, margin: '4px 0 0' }}>byt&amp;leg intern administration</p>
+        </div>
+
         {adminInst && (
           <div style={{ background: PRIMARY, borderRadius: 12, padding: '10px 16px', marginBottom: 16, display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
             <div style={{ fontFamily: FONT, fontSize: 13, fontWeight: 700, color: '#fff', display: 'flex', alignItems: 'center', gap: 8 }}>
@@ -116,7 +275,6 @@ export default function AdminPage() {
           </div>
         )}
 
-        {/* Tabs */}
         <div style={{ display: 'flex', gap: 2, borderBottom: `1px solid ${PAPER3}`, marginBottom: 24, overflowX: 'auto', scrollbarWidth: 'none' }}>
           {TABS.map(({ id, label, Icon }) => (
             <button key={id} onClick={() => setTab(id)} style={{ background: 'none', border: 'none', borderBottom: tab === id ? `2.5px solid ${PRIMARY}` : '2.5px solid transparent', padding: isMobile ? '10px 14px' : '10px 18px', fontFamily: FONT, fontWeight: tab === id ? 700 : 600, fontSize: 13, color: tab === id ? PRIMARY : INK3, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6, borderRadius: '8px 8px 0 0', transition: 'color 0.15s', marginBottom: -1, whiteSpace: 'nowrap', flexShrink: 0 }}>
@@ -124,9 +282,7 @@ export default function AdminPage() {
             </button>
           ))}
         </div>
-      </div>
 
-      <div style={{ maxWidth: 1200, margin: '0 auto', padding: isMobile ? '0 16px 80px' : '0 20px 64px' }}>
         {tab === 'overview'     && <OverviewTab institutions={allInstitutions} setAdminInst={setAdminInst} adminInst={adminInst} isMobile={isMobile} />}
         {tab === 'institutions' && <InstitutionsTab institutions={allInstitutions} setAdminInst={setAdminInst} adminInst={adminInst} isMobile={isMobile} />}
         {tab === 'listings'     && <ListingsTab allInstitutions={allInstitutions} isMobile={isMobile} />}
@@ -140,7 +296,7 @@ export default function AdminPage() {
 function ShippingAdminRedirect() {
   const router = useRouter();
   useEffect(() => { router.push('/admin/shipping'); }, []);
-  return <div style={{ padding:40, textAlign:'center', color:INK3, fontFamily:FONT }}>Åbner forsendelsesadmin…</div>;
+  return <div style={{ padding: 40, textAlign: 'center', color: INK3, fontFamily: FONT }}>Åbner forsendelsesadmin…</div>;
 }
 
 // ── Overview tab ─────────────────────────────────────────────────────────────
@@ -247,7 +403,6 @@ function InstitutionsTab({ institutions, setAdminInst, adminInst, isMobile }) {
 
   return (
     <div>
-      {/* Search */}
       <div style={{ position: 'relative', maxWidth: 400, marginBottom: 16 }}>
         <span style={{ position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)', color: INK3, display: 'flex' }}><IconSearch /></span>
         <input value={query} onChange={e => setQuery(e.target.value)} placeholder="Søg på navn, by eller CVR…" style={{ width: '100%', padding: '10px 14px 10px 36px', border: `1.5px solid ${PAPER3}`, borderRadius: 10, fontFamily: FONT, fontSize: 14, background: PAPER2, color: INK, outline: 'none', boxSizing: 'border-box' }} />
@@ -255,7 +410,6 @@ function InstitutionsTab({ institutions, setAdminInst, adminInst, isMobile }) {
 
       <div style={{ fontFamily: FONT, fontSize: 12, color: INK3, marginBottom: 12 }}>{filtered.length} institutioner</div>
 
-      {/* Card list */}
       <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
         {filtered.length === 0
           ? <Empty text="Ingen institutioner fundet" />
@@ -266,22 +420,18 @@ function InstitutionsTab({ institutions, setAdminInst, adminInst, isMobile }) {
 
             return (
               <div key={inst.id} style={{ background: PAPER2, border: `1.5px solid ${isActive ? PRIMARY : 'rgba(22,34,28,0.08)'}`, borderRadius: 14, overflow: 'hidden', transition: 'border-color 0.15s' }}>
-                {/* Card header row */}
                 <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '14px 16px' }}>
-                  {/* Avatar */}
                   <div style={{ width: 38, height: 38, borderRadius: 10, background: isActive ? PRIMARY : GREEN_TINT, display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: FONT, fontWeight: 800, fontSize: 14, color: isActive ? '#fff' : PRIMARY, flexShrink: 0, overflow: 'hidden' }}>
                     {inst.logo_url
                       ? <img src={inst.logo_url} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
                       : inst.name?.charAt(0)?.toUpperCase()}
                   </div>
 
-                  {/* Name + meta */}
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <div style={{ fontFamily: FONT, fontWeight: 700, fontSize: 14, color: isActive ? PRIMARY : INK, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{inst.name}</div>
                     <div style={{ fontFamily: FONT, fontSize: 12, color: INK3 }}>{[inst.city, inst.cvr].filter(Boolean).join(' · ') || '—'}</div>
                   </div>
 
-                  {/* Agér som button */}
                   <button
                     onClick={() => setAdminInst(isActive ? null : inst)}
                     style={{ flexShrink: 0, background: isActive ? PRIMARY : GREEN_TINT, border: 'none', color: isActive ? '#fff' : PRIMARY, borderRadius: 10, padding: '7px 14px', fontFamily: FONT, fontWeight: 700, fontSize: 13, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6, transition: 'all 0.15s' }}
@@ -290,13 +440,11 @@ function InstitutionsTab({ institutions, setAdminInst, adminInst, isMobile }) {
                     {isActive ? 'Stop' : 'Agér'}
                   </button>
 
-                  {/* Expand toggle */}
                   <button onClick={() => toggleDetail(inst)} style={{ background: 'none', border: 'none', color: INK3, cursor: 'pointer', padding: 4, display: 'flex', alignItems: 'center' }}>
                     <IconChevron open={isOpen} />
                   </button>
                 </div>
 
-                {/* Expanded detail */}
                 {isOpen && (
                   <div style={{ borderTop: `1px solid ${PAPER3}`, padding: '16px' }}>
                     {loadingId === inst.id
@@ -442,7 +590,6 @@ function EditListingModal({ listing, onClose, onSave }) {
 }
 
 function ListingsTab({ allInstitutions = [], isMobile }) {
-  const { listings: activeListings, fetchListings } = useApp();
   const [listings, setListings] = useState([]);
   const [loading, setLoading] = useState(true);
   const [query, setQuery] = useState('');
@@ -455,15 +602,10 @@ function ListingsTab({ allInstitutions = [], isMobile }) {
 
   const fetchAll = useCallback(async () => {
     setLoading(true);
-    const { data, error } = await db.from('listings').select('id,title,type,is_active,created_at,institution_id').order('created_at', { ascending: false });
-    if (error) console.error('ListingsTab fetch error:', error.message);
-    if (data && data.length > 0) {
-      setListings(data);
-    } else {
-      setListings(activeListings.map(l => ({ id: l.id, title: l.title, type: l.type, is_active: l.is_active, created_at: l.created_at, institution_id: l.institution_id })));
-    }
+    const { data } = await db.from('listings').select('id,title,type,is_active,created_at,institution_id').order('created_at', { ascending: false });
+    setListings(data || []);
     setLoading(false);
-  }, [activeListings]);
+  }, []);
 
   useEffect(() => { fetchAll(); }, [fetchAll]);
 
@@ -476,7 +618,6 @@ function ListingsTab({ allInstitutions = [], isMobile }) {
     await db.from('listings').delete().eq('id', id);
     setListings(prev => prev.filter(l => l.id !== id));
     setConfirm(null);
-    fetchListings();
   }
 
   const filtered = listings.filter(l => {
@@ -489,7 +630,6 @@ function ListingsTab({ allInstitutions = [], isMobile }) {
 
   return (
     <div>
-      {/* Filters */}
       <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 16 }}>
         <div style={{ position: 'relative', flex: '1 1 200px', minWidth: 160 }}>
           <span style={{ position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)', color: INK3, display: 'flex' }}><IconSearch /></span>
@@ -513,7 +653,6 @@ function ListingsTab({ allInstitutions = [], isMobile }) {
           <div style={{ fontFamily: FONT, fontSize: 12, color: INK3, marginBottom: 10 }}>Viser {filtered.length} af {listings.length} opslag</div>
 
           {isMobile ? (
-            /* Mobile: cards */
             <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
               {filtered.length === 0
                 ? <Empty text="Ingen opslag fundet" />
@@ -532,7 +671,7 @@ function ListingsTab({ allInstitutions = [], isMobile }) {
                       <TypeBadge type={l.type} />
                       <span style={{ fontFamily: FONT, fontSize: 11, color: INK3 }}>{new Date(l.created_at).toLocaleDateString('da-DK', { day: 'numeric', month: 'short', year: '2-digit' })}</span>
                       <div style={{ marginLeft: 'auto', display: 'flex', gap: 6 }}>
-                        <button onClick={() => toggleActive(l.id, l.is_active)} title={l.is_active ? 'Deaktiver' : 'Aktiver'} style={{ background: l.is_active ? PAPER3 : GREEN_TINT, border: 'none', color: l.is_active ? INK3 : PRIMARY, borderRadius: 7, padding: '6px 8px', cursor: 'pointer', display: 'flex', alignItems: 'center' }}>
+                        <button onClick={() => toggleActive(l.id, l.is_active)} style={{ background: l.is_active ? PAPER3 : GREEN_TINT, border: 'none', color: l.is_active ? INK3 : PRIMARY, borderRadius: 7, padding: '6px 8px', cursor: 'pointer', display: 'flex', alignItems: 'center' }}>
                           <IconToggle on={!l.is_active} />
                         </button>
                         <button onClick={() => setEditing(l)} style={{ background: GREEN_TINT, border: 'none', color: PRIMARY, borderRadius: 7, padding: '6px 8px', cursor: 'pointer', display: 'flex', alignItems: 'center' }}>
@@ -548,7 +687,6 @@ function ListingsTab({ allInstitutions = [], isMobile }) {
               }
             </div>
           ) : (
-            /* Desktop: table */
             <div style={{ background: PAPER2, border: `1px solid rgba(22,34,28,0.08)`, borderRadius: 16, overflow: 'hidden' }}>
               <table style={{ width: '100%', borderCollapse: 'collapse', fontFamily: FONT, fontSize: 13 }}>
                 <thead>
@@ -617,7 +755,7 @@ function ListingsTab({ allInstitutions = [], isMobile }) {
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
 function SectionHead({ title }) {
-  return <h3 style={{ fontFamily: FONT, fontWeight: 700, fontSize: 13, color: INK2, margin: '0 0 12px', letterSpacing: '-0.01em', textTransform: 'uppercase', letterSpacing: '0.04em' }}>{title}</h3>;
+  return <h3 style={{ fontFamily: FONT, fontWeight: 700, fontSize: 13, color: INK2, margin: '0 0 12px', textTransform: 'uppercase', letterSpacing: '0.04em' }}>{title}</h3>;
 }
 
 function Spinner({ small }) {

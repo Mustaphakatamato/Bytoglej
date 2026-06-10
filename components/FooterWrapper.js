@@ -3,7 +3,7 @@ import { usePathname } from 'next/navigation';
 import Footer from './Footer';
 
 // Pages where the footer shouldn't show (full-screen app-like views)
-const HIDDEN_ON = ['/beskeder'];
+const HIDDEN_ON = ['/beskeder', '/admin'];
 
 export default function FooterWrapper() {
   const pathname = usePathname();
