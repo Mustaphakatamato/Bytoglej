@@ -10,15 +10,28 @@ import { Spinner } from '@/components/ui';
 const FONT = "'Sora', sans-serif";
 const FILTERS = ['Alle', 'Aktive', 'Inaktive', 'Solgt'];
 
-function ListingCard({ l, favoriters, onToggleActive, onDelete, onEdit }) {
+function ListingCard({ l, favoriters, onToggleActive, onDelete, onEdit, onPriceChange }) {
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [showLikers, setShowLikers] = useState(false);
+  const [priceMode, setPriceMode] = useState(false);
+  const [newPrice, setNewPrice] = useState('');
+  const [savingPrice, setSavingPrice] = useState(false);
   const statusLabel = l.is_sold ? 'Solgt' : l.is_active ? 'Aktiv' : 'Inaktiv';
   const statusColor = l.is_sold
     ? { bg:'#FECACA', color:'#991B1B' }
     : l.is_active ? { bg:'#D1FAE5', color:'#065F46' }
     : { bg:PAPER3, color:INK3 };
   const likers = favoriters.filter(f => f.listing_id === l.id);
+
+  async function savePrice() {
+    const p = Number(newPrice);
+    if (!p || p <= 0) return;
+    setSavingPrice(true);
+    await onPriceChange(l.id, p, l.price, l.original_price);
+    setSavingPrice(false);
+    setPriceMode(false);
+    setNewPrice('');
+  }
 
   return (
     <div style={{ background:'#fff', borderRadius:14, overflow:'hidden', boxShadow:'0 1px 3px rgba(22,34,28,0.06)', border:`1px solid ${PAPER3}` }}>
@@ -34,9 +47,17 @@ function ListingCard({ l, favoriters, onToggleActive, onDelete, onEdit }) {
             <span style={{ fontFamily:FONT, fontSize:10, fontWeight:700, background:statusColor.bg, color:statusColor.color, borderRadius:99, padding:'2px 8px', flexShrink:0 }}>{statusLabel}</span>
           </div>
           <div style={{ display:'flex', alignItems:'center', gap:8 }}>
-            <span style={{ fontFamily:FONT, fontSize:12, color:INK3 }}>
-              {l.price ? `${l.price} kr` : 'Byt / Gratis'}
-            </span>
+            {l.original_price && l.original_price > l.price ? (
+              <span style={{ fontFamily:FONT, fontSize:12, color:INK3 }}>
+                <span style={{ textDecoration:'line-through' }}>{l.original_price} kr</span>
+                {' → '}
+                <span style={{ color:'#e11d48', fontWeight:700 }}>{l.price} kr</span>
+              </span>
+            ) : (
+              <span style={{ fontFamily:FONT, fontSize:12, color:INK3 }}>
+                {l.price ? `${l.price} kr` : 'Byt / Gratis'}
+              </span>
+            )}
             {likers.length > 0 && (
               <button onClick={() => setShowLikers(v => !v)}
                 style={{ background:'none', border:'none', cursor:'pointer', padding:0, fontFamily:FONT, fontSize:12, color:PRIMARY, fontWeight:600, display:'flex', alignItems:'center', gap:3 }}>
@@ -56,12 +77,53 @@ function ListingCard({ l, favoriters, onToggleActive, onDelete, onEdit }) {
         </div>
       )}
 
+      {/* Inline price reduction panel */}
+      {priceMode && (
+        <div style={{ background:'#FFF7ED', borderTop:`1px solid #FED7AA`, padding:'12px 14px' }}>
+          <div style={{ fontFamily:FONT, fontSize:13, fontWeight:700, color:'#92400E', marginBottom:8 }}>
+            Sæt ny pris {l.price ? `(nu: ${l.price} kr)` : ''}
+          </div>
+          <div style={{ display:'flex', gap:8, alignItems:'center' }}>
+            <input
+              type="number"
+              value={newPrice}
+              onChange={e => setNewPrice(e.target.value)}
+              onKeyDown={e => e.key === 'Enter' && savePrice()}
+              placeholder={l.price ? `Under ${l.price}` : 'Ny pris'}
+              min="1"
+              autoFocus
+              style={{ flex:1, padding:'9px 12px', borderRadius:10, border:'1.5px solid #FCD34D', fontSize:14, outline:'none', fontFamily:FONT, background:'#fff', color:INK, boxSizing:'border-box' }}
+            />
+            <span style={{ fontFamily:FONT, fontSize:13, color:INK3, flexShrink:0 }}>kr.</span>
+            <button onClick={savePrice} disabled={savingPrice || !newPrice || Number(newPrice) <= 0}
+              style={{ background: savingPrice || !newPrice ? PAPER3 : '#D97706', border:'none', borderRadius:99, padding:'9px 16px', fontSize:13, fontWeight:700, color: savingPrice || !newPrice ? INK3 : '#fff', cursor: savingPrice || !newPrice ? 'not-allowed' : 'pointer', fontFamily:FONT, flexShrink:0 }}>
+              {savingPrice ? '…' : 'Gem'}
+            </button>
+            <button onClick={() => { setPriceMode(false); setNewPrice(''); }}
+              style={{ background:'none', border:'none', borderRadius:99, padding:'9px 12px', fontSize:13, fontWeight:600, color:INK3, cursor:'pointer', fontFamily:FONT, flexShrink:0 }}>
+              Annuller
+            </button>
+          </div>
+          {newPrice && Number(newPrice) > 0 && l.price && Number(newPrice) >= l.price && (
+            <div style={{ fontFamily:FONT, fontSize:11, color:'#B45309', marginTop:6 }}>
+              ⚠️ Den nye pris skal være lavere end den nuværende ({l.price} kr)
+            </div>
+          )}
+        </div>
+      )}
+
       {!l.is_sold && (
         <div style={{ display:'flex', gap:6, padding:'0 14px 12px' }}>
           <button onClick={() => onEdit(l.id)}
             style={{ flex:1, background:GREEN_TINT, border:`1.5px solid ${PRIMARY}`, borderRadius:99, padding:'7px 0', fontSize:12, fontWeight:700, color:PRIMARY, cursor:'pointer', fontFamily:FONT }}>
             ✏️ Rediger
           </button>
+          {l.type === 'køb' && (
+            <button onClick={() => { setPriceMode(v => !v); setNewPrice(''); }}
+              style={{ flex:1, background: priceMode ? '#FEF3C7' : '#FFF7ED', border:`1.5px solid #F59E0B`, borderRadius:99, padding:'7px 0', fontSize:12, fontWeight:700, color:'#B45309', cursor:'pointer', fontFamily:FONT }}>
+              💰 Sæt ned
+            </button>
+          )}
           <button onClick={() => onToggleActive(l.id, l.is_active)}
             style={{ flex:1, background:l.is_active?'#FEF9C3':'#F0FDF4', border:'none', borderRadius:99, padding:'7px 0', fontSize:12, fontWeight:700, color:l.is_active?'#B45309':'#15803D', cursor:'pointer', fontFamily:FONT }}>
             {l.is_active ? 'Deaktivér' : 'Aktivér'}
@@ -118,7 +180,7 @@ export default function MineOpslagPage() {
         }
       }
 
-      const SELECT = 'id,title,emoji,color,images,price,type,is_active,is_sold,created_at';
+      const SELECT = 'id,title,emoji,color,images,price,original_price,type,is_active,is_sold,created_at';
 
       const promises = [];
       if (user.id) {
@@ -170,6 +232,15 @@ export default function MineOpslagPage() {
     await db.from('listings').delete().eq('id', id);
     setListings(ls => ls.filter(l => l.id !== id));
     showToast?.('Opslag slettet');
+  }
+
+  async function changePrice(id, newPrice, currentPrice, storedOriginal) {
+    const origToSet = storedOriginal || currentPrice || null;
+    await db.from('listings').update({ price: newPrice }).eq('id', id);
+    // Store original_price separately — fails silently if column not yet migrated
+    db.from('listings').update({ original_price: newPrice < (currentPrice || Infinity) ? origToSet : null }).eq('id', id).then(() => {});
+    setListings(ls => ls.map(l => l.id === id ? { ...l, price: newPrice, original_price: newPrice < (currentPrice || Infinity) ? origToSet : null } : l));
+    showToast?.(`Pris sat ned til ${newPrice} kr ✓`);
   }
 
   const filtered = filter === 'Alle' ? listings
@@ -226,6 +297,7 @@ export default function MineOpslagPage() {
                 onToggleActive={toggleActive}
                 onDelete={deleteListing}
                 onEdit={id => router.push('/rediger-opslag/' + id)}
+                onPriceChange={changePrice}
               />
             ))
           )}

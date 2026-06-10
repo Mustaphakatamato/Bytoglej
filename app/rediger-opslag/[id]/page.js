@@ -190,11 +190,13 @@ export default function RedigerOpslagPage() {
       category: form.category || null,
       subcategory: form.subcategory || null,
       images: allImages,
-      original_price: originalPrice,
     }).eq('id', id);
 
     setSaving(false);
     if (error) { showToast('Noget gik galt — prøv igen', 'error'); return; }
+
+    // Update original_price separately — fails silently if column doesn't exist yet
+    db.from('listings').update({ original_price: originalPrice }).eq('id', id).then(() => {});
     fetchListings?.();
     showToast('Opslag opdateret ✓');
     router.push('/profil');
