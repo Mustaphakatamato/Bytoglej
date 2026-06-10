@@ -6,7 +6,6 @@ import { useWindowWidth } from '@/lib/hooks';
 import { Spinner } from '@/components/ui';
 import { db } from '@/lib/supabase';
 import { useApp } from '@/providers/AppProvider';
-import { checkIsAdmin } from '@/lib/admin';
 import { LogoLockup } from '@/components/Logo';
 
 const FONT = "'Sora', sans-serif";
@@ -77,8 +76,7 @@ export default function LoginPage() {
     setLoading(false);
     if (error) { setError('Forkert adgangskode — prøv igen'); return; }
     setLoggedIn(true);
-    const isAdmin = await checkIsAdmin(authData?.user?.id);
-    router.push(isAdmin ? '/admin' : '/dashboard');
+    router.push('/dashboard');
   }
 
   const inputStyle = {

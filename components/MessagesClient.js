@@ -6,7 +6,6 @@ import { PRIMARY, GREEN_SOFT, GREEN_TINT, PAPER, PAPER2, PAPER3, INK, INK3, CORA
 import { useWindowWidth, relTime, haversine, geocodeAddress } from '@/lib/hooks';
 import { useApp, useActiveUser } from '@/providers/AppProvider';
 import { Badge, Btn, Spinner, SkeletonMessageRow } from '@/components/ui';
-import { checkIsAdmin } from '@/lib/admin';
 import PullToRefresh from '@/components/PullToRefresh';
 import { calculateCO2Savings } from '@/lib/co2/calculator';
 import { geocodeForCO2, getRoutingDistanceKm } from '@/lib/co2/geocoding';
@@ -145,8 +144,6 @@ function LoginInline({ onLogin }) {
     setLoading(false);
     if (error) { setError('Forkert adgangskode — prøv igen'); return; }
     setLoggedIn(true);
-    const isAdminUser = await checkIsAdmin(authData?.user?.id);
-    if (isAdminUser) { router.push('/admin'); return; }
     onLogin?.();
   }
 
