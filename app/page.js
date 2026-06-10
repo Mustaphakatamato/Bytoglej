@@ -112,7 +112,7 @@ function MobileHomeFeed({ listings, loading }) {
 }
 
 /* ── Hero ─────────────────────────────────────────────────── */
-function HeroSection() {
+function HeroSection({ stats }) {
   const router = useRouter();
   const w = useWindowWidth();
   const isMobile = w < 768;
@@ -167,19 +167,29 @@ function HeroSection() {
           </button>
         </div>
 
-        {/* Stats row */}
-        <div style={{ display: 'flex', justifyContent: 'center', gap: isMobile ? 28 : 56, flexWrap: 'wrap' }}>
-          {[
-            { n: '2.847', label: 'handler gennemført' },
-            { n: '156',   label: 'institutioner tilmeldt' },
-            { n: '12,5 ton', label: 'CO₂ sparet' },
-          ].map((s, i) => (
-            <div key={i} style={{ textAlign: 'center' }}>
-              <div style={{ fontFamily: FONT, fontWeight: 800, fontSize: isMobile ? 26 : 34, color: '#fff', letterSpacing: '-0.04em', lineHeight: 1 }}>{s.n}</div>
-              <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.5)', marginTop: 4, fontFamily: FONT, letterSpacing: '0.02em' }}>{s.label}</div>
-            </div>
-          ))}
-        </div>
+        {/* Live stats row */}
+        {stats && (stats.institutions > 0 || stats.deals > 0) && (
+          <div style={{ display: 'flex', justifyContent: 'center', gap: isMobile ? 28 : 56, flexWrap: 'wrap' }}>
+            {stats.institutions > 0 && (
+              <div style={{ textAlign: 'center' }}>
+                <div style={{ fontFamily: FONT, fontWeight: 800, fontSize: isMobile ? 26 : 34, color: '#fff', letterSpacing: '-0.04em', lineHeight: 1 }}>{stats.institutions}</div>
+                <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.5)', marginTop: 4, fontFamily: FONT, letterSpacing: '0.02em' }}>institutioner tilmeldt</div>
+              </div>
+            )}
+            {stats.listings > 0 && (
+              <div style={{ textAlign: 'center' }}>
+                <div style={{ fontFamily: FONT, fontWeight: 800, fontSize: isMobile ? 26 : 34, color: '#fff', letterSpacing: '-0.04em', lineHeight: 1 }}>{stats.listings}</div>
+                <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.5)', marginTop: 4, fontFamily: FONT, letterSpacing: '0.02em' }}>aktive opslag</div>
+              </div>
+            )}
+            {stats.deals > 0 && (
+              <div style={{ textAlign: 'center' }}>
+                <div style={{ fontFamily: FONT, fontWeight: 800, fontSize: isMobile ? 26 : 34, color: '#fff', letterSpacing: '-0.04em', lineHeight: 1 }}>{stats.deals}</div>
+                <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.5)', marginTop: 4, fontFamily: FONT, letterSpacing: '0.02em' }}>handler gennemført</div>
+              </div>
+            )}
+          </div>
+        )}
       </div>
 
       {/* Wave */}
@@ -617,6 +627,21 @@ export default function HomePage() {
   const { listings, loadingListings, fetchListings, refreshSeed, realUserId, institution } = useApp();
   const w = useWindowWidth();
   const isMobile = w !== null && w < 768;
+  const [heroStats, setHeroStats] = useState(null);
+
+  useEffect(() => {
+    Promise.all([
+      db.from('institutions').select('id', { count: 'exact', head: true }),
+      db.from('listings').select('id', { count: 'exact', head: true }).eq('is_active', true).eq('is_sold', false),
+      db.from('conversations').select('id', { count: 'exact', head: true }).eq('deal_completed', true),
+    ]).then(([{ count: instCount }, { count: listCount }, { count: dealCount }]) => {
+      setHeroStats({
+        institutions: instCount || 0,
+        listings: listCount || 0,
+        deals: dealCount || 0,
+      });
+    });
+  }, []);
 
   const ownFiltered = listings.filter(l =>
     l.user_id !== realUserId && !(institution?.name && l.institution_name === institution.name)
@@ -639,7 +664,7 @@ export default function HomePage() {
 
   return (
     <>
-      <HeroSection />
+      <HeroSection stats={heroStats} />
       <HowSection />
       <ListingsPreview listings={visibleListings} loading={loadingListings} goToInstitution={goToInstitution} />
       <TradeTypesStrip />
