@@ -9,15 +9,14 @@ import { Spinner } from '@/components/ui';
 
 const FONT = "'Sora', sans-serif";
 
-function ListingCard({ l, isFav, onToggle }) {
-  const router = useRouter();
+function ListingCard({ l, isFav, onToggle, onOpen }) {
   const typeLabels = { køb:'Til salg', byt:'Byttes', byd:'Afgiv bud', søges:'Søges' };
   const typeColors = { køb:{ bg:'#D1FAE5', color:'#065F46' }, byt:{ bg:'#DBEAFE', color:'#1E40AF' }, byd:{ bg:'#EDE9FE', color:'#5B21B6' }, søges:{ bg:'#FEF9C3', color:'#92400E' } };
   const tc = typeColors[l.type] || { bg:PAPER3, color:INK3 };
 
   return (
     <div style={{ background:'#fff', borderRadius:14, overflow:'hidden', boxShadow:'0 1px 3px rgba(22,34,28,0.06)', border:`1px solid ${PAPER3}`, cursor:'pointer' }}
-      onClick={() => router.push('/opslag/' + l.id)}>
+      onClick={() => onOpen(l)}>
       <div style={{ height:140, background:l.color || GREEN_TINT, position:'relative', overflow:'hidden', display:'flex', alignItems:'center', justifyContent:'center', fontSize:52 }}>
         {l.images?.[0]
           ? <img src={l.images[0]} style={{ width:'100%', height:'100%', objectFit:'cover' }} alt="" />
@@ -44,7 +43,12 @@ function ListingCard({ l, isFav, onToggle }) {
 
 export default function FavoritterPage() {
   const router = useRouter();
-  const { favs, toggleFav } = useApp();
+  const { favs, toggleFav, setActiveListing } = useApp();
+
+  function handleOpen(l) {
+    setActiveListing(l);
+    router.push('/opslag/detail');
+  }
   const ww = useWindowWidth();
   const isMobile = ww < 768;
 
@@ -124,7 +128,7 @@ export default function FavoritterPage() {
           ) : (
             <div style={{ display:'grid', gridTemplateColumns:'repeat(2,minmax(0,1fr))', gap:10 }}>
               {listings.map(l => (
-                <ListingCard key={l.id} l={l} isFav={favs?.includes(l.id)} onToggle={toggleFav} />
+                <ListingCard key={l.id} l={l} isFav={favs?.includes(l.id)} onToggle={toggleFav} onOpen={handleOpen} />
               ))}
             </div>
           )}
