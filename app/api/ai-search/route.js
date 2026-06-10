@@ -1,6 +1,7 @@
 import Groq from 'groq-sdk';
 import { NextResponse } from 'next/server';
 import { db } from '@/lib/supabase';
+import { requireAuth, UNAUTHORIZED } from '@/lib/api-auth';
 
 export const maxDuration = 30;
 
@@ -14,6 +15,7 @@ const CATEGORY_KEYS = [
 const AGE_GROUPS = ['0-2 år', '3-6 år', '6-10 år', '10+ år', 'Alle aldre'];
 
 export async function POST(req) {
+  if (!await requireAuth(req)) return UNAUTHORIZED();
   if (!process.env.GROQ_API_KEY) {
     return NextResponse.json({ error: 'GROQ_API_KEY ikke konfigureret' }, { status: 500 });
   }

@@ -1,6 +1,8 @@
 import { NextResponse } from 'next/server';
+import { requireAuth, UNAUTHORIZED } from '@/lib/api-auth';
 
 export async function POST(req) {
+  if (!await requireAuth(req)) return UNAUTHORIZED();
   try {
     const { ownerEmail, ownerName, senderName, listingTitle, listingEmoji, convId } =
       await req.json();

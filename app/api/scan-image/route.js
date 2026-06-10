@@ -1,7 +1,9 @@
 import Groq from 'groq-sdk';
 import { NextResponse } from 'next/server';
+import { requireAuth, UNAUTHORIZED } from '@/lib/api-auth';
 
 export async function POST(req) {
+  if (!await requireAuth(req)) return UNAUTHORIZED();
   if (!process.env.GROQ_API_KEY) return NextResponse.json({ safe: true });
 
   try {

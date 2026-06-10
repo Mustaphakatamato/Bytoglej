@@ -1,7 +1,9 @@
 import Groq from 'groq-sdk';
 import { NextResponse } from 'next/server';
+import { requireAuth, UNAUTHORIZED } from '@/lib/api-auth';
 
 export async function POST(req) {
+  if (!await requireAuth(req)) return UNAUTHORIZED();
   try {
     const groq = new Groq({ apiKey: process.env.GROQ_API_KEY });
     const { title, description, type, condition, age_group, tags } = await req.json();

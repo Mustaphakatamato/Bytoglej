@@ -1,7 +1,9 @@
 import { NextResponse } from 'next/server';
 import { db } from '@/lib/supabase';
+import { requireAuth, UNAUTHORIZED } from '@/lib/api-auth';
 
 export async function POST(req) {
+  if (!await requireAuth(req)) return UNAUTHORIZED();
   try {
     const { listingId, title, type, tags, city, age_group } = await req.json();
 

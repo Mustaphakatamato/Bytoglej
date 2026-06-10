@@ -1,5 +1,6 @@
 import Groq from 'groq-sdk';
 import { NextResponse } from 'next/server';
+import { requireAuth, UNAUTHORIZED } from '@/lib/api-auth';
 
 export const maxDuration = 30;
 
@@ -14,6 +15,7 @@ const URGENCY_KEYS = ['haster','måneden','ingen'];
 const CONDITIONS = ['Ny','Meget god','God','Acceptabel'];
 
 export async function POST(req) {
+  if (!await requireAuth(req)) return UNAUTHORIZED();
   if (!process.env.GROQ_API_KEY) {
     return NextResponse.json({ error: 'GROQ_API_KEY ikke konfigureret' }, { status: 500 });
   }
