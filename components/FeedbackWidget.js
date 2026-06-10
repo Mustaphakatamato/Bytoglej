@@ -68,23 +68,25 @@ export default function FeedbackWidget({ loggedIn, institutionName, userEmail })
 
   return (
     <>
-      {/* ── Floating pill button ── */}
+      {/* ── Floating button — mirrors chat bubble on the left ── */}
       <button
         onClick={() => setOpen(o => !o)}
+        title="Pilot-feedback"
         style={{
-          position: 'fixed', bottom: 24, left: 20, zIndex: 9990,
+          position: 'fixed',
+          bottom: 'calc(84px + env(safe-area-inset-bottom, 0px) + 14px)',
+          left: 20,
+          zIndex: 9990,
+          width: 46, height: 46, borderRadius: '50%',
           background: open ? PRIMARY : PAPER,
-          color: open ? '#fff' : INK,
           border: `1.5px solid ${open ? PRIMARY : PAPER3}`,
-          borderRadius: 99, padding: '10px 16px',
-          fontFamily: FONT, fontWeight: 700, fontSize: 13,
-          cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 7,
-          boxShadow: '0 2px 12px rgba(22,34,28,0.12)',
+          cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center',
+          boxShadow: '0 2px 12px rgba(22,34,28,0.14)',
+          fontSize: 20,
           transition: 'all 0.15s',
         }}
       >
-        <span style={{ fontSize: 15 }}>🚀</span>
-        Pilot-feedback
+        🚀
       </button>
 
       {/* ── Modal backdrop ── */}
@@ -95,10 +97,13 @@ export default function FeedbackWidget({ loggedIn, institutionName, userEmail })
             style={{ position: 'fixed', inset: 0, background: 'rgba(22,34,28,0.35)', zIndex: 9991, backdropFilter: 'blur(2px)' }}
           />
 
-          {/* ── Modal ── */}
+          {/* ── Modal — centred on mobile, anchored bottom-left on desktop ── */}
           <div style={{
-            position: 'fixed', bottom: 76, left: 20, zIndex: 9992,
-            width: 'min(360px, calc(100vw - 40px))',
+            position: 'fixed',
+            bottom: 'calc(84px + env(safe-area-inset-bottom, 0px) + 68px)',
+            left: 20,
+            zIndex: 9992,
+            width: 'min(340px, calc(100vw - 40px))',
             background: PAPER, borderRadius: 20,
             boxShadow: '0 8px 40px rgba(22,34,28,0.18)',
             border: `1px solid ${PAPER3}`,
