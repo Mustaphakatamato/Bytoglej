@@ -1,7 +1,7 @@
 'use client';
 import { useState, useEffect } from 'react';
 import { PRIMARY, GREEN_TINT, GREEN_DEEP, PAPER, PAPER2, PAPER3, INK, INK3, FONT } from '@/lib/constants';
-import { authedFetch } from '@/lib/authed-fetch';
+import { db } from '@/lib/supabase';
 
 const CATEGORIES = [
   { key: 'bug',        label: 'Fejl / bug',  emoji: '🐛' },
@@ -39,9 +39,13 @@ export default function FeedbackWidget({ loggedIn, institutionName, userEmail })
     if (!message.trim()) return;
     setSending(true);
     try {
-      await authedFetch('/api/feedback', {
+      const { data: { session } } = await db.auth.getSession();
+      const res = await fetch('/api/feedback', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          ...(session?.access_token ? { Authorization: `Bearer ${session.access_token}` } : {}),
+        },
         body: JSON.stringify({ category, message, institutionName, userEmail }),
       });
       const json = await res.json().catch(() => ({}));

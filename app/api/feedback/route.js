@@ -1,8 +1,5 @@
 import { NextResponse } from 'next/server';
-import { requireAuth, UNAUTHORIZED } from '@/lib/api-auth';
-
 export async function POST(req) {
-  if (!await requireAuth(req)) return UNAUTHORIZED();
   try {
     const { category, message, institutionName, userEmail } = await req.json();
     if (!message?.trim()) return NextResponse.json({ error: 'Besked mangler' }, { status: 400 });
