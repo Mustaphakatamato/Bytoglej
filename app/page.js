@@ -100,7 +100,7 @@ function MobileHomeFeed({ listings, loading }) {
         <div style={{ fontFamily: FONT, fontWeight: 800, fontSize: 19, color: INK, letterSpacing: '-0.03em' }}>Nyeste opslag</div>
         <button onClick={() => router.push('/opslag')} style={{ background: 'none', border: 'none', fontSize: 13, fontWeight: 700, color: PRIMARY, fontFamily: FONT, cursor: 'pointer' }}>Se alle →</button>
       </div>
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, padding: '6px 8px 16px' }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2,minmax(0,1fr))', gap: 8, padding: '6px 8px 16px' }}>
         {loading
           ? [1,2,3,4,5,6,7,8].map(i => <div key={i} className="skeleton" style={{ aspectRatio: '3/4', borderRadius: 12 }} />)
           : newest.map(l => (

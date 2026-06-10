@@ -122,7 +122,7 @@ export default function FavoritterPage() {
               </button>
             </div>
           ) : (
-            <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:10 }}>
+            <div style={{ display:'grid', gridTemplateColumns:'repeat(2,minmax(0,1fr))', gap:10 }}>
               {listings.map(l => (
                 <ListingCard key={l.id} l={l} isFav={favs?.includes(l.id)} onToggle={toggleFav} />
               ))}

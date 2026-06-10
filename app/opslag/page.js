@@ -635,7 +635,7 @@ function OpslagInner() {
             isMobile={isMobile}
           />
         ) : loading ? (
-          <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr 1fr' : 'repeat(auto-fill,minmax(240px,1fr))', gap: isMobile ? 8 : 18 }}>
+          <div style={{ display: 'grid', gridTemplateColumns: isMobile ? 'repeat(2,minmax(0,1fr))' : 'repeat(auto-fill,minmax(240px,1fr))', gap: isMobile ? 8 : 18 }}>
             {[1,2,3,4,5,6].map(i => isMobile
               ? <SkeletonMobileCard key={i} />
               : <SkeletonCard key={i} />)}
@@ -654,7 +654,7 @@ function OpslagInner() {
             </button>
           </div>
         ) : isMobile ? (
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2,minmax(0,1fr))', gap: 8 }}>
             {filtered.map(l => {
               const isFav = favs.includes(l.id);
               return (

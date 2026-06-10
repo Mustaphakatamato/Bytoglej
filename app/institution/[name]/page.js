@@ -295,7 +295,7 @@ export default function InstitutionPage() {
             <p style={{ fontSize:14 }}>Ingen aktive opslag fra {institutionName}</p>
           </div>
         ) : (
-          <div style={{ display:'grid', gridTemplateColumns:isMobile?'repeat(2,1fr)':'repeat(auto-fill,minmax(260px,1fr))', gap:isMobile?12:16, paddingBottom: selectMode&&selected.length>0 ? 100 : 80 }}>
+          <div style={{ display:'grid', gridTemplateColumns:isMobile?'repeat(2,minmax(0,1fr))':'repeat(auto-fill,minmax(260px,1fr))', gap:isMobile?12:16, paddingBottom: selectMode&&selected.length>0 ? 100 : 80 }}>
             {listings.map(l => {
               const isSelected = selected.find(x => x.id === l.id);
               return (
