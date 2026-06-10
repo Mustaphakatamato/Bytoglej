@@ -27,7 +27,7 @@ import { useApp, useActiveUser } from '@/providers/AppProvider';
 import { Badge, Btn, Spinner, Modal } from '@/components/ui';
 import { authedFetch } from '@/lib/authed-fetch';
 
-function ImageGallery({ images, color, emoji }) {
+function ImageGallery({ images, color, emoji, title }) {
   const [active, setActive] = useState(0);
   const [lightbox, setLightbox] = useState(false);
   const w = useWindowWidth();
@@ -38,7 +38,7 @@ function ImageGallery({ images, color, emoji }) {
   return (
     <div style={{ marginBottom:20 }}>
       <div style={{ position:'relative', height:imgH, borderRadius:20, overflow:'hidden', background:'#f5f5f5' }}>
-        <img src={images[active]} alt="" onClick={()=>setLightbox(true)} style={{ width:'100%', height:'100%', objectFit:'contain', display:'block', cursor:'zoom-in' }} />
+        <img src={images[active]} alt={title || ''} onClick={()=>setLightbox(true)} style={{ width:'100%', height:'100%', objectFit:'contain', display:'block', cursor:'zoom-in' }} />
         <div style={{ position:'absolute', bottom:12, right:12, background:'rgba(0,0,0,0.48)', color:'#fff', borderRadius:8, padding:'4px 10px', fontSize:11, fontWeight:600, pointerEvents:'none' }}>🔍 Klik for fuld visning</div>
         {images.length > 1 && <>
           <button onClick={()=>setActive(i=>(i-1+images.length)%images.length)}
@@ -61,7 +61,7 @@ function ImageGallery({ images, color, emoji }) {
       )}
       {lightbox && (
         <div onClick={()=>setLightbox(false)} style={{ position:'fixed', inset:0, background:'rgba(0,0,0,0.93)', zIndex:9999, display:'flex', alignItems:'center', justifyContent:'center', cursor:'zoom-out' }}>
-          <img src={images[active]} alt="" onClick={e=>e.stopPropagation()} style={{ maxWidth:'92vw', maxHeight:'88vh', objectFit:'contain', borderRadius:10, boxShadow:'0 8px 48px rgba(0,0,0,0.5)' }} />
+          <img src={images[active]} alt={title || ''} onClick={e=>e.stopPropagation()} style={{ maxWidth:'92vw', maxHeight:'88vh', objectFit:'contain', borderRadius:10, boxShadow:'0 8px 48px rgba(0,0,0,0.5)' }} />
           {images.length > 1 && <>
             <button onClick={e=>{e.stopPropagation();setActive(i=>(i-1+images.length)%images.length);}} style={{ position:'absolute', left:20, top:'50%', transform:'translateY(-50%)', background:'rgba(255,255,255,0.15)', border:'none', color:'#fff', borderRadius:'50%', width:52, height:52, fontSize:28, cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center' }}>‹</button>
             <button onClick={e=>{e.stopPropagation();setActive(i=>(i+1)%images.length);}} style={{ position:'absolute', right:20, top:'50%', transform:'translateY(-50%)', background:'rgba(255,255,255,0.15)', border:'none', color:'#fff', borderRadius:'50%', width:52, height:52, fontSize:28, cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center' }}>›</button>
@@ -534,7 +534,7 @@ export default function ListingDetailClient() {
 
           {/* LEFT: Gallery */}
           <div>
-            <ImageGallery images={listing.images} color={listing.color} emoji={listing.emoji} />
+            <ImageGallery images={listing.images} color={listing.color} emoji={listing.emoji} title={listing.title} />
             {/* "Dit eget opslag" + rediger on mobile only */}
             {isOwn && isMobile && (
               <div style={{ background:GREEN_TINT, borderRadius:16, padding:'14px 18px', marginTop:16 }}>

@@ -423,7 +423,7 @@ function InstitutionsTab({ institutions, setAdminInst, adminInst, isMobile }) {
                 <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '14px 16px' }}>
                   <div style={{ width: 38, height: 38, borderRadius: 10, background: isActive ? PRIMARY : GREEN_TINT, display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: FONT, fontWeight: 800, fontSize: 14, color: isActive ? '#fff' : PRIMARY, flexShrink: 0, overflow: 'hidden' }}>
                     {inst.logo_url
-                      ? <img src={inst.logo_url} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                      ? <img src={inst.logo_url} alt={inst.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
                       : inst.name?.charAt(0)?.toUpperCase()}
                   </div>
 

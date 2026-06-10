@@ -56,11 +56,11 @@ export default function ListingCard({ listing, onClick, favs, toggleFav, onInsti
       }}>
         {imgs.length > 1 ? (
           <>
-            <img src={imgs[imgIdx]} alt="" style={{ width:'100%', height:'100%', objectFit:'cover', display:'block', position:'absolute', inset:0, opacity: hovered ? 0 : 1, transition:'opacity 0.3s ease' }} />
+            <img src={imgs[imgIdx]} alt={listing.title || ''} style={{ width:'100%', height:'100%', objectFit:'cover', display:'block', position:'absolute', inset:0, opacity: hovered ? 0 : 1, transition:'opacity 0.3s ease' }} />
             <img src={imgs[(imgIdx + 1) % imgs.length]} alt="" style={{ width:'100%', height:'100%', objectFit:'cover', display:'block', position:'absolute', inset:0, opacity: hovered ? 1 : 0, transition:'opacity 0.3s ease' }} />
           </>
         ) : imgs.length === 1 ? (
-          <img src={imgs[0]} alt="" style={{ width:'100%', height:'100%', objectFit:'cover', display:'block' }} />
+          <img src={imgs[0]} alt={listing.title || ''} style={{ width:'100%', height:'100%', objectFit:'cover', display:'block' }} />
         ) : (
           <span style={{ fontSize:52, opacity:0.45 }}>{listing.emoji || '🧸'}</span>
         )}
