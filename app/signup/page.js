@@ -378,7 +378,8 @@ export default function SignupPage() {
       children_count: Number(form.children_count) || null,
       phone: form.inst_phone || null, website: form.website || null,
       leader_name: form.leader_name, leader_phone: form.leader_phone, leader_email: form.leader_email,
-      contact_name: form.contact_name, email: form.email.toLowerCase()
+      contact_name: form.contact_name, email: form.email.toLowerCase(),
+      is_approved: false,
     });
     geocodeAddress(form.address, form.zipcode, form.city).then(coords => {
       if (coords) db.from('institutions').update({ latitude: coords.lat, longitude: coords.lon }).eq('email', form.email.toLowerCase());
@@ -388,9 +389,14 @@ export default function SignupPage() {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ email: form.email.toLowerCase(), contactName: form.contact_name, institutionName: cvrData.name }),
     }).catch(() => {});
+    fetch('/api/notify-new-institution', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ institutionName: cvrData.name, contactName: form.contact_name, email: form.email.toLowerCase(), cvr: cvr || null, instType: form.inst_type, city: form.city }),
+    }).catch(() => {});
     setSaving(false);
     if (data.user && !data.session) { setNeedsConfirm(true); setStep(5); }
-    else { setLoggedIn(true); router.push('/profil'); showToast('Velkommen til byt&leg! 🎉'); }
+    else { setLoggedIn(true); router.push('/afventer-godkendelse'); }
   }
 
   const steps = ['CVR / P-nr', 'Om institutionen', 'Leder & kontakt', 'Opret konto'];

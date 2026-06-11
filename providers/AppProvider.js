@@ -49,6 +49,7 @@ export function AppProvider({ children }) {
   const [loggedIn,        setLoggedIn]        = useState(false);
   const [institution,     setInstitution]     = useState(null);
   const [isAdmin,         setIsAdmin]         = useState(false);
+  const [pendingApproval, setPendingApproval] = useState(false);
   const [adminInst,       setAdminInst]       = useState(null);
   const [allInstitutions, setAllInstitutions] = useState([]);
   const [listings,        setListings]        = useState([]);
@@ -103,6 +104,7 @@ export function AppProvider({ children }) {
 
     if (instResult.data) {
       setInstitution(instResult.data);
+      if (instResult.data.is_approved === false) setPendingApproval(true);
       try { sessionStorage.setItem(cacheKey, JSON.stringify({ ts: Date.now(), isAdmin: false, inst: instResult.data })); } catch {}
       return;
     }
@@ -112,6 +114,7 @@ export function AppProvider({ children }) {
     if (mem?.institutions) {
       const inst = { ...mem.institutions, _memberRole: mem.role };
       setInstitution(inst);
+      if (inst.is_approved === false) setPendingApproval(true);
       try { sessionStorage.setItem(cacheKey, JSON.stringify({ ts: Date.now(), isAdmin: false, inst })); } catch {}
     }
   }
@@ -286,7 +289,7 @@ export function AppProvider({ children }) {
         try { Object.keys(sessionStorage).filter(k => k.startsWith('ltb_inst_')).forEach(k => sessionStorage.removeItem(k)); } catch {}
         setRealUserId(null); setRealEmail(null); setLoggedIn(false);
         setInstitution(null); setUnreadTotal(0); setIsAdmin(false);
-        setAdminInst(null); setAllInstitutions([]);
+        setAdminInst(null); setAllInstitutions([]); setPendingApproval(false);
       }
     });
     return () => subscription.unsubscribe();
@@ -330,6 +333,7 @@ export function AppProvider({ children }) {
     institution, setInstitution,
     isAdmin, adminInst, setAdminInst,
     allInstitutions,
+    pendingApproval,
     listings, loadingListings, fetchListings, refreshSeed,
     loadMoreListings, hasMore, loadingMore,
     realUserId, realEmail,

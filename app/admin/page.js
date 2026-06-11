@@ -67,6 +67,7 @@ function Stat({ label, value, color = PRIMARY, icon }) {
 
 const TABS = [
   { id: 'overview',      label: 'Overblik',      Icon: IconActivity },
+  { id: 'approvals',     label: 'Godkendelser',  Icon: () => <span style={{ fontSize:16 }}>✅</span> },
   { id: 'institutions',  label: 'Institutioner', Icon: IconBuilding },
   { id: 'listings',      label: 'Opslag',         Icon: IconList },
   { id: 'shipping',      label: 'Forsendelser',   Icon: () => <span style={{ fontSize:16 }}>📦</span> },
@@ -143,10 +144,19 @@ export default function AdminPage() {
   const [tab, setTab] = useState('overview');
   const [allInstitutions, setAllInstitutions] = useState([]);
   const [adminInst, setAdminInst] = useState(null);
+  const [pendingApprovalCount, setPendingApprovalCount] = useState(0);
   const w = useWindowWidth();
   const isMobile = w < 768;
 
   useEffect(() => { checkAuth(); }, []);
+
+  useEffect(() => {
+    async function fetchPendingCount() {
+      const { count } = await db.from('institutions').select('id', { count: 'exact', head: true }).eq('is_approved', false);
+      setPendingApprovalCount(count || 0);
+    }
+    fetchPendingCount();
+  }, []);
 
   async function checkAuth() {
     const { data: { session } } = await db.auth.getSession();
@@ -278,11 +288,17 @@ export default function AdminPage() {
           {TABS.map(({ id, label, Icon }) => (
             <button key={id} onClick={() => setTab(id)} style={{ background: 'none', border: 'none', borderBottom: tab === id ? `2.5px solid ${PRIMARY}` : '2.5px solid transparent', padding: isMobile ? '10px 14px' : '10px 18px', fontFamily: FONT, fontWeight: tab === id ? 700 : 600, fontSize: 13, color: tab === id ? PRIMARY : INK3, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6, borderRadius: '8px 8px 0 0', transition: 'color 0.15s', marginBottom: -1, whiteSpace: 'nowrap', flexShrink: 0 }}>
               <Icon /> {label}
+              {id === 'approvals' && pendingApprovalCount > 0 && (
+                <span style={{ background: '#EF476F', color: '#fff', borderRadius: 99, fontSize: 10, fontWeight: 800, minWidth: 18, height: 18, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', padding: '0 5px' }}>
+                  {pendingApprovalCount}
+                </span>
+              )}
             </button>
           ))}
         </div>
 
         {tab === 'overview'     && <OverviewTab institutions={allInstitutions} setAdminInst={setAdminInst} adminInst={adminInst} isMobile={isMobile} />}
+        {tab === 'approvals'    && <ApprovalsTab isMobile={isMobile} />}
         {tab === 'institutions' && <InstitutionsTab institutions={allInstitutions} setAdminInst={setAdminInst} adminInst={adminInst} isMobile={isMobile} />}
         {tab === 'listings'     && <ListingsTab allInstitutions={allInstitutions} isMobile={isMobile} />}
         {tab === 'shipping'     && <ShippingAdminRedirect />}
@@ -296,6 +312,110 @@ function ShippingAdminRedirect() {
   const router = useRouter();
   useEffect(() => { router.push('/admin/shipping'); }, []);
   return <div style={{ padding: 40, textAlign: 'center', color: INK3, fontFamily: FONT }}>Åbner forsendelsesadmin…</div>;
+}
+
+// ── Approvals tab ────────────────────────────────────────────────────────────
+
+function ApprovalsTab({ isMobile }) {
+  const [pending, setPending] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [acting, setActing] = useState(null);
+  const [rejectNote, setRejectNote] = useState('');
+  const [rejectTarget, setRejectTarget] = useState(null);
+
+  useEffect(() => { fetchPending(); }, []);
+
+  async function fetchPending() {
+    setLoading(true);
+    const { data } = await db.from('institutions').select('*').eq('is_approved', false).order('created_at', { ascending: false });
+    setPending(data || []);
+    setLoading(false);
+  }
+
+  async function handleAction(institutionId, action, note = '') {
+    setActing(institutionId + action);
+    const { data: { session } } = await db.auth.getSession();
+    await fetch('/api/admin-approve-institution', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session.access_token}` },
+      body: JSON.stringify({ institutionId, action, note }),
+    });
+    setActing(null);
+    setRejectTarget(null);
+    setRejectNote('');
+    fetchPending();
+  }
+
+  if (loading) return <div style={{ padding: 40, textAlign: 'center', color: INK3, fontFamily: FONT }}>Henter…</div>;
+
+  if (!pending.length) return (
+    <div style={{ padding: '60px 20px', textAlign: 'center' }}>
+      <div style={{ fontSize: 48, marginBottom: 12 }}>✅</div>
+      <div style={{ fontFamily: FONT, fontWeight: 700, fontSize: 18, color: INK }}>Ingen afventende ansøgninger</div>
+      <div style={{ fontSize: 14, color: INK3, marginTop: 8 }}>Alle institutioner er godkendt.</div>
+    </div>
+  );
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+      <div style={{ fontFamily: FONT, fontWeight: 600, fontSize: 13, color: INK3 }}>{pending.length} afventende godkendelse{pending.length !== 1 ? 'r' : ''}</div>
+      {pending.map(inst => (
+        <div key={inst.id} style={{ background: '#fff', borderRadius: 16, padding: '20px 24px', border: `1px solid ${PAPER3}`, boxShadow: '0 1px 4px rgba(22,34,28,0.06)' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 12, flexWrap: 'wrap' }}>
+            <div>
+              <div style={{ fontFamily: FONT, fontWeight: 800, fontSize: 16, color: INK, marginBottom: 4 }}>{inst.name}</div>
+              <div style={{ fontSize: 12, color: INK3, display: 'flex', gap: 12, flexWrap: 'wrap' }}>
+                {inst.email && <span>📧 {inst.email}</span>}
+                {inst.cvr && <span>CVR {inst.cvr}</span>}
+                {inst.pnr && <span>P-nr {inst.pnr}</span>}
+                {inst.institution_type && <span>🏫 {inst.institution_type}</span>}
+                {inst.city && <span>📍 {inst.city}</span>}
+                {inst.contact_name && <span>👤 {inst.contact_name}</span>}
+                {inst.phone && <span>📞 {inst.phone}</span>}
+              </div>
+              <div style={{ fontSize: 11, color: INK3, marginTop: 6 }}>
+                Tilmeldt {inst.created_at ? new Date(inst.created_at).toLocaleDateString('da-DK', { day:'numeric', month:'long', year:'numeric' }) : '—'}
+              </div>
+            </div>
+            <div style={{ display: 'flex', gap: 8, flexShrink: 0 }}>
+              <button
+                onClick={() => handleAction(inst.id, 'approve')}
+                disabled={!!acting}
+                style={{ padding: '9px 18px', borderRadius: 10, border: 'none', background: PRIMARY, color: '#fff', fontFamily: FONT, fontWeight: 700, fontSize: 13, cursor: acting ? 'default' : 'pointer', opacity: acting ? 0.7 : 1 }}
+              >
+                {acting === inst.id + 'approve' ? '…' : '✓ Godkend'}
+              </button>
+              <button
+                onClick={() => setRejectTarget(inst)}
+                disabled={!!acting}
+                style={{ padding: '9px 18px', borderRadius: 10, border: `1.5px solid #FCA5A5`, background: '#FEF2F2', color: '#DC2626', fontFamily: FONT, fontWeight: 700, fontSize: 13, cursor: acting ? 'default' : 'pointer' }}
+              >
+                ✕ Afvis
+              </button>
+            </div>
+          </div>
+          {rejectTarget?.id === inst.id && (
+            <div style={{ marginTop: 16, padding: '14px 16px', background: '#FEF2F2', borderRadius: 12 }}>
+              <div style={{ fontFamily: FONT, fontWeight: 600, fontSize: 13, color: '#DC2626', marginBottom: 8 }}>Begrundelse (valgfri — sendes til institutionen)</div>
+              <textarea
+                value={rejectNote}
+                onChange={e => setRejectNote(e.target.value)}
+                rows={3}
+                placeholder="Evt. forklaring til institutionen…"
+                style={{ width: '100%', padding: '8px 12px', borderRadius: 8, border: '1.5px solid #FCA5A5', fontSize: 13, fontFamily: FONT, resize: 'none', outline: 'none', boxSizing: 'border-box', background: '#fff' }}
+              />
+              <div style={{ display: 'flex', gap: 8, marginTop: 10, justifyContent: 'flex-end' }}>
+                <button onClick={() => { setRejectTarget(null); setRejectNote(''); }} style={{ padding: '8px 16px', borderRadius: 8, border: `1px solid ${PAPER3}`, background: '#fff', fontFamily: FONT, fontSize: 13, cursor: 'pointer', color: INK3 }}>Annuller</button>
+                <button onClick={() => handleAction(inst.id, 'reject', rejectNote)} disabled={!!acting} style={{ padding: '8px 16px', borderRadius: 8, border: 'none', background: '#DC2626', color: '#fff', fontFamily: FONT, fontWeight: 700, fontSize: 13, cursor: acting ? 'default' : 'pointer' }}>
+                  {acting === inst.id + 'reject' ? '…' : 'Bekræft afvisning'}
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
+      ))}
+    </div>
+  );
 }
 
 // ── Overview tab ─────────────────────────────────────────────────────────────
