@@ -277,7 +277,7 @@ export default function ProfilPage() {
               {[
                 { icon:'🏷️', value: activeListingCount ?? '—', label:'Aktive opslag', highlight: false, to:'/mine-opslag' },
                 { icon:'🔄', value: tradeCount ?? '—', label:'Gennemførte handler', highlight: false, to:'/mine-handeler' },
-                { icon:'📤', value: sentCount ?? '—', label:'Sendte forespørgsler', highlight: false, to:'/mine-handeler' },
+                { icon:'📤', value: sentCount ?? '—', label:'Sendte forespørgsler', highlight: false, to:'/mine-forespørgsler' },
                 { icon:'📋', value: pendingCount, label:'Opgaver', highlight: pendingCount > 0, to:'/mine-opgaver' },
               ].map(s => (
                 <div key={s.label} onClick={() => router.push(s.to)} style={{ background: s.highlight ? '#FEF9C3' : PAPER2, borderRadius:12, padding:'12px 8px', textAlign:'center', cursor:'pointer' }}>
@@ -503,7 +503,7 @@ export default function ProfilPage() {
               label="Sendte forespørgsler"
               sublabel="Igangværende"
               value={sentCount ?? '—'}
-              onClick={() => router.push('/mine-handeler')}
+              onClick={() => router.push('/mine-forespørgsler')}
             />
             <ActivityCard
               icon="❤️"
