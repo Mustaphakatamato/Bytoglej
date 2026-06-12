@@ -10,7 +10,7 @@ import { authedFetch } from '@/lib/authed-fetch';
 
 // ── Helpers ────────────────────────────────────────────────────
 
-function RadioRow({ chosen, value, onChoose, icon, label, sublabel, price, loading }) {
+function RadioRow({ chosen, value, onChoose, icon, label, sublabel, price, loading, priceFixed }) {
   const active = chosen === value;
   return (
     <button type="button" onClick={() => onChoose(value)} style={{
@@ -31,7 +31,7 @@ function RadioRow({ chosen, value, onChoose, icon, label, sublabel, price, loadi
           ? <span style={{ fontSize: 12, color: INK3, fontFamily: FONT }}>Henter…</span>
           : price != null
             ? <span style={{ fontFamily: FONT, fontWeight: 700, fontSize: 14, color: active ? PRIMARY : INK2 }}>
-                Fra {price} kr.
+                {priceFixed ? 'Ca.' : 'Fra'} {price} kr.
               </span>
             : null}
       </div>
@@ -383,9 +383,10 @@ export default function CartPage() {
                         chosen={ds.method} value="parcel_shop"
                         onChoose={() => setDeliveryMethod(name, 'parcel_shop', quote?.parcel_shop?.min_price ?? null)}
                         icon="📦" label="Send til afhentningssted"
-                        sublabel="PostNord, DAO eller GLS pakkeshop"
+                        sublabel="PostNord eller GLS pakkeshop"
                         price={quote?.parcel_shop?.min_price ?? null}
                         loading={quotesLoading && !quote}
+                        priceFixed={quote?.fixed}
                       />
                     )}
 
@@ -397,6 +398,7 @@ export default function CartPage() {
                         sublabel={institution ? [institution.address, institution.zipcode, institution.city].filter(Boolean).join(', ') : 'Leveres til institutionens adresse'}
                         price={quote?.home_delivery?.min_price ?? null}
                         loading={quotesLoading && !quote}
+                        priceFixed={quote?.fixed}
                       />
                     )}
 
