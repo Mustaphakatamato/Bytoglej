@@ -164,14 +164,14 @@ export default function OpretOpslagPage() {
 
   useEffect(() => {
     if (!delivery.shipping || !delivery.size_category) { setPriceEstimates(null); return; }
-    db.from('shipmondo_price_cache')
-      .select('price_dkk')
-      .eq('size_category', delivery.size_category)
-      .then(({ data }) => {
-        if (!data?.length) return;
-        const prices = data.map(r => Number(r.price_dkk));
-        setPriceEstimates({ min: Math.min(...prices), max: Math.max(...prices) });
-      });
+    db.auth.getSession().then(({ data: { session } }) => {
+      fetch(`/api/shipping/quote?size=${delivery.size_category}`, {
+        headers: session?.access_token ? { Authorization: `Bearer ${session.access_token}` } : {},
+      })
+        .then(r => r.ok ? r.json() : null)
+        .then(json => { if (json?.min) setPriceEstimates({ min: json.min, max: json.max }); })
+        .catch(() => {});
+    });
   }, [delivery.shipping, delivery.size_category]);
 
   useEffect(() => {

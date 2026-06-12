@@ -34,6 +34,8 @@ export default function CartPage() {
   const [shippingOptions, setShippingOptions] = useState({});
   const [deliveryChoices, setDeliveryChoices] = useState({});
   const [listingsCanShip, setListingsCanShip] = useState({});
+  // Live shipping price estimates: size_category → { min, max }
+  const [shippingPrices, setShippingPrices] = useState({});
 
   useEffect(() => {
     const ids = (cart || []).map(i => i.listingId).filter(Boolean);
@@ -43,6 +45,17 @@ export default function CartPage() {
       const map = {};
       for (const so of data) map[so.listing_id] = so;
       setShippingOptions(map);
+      // Fetch price quotes for each unique size category
+      const sizes = [...new Set(data.map(s => s.shipping_size_category).filter(Boolean))];
+      db.auth.getSession().then(({ data: { session } }) => {
+        const headers = session?.access_token ? { Authorization: `Bearer ${session.access_token}` } : {};
+        sizes.forEach(size => {
+          fetch(`/api/shipping/quote?size=${size}`, { headers })
+            .then(r => r.ok ? r.json() : null)
+            .then(json => { if (json?.min) setShippingPrices(prev => ({ ...prev, [size]: { min: json.min, max: json.max } })); })
+            .catch(() => {});
+        });
+      });
     });
     db.from('listings').select('id, can_ship').in('id', ids).then(({ data }) => {
       if (!data) return;
@@ -255,7 +268,14 @@ export default function CartPage() {
                 if (!firstSo) return null;
                 const opts = [];
                 if (firstSo.allow_pickup) opts.push({ key:'pickup', icon:'📍', label:'Afhentes', sub: firstSo.pickup_address || null });
-                if (firstSo.allow_shipping) opts.push({ key:'shipping', icon:'📦', label:'Pakkepost', sub: firstSo.shipping_included_in_price ? 'Porto inkluderet' : 'Porto betales separat' });
+                if (firstSo.allow_shipping) {
+                  const szKey = firstSo.shipping_size_category;
+                  const pr = shippingPrices[szKey];
+                  const shippingSub = firstSo.shipping_included_in_price
+                    ? 'Porto inkluderet'
+                    : pr ? `ca. ${pr.min}–${pr.max} kr. porto` : 'Porto betales separat';
+                  opts.push({ key:'shipping', icon:'📦', label:'Pakkepost', sub: shippingSub });
+                }
                 if (firstSo.allow_custom) opts.push({ key:'custom', icon:'🤝', label:'Aftales', sub: 'I aftaler levering direkte' });
                 if (!opts.length) return null;
                 const chosen = deliveryChoices[name];
