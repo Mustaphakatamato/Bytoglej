@@ -103,7 +103,7 @@ export default function CartPage() {
       setListingsCanShip(canShipMap);
 
       // Fetch price quotes for unique size categories (fallback to 'medium' for legacy can_ship listings)
-      const soSizes = (soData || []).map(s => s.shipping_size_category).filter(Boolean);
+      const soSizes = (soData || []).map(s => s.allow_shipping ? (s.shipping_size_category || 'medium') : null).filter(Boolean);
       const hasLegacyShip = (lstData || []).some(l => l.can_ship && !soMap[l.id]);
       const sizes = [...new Set([...soSizes, ...(hasLegacyShip ? ['medium'] : [])])];
       if (!sizes.length) return;
