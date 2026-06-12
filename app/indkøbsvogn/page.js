@@ -33,6 +33,7 @@ export default function CartPage() {
   // Delivery: shipping_options per listingId, and chosen method per group
   const [shippingOptions, setShippingOptions] = useState({});
   const [deliveryChoices, setDeliveryChoices] = useState({});
+  const [listingsCanShip, setListingsCanShip] = useState({});
 
   useEffect(() => {
     const ids = (cart || []).map(i => i.listingId).filter(Boolean);
@@ -42,6 +43,12 @@ export default function CartPage() {
       const map = {};
       for (const so of data) map[so.listing_id] = so;
       setShippingOptions(map);
+    });
+    db.from('listings').select('id, can_ship').in('id', ids).then(({ data }) => {
+      if (!data) return;
+      const map = {};
+      for (const l of data) map[l.id] = l.can_ship;
+      setListingsCanShip(map);
     });
   }, [cart?.length]);
 
@@ -200,7 +207,12 @@ export default function CartPage() {
                   {name?.charAt(0)?.toUpperCase()}
                 </div>
                 <div style={{ fontFamily: FONT, fontWeight: 700, fontSize: 14, color: INK, flex: 1 }}>{name}</div>
-                <div style={{ fontFamily: FONT, fontWeight: 700, fontSize: 14, color: sel ? PRIMARY : INK3 }}>{groupTotal > 0 ? `${groupTotal} kr.` : '—'}</div>
+                <div style={{ display:'flex', flexDirection:'column', alignItems:'flex-end', gap:2 }}>
+                  <span style={{ fontFamily: FONT, fontWeight: 700, fontSize: 14, color: sel ? PRIMARY : INK3 }}>{groupTotal > 0 ? `${groupTotal} kr.` : '—'}</span>
+                  {group.items.some(i => { const so = shippingOptions[i.listingId]; return (so?.allow_shipping || (!so && listingsCanShip[i.listingId])) && !so?.shipping_included_in_price; }) && (
+                    <span style={{ fontSize:10, fontWeight:600, color:'#2563EB', fontFamily:FONT }}>+ fragt</span>
+                  )}
+                </div>
               </div>
 
               {/* Items */}
@@ -217,8 +229,18 @@ export default function CartPage() {
                       <div style={{ fontFamily: FONT, fontWeight: 700, fontSize: 13, color: INK, lineHeight: 1.3 }}>{item.listingTitle}</div>
                       {cat && <div style={{ fontFamily: FONT, fontSize: 11, color: INK3, marginTop: 1 }}>{cat.emoji} {cat.label}</div>}
                     </div>
-                    <div style={{ fontFamily: FONT, fontWeight: 800, fontSize: 15, color: item.price ? PRIMARY : INK3, flexShrink: 0 }}>
-                      {item.price ? `${item.price} kr.` : '—'}
+                    <div style={{ display:'flex', flexDirection:'column', alignItems:'flex-end', flexShrink:0, gap:2 }}>
+                      <span style={{ fontFamily: FONT, fontWeight: 800, fontSize: 15, color: item.price ? PRIMARY : INK3 }}>
+                        {item.price ? `${item.price} kr.` : '—'}
+                      </span>
+                      {(() => {
+                        const so = shippingOptions[item.listingId];
+                        const canShip = so?.allow_shipping || (!so && listingsCanShip[item.listingId]);
+                        if (!canShip) return null;
+                        return so?.shipping_included_in_price
+                          ? <span style={{ fontSize:10, fontWeight:700, color:'#16a34a', background:'#F0FDF4', borderRadius:99, padding:'1px 7px', border:'1px solid #86efac', fontFamily:FONT }}>inkl. fragt</span>
+                          : <span style={{ fontSize:10, fontWeight:700, color:'#2563EB', background:'#EFF6FF', borderRadius:99, padding:'1px 7px', border:'1px solid #93c5fd', fontFamily:FONT }}>+ fragt</span>;
+                      })()}
                     </div>
                     <button onClick={() => removeFromCart(item.listingId)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: INK3, padding: 4, display: 'flex', alignItems: 'center', flexShrink: 0 }}>
                       <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
@@ -279,7 +301,12 @@ export default function CartPage() {
                 ? 'Ingen sælgere valgt'
                 : `Sender til ${selectedGroups.length} ud af ${groups.length} sælger${groups.length !== 1 ? 'e' : ''}`}
             </span>
-            <span style={{ fontFamily: FONT, fontWeight: 800, fontSize: 20, color: INK }}>{selectedTotal > 0 ? `${selectedTotal} kr.` : '—'}</span>
+            <div style={{ display:'flex', flexDirection:'column', alignItems:'flex-end', gap:2 }}>
+              <span style={{ fontFamily: FONT, fontWeight: 800, fontSize: 20, color: INK }}>{selectedTotal > 0 ? `${selectedTotal} kr.` : '—'}</span>
+              {selectedItems.some(i => { const so = shippingOptions[i.listingId]; return (so?.allow_shipping || (!so && listingsCanShip[i.listingId])) && !so?.shipping_included_in_price; }) && (
+                <span style={{ fontSize:11, fontWeight:600, color:'#2563EB', fontFamily:FONT }}>+ fragt (betales separat)</span>
+              )}
+            </div>
           </div>
           <p style={{ fontFamily: FONT, fontSize: 12, color: INK3, margin: 0 }}>
             Ikke-valgte sælgere forbliver i kurven til næste gang.
