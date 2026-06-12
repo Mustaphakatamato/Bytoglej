@@ -105,6 +105,8 @@ export async function POST(req) {
   for (const g of groups) {
     let shipmentResult = null;
 
+    console.log('[stripe-webhook] group shippingMethod:', g.shippingMethod, '| sellerEmail:', g.sellerEmail, '| sellerZip:', g.sellerZip);
+
     // Create Shipmondo label if shipping (not pickup/custom)
     if (g.shippingMethod && (g.shippingMethod.startsWith('parcel_shop_') || g.shippingMethod.startsWith('home_'))) {
       const carrierCode = g.shippingMethod.replace('parcel_shop_', '').replace('home_', '');
