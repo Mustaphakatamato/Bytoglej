@@ -1237,7 +1237,7 @@ export default function MessagesClient() {
                         const showDate = dateStr !== lastDate;
                         lastDate = dateStr;
                         const prevMine = i>0 && (ctxIsAdmin && adminInstName ? messages[i-1].sender_name === adminInstName : messages[i-1].sender_id === userId);
-                        const grouped = mine === prevMine && !showDate && m.message_type !== 'bid' && messages[i-1]?.message_type !== 'bid' && m.message_type !== 'swap' && messages[i-1]?.message_type !== 'swap' && m.message_type !== 'bundle' && messages[i-1]?.message_type !== 'bundle' && m.message_type !== 'image' && messages[i-1]?.message_type !== 'image' && m.message_type !== 'buy_request' && messages[i-1]?.message_type !== 'buy_request' && m.message_type !== 'checkout_pending' && messages[i-1]?.message_type !== 'checkout_pending' && m.message_type !== 'shipment' && messages[i-1]?.message_type !== 'shipment';
+                        const grouped = mine === prevMine && !showDate && m.message_type !== 'bid' && messages[i-1]?.message_type !== 'bid' && m.message_type !== 'swap' && messages[i-1]?.message_type !== 'swap' && m.message_type !== 'bundle' && messages[i-1]?.message_type !== 'bundle' && m.message_type !== 'image' && messages[i-1]?.message_type !== 'image' && m.message_type !== 'buy_request' && messages[i-1]?.message_type !== 'buy_request' && m.message_type !== 'checkout_pending' && messages[i-1]?.message_type !== 'checkout_pending' && m.message_type !== 'shipment' && messages[i-1]?.message_type !== 'shipment' && m.message_type !== 'payment_confirmed' && messages[i-1]?.message_type !== 'payment_confirmed';
                         const isBid = m.message_type === 'bid';
                         const isSwap = m.message_type === 'swap';
                         const isBundle = m.message_type === 'bundle';
@@ -1251,6 +1251,8 @@ export default function MessagesClient() {
                         const buyData = isBuyRequest ? (() => { try { return JSON.parse(m.content); } catch { return null; } })() : null;
                         const checkoutData = isCheckout ? (() => { try { return JSON.parse(m.content); } catch { return null; } })() : null;
                         const shipmentData = isShipment ? (() => { try { return JSON.parse(m.content); } catch { return null; } })() : null;
+                        const isPaymentConfirmed = m.message_type === 'payment_confirmed';
+                        const paymentData = isPaymentConfirmed ? (() => { try { return JSON.parse(m.content); } catch { return null; } })() : null;
                         return (
                           <React.Fragment key={m.id}>
                             {showDate && <div style={{ textAlign:'center', margin:'12px 0 4px', fontSize:11, fontWeight:600, color:INK3, letterSpacing:0.5, fontFamily:FONT }}>{dateStr}</div>}
@@ -1743,6 +1745,54 @@ export default function MessagesClient() {
                                         <li>Klæb den på pakken</li>
                                         <li>Aflevér pakken på nærmeste udleveringssted</li>
                                       </ol>
+                                    </div>
+                                  )}
+                                </div>
+                              </div>
+                            ) : isPaymentConfirmed && paymentData ? (
+                              <div style={{ margin:'16px 0' }}>
+                                <div style={{ background:GREEN_TINT, border:`2px solid ${PRIMARY}`, borderRadius:16, padding:'16px 18px' }}>
+                                  <div style={{ display:'flex', alignItems:'center', gap:10, marginBottom:14 }}>
+                                    <span style={{ fontSize:22 }}>✅</span>
+                                    <div>
+                                      <div style={{ fontFamily:FONT, fontWeight:800, fontSize:14, color:INK }}>Betaling bekræftet</div>
+                                      <div style={{ fontFamily:FONT, fontSize:12, color:INK3, marginTop:1 }}>
+                                        {d.toLocaleTimeString('da-DK',{hour:'2-digit',minute:'2-digit'})} · {d.toLocaleDateString('da-DK',{day:'numeric',month:'short'})}
+                                      </div>
+                                    </div>
+                                  </div>
+                                  {(paymentData.items || []).map((item, ii) => (
+                                    <div key={ii} style={{ display:'flex', justifyContent:'space-between', marginBottom:6 }}>
+                                      <span style={{ fontFamily:FONT, fontSize:13, color:INK }}>{item.emoji || '📦'} {item.title}</span>
+                                      <span style={{ fontFamily:FONT, fontSize:13, color:INK, fontWeight:700 }}>{item.price} kr.</span>
+                                    </div>
+                                  ))}
+                                  <div style={{ borderTop:`1px solid rgba(42,125,79,0.2)`, marginTop:10, paddingTop:10 }}>
+                                    {paymentData.shippingTotal > 0 && (
+                                      <div style={{ display:'flex', justifyContent:'space-between', marginBottom:4 }}>
+                                        <span style={{ fontFamily:FONT, fontSize:12, color:INK3 }}>Levering</span>
+                                        <span style={{ fontFamily:FONT, fontSize:12, color:INK3 }}>{paymentData.shippingTotal} kr.</span>
+                                      </div>
+                                    )}
+                                    <div style={{ display:'flex', justifyContent:'space-between' }}>
+                                      <span style={{ fontFamily:FONT, fontWeight:800, fontSize:13, color:INK }}>I alt betalt</span>
+                                      <span style={{ fontFamily:FONT, fontWeight:800, fontSize:14, color:PRIMARY }}>{((paymentData.itemTotal || 0) + (paymentData.shippingTotal || 0) + (paymentData.serviceFee || 0)).toFixed(2).replace('.',',')} kr.</span>
+                                    </div>
+                                  </div>
+                                  {paymentData.pickupPoint && (
+                                    <div style={{ marginTop:10, fontFamily:FONT, fontSize:12, color:INK3 }}>
+                                      📍 Afhentes: {paymentData.pickupPoint.name}{paymentData.pickupPoint.address ? `, ${paymentData.pickupPoint.address}` : ''}
+                                    </div>
+                                  )}
+                                  {paymentData.tracking?.label_pdf_url && isOwnerInConv && (
+                                    <a href={paymentData.tracking.label_pdf_url} target="_blank" rel="noreferrer"
+                                      style={{ display:'flex', alignItems:'center', justifyContent:'center', gap:6, marginTop:12, padding:'10px 14px', borderRadius:99, background:PRIMARY, color:'#fff', fontFamily:FONT, fontWeight:700, fontSize:13, textDecoration:'none' }}>
+                                      🖨️ Download pakkemærkat
+                                    </a>
+                                  )}
+                                  {!paymentData.tracking?.label_pdf_url && isOwnerInConv && paymentData.shippingMethod && paymentData.shippingMethod !== 'pickup' && paymentData.shippingMethod !== 'custom' && (
+                                    <div style={{ marginTop:10, background:'rgba(42,125,79,0.07)', borderRadius:10, padding:'10px 12px', fontFamily:FONT, fontSize:12, color:INK2 }}>
+                                      Pakkemærkaten er sendt til din e-mail — tjek din indbakke.
                                     </div>
                                   )}
                                 </div>

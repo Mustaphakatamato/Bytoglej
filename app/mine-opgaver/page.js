@@ -238,22 +238,25 @@ export default function MineOpgaverPage() {
     const instId = inst?.id;
     const instName = inst?.name;
 
-    // 1. Stripe orders where I'm a seller (JSONB contains match)
-    if (instId) {
+    // 1. Stripe orders where I'm a seller — fetch recent and filter client-side
+    if (instId || uid) {
       const { data: orders } = await db
         .from('orders')
         .select('id, created_at, status, order_groups, buyer_name, buyer_email, paid_at')
-        .filter('order_groups', 'cs', JSON.stringify([{ sellerInstitutionId: instId }]))
         .in('status', ['paid', 'shipped', 'delivered'])
         .order('created_at', { ascending: false })
-        .limit(50);
+        .limit(200);
 
       if (orders) {
-        // Attach the relevant group(s) to each order
-        const withGroups = orders.map(o => ({
-          ...o,
-          myGroups: (o.order_groups || []).filter(g => g.sellerInstitutionId === instId),
-        })).filter(o => o.myGroups.length > 0);
+        const withGroups = orders
+          .map(o => ({
+            ...o,
+            myGroups: (o.order_groups || []).filter(g =>
+              (instId && g.sellerInstitutionId === instId) ||
+              (uid && g.sellerId === uid)
+            ),
+          }))
+          .filter(o => o.myGroups.length > 0);
         setStripeOrders(withGroups);
       }
     }
