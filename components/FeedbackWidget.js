@@ -1,5 +1,6 @@
 'use client';
 import { useState, useEffect } from 'react';
+import { usePathname } from 'next/navigation';
 import { PRIMARY, GREEN_TINT, GREEN_DEEP, PAPER, PAPER2, PAPER3, INK, INK3, FONT } from '@/lib/constants';
 import { db } from '@/lib/supabase';
 
@@ -12,6 +13,7 @@ const CATEGORIES = [
 const FIRST_SHOWN_KEY = 'ltb_pilot_welcomed';
 
 export default function FeedbackWidget({ loggedIn, institutionName, userEmail }) {
+  const pathname = usePathname();
   const [open, setOpen]         = useState(false);
   const [category, setCategory] = useState('general');
   const [message, setMessage]   = useState('');
@@ -46,7 +48,7 @@ export default function FeedbackWidget({ loggedIn, institutionName, userEmail })
           'Content-Type': 'application/json',
           ...(session?.access_token ? { Authorization: `Bearer ${session.access_token}` } : {}),
         },
-        body: JSON.stringify({ category, message, institutionName, userEmail }),
+        body: JSON.stringify({ category, message, institutionName, userEmail, page: pathname }),
       });
       const json = await res.json().catch(() => ({}));
       if (!res.ok) {
