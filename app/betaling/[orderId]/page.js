@@ -38,14 +38,12 @@ function PaymentForm({ orderId, grandTotal, breakdown }) {
 
   return (
     <form onSubmit={handleSubmit}>
-      <div style={{ marginBottom: 24, position: 'relative' }}>
+      <div style={{ marginBottom: 24 }}>
         <PaymentElement options={{
           layout: 'tabs',
           fields: { billingDetails: 'never' },
           terms: { card: 'never', ideal: 'never', sepaDebit: 'never', sofort: 'never', auBecsDebit: 'never', bancontact: 'never', giropay: 'never', p24: 'never' },
         }} />
-        {/* Skjul Stripe-badge (sidder i iframe, kan ikke fjernes via CSS) */}
-        <div style={{ position: 'absolute', bottom: 0, right: 0, width: 160, height: 30, background: '#fff', zIndex: 10, borderRadius: 4 }} />
       </div>
 
       {error && (
