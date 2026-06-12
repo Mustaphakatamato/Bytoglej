@@ -238,26 +238,15 @@ export default function MineOpgaverPage() {
     const instId = inst?.id;
     const instName = inst?.name;
 
-    // 1. Stripe orders where I'm a seller — fetch recent and filter client-side
-    if (instId || uid) {
-      const { data: orders } = await db
-        .from('orders')
-        .select('id, created_at, status, order_groups, buyer_name, buyer_email, paid_at')
-        .in('status', ['paid', 'shipped', 'delivered'])
-        .order('created_at', { ascending: false })
-        .limit(200);
-
-      if (orders) {
-        const withGroups = orders
-          .map(o => ({
-            ...o,
-            myGroups: (o.order_groups || []).filter(g =>
-              (instId && g.sellerInstitutionId === instId) ||
-              (uid && g.sellerId === uid)
-            ),
-          }))
-          .filter(o => o.myGroups.length > 0);
-        setStripeOrders(withGroups);
+    // 1. Stripe orders where I'm a seller — via service-role API route (bypasses RLS)
+    const { data: { session } } = await db.auth.getSession();
+    if (session?.access_token) {
+      const res = await fetch('/api/seller-orders', {
+        headers: { Authorization: `Bearer ${session.access_token}` },
+      });
+      if (res.ok) {
+        const json = await res.json();
+        setStripeOrders(json.orders || []);
       }
     }
 
