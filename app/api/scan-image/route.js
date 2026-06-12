@@ -24,7 +24,7 @@ export async function POST(req) {
         role: 'user',
         content: [
           { type: 'image_url', image_url: { url: `data:${mimeType};base64,${base64}`, detail: 'low' } },
-          { type: 'text', text: 'Does this image show a clearly visible human face, or a person where you can identify who they are? Reply yes or no only. Reply NO for: hands, fingers, arms, legs, feet, partial limbs, blurry people in the background, cartoon characters, toys, games, furniture, equipment, food, nature, buildings, animals, or any object. Reply YES only if there is a clearly recognizable human face or full person that would allow identification.' },
+          { type: 'text', text: 'Is there a real, living human person visible in this photo? Reply YES or NO only. IMPORTANT: Reply NO for ALL of the following — cartoon characters, animated characters, Disney characters, illustrated characters, drawings, paintings, printed characters on toys/puzzles/books/packaging, dolls, action figures, stuffed animals, partial body parts (hands/fingers/arms/legs/feet), blurry background people, shadows, reflections, silhouettes, clothing without a person, furniture, equipment, food, animals, buildings, nature, or any non-human object. Reply YES ONLY if there is an actual real photograph of a real living human being\'s face or body that could identify them.' },
         ],
       }],
     });
