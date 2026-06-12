@@ -101,23 +101,22 @@ export default function CartPage() {
       if (lstData) for (const l of lstData) canShipMap[l.id] = l.can_ship;
       setListingsCanShip(canShipMap);
 
-      // Fetch price quotes for unique size categories
-      const sizes = [...new Set((soData || []).map(s => s.shipping_size_category).filter(Boolean))];
+      // Fetch price quotes for unique size categories (fallback to 'medium' for legacy can_ship listings)
+      const soSizes = (soData || []).map(s => s.shipping_size_category).filter(Boolean);
+      const hasLegacyShip = (lstData || []).some(l => l.can_ship && !soMap[l.id]);
+      const sizes = [...new Set([...soSizes, ...(hasLegacyShip ? ['medium'] : [])])];
       if (!sizes.length) return;
       setQuotesLoading(true);
-      db.auth.getSession().then(({ data: { session } }) => {
-        const headers = session?.access_token ? { Authorization: `Bearer ${session.access_token}` } : {};
-        Promise.all(sizes.map(size =>
-          fetch(`/api/shipping/quote?size=${size}`, { headers })
-            .then(r => r.ok ? r.json() : null)
-            .then(json => json ? { size, data: json } : null)
-            .catch(() => null)
-        )).then(results => {
-          const q = {};
-          for (const r of results) if (r) q[r.size] = r.data;
-          setQuotes(q);
-          setQuotesLoading(false);
-        });
+      Promise.all(sizes.map(size =>
+        authedFetch(`/api/shipping/quote?size=${size}`)
+          .then(r => r.ok ? r.json() : null)
+          .then(json => json ? { size, data: json } : null)
+          .catch(() => null)
+      )).then(results => {
+        const q = {};
+        for (const r of results) if (r) q[r.size] = r.data;
+        setQuotes(q);
+        setQuotesLoading(false);
       });
     });
   }, [cart?.length]);
@@ -133,15 +132,15 @@ export default function CartPage() {
   function loadPickupPoints(sellerName) {
     const zip = institution?.zipcode || institution?.zip_code || '2100';
     setPickupState(p => ({ ...p, [sellerName]: { loading: true, points: [], chosen: null } }));
-    db.auth.getSession().then(({ data: { session } }) => {
-      const headers = session?.access_token ? { Authorization: `Bearer ${session.access_token}` } : {};
-      fetch(`/api/shipping/pickup-points?zip=${zip}&carrier=postnord`, { headers })
-        .then(r => r.ok ? r.json() : null)
-        .then(json => {
-          setPickupState(p => ({ ...p, [sellerName]: { loading: false, points: json?.points || [], chosen: null } }));
-        })
-        .catch(() => setPickupState(p => ({ ...p, [sellerName]: { loading: false, points: [], chosen: null } })));
-    });
+    authedFetch(`/api/shipping/pickup-points?zip=${zip}&carrier=postnord`)
+      .then(r => r.ok ? r.json() : Promise.reject(r.status))
+      .then(json => {
+        setPickupState(p => ({ ...p, [sellerName]: { loading: false, points: json?.points || [], chosen: null } }));
+      })
+      .catch(err => {
+        console.error('[pickup-points]', err);
+        setPickupState(p => ({ ...p, [sellerName]: { loading: false, points: [], chosen: null } }));
+      });
   }
 
   function choosePickupPoint(sellerName, point) {
@@ -389,7 +388,7 @@ export default function CartPage() {
                         chosen={ds.method} value="home_delivery"
                         onChoose={() => setDeliveryMethod(name, 'home_delivery', quote?.home_delivery?.min_price ?? null)}
                         icon="🏠" label="Send til hjemadresse"
-                        sublabel={institution?.address ? `Leveres til ${institution.city || 'din adresse'}` : 'Leveres til institutionens adresse'}
+                        sublabel={institution ? [institution.address, institution.zipcode, institution.city].filter(Boolean).join(', ') : 'Leveres til institutionens adresse'}
                         price={quote?.home_delivery?.min_price ?? null}
                         loading={quotesLoading && !quote}
                       />
