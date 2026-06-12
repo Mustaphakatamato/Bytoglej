@@ -13,6 +13,7 @@ export async function GET() {
     method: 'POST',
     headers,
     body: JSON.stringify({
+      own_agreement: false,
       carrier_code: 'pdk',
       product_code: 'PDK_MC',
       sender:   { zip_code: '8000', country_code: 'DK' },

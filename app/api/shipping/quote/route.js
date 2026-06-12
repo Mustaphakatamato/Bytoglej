@@ -33,6 +33,7 @@ async function getQuote({ carrier_code, product_code, size_category, from_zip, t
     method: 'POST',
     headers: { Authorization: `Basic ${encoded}`, 'Content-Type': 'application/json' },
     body: JSON.stringify({
+      own_agreement: false,
       carrier_code,
       product_code,
       sender:   { zip_code: from_zip || '8000', country_code: 'DK' },
