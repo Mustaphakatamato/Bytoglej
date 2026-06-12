@@ -26,6 +26,7 @@ function PaymentForm({ orderId, grandTotal, breakdown }) {
       elements,
       confirmParams: {
         return_url: `${window.location.origin}/betaling/success?order_id=${orderId}`,
+        payment_method_data: { billing_details: {} },
       },
     });
 
@@ -38,7 +39,11 @@ function PaymentForm({ orderId, grandTotal, breakdown }) {
   return (
     <form onSubmit={handleSubmit}>
       <div style={{ marginBottom: 24 }}>
-        <PaymentElement options={{ layout: 'tabs' }} />
+        <PaymentElement options={{
+          layout: 'tabs',
+          fields: { billingDetails: 'never' },
+          terms: { card: 'never', ideal: 'never', sepaDebit: 'never', sofort: 'never', auBecsDebit: 'never', bancontact: 'never', giropay: 'never', p24: 'never' },
+        }} />
       </div>
 
       {error && (
@@ -97,7 +102,9 @@ export default function BetalingPage() {
     appearance: {
       theme: 'stripe',
       variables: { colorPrimary: PRIMARY, fontFamily: FONT, borderRadius: '12px' },
+      rules: { '.Block': { boxShadow: 'none' } },
     },
+    loader: 'never',
   };
 
   return (
