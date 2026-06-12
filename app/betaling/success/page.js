@@ -1,9 +1,9 @@
 'use client';
-import { useEffect, useState } from 'react';
+import { Suspense, useEffect, useState } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
 import { PRIMARY, GREEN_TINT, GREEN_SOFT, INK, INK3, PAPER, PAPER3, FONT } from '@/lib/constants';
 
-export default function BetalingSuccessPage() {
+function SuccessContent() {
   const searchParams = useSearchParams();
   const router = useRouter();
   const orderId = searchParams.get('order_id');
@@ -65,5 +65,13 @@ export default function BetalingSuccessPage() {
         )}
       </div>
     </div>
+  );
+}
+
+export default function BetalingSuccessPage() {
+  return (
+    <Suspense fallback={<div style={{ minHeight: '100vh', background: PAPER, display: 'flex', alignItems: 'center', justifyContent: 'center' }}><span style={{ fontFamily: FONT, color: INK3 }}>Indlæser…</span></div>}>
+      <SuccessContent />
+    </Suspense>
   );
 }
