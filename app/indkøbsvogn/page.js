@@ -129,10 +129,10 @@ export default function CartPage() {
     if (method === 'parcel_shop') loadPickupPoints(sellerName);
   }
 
-  function loadPickupPoints(sellerName) {
+  function loadPickupPoints(sellerName, carrier = 'postnord') {
     const zip = institution?.zipcode || institution?.zip_code || '2100';
     setPickupState(p => ({ ...p, [sellerName]: { loading: true, points: [], chosen: null, error: null } }));
-    authedFetch(`/api/shipping/pickup-points?zip=${zip}&carrier=postnord`)
+    authedFetch(`/api/shipping/pickup-points?zip=${zip}&carrier=${carrier}`)
       .then(r => r.json().then(j => ({ ok: r.ok, status: r.status, json: j })))
       .then(({ ok, status, json }) => {
         if (!ok) {
@@ -175,7 +175,7 @@ export default function CartPage() {
       if (canShip && !deliveryState[name]?.method) {
         showToast('Vælg leveringsmetode for alle sælgere', 'error'); return;
       }
-      if (deliveryState[name]?.method === 'parcel_shop' && !pickupState[name]?.chosen) {
+      if (deliveryState[name]?.method?.startsWith('parcel_shop_') && !pickupState[name]?.chosen) {
         showToast('Vælg et afhentningssted', 'error'); return;
       }
     }
@@ -233,7 +233,7 @@ export default function CartPage() {
         if (!convId) continue;
 
         // Map UI method → DB delivery_method
-        const dbDeliveryMethod = ds.method === 'parcel_shop' || ds.method === 'home_delivery' ? 'shipping' : (ds.method || null);
+        const dbDeliveryMethod = (ds.method?.startsWith('parcel_shop_') || ds.method?.startsWith('home_')) ? 'shipping' : (ds.method || null);
 
         const buyData = {
           items: group.items.map(i => ({ listingId: i.listingId, title: i.listingTitle, price: i.price, emoji: i.listingEmoji, category: i.category })),
@@ -378,29 +378,34 @@ export default function CartPage() {
                       />
                     )}
 
-                    {canShip && (
+                    {canShip && (quote?.parcel_shop?.options ?? []).map(opt => (
                       <RadioRow
-                        chosen={ds.method} value="parcel_shop"
-                        onChoose={() => setDeliveryMethod(name, 'parcel_shop', quote?.parcel_shop?.min_price ?? null)}
-                        icon="📦" label="Send til afhentningssted"
-                        sublabel="PostNord eller GLS pakkeshop"
-                        price={quote?.parcel_shop?.min_price ?? null}
+                        key={opt.product_code}
+                        chosen={ds.method} value={`parcel_shop_${opt.carrier_code}`}
+                        onChoose={() => {
+                          setDeliveryState(p => ({ ...p, [name]: { ...p[name], method: `parcel_shop_${opt.carrier_code}`, price: opt.price_dkk, pickupPoint: null, selectedCarrier: opt.carrier_code } }));
+                          loadPickupPoints(name, opt.carrier_code);
+                        }}
+                        icon="📦" label={opt.label}
+                        sublabel="Afhent på pakkeshop nær dig"
+                        price={opt.price_dkk}
                         loading={quotesLoading && !quote}
-                        priceFixed={quote?.fixed}
+                        priceFixed={true}
                       />
-                    )}
+                    ))}
 
-                    {canShip && (
+                    {canShip && (quote?.home_delivery?.options ?? []).map(opt => (
                       <RadioRow
-                        chosen={ds.method} value="home_delivery"
-                        onChoose={() => setDeliveryMethod(name, 'home_delivery', quote?.home_delivery?.min_price ?? null)}
-                        icon="🏠" label="Send til hjemadresse"
+                        key={opt.product_code}
+                        chosen={ds.method} value={`home_${opt.carrier_code}`}
+                        onChoose={() => setDeliveryState(p => ({ ...p, [name]: { ...p[name], method: `home_${opt.carrier_code}`, price: opt.price_dkk, pickupPoint: null } }))}
+                        icon="🏠" label={opt.label}
                         sublabel={institution ? [institution.address, institution.zipcode, institution.city].filter(Boolean).join(', ') : 'Leveres til institutionens adresse'}
-                        price={quote?.home_delivery?.min_price ?? null}
+                        price={opt.price_dkk}
                         loading={quotesLoading && !quote}
-                        priceFixed={quote?.fixed}
+                        priceFixed={true}
                       />
-                    )}
+                    ))}
 
                     {canCustom && (
                       <RadioRow
@@ -415,7 +420,7 @@ export default function CartPage() {
                 )}
 
                 {/* Pickup point selector */}
-                {ds.method === 'parcel_shop' && (
+                {ds.method?.startsWith('parcel_shop_') && (
                   <div style={{ padding: '0 20px 16px', borderBottom: `1px solid ${PAPER2}` }}>
                     <div style={{ fontFamily: FONT, fontWeight: 700, fontSize: 13, color: INK, marginBottom: 10 }}>
                       Leveringsoplysninger
@@ -492,7 +497,7 @@ export default function CartPage() {
               {selectedGroups.map(g => {
                 const ds = deliveryState[g.ownerInstitutionName] || {};
                 if (!ds.method || ds.price == null) return null;
-                const label = ds.method === 'parcel_shop' ? 'Pakkeshop' : ds.method === 'home_delivery' ? 'Hjemlevering' : 'Afhentning';
+                const label = ds.method?.startsWith('parcel_shop_') ? 'Pakkeshop' : ds.method?.startsWith('home_') ? 'Hjemlevering' : 'Afhentning';
                 return (
                   <div key={g.ownerInstitutionName} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                     <span style={{ fontFamily: FONT, fontSize: 14, color: INK2 }}>Levering ({label})</span>
