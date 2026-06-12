@@ -109,88 +109,280 @@ function MobileHomeFeed({ listings, loading }) {
   );
 }
 
-/* ── Hero ─────────────────────────────────────────────────── */
+/* ── Hero (Vinted-inspired, supports NEXT_PUBLIC_HERO_IMAGE_URL) ── */
 function HeroSection({ stats }) {
   const router = useRouter();
   const w = useWindowWidth();
   const isMobile = w < 768;
+  const heroImageUrl = process.env.NEXT_PUBLIC_HERO_IMAGE_URL || null;
+  const hasImage = !!heroImageUrl;
 
+  /* ── shared content pieces ── */
+  const pill = (
+    <div style={{
+      display: 'inline-block',
+      background: hasImage ? 'rgba(22,101,52,0.10)' : 'rgba(255,255,255,0.12)',
+      borderRadius: 999, padding: '6px 18px',
+      fontSize: 12, fontWeight: 600,
+      color: hasImage ? PRIMARY : 'rgba(255,255,255,0.8)',
+      letterSpacing: '0.08em', textTransform: 'uppercase',
+      marginBottom: 20, fontFamily: FONT,
+    }}>
+      Markedsplads for institutioner
+    </div>
+  );
+
+  const headline = (
+    <h1 style={{
+      fontFamily: FONT, fontWeight: 800,
+      fontSize: isMobile ? 36 : 52,
+      letterSpacing: '-0.04em', lineHeight: 1.0,
+      color: hasImage ? INK : '#fff',
+      marginBottom: 18,
+    }}>
+      Legetøj til glæde<br />
+      <span style={{ color: hasImage ? PRIMARY : GREEN_SOFT }}>for alle.</span>
+    </h1>
+  );
+
+  const subtitle = (
+    <p style={{
+      fontSize: isMobile ? 14 : 16,
+      color: hasImage ? INK3 : 'rgba(255,255,255,0.68)',
+      lineHeight: 1.65,
+      marginBottom: 28,
+    }}>
+      Den første markedsplads hvor børnehaver, skoler og SFO'er køber, sælger og bytter legetøj direkte med hinanden — sikkert og bæredygtigt.
+    </p>
+  );
+
+  const ctaButtons = (
+    <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', marginBottom: 32, justifyContent: isMobile ? 'center' : 'flex-start' }}>
+      <button onClick={() => router.push('/signup')} style={{
+        background: hasImage ? PRIMARY : PAPER,
+        color: hasImage ? '#fff' : PRIMARY,
+        border: 'none', borderRadius: 999,
+        padding: isMobile ? '12px 24px' : '13px 30px',
+        fontSize: 14, fontWeight: 700, fontFamily: FONT, cursor: 'pointer', letterSpacing: '-0.01em',
+      }}>
+        Tilmeld institution
+      </button>
+      <button onClick={() => router.push('/opslag')} style={{
+        background: 'transparent',
+        color: hasImage ? INK2 : 'rgba(255,255,255,0.88)',
+        border: hasImage ? `1.5px solid ${PAPER3}` : '1.5px solid rgba(255,255,255,0.3)',
+        borderRadius: 999,
+        padding: isMobile ? '12px 20px' : '13px 26px',
+        fontSize: 14, fontWeight: 600, fontFamily: FONT, cursor: 'pointer', letterSpacing: '-0.01em',
+      }}>
+        Se markedspladsen →
+      </button>
+    </div>
+  );
+
+  const statsRow = stats && (stats.institutions > 0 || stats.deals > 0) ? (
+    <div style={{ display: 'flex', gap: isMobile ? 24 : 36, flexWrap: 'wrap', justifyContent: isMobile ? 'center' : 'flex-start' }}>
+      {stats.institutions > 0 && (
+        <div style={{ textAlign: isMobile ? 'center' : 'left' }}>
+          <div style={{ fontFamily: FONT, fontWeight: 800, fontSize: isMobile ? 22 : 28, color: hasImage ? INK : '#fff', letterSpacing: '-0.04em', lineHeight: 1 }}>{stats.institutions}</div>
+          <div style={{ fontSize: 11, color: hasImage ? INK3 : 'rgba(255,255,255,0.5)', marginTop: 3, fontFamily: FONT, letterSpacing: '0.02em' }}>institutioner tilmeldt</div>
+        </div>
+      )}
+      {stats.listings > 0 && (
+        <div style={{ textAlign: isMobile ? 'center' : 'left' }}>
+          <div style={{ fontFamily: FONT, fontWeight: 800, fontSize: isMobile ? 22 : 28, color: hasImage ? INK : '#fff', letterSpacing: '-0.04em', lineHeight: 1 }}>{stats.listings}</div>
+          <div style={{ fontSize: 11, color: hasImage ? INK3 : 'rgba(255,255,255,0.5)', marginTop: 3, fontFamily: FONT, letterSpacing: '0.02em' }}>aktive opslag</div>
+        </div>
+      )}
+      {stats.deals > 0 && (
+        <div style={{ textAlign: isMobile ? 'center' : 'left' }}>
+          <div style={{ fontFamily: FONT, fontWeight: 800, fontSize: isMobile ? 22 : 28, color: hasImage ? INK : '#fff', letterSpacing: '-0.04em', lineHeight: 1 }}>{stats.deals}</div>
+          <div style={{ fontSize: 11, color: hasImage ? INK3 : 'rgba(255,255,255,0.5)', marginTop: 3, fontFamily: FONT, letterSpacing: '0.02em' }}>handler gennemført</div>
+        </div>
+      )}
+    </div>
+  ) : null;
+
+  /* ── NO IMAGE: original green gradient layout ── */
+  if (!hasImage) {
+    return (
+      <section style={{
+        background: `linear-gradient(160deg, ${GREEN_DEEP} 0%, ${PRIMARY} 100%)`,
+        paddingTop: isMobile ? 100 : 120,
+        paddingBottom: isMobile ? 60 : 80,
+        position: 'relative', overflow: 'hidden',
+      }}>
+        {/* Background watermark */}
+        <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', pointerEvents: 'none', userSelect: 'none' }}>
+          <span style={{ fontFamily: FONT, fontWeight: 800, fontSize: isMobile ? 240 : 420, color: 'rgba(255,255,255,0.035)', lineHeight: 1, letterSpacing: '-0.06em' }}>byt</span>
+        </div>
+
+        <div style={{ position: 'relative', maxWidth: 780, margin: '0 auto', padding: '0 24px', textAlign: 'center' }}>
+          {pill}
+          {headline}
+          <p style={{ fontSize: isMobile ? 15 : 18, color: 'rgba(255,255,255,0.68)', lineHeight: 1.65, maxWidth: 520, margin: '0 auto 36px' }}>
+            Den første markedsplads hvor børnehaver, skoler og SFO'er køber, sælger og bytter legetøj direkte med hinanden — sikkert og bæredygtigt.
+          </p>
+          <div style={{ display: 'flex', gap: 12, justifyContent: 'center', flexWrap: 'wrap', marginBottom: 56 }}>
+            <button onClick={() => router.push('/signup')} style={{
+              background: PAPER, color: PRIMARY,
+              border: 'none', borderRadius: 999, padding: isMobile ? '13px 28px' : '15px 36px',
+              fontSize: 15, fontWeight: 700, fontFamily: FONT, cursor: 'pointer', letterSpacing: '-0.01em',
+            }}>
+              Tilmeld institution
+            </button>
+            <button onClick={() => router.push('/opslag')} style={{
+              background: 'transparent', color: 'rgba(255,255,255,0.88)',
+              border: '1.5px solid rgba(255,255,255,0.3)', borderRadius: 999, padding: isMobile ? '13px 24px' : '15px 32px',
+              fontSize: 15, fontWeight: 600, fontFamily: FONT, cursor: 'pointer', letterSpacing: '-0.01em',
+            }}>
+              Se markedspladsen →
+            </button>
+          </div>
+          {stats && (stats.institutions > 0 || stats.deals > 0) && (
+            <div style={{ display: 'flex', justifyContent: 'center', gap: isMobile ? 28 : 56, flexWrap: 'wrap' }}>
+              {stats.institutions > 0 && (
+                <div style={{ textAlign: 'center' }}>
+                  <div style={{ fontFamily: FONT, fontWeight: 800, fontSize: isMobile ? 26 : 34, color: '#fff', letterSpacing: '-0.04em', lineHeight: 1 }}>{stats.institutions}</div>
+                  <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.5)', marginTop: 4, fontFamily: FONT, letterSpacing: '0.02em' }}>institutioner tilmeldt</div>
+                </div>
+              )}
+              {stats.listings > 0 && (
+                <div style={{ textAlign: 'center' }}>
+                  <div style={{ fontFamily: FONT, fontWeight: 800, fontSize: isMobile ? 26 : 34, color: '#fff', letterSpacing: '-0.04em', lineHeight: 1 }}>{stats.listings}</div>
+                  <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.5)', marginTop: 4, fontFamily: FONT, letterSpacing: '0.02em' }}>aktive opslag</div>
+                </div>
+              )}
+              {stats.deals > 0 && (
+                <div style={{ textAlign: 'center' }}>
+                  <div style={{ fontFamily: FONT, fontWeight: 800, fontSize: isMobile ? 26 : 34, color: '#fff', letterSpacing: '-0.04em', lineHeight: 1 }}>{stats.deals}</div>
+                  <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.5)', marginTop: 4, fontFamily: FONT, letterSpacing: '0.02em' }}>handler gennemført</div>
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+
+        {/* Wave */}
+        <svg viewBox="0 0 1440 72" style={{ position: 'absolute', bottom: -1, left: 0, right: 0, width: '100%', display: 'block' }} preserveAspectRatio="none">
+          <path d="M0,36 C360,72 1080,0 1440,36 L1440,72 L0,72 Z" fill={PAPER} />
+        </svg>
+      </section>
+    );
+  }
+
+  /* ── WITH IMAGE ── */
+
+  /* Mobile: image fills background with dark overlay, centered white text */
+  if (isMobile) {
+    return (
+      <section style={{
+        position: 'relative', overflow: 'hidden',
+        paddingTop: 100, paddingBottom: 60,
+        minHeight: '75vh',
+        display: 'flex', alignItems: 'center',
+      }}>
+        {/* Background image */}
+        <img src={heroImageUrl} alt="" style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover', objectPosition: 'center', display: 'block' }} />
+        {/* Dark overlay */}
+        <div style={{ position: 'absolute', inset: 0, background: 'rgba(10,24,16,0.58)' }} />
+
+        <div style={{ position: 'relative', zIndex: 1, width: '100%', padding: '0 24px', textAlign: 'center' }}>
+          <div style={{ display: 'inline-block', background: 'rgba(255,255,255,0.15)', borderRadius: 999, padding: '6px 18px', fontSize: 12, fontWeight: 600, color: 'rgba(255,255,255,0.85)', letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: 20, fontFamily: FONT }}>
+            Markedsplads for institutioner
+          </div>
+          <h1 style={{ fontFamily: FONT, fontWeight: 800, fontSize: 36, letterSpacing: '-0.04em', lineHeight: 1.0, color: '#fff', marginBottom: 18 }}>
+            Legetøj til glæde<br /><span style={{ color: GREEN_SOFT }}>for alle.</span>
+          </h1>
+          <p style={{ fontSize: 14, color: 'rgba(255,255,255,0.75)', lineHeight: 1.65, marginBottom: 28 }}>
+            Den første markedsplads hvor børnehaver, skoler og SFO'er køber, sælger og bytter legetøj direkte med hinanden — sikkert og bæredygtigt.
+          </p>
+          <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', marginBottom: 32, justifyContent: 'center' }}>
+            <button onClick={() => router.push('/signup')} style={{ background: PAPER, color: PRIMARY, border: 'none', borderRadius: 999, padding: '12px 24px', fontSize: 14, fontWeight: 700, fontFamily: FONT, cursor: 'pointer' }}>
+              Tilmeld institution
+            </button>
+            <button onClick={() => router.push('/opslag')} style={{ background: 'transparent', color: 'rgba(255,255,255,0.88)', border: '1.5px solid rgba(255,255,255,0.35)', borderRadius: 999, padding: '12px 20px', fontSize: 14, fontWeight: 600, fontFamily: FONT, cursor: 'pointer' }}>
+              Se markedspladsen →
+            </button>
+          </div>
+          {statsRow}
+        </div>
+
+        {/* Wave into next section */}
+        <svg viewBox="0 0 1440 72" style={{ position: 'absolute', bottom: -1, left: 0, right: 0, width: '100%', display: 'block' }} preserveAspectRatio="none">
+          <path d="M0,36 C360,72 1080,0 1440,36 L1440,72 L0,72 Z" fill={PAPER} />
+        </svg>
+      </section>
+    );
+  }
+
+  /* Desktop: image fills right side, white floating card on left */
   return (
     <section style={{
-      background: `linear-gradient(160deg, ${GREEN_DEEP} 0%, ${PRIMARY} 100%)`,
-      paddingTop: isMobile ? 100 : 120,
-      paddingBottom: isMobile ? 60 : 80,
       position: 'relative', overflow: 'hidden',
+      minHeight: '88vh',
+      display: 'flex', alignItems: 'stretch',
     }}>
-      {/* Background watermark */}
-      <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', pointerEvents: 'none', userSelect: 'none' }}>
-        <span style={{ fontFamily: FONT, fontWeight: 800, fontSize: isMobile ? 240 : 420, color: 'rgba(255,255,255,0.035)', lineHeight: 1, letterSpacing: '-0.06em' }}>byt</span>
+      {/* Right: hero image */}
+      <div style={{ position: 'absolute', inset: 0 }}>
+        <img src={heroImageUrl} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover', objectPosition: 'center', display: 'block' }} />
+        {/* subtle right-to-left fade so card blends in */}
+        <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(to right, rgba(255,255,255,0.92) 0%, rgba(255,255,255,0.55) 45%, rgba(255,255,255,0) 70%)' }} />
       </div>
 
-      <div style={{ position: 'relative', maxWidth: 780, margin: '0 auto', padding: '0 24px', textAlign: 'center' }}>
-        {/* Pill badge */}
-        <div style={{ display: 'inline-block', background: 'rgba(255,255,255,0.12)', borderRadius: 999, padding: '6px 18px', fontSize: 12, fontWeight: 600, color: 'rgba(255,255,255,0.8)', letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: 28, fontFamily: FONT }}>
-          Markedsplads for institutioner
-        </div>
-
-        <h1 style={{
-          fontFamily: FONT, fontWeight: 800,
-          fontSize: isMobile ? 38 : 64,
-          letterSpacing: '-0.04em', lineHeight: 1.0,
-          color: '#fff', marginBottom: 22,
+      {/* Left: floating white card */}
+      <div style={{ position: 'relative', zIndex: 1, display: 'flex', alignItems: 'center', padding: '120px 0 100px', maxWidth: 1200, margin: '0 auto', width: '100%', paddingLeft: 64, paddingRight: 64 }}>
+        <div style={{
+          background: 'rgba(255,255,255,0.97)',
+          borderRadius: 24,
+          padding: '52px 48px',
+          maxWidth: 480,
+          boxShadow: '0 24px 80px rgba(10,24,16,0.13), 0 2px 8px rgba(10,24,16,0.06)',
+          backdropFilter: 'blur(8px)',
         }}>
-          Legetøj til glæde<br />
-          <span style={{ color: GREEN_SOFT }}>for alle.</span>
-        </h1>
-
-        <p style={{ fontSize: isMobile ? 15 : 18, color: 'rgba(255,255,255,0.68)', lineHeight: 1.65, maxWidth: 520, margin: '0 auto 36px' }}>
-          Den første markedsplads hvor børnehaver, skoler og SFO'er køber, sælger og bytter legetøj direkte med hinanden — sikkert og bæredygtigt.
-        </p>
-
-        {/* CTA buttons */}
-        <div style={{ display: 'flex', gap: 12, justifyContent: 'center', flexWrap: 'wrap', marginBottom: 56 }}>
-          <button onClick={() => router.push('/signup')} style={{
-            background: PAPER, color: PRIMARY,
-            border: 'none', borderRadius: 999, padding: isMobile ? '13px 28px' : '15px 36px',
-            fontSize: 15, fontWeight: 700, fontFamily: FONT, cursor: 'pointer', letterSpacing: '-0.01em',
-          }}>
-            Tilmeld institution
-          </button>
-          <button onClick={() => router.push('/opslag')} style={{
-            background: 'transparent', color: 'rgba(255,255,255,0.88)',
-            border: '1.5px solid rgba(255,255,255,0.3)', borderRadius: 999, padding: isMobile ? '13px 24px' : '15px 32px',
-            fontSize: 15, fontWeight: 600, fontFamily: FONT, cursor: 'pointer', letterSpacing: '-0.01em',
-          }}>
-            Se markedspladsen →
-          </button>
-        </div>
-
-        {/* Live stats row */}
-        {stats && (stats.institutions > 0 || stats.deals > 0) && (
-          <div style={{ display: 'flex', justifyContent: 'center', gap: isMobile ? 28 : 56, flexWrap: 'wrap' }}>
-            {stats.institutions > 0 && (
-              <div style={{ textAlign: 'center' }}>
-                <div style={{ fontFamily: FONT, fontWeight: 800, fontSize: isMobile ? 26 : 34, color: '#fff', letterSpacing: '-0.04em', lineHeight: 1 }}>{stats.institutions}</div>
-                <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.5)', marginTop: 4, fontFamily: FONT, letterSpacing: '0.02em' }}>institutioner tilmeldt</div>
-              </div>
-            )}
-            {stats.listings > 0 && (
-              <div style={{ textAlign: 'center' }}>
-                <div style={{ fontFamily: FONT, fontWeight: 800, fontSize: isMobile ? 26 : 34, color: '#fff', letterSpacing: '-0.04em', lineHeight: 1 }}>{stats.listings}</div>
-                <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.5)', marginTop: 4, fontFamily: FONT, letterSpacing: '0.02em' }}>aktive opslag</div>
-              </div>
-            )}
-            {stats.deals > 0 && (
-              <div style={{ textAlign: 'center' }}>
-                <div style={{ fontFamily: FONT, fontWeight: 800, fontSize: isMobile ? 26 : 34, color: '#fff', letterSpacing: '-0.04em', lineHeight: 1 }}>{stats.deals}</div>
-                <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.5)', marginTop: 4, fontFamily: FONT, letterSpacing: '0.02em' }}>handler gennemført</div>
-              </div>
-            )}
+          <div style={{ display: 'inline-block', background: GREEN_TINT, borderRadius: 999, padding: '6px 18px', fontSize: 12, fontWeight: 600, color: PRIMARY, letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: 20, fontFamily: FONT }}>
+            Markedsplads for institutioner
           </div>
-        )}
+          <h1 style={{ fontFamily: FONT, fontWeight: 800, fontSize: 52, letterSpacing: '-0.04em', lineHeight: 1.0, color: INK, marginBottom: 18 }}>
+            Legetøj til glæde<br /><span style={{ color: PRIMARY }}>for alle.</span>
+          </h1>
+          <p style={{ fontSize: 16, color: INK3, lineHeight: 1.65, marginBottom: 28 }}>
+            Den første markedsplads hvor børnehaver, skoler og SFO'er køber, sælger og bytter legetøj direkte med hinanden — sikkert og bæredygtigt.
+          </p>
+          <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', marginBottom: 36 }}>
+            <button onClick={() => router.push('/signup')} style={{ background: PRIMARY, color: '#fff', border: 'none', borderRadius: 999, padding: '13px 30px', fontSize: 15, fontWeight: 700, fontFamily: FONT, cursor: 'pointer' }}>
+              Tilmeld institution
+            </button>
+            <button onClick={() => router.push('/opslag')} style={{ background: 'transparent', color: INK2, border: `1.5px solid ${PAPER3}`, borderRadius: 999, padding: '13px 26px', fontSize: 15, fontWeight: 600, fontFamily: FONT, cursor: 'pointer' }}>
+              Se markedspladsen →
+            </button>
+          </div>
+          {stats && (stats.institutions > 0 || stats.deals > 0) && (
+            <div style={{ display: 'flex', gap: 32, flexWrap: 'wrap' }}>
+              {stats.institutions > 0 && (
+                <div>
+                  <div style={{ fontFamily: FONT, fontWeight: 800, fontSize: 28, color: INK, letterSpacing: '-0.04em', lineHeight: 1 }}>{stats.institutions}</div>
+                  <div style={{ fontSize: 11, color: INK3, marginTop: 3, fontFamily: FONT, letterSpacing: '0.02em' }}>institutioner tilmeldt</div>
+                </div>
+              )}
+              {stats.listings > 0 && (
+                <div>
+                  <div style={{ fontFamily: FONT, fontWeight: 800, fontSize: 28, color: INK, letterSpacing: '-0.04em', lineHeight: 1 }}>{stats.listings}</div>
+                  <div style={{ fontSize: 11, color: INK3, marginTop: 3, fontFamily: FONT, letterSpacing: '0.02em' }}>aktive opslag</div>
+                </div>
+              )}
+              {stats.deals > 0 && (
+                <div>
+                  <div style={{ fontFamily: FONT, fontWeight: 800, fontSize: 28, color: INK, letterSpacing: '-0.04em', lineHeight: 1 }}>{stats.deals}</div>
+                  <div style={{ fontSize: 11, color: INK3, marginTop: 3, fontFamily: FONT, letterSpacing: '0.02em' }}>handler gennemført</div>
+                </div>
+              )}
+            </div>
+          )}
+        </div>
       </div>
 
-      {/* Wave */}
+      {/* Wave into next section */}
       <svg viewBox="0 0 1440 72" style={{ position: 'absolute', bottom: -1, left: 0, right: 0, width: '100%', display: 'block' }} preserveAspectRatio="none">
         <path d="M0,36 C360,72 1080,0 1440,36 L1440,72 L0,72 Z" fill={PAPER} />
       </svg>
@@ -198,7 +390,7 @@ function HeroSection({ stats }) {
   );
 }
 
-/* ── Journey animation — desktop sticky scroll + mobile slide-in ── */
+/* ── Journey steps data ───────────────────────────────────── */
 const JOURNEY_STEPS = [
   { emoji: '🧸', bg: '#FFFBEB', accent: '#D97706', n: '01', title: 'Legetøjet samler støv', desc: 'Du har cykler, puslespil eller møbler der ikke bruges. Et andet sted vil de gøre børn glade.' },
   { emoji: '📸', bg: '#F0FDF4', accent: '#16A34A', n: '02', title: 'Opret et opslag på 2 min.', desc: 'Tag ét billede. AI udfylder titel, kategori og beskrivelse automatisk. Nemmere end en brugtannonce.' },
@@ -206,157 +398,111 @@ const JOURNEY_STEPS = [
   { emoji: '🚀', bg: '#FDF4FF', accent: '#9333EA', n: '04', title: 'Nyt hjem, ny glæde', desc: 'I aftaler pris og afhentning. Legetøjet giver glæde et nyt sted — og du har skabt plads.' },
 ];
 
-function MobileHowSection() {
+/* ── How steps — shared grid, works on both mobile and desktop ── */
+function HowStepsSection() {
+  const w = useWindowWidth();
+  const isMobile = w < 768;
+  const cardRefs = useRef([]);
   const [visible, setVisible] = useState(new Set());
-  const refs = useRef([]);
 
   useEffect(() => {
-    const obs = refs.current.map((el, i) => {
+    const observers = cardRefs.current.map((el, i) => {
       if (!el) return null;
-      const o = new IntersectionObserver(([e]) => {
-        if (e.isIntersecting) setVisible(v => new Set([...v, i]));
-      }, { threshold: 0.25 });
-      o.observe(el);
-      return o;
+      const obs = new IntersectionObserver(([entry]) => {
+        if (entry.isIntersecting) setVisible(v => new Set([...v, i]));
+      }, { threshold: 0.18 });
+      obs.observe(el);
+      return obs;
     });
-    return () => obs.forEach(o => o?.disconnect());
+    return () => observers.forEach(o => o?.disconnect());
   }, []);
 
   return (
-    <section style={{ background: PAPER, padding: '60px 0 80px', overflow: 'hidden' }}>
+    <section style={{ background: PAPER, padding: isMobile ? '60px 20px 80px' : '80px 24px 100px', position: 'relative', overflow: 'hidden' }}>
       <style>{`
-        .hjw-step { opacity: 0; transform: translateX(48px); transition: opacity 0.65s cubic-bezier(0.22,1,0.36,1), transform 0.65s cubic-bezier(0.22,1,0.36,1); }
-        .hjw-step.in { opacity: 1; transform: translateX(0); }
+        @keyframes how-fade-up {
+          from { opacity: 0; transform: translateY(32px); }
+          to   { opacity: 1; transform: translateY(0); }
+        }
+        .how-card-visible {
+          animation: how-fade-up 0.6s cubic-bezier(0.22,1,0.36,1) forwards;
+        }
+        .how-card-hidden {
+          opacity: 0;
+        }
       `}</style>
 
-      <div style={{ textAlign: 'center', padding: '0 24px 48px' }}>
-        <div style={{ display: 'inline-block', background: GREEN_TINT, borderRadius: 999, padding: '5px 16px', fontSize: 11, fontWeight: 700, color: PRIMARY, letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: 14, fontFamily: FONT }}>Rejsen</div>
-        <h2 style={{ fontFamily: FONT, fontWeight: 800, fontSize: 30, color: INK, letterSpacing: '-0.04em', lineHeight: 1.1, margin: 0 }}>Fra støv<br />til glæde</h2>
+      {/* Section header */}
+      <div style={{ textAlign: 'center', marginBottom: isMobile ? 40 : 56 }}>
+        <div style={{ display: 'inline-block', background: GREEN_TINT, borderRadius: 999, padding: '5px 16px', fontSize: 11, fontWeight: 700, color: PRIMARY, letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: 14, fontFamily: FONT }}>
+          Sådan virker det
+        </div>
+        <h2 style={{ fontFamily: FONT, fontWeight: 800, fontSize: isMobile ? 30 : 42, color: INK, letterSpacing: '-0.04em', lineHeight: 1.1, margin: 0 }}>
+          Fra støv til glæde
+        </h2>
       </div>
 
-      <div style={{ position: 'relative', padding: '0 20px' }}>
-        <div style={{ position: 'absolute', left: 47, top: 20, bottom: 20, width: 2, background: `linear-gradient(to bottom, transparent, ${PRIMARY}55 15%, ${PRIMARY}55 85%, transparent)` }} />
-        {JOURNEY_STEPS.map((s, i) => (
-          <div key={i} ref={el => refs.current[i] = el}
-            className={`hjw-step${visible.has(i) ? ' in' : ''}`}
-            style={{ transitionDelay: `${i * 0.07}s`, display: 'flex', gap: 20, alignItems: 'flex-start', paddingBottom: i < 3 ? 44 : 0 }}>
-            <div style={{ position: 'relative', flexShrink: 0, zIndex: 1 }}>
-              <div style={{ width: 56, height: 56, borderRadius: '50%', background: s.bg, border: `2px solid ${s.accent}44`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 26, boxShadow: `0 6px 20px ${s.accent}33` }}>
-                {s.emoji}
-              </div>
-              <div style={{ position: 'absolute', top: -5, right: -5, width: 20, height: 20, borderRadius: '50%', background: s.accent, color: '#fff', fontSize: 9, fontWeight: 800, display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: FONT, boxShadow: `0 2px 6px ${s.accent}55` }}>
-                {i + 1}
-              </div>
-            </div>
-            <div style={{ paddingTop: 10 }}>
-              <div style={{ fontFamily: FONT, fontWeight: 800, fontSize: 16, color: INK, marginBottom: 6 }}>{s.title}</div>
-              <div style={{ fontSize: 13, color: INK3, lineHeight: 1.65, fontFamily: FONT }}>{s.desc}</div>
-            </div>
-          </div>
-        ))}
-      </div>
-    </section>
-  );
-}
-
-function DesktopHowSection() {
-  const sectionRef = useRef(null);
-  const [activeIdx, setActiveIdx] = useState(0);
-  const [prevIdx, setPrevIdx] = useState(0);
-  const [animKey, setAnimKey] = useState(0);
-
-  useEffect(() => {
-    const onScroll = () => {
-      if (!sectionRef.current) return;
-      const { top, height } = sectionRef.current.getBoundingClientRect();
-      const scrolled = -top;
-      const total = height - window.innerHeight;
-      const progress = Math.max(0, Math.min(0.9999, scrolled / total));
-      const idx = Math.min(JOURNEY_STEPS.length - 1, Math.floor(progress * JOURNEY_STEPS.length));
-      setActiveIdx(prev => {
-        if (prev !== idx) { setPrevIdx(prev); setAnimKey(k => k + 1); }
-        return idx;
-      });
-    };
-    window.addEventListener('scroll', onScroll, { passive: true });
-    onScroll();
-    return () => window.removeEventListener('scroll', onScroll);
-  }, []);
-
-  const step = JOURNEY_STEPS[activeIdx];
-
-  return (
-    <div ref={sectionRef} style={{ height: `${JOURNEY_STEPS.length * 100 + 50}vh`, position: 'relative' }}>
-      <style>{`
-        @keyframes hjw-emoji-in { from { opacity:0; transform:scale(0.72) rotate(-8deg); } to { opacity:1; transform:scale(1) rotate(0deg); } }
-        @keyframes hjw-text-in  { from { opacity:0; transform:translateY(22px); } to { opacity:1; transform:translateY(0); } }
-        @keyframes hjw-num-in   { from { opacity:0; transform:translateX(-20px); } to { opacity:0.12; transform:translateX(0); } }
-        .hjw-emoji-anim { animation: hjw-emoji-in 0.55s cubic-bezier(0.22,1,0.36,1) forwards; }
-        .hjw-text-anim  { animation: hjw-text-in  0.5s  cubic-bezier(0.22,1,0.36,1) forwards; animation-delay: 0.05s; opacity:0; }
-        .hjw-num-anim   { animation: hjw-num-in   0.6s  cubic-bezier(0.22,1,0.36,1) forwards; opacity:0; }
-      `}</style>
-
-      <div style={{ position: 'sticky', top: 0, height: '100vh', display: 'flex', alignItems: 'center', background: PAPER, overflow: 'hidden' }}>
-        {/* Subtle bg color wash */}
-        <div style={{ position: 'absolute', inset: 0, background: step.bg, opacity: 0.18, transition: 'background 0.6s ease' }} />
-
-        <div style={{ maxWidth: 1100, margin: '0 auto', width: '100%', padding: '0 64px', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 80, alignItems: 'center', position: 'relative', zIndex: 1 }}>
-
-          {/* LEFT: visual */}
-          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 32 }}>
-            {/* Progress dots */}
-            <div style={{ display: 'flex', gap: 10 }}>
-              {JOURNEY_STEPS.map((s, i) => (
-                <div key={i} style={{ height: 6, borderRadius: 3, background: i === activeIdx ? s.accent : PAPER3, width: i === activeIdx ? 28 : 6, transition: 'all 0.45s cubic-bezier(0.22,1,0.36,1)' }} />
-              ))}
+      {/* 4-card grid: 2×2 on mobile, 1×4 on desktop */}
+      <div style={{
+        maxWidth: 1100, margin: '0 auto',
+        display: 'grid',
+        gridTemplateColumns: isMobile ? 'repeat(2, 1fr)' : 'repeat(4, 1fr)',
+        gap: isMobile ? 16 : 24,
+      }}>
+        {JOURNEY_STEPS.map((step, i) => (
+          <div
+            key={i}
+            ref={el => cardRefs.current[i] = el}
+            className={visible.has(i) ? 'how-card-visible' : 'how-card-hidden'}
+            style={{
+              animationDelay: `${i * 0.1}s`,
+              background: '#fff',
+              borderRadius: 20,
+              padding: isMobile ? '24px 20px' : '32px 28px',
+              boxShadow: '0 2px 16px rgba(22,34,28,0.07), 0 1px 4px rgba(22,34,28,0.04)',
+              border: '1px solid rgba(22,34,28,0.06)',
+              position: 'relative',
+              overflow: 'hidden',
+            }}
+          >
+            {/* Big step number watermark */}
+            <div style={{
+              position: 'absolute', top: 8, right: 14,
+              fontFamily: FONT, fontWeight: 800,
+              fontSize: isMobile ? 56 : 72,
+              color: step.accent,
+              opacity: 0.10,
+              lineHeight: 1,
+              userSelect: 'none',
+              letterSpacing: '-0.06em',
+            }}>
+              {step.n}
             </div>
 
-            {/* Emoji circle */}
-            <div key={`emoji-${animKey}`} className="hjw-emoji-anim"
-              style={{ width: 200, height: 200, borderRadius: 56, background: step.bg, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 90, boxShadow: `0 20px 64px ${step.accent}44`, border: `3px solid ${step.accent}22` }}>
+            {/* Emoji */}
+            <div style={{ fontSize: isMobile ? 36 : 48, marginBottom: isMobile ? 14 : 20, lineHeight: 1 }}>
               {step.emoji}
             </div>
 
-            {/* Big number watermark */}
-            <div key={`num-${animKey}`} className="hjw-num-anim"
-              style={{ fontFamily: FONT, fontWeight: 800, fontSize: 120, color: step.accent, lineHeight: 1, letterSpacing: '-0.06em', userSelect: 'none' }}>
-              {step.n}
-            </div>
-          </div>
-
-          {/* RIGHT: step list */}
-          <div>
-            <div style={{ marginBottom: 48 }}>
-              <div style={{ display: 'inline-block', background: GREEN_TINT, borderRadius: 999, padding: '5px 16px', fontSize: 11, fontWeight: 700, color: PRIMARY, letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: 16, fontFamily: FONT }}>Sådan virker det</div>
-              <h2 style={{ fontFamily: FONT, fontWeight: 800, fontSize: 42, color: INK, letterSpacing: '-0.04em', lineHeight: 1.05, margin: 0 }}>Fra støv<br />til glæde</h2>
+            {/* Title */}
+            <div style={{ fontFamily: FONT, fontWeight: 800, fontSize: isMobile ? 14 : 16, color: INK, marginBottom: 8, lineHeight: 1.3 }}>
+              {step.title}
             </div>
 
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-              {JOURNEY_STEPS.map((s, i) => {
-                const isActive = i === activeIdx;
-                return (
-                  <div key={i} style={{ display: 'flex', gap: 14, alignItems: 'flex-start', opacity: isActive ? 1 : 0.3, transform: `translateX(${isActive ? 0 : -10}px)`, transition: 'all 0.45s cubic-bezier(0.22,1,0.36,1)' }}>
-                    <div style={{ width: 44, height: 44, borderRadius: 14, background: isActive ? s.bg : PAPER2, border: `1.5px solid ${isActive ? s.accent + '55' : 'transparent'}`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 20, flexShrink: 0, transition: 'all 0.4s' }}>
-                      {s.emoji}
-                    </div>
-                    <div>
-                      <div style={{ fontFamily: FONT, fontWeight: 800, fontSize: 15, color: isActive ? INK : INK3, marginBottom: isActive ? 4 : 0, transition: 'color 0.3s' }}>{s.title}</div>
-                      <div style={{ fontSize: 13, color: INK3, lineHeight: 1.6, fontFamily: FONT, maxHeight: isActive ? 60 : 0, overflow: 'hidden', opacity: isActive ? 1 : 0, transition: 'max-height 0.45s cubic-bezier(0.22,1,0.36,1), opacity 0.35s' }}>{s.desc}</div>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
+            {/* Description */}
+            <p style={{ fontSize: isMobile ? 12 : 13, color: INK3, lineHeight: 1.65, margin: 0 }}>
+              {step.desc}
+            </p>
           </div>
-        </div>
+        ))}
       </div>
-    </div>
-  );
-}
 
-function HowSection() {
-  const w = useWindowWidth();
-  return w < 768 ? <MobileHowSection /> : <DesktopHowSection />;
+      {/* Wave into TradeTypesStrip (GREEN_TINT) */}
+      <svg viewBox="0 0 1440 72" style={{ position: 'absolute', bottom: -1, left: 0, right: 0, width: '100%', display: 'block' }} preserveAspectRatio="none">
+        <path d="M0,36 C360,72 1080,0 1440,36 L1440,72 L0,72 Z" fill={GREEN_TINT} />
+      </svg>
+    </section>
+  );
 }
 
 /* ── Trade types strip ────────────────────────────────────── */
@@ -365,7 +511,7 @@ function TradeTypesStrip() {
   const isMobile = w < 640;
 
   return (
-    <section style={{ background: GREEN_TINT, padding: isMobile ? '40px 20px' : '48px 24px' }}>
+    <section style={{ background: GREEN_TINT, padding: isMobile ? '40px 20px' : '48px 24px', position: 'relative', overflow: 'hidden' }}>
       <div style={{ maxWidth: 900, margin: '0 auto', display: 'grid', gridTemplateColumns: isMobile ? '1fr' : 'repeat(3,1fr)', gap: isMobile ? 16 : 0 }}>
         {[
           { key: 'køb', title: 'Køb', sub: 'Fastpris', desc: 'Se prisen og køb med det samme.' },
@@ -394,6 +540,11 @@ function TradeTypesStrip() {
           );
         })}
       </div>
+
+      {/* Wave into MissionSection (GREEN_DEEP) */}
+      <svg viewBox="0 0 1440 72" style={{ position: 'absolute', bottom: -1, left: 0, right: 0, width: '100%', display: 'block' }} preserveAspectRatio="none">
+        <path d="M0,36 C360,72 1080,0 1440,36 L1440,72 L0,72 Z" fill={GREEN_DEEP} />
+      </svg>
     </section>
   );
 }
@@ -412,7 +563,7 @@ function ListingsPreview({ listings, loading, goToInstitution }) {
   }, [listings, filter]);
 
   return (
-    <section style={{ background: PAPER2, padding: isMobile ? '48px 16px 72px' : '64px 24px 96px' }}>
+    <section style={{ background: PAPER2, padding: isMobile ? '48px 16px 72px' : '64px 24px 96px', position: 'relative', overflow: 'hidden' }}>
       <div style={{ maxWidth: 1140, margin: '0 auto' }}>
 
         {/* Header row */}
@@ -474,6 +625,11 @@ function ListingsPreview({ listings, loading, goToInstitution }) {
           </button>
         </div>
       </div>
+
+      {/* Wave into HowStepsSection (PAPER) */}
+      <svg viewBox="0 0 1440 72" style={{ position: 'absolute', bottom: -1, left: 0, right: 0, width: '100%', display: 'block' }} preserveAspectRatio="none">
+        <path d="M0,36 C360,72 1080,0 1440,36 L1440,72 L0,72 Z" fill={PAPER} />
+      </svg>
     </section>
   );
 }
@@ -523,6 +679,11 @@ function MissionSection() {
           ))}
         </div>
       </div>
+
+      {/* Wave into PlatformCO2Stat (GREEN_TINT) */}
+      <svg viewBox="0 0 1440 72" style={{ position: 'absolute', bottom: -1, left: 0, right: 0, width: '100%', display: 'block' }} preserveAspectRatio="none">
+        <path d="M0,36 C360,72 1080,0 1440,36 L1440,72 L0,72 Z" fill={GREEN_TINT} />
+      </svg>
     </section>
   );
 }
@@ -650,7 +811,7 @@ export default function HomePage() {
     return (
       <PullToRefresh onRefresh={fetchListings}>
         <MobileHomeFeed listings={visibleListings} loading={loadingListings} />
-        <MobileHowSection />
+        <HowStepsSection />
         <MissionSection />
       </PullToRefresh>
     );
@@ -664,7 +825,7 @@ export default function HomePage() {
     <>
       <HeroSection stats={heroStats} />
       <ListingsPreview listings={visibleListings} loading={loadingListings} goToInstitution={goToInstitution} />
-      <HowSection />
+      <HowStepsSection />
       <TradeTypesStrip />
       <MissionSection />
       <PlatformCO2Stat />
