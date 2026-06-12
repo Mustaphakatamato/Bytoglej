@@ -663,8 +663,8 @@ export default function HomePage() {
   return (
     <>
       <HeroSection stats={heroStats} />
-      <HowSection />
       <ListingsPreview listings={visibleListings} loading={loadingListings} goToInstitution={goToInstitution} />
+      <HowSection />
       <TradeTypesStrip />
       <MissionSection />
       <PlatformCO2Stat />
