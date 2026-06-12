@@ -11,15 +11,11 @@ const MOCK_PRICES = {
   home_delivery: { small: 65, medium: 89, large: 119, xlarge: 179 },
 };
 
-// Shipmondo product codes (PostNord):
-// PDK_MC  = MyPack Collect (service point / pakkeshop)
-// PDK_MH  = MyPack Home (hjemlevering)
+// Produkter tilgængelige på denne konto (hentet fra GET /products):
 const CARRIERS = [
-  { carrier_code: 'pdk', product_code: 'PDK_MC',  type: 'parcel_shop',   label: 'PostNord pakkeshop'     },
-  { carrier_code: 'pdk', product_code: 'PDK_MH',  type: 'home_delivery', label: 'PostNord hjemlevering'  },
-  { carrier_code: 'dao', product_code: 'DAO_DROPPOINT', type: 'parcel_shop',   label: 'DAO pakkeshop'    },
-  { carrier_code: 'dao', product_code: 'DAO_HOMEDELIVERY', type: 'home_delivery', label: 'DAO hjemlevering' },
-  { carrier_code: 'gls', product_code: 'GLS_DROPPOINT', type: 'parcel_shop', label: 'GLS pakkeshop'      },
+  { carrier_code: 'pdk', product_code: 'PDK_MC',   type: 'parcel_shop',   label: 'PostNord pakkeshop' },
+  { carrier_code: 'gls', product_code: 'GLSDK_SD', type: 'parcel_shop',   label: 'GLS pakkeshop'     },
+  { carrier_code: 'dao', product_code: 'DAO_STH',  type: 'home_delivery', label: 'DAO hjemlevering'  },
 ];
 
 const SIZES = {
@@ -41,7 +37,7 @@ async function getQuote({ carrier_code, product_code, size_category, from_zip, t
       product_code,
       sender:   { zip_code: from_zip || '8000', country_code: 'DK' },
       receiver: { zip_code: to_zip   || '2100', country_code: 'DK' },
-      parcels:  [parcel],
+      parcels:  [{ quantity: 1, ...parcel }],
     }),
   });
 
