@@ -3,7 +3,10 @@ import Stripe from 'stripe';
 import { requireAuth, UNAUTHORIZED } from '@/lib/api-auth';
 import { createServerClient } from '@/lib/supabase-server';
 
-const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
+function getStripe() {
+  if (!process.env.STRIPE_SECRET_KEY) throw new Error('STRIPE_SECRET_KEY er ikke sat');
+  return new Stripe(process.env.STRIPE_SECRET_KEY);
+}
 
 // Service fee: 5% of item total, min 5 kr, max 50 kr
 function calcServiceFee(itemTotal) {
@@ -68,6 +71,7 @@ export async function POST(req) {
 
   // Create Stripe PaymentIntent (amount in øre)
   const amountOre = Math.round(grandTotal * 100);
+  const stripe = getStripe();
   const paymentIntent = await stripe.paymentIntents.create({
     amount: amountOre,
     currency: 'dkk',

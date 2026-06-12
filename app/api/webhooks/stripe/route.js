@@ -3,13 +3,17 @@ import Stripe from 'stripe';
 import { createServerClient } from '@/lib/supabase-server';
 import { createShipment } from '@/lib/shipmondo/client';
 
-const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
-const WEBHOOK_SECRET = process.env.STRIPE_WEBHOOK_SECRET;
+function getStripe() {
+  if (!process.env.STRIPE_SECRET_KEY) throw new Error('STRIPE_SECRET_KEY er ikke sat');
+  return new Stripe(process.env.STRIPE_SECRET_KEY);
+}
 
 export async function POST(req) {
   const body = await req.text();
   const sig = req.headers.get('stripe-signature');
 
+  const stripe = getStripe();
+  const WEBHOOK_SECRET = process.env.STRIPE_WEBHOOK_SECRET;
   let event;
   try {
     event = stripe.webhooks.constructEvent(body, sig, WEBHOOK_SECRET);
