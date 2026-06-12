@@ -275,6 +275,35 @@ export async function POST(req) {
     } : {}),
   }).eq('id', order.id);
 
+  // Send bekræftelses-email til køber via Resend
+  if (order.buyer_email) {
+    try {
+      const res = await fetch('https://api.resend.com/emails', {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${process.env.RESEND_API_KEY}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          from: 'byt&leg <noreply@bytogleg.dk>',
+          to: [order.buyer_email],
+          subject: `Din ordre er bekræftet — byt&leg`,
+          html: buyerOrderEmailHtml({
+            buyerName:  order.buyer_name,
+            groups:     updatedGroups,
+            orderId:    order.id,
+            grandTotal: updatedGroups.reduce((s, g) => s + (g.itemTotal || 0) + (g.shippingTotal || 0) + (g.serviceFee || 0), 0),
+          }),
+        }),
+      });
+      if (!res.ok) {
+        console.error('[stripe-webhook] Køber-email fejl:', await res.text());
+      }
+    } catch (err) {
+      console.error('[stripe-webhook] Køber-email fejl:', err.message);
+    }
+  }
+
   return NextResponse.json({ received: true, shipments_created: anyShipment });
 }
 
@@ -389,6 +418,110 @@ function sellerOrderEmailHtml({ sellerName, items, itemTotal, shippingMethod, pi
         <p style="font-size:13px;color:#6B7570;line-height:1.6;margin:0;">
           byt&amp;leg holder beløbet sikkert, indtil køberen har modtaget varen. Når leveringen er bekræftet, overfører vi <strong style="color:#2A7D4F;">${fmtKr(itemTotal)}</strong> til jeres konto.
         </p>
+      </div>
+    </div>
+
+    <!-- Footer -->
+    <div style="background:#F6F2EA;border-radius:0 0 20px 20px;border:1px solid rgba(22,34,28,0.08);border-top:none;padding:24px 44px;text-align:center;">
+      <p style="font-size:13px;color:#6B7570;margin:0 0 8px;">Spørgsmål? Skriv til os på <a href="mailto:kontakt@bytogleg.dk" style="color:#2A7D4F;text-decoration:none;">kontakt@bytogleg.dk</a></p>
+      <p style="font-size:12px;color:#DAD3C4;margin:0;">© 2025 byt&amp;leg · <a href="${base}/privatlivspolitik" style="color:#DAD3C4;text-decoration:none;">Privatlivspolitik</a></p>
+    </div>
+
+  </div>
+</body>
+</html>`;
+}
+
+// ── Køber-email ────────────────────────────────────────────────
+
+function buyerOrderEmailHtml({ buyerName, groups, orderId, grandTotal }) {
+  const base = process.env.NEXT_PUBLIC_BASE_URL || 'https://bytogleg.dk';
+  const name = escapeHtml(String(buyerName || 'køber'));
+
+  const groupRows = (groups || []).map(g => {
+    const itemRows = (g.items || []).map(i => `
+        <tr>
+          <td style="padding:8px 0;border-bottom:1px solid #ECE6DA;font-size:13px;color:#16221C;">${escapeHtml(String(i.emoji || '📦'))} ${escapeHtml(String(i.title || 'Vare'))}</td>
+          <td style="padding:8px 0;border-bottom:1px solid #ECE6DA;font-size:13px;color:#16221C;font-weight:700;text-align:right;white-space:nowrap;">${fmtKr(i.price)}</td>
+        </tr>`).join('');
+
+    const methodLabel = SHIPPING_LABELS[g.shippingMethod] || 'Forsendelse';
+    const isShipping = g.shippingMethod && g.shippingMethod !== 'pickup' && g.shippingMethod !== 'custom';
+
+    const deliveryLine = isShipping
+      ? `<tr><td style="padding:6px 0;font-size:12px;color:#6B7570;">Levering (${escapeHtml(methodLabel)})</td><td style="padding:6px 0;font-size:12px;color:#6B7570;text-align:right;">${fmtKr(g.shippingTotal)}</td></tr>`
+      : `<tr><td style="padding:6px 0;font-size:12px;color:#6B7570;">${escapeHtml(methodLabel)}</td><td style="padding:6px 0;font-size:12px;color:#6B7570;text-align:right;">—</td></tr>`;
+
+    return `
+      <div style="margin-bottom:20px;padding-bottom:20px;border-bottom:1px solid #ECE6DA;">
+        <div style="font-size:12px;font-weight:700;color:#6B7570;text-transform:uppercase;letter-spacing:0.06em;margin-bottom:10px;">Fra ${escapeHtml(String(g.sellerName || 'sælger'))}</div>
+        <table style="width:100%;border-collapse:collapse;">
+          <thead><tr>
+            <th style="padding:0 0 6px;border-bottom:2px solid #DAD3C4;font-size:11px;color:#6B7570;text-transform:uppercase;letter-spacing:0.06em;text-align:left;">Vare</th>
+            <th style="padding:0 0 6px;border-bottom:2px solid #DAD3C4;font-size:11px;color:#6B7570;text-transform:uppercase;letter-spacing:0.06em;text-align:right;">Pris</th>
+          </tr></thead>
+          <tbody>${itemRows}</tbody>
+        </table>
+        <table style="width:100%;border-collapse:collapse;margin-top:6px;">
+          ${deliveryLine}
+          <tr><td style="padding:6px 0;font-size:12px;color:#6B7570;">Bytogleg beskyttelse</td><td style="padding:6px 0;font-size:12px;color:#6B7570;text-align:right;">${fmtKr(g.serviceFee)}</td></tr>
+        </table>
+        ${isShipping && g.pickupPoint ? `<div style="font-size:12px;color:#6B7570;margin-top:6px;">Afhentningssted: ${escapeHtml(String(g.pickupPoint.name || ''))}${g.pickupPoint.address ? `, ${escapeHtml(String(g.pickupPoint.address))}` : ''}</div>` : ''}
+      </div>`;
+  }).join('');
+
+  return `<!DOCTYPE html>
+<html lang="da">
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head>
+<body style="margin:0;padding:0;background:#F6F2EA;font-family:'Helvetica Neue',Helvetica,Arial,sans-serif;">
+  <div style="max-width:580px;margin:48px auto 32px;">
+
+    <!-- Header -->
+    <div style="background:linear-gradient(160deg,#133F2B 0%,#2A7D4F 100%);border-radius:20px 20px 0 0;padding:44px 44px 36px;text-align:center;">
+      <div style="display:inline-block;background:rgba(255,255,255,0.12);border-radius:14px;padding:10px 22px;color:#fff;font-size:26px;font-weight:900;letter-spacing:-0.04em;margin-bottom:20px;">byt<span style="opacity:0.55">&amp;</span>leg.</div>
+      <h1 style="color:#fff;font-size:26px;font-weight:800;margin:0 0 10px;letter-spacing:-0.03em;">Din betaling er gennemført! 🎉</h1>
+      <p style="color:rgba(255,255,255,0.7);font-size:15px;margin:0;line-height:1.55;">Sælger er notificeret og pakker varen til dig.</p>
+    </div>
+
+    <!-- Body -->
+    <div style="background:#fff;padding:40px 44px;border-left:1px solid rgba(22,34,28,0.08);border-right:1px solid rgba(22,34,28,0.08);">
+      <p style="font-size:15px;color:#3A473D;line-height:1.65;margin:0 0 28px;">
+        Hej ${name},<br><br>
+        Tak for dit køb! Her er en oversigt over din ordre.
+      </p>
+
+      ${groupRows}
+
+      <!-- Total -->
+      <div style="display:flex;justify-content:space-between;align-items:center;padding:14px 0 0;border-top:2px solid #16221C;">
+        <span style="font-size:15px;font-weight:800;color:#16221C;">I alt betalt</span>
+        <span style="font-size:18px;font-weight:800;color:#2A7D4F;">${fmtKr(grandTotal)}</span>
+      </div>
+      <p style="font-size:12px;color:#6B7570;margin:6px 0 28px;">Ordrenummer: ${escapeHtml(String(orderId || ''))}</p>
+
+      <!-- Beskyttelse -->
+      <div style="background:#E8F1EC;border:1px solid #CFE3D8;border-radius:14px;padding:18px 20px;margin-bottom:28px;">
+        <div style="font-weight:800;font-size:14px;color:#133F2B;margin-bottom:6px;">🛡️ Du er dækket af Bytogleg beskyttelse</div>
+        <p style="font-size:13px;color:#3A473D;line-height:1.6;margin:0;">
+          Hvis varen ikke ankommer eller ikke matcher beskrivelsen, hjælper vi dig med at få dine penge tilbage.
+        </p>
+      </div>
+
+      <!-- Hvad sker der nu -->
+      <div style="font-weight:800;font-size:14px;color:#16221C;margin:0 0 14px;">Hvad sker der nu?</div>
+      ${[
+        { icon: '📦', text: 'Sælger pakker varen og printer pakkemærkaten.' },
+        { icon: '🚚', text: 'Du modtager en notifikation når pakken er sendt.' },
+        { icon: '🏠', text: 'Pakken leveres til dit valgte afhentningssted.' },
+      ].map((s, i) => `
+      <div style="display:flex;gap:14px;margin-bottom:14px;align-items:flex-start;">
+        <div style="flex-shrink:0;width:34px;height:34px;background:#e8f5ee;border-radius:10px;font-size:17px;text-align:center;line-height:34px;">${s.icon}</div>
+        <div style="flex:1;font-size:13px;color:#3A473D;line-height:1.55;padding-top:7px;">${s.text}</div>
+      </div>`).join('')}
+
+      <!-- CTA -->
+      <div style="text-align:center;margin-top:28px;">
+        <a href="${base}/beskeder" style="display:inline-block;background:#2A7D4F;color:#fff;text-decoration:none;font-weight:700;font-size:14px;padding:14px 32px;border-radius:99px;">Følg din ordre i beskeder →</a>
       </div>
     </div>
 
