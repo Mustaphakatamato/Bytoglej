@@ -44,21 +44,67 @@ function StatusBadge({ status }) {
   );
 }
 
-function OrderCard({ order }) {
+const STATUS_STEPS = ['paid', 'shipped', 'delivered'];
+const STATUS_STEP_LABELS = ['Betalt', 'Afsendt', 'Leveret'];
+
+function OrderProgress({ status }) {
+  const step = STATUS_STEPS.indexOf(status);
+  if (step < 0) return null;
+  return (
+    <div style={{ display: 'flex', alignItems: 'center', margin: '12px 0 4px' }}>
+      {STATUS_STEP_LABELS.map((lbl, i) => {
+        const done = i < step;
+        const active = i === step;
+        return (
+          <div key={lbl} style={{ display: 'flex', alignItems: 'center', flex: i < STATUS_STEP_LABELS.length - 1 ? 1 : 'none' }}>
+            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', minWidth: 56 }}>
+              <div style={{
+                width: 24, height: 24, borderRadius: '50%',
+                border: `2px solid ${done || active ? PRIMARY : PAPER3}`,
+                background: done ? PRIMARY : active ? GREEN_TINT : '#fff',
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                fontSize: 11, color: done ? '#fff' : active ? PRIMARY : INK3, fontWeight: 800,
+              }}>
+                {done ? '✓' : i + 1}
+              </div>
+              <div style={{ fontFamily: FONT, fontSize: 9, fontWeight: active ? 700 : 500, color: done || active ? PRIMARY : INK3, marginTop: 3, textAlign: 'center' }}>{lbl}</div>
+            </div>
+            {i < STATUS_STEP_LABELS.length - 1 && (
+              <div style={{ flex: 1, height: 2, background: done ? PRIMARY : PAPER3, margin: '0 2px', marginBottom: 14 }} />
+            )}
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+function OrderCard({ order, onUpdate }) {
+  const router = useRouter();
   const [open, setOpen] = useState(false);
+  const [confirming, setConfirming] = useState(false);
   const groups = order.order_groups || [];
   const firstItem = groups[0]?.items?.[0];
   const itemCount = groups.reduce((s, g) => s + (g.items?.length || 0), 0);
   const grandTotal = order.grand_total ?? groups.reduce((s, g) => s + (g.itemTotal || 0) + (g.shippingTotal || 0) + (g.serviceFee || 0), 0);
+  const trackingUrl = order.tracking_url || groups.find(g => g.tracking_url)?.tracking_url;
+  const trackingNumber = order.tracking_number || groups.find(g => g.tracking_number)?.tracking_number;
+  const isShipping = groups.some(g => g.shippingMethod && g.shippingMethod !== 'pickup' && g.shippingMethod !== 'custom');
+
+  async function handleConfirmReceived() {
+    setConfirming(true);
+    const { error } = await db.from('orders')
+      .update({ status: 'delivered', delivered_at: new Date().toISOString() })
+      .eq('id', order.id);
+    setConfirming(false);
+    if (!error) onUpdate(order.id, 'delivered');
+  }
 
   return (
     <div style={{ background: '#fff', borderRadius: 16, border: `1.5px solid ${PAPER3}`, overflow: 'hidden', marginBottom: 12 }}>
       <button
         onClick={() => setOpen(o => !o)}
-        style={{
-          width: '100%', background: 'none', border: 'none', cursor: 'pointer',
-          padding: '16px 18px', display: 'flex', alignItems: 'center', gap: 12,
-        }}
+        style={{ width: '100%', background: 'none', border: 'none', cursor: 'pointer', padding: '16px 18px', display: 'flex', alignItems: 'center', gap: 12 }}
       >
         <div style={{ flex: 1, textAlign: 'left' }}>
           <div style={{ fontFamily: FONT, fontWeight: 700, fontSize: 13, color: INK, marginBottom: 4 }}>
@@ -78,87 +124,85 @@ function OrderCard({ order }) {
 
       {open && (
         <div style={{ borderTop: `1px solid ${PAPER2}`, padding: '16px 18px' }}>
-          {groups.map((g, gi) => (
-            <div key={gi} style={{ marginBottom: gi < groups.length - 1 ? 20 : 0, paddingBottom: gi < groups.length - 1 ? 20 : 0, borderBottom: gi < groups.length - 1 ? `1px solid ${PAPER2}` : 'none' }}>
-              <div style={{ fontFamily: FONT, fontWeight: 700, fontSize: 12, color: INK2, marginBottom: 10 }}>
-                Fra {g.sellerName}
-              </div>
 
+          {/* Status progress */}
+          {['paid','shipped','delivered'].includes(order.status) && isShipping && (
+            <OrderProgress status={order.status} />
+          )}
+
+          {/* Groups */}
+          {groups.map((g, gi) => (
+            <div key={gi} style={{ marginTop: 14, paddingTop: gi > 0 ? 14 : 0, borderTop: gi > 0 ? `1px solid ${PAPER2}` : 'none' }}>
+              <div style={{ fontFamily: FONT, fontWeight: 700, fontSize: 12, color: INK2, marginBottom: 8 }}>Fra {g.sellerName}</div>
               {(g.items || []).map((item, ii) => (
                 <div key={ii} style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 6 }}>
-                  <span style={{ fontFamily: FONT, fontSize: 13, color: INK }}>
-                    {item.emoji || '📦'} {item.title}
-                  </span>
-                  <span style={{ fontFamily: FONT, fontSize: 13, color: INK, fontWeight: 600 }}>
-                    {fmtKr(item.price)}
-                  </span>
+                  <span style={{ fontFamily: FONT, fontSize: 13, color: INK }}>{item.emoji || '📦'} {item.title}</span>
+                  <span style={{ fontFamily: FONT, fontSize: 13, color: INK, fontWeight: 600 }}>{fmtKr(item.price)}</span>
                 </div>
               ))}
-
-              <div style={{ marginTop: 8, paddingTop: 8, borderTop: `1px dashed ${PAPER3}` }}>
+              <div style={{ marginTop: 6, paddingTop: 6, borderTop: `1px dashed ${PAPER3}` }}>
                 {g.shippingTotal > 0 && (
-                  <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>
-                    <span style={{ fontFamily: FONT, fontSize: 12, color: INK3 }}>
-                      Levering ({SHIPPING_LABELS[g.shippingMethod] || g.shippingMethod})
-                    </span>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 3 }}>
+                    <span style={{ fontFamily: FONT, fontSize: 12, color: INK3 }}>Levering ({SHIPPING_LABELS[g.shippingMethod] || g.shippingMethod})</span>
                     <span style={{ fontFamily: FONT, fontSize: 12, color: INK3 }}>{fmtKr(g.shippingTotal)}</span>
                   </div>
-                )}
-                {g.shippingMethod === 'pickup' && (
-                  <div style={{ fontFamily: FONT, fontSize: 12, color: INK3, marginBottom: 4 }}>Afhentning</div>
                 )}
                 <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                   <span style={{ fontFamily: FONT, fontSize: 12, color: INK3 }}>Bytogleg beskyttelse</span>
                   <span style={{ fontFamily: FONT, fontSize: 12, color: INK3 }}>{fmtKr(g.serviceFee)}</span>
                 </div>
               </div>
-
-              {g.tracking_number && (
-                <div style={{ background: GREEN_TINT, borderRadius: 10, padding: '10px 12px', marginTop: 10 }}>
-                  <div style={{ fontFamily: FONT, fontWeight: 700, fontSize: 12, color: INK, marginBottom: 4 }}>
-                    Sporingsoplysninger
-                  </div>
-                  <div style={{ fontFamily: FONT, fontSize: 12, color: INK2, marginBottom: g.tracking_url ? 6 : 0 }}>
-                    Tracking-nummer: {g.tracking_number}
-                  </div>
-                  {g.tracking_url && (
-                    <a href={g.tracking_url} target="_blank" rel="noopener noreferrer"
-                      style={{ fontFamily: FONT, fontSize: 12, color: PRIMARY, fontWeight: 700, textDecoration: 'none' }}>
-                      Spor pakken →
-                    </a>
-                  )}
-                </div>
-              )}
             </div>
           ))}
 
-          {order.tracking_number && !groups.some(g => g.tracking_number) && (
-            <div style={{ background: GREEN_TINT, borderRadius: 10, padding: '10px 12px', marginTop: 10 }}>
-              <div style={{ fontFamily: FONT, fontWeight: 700, fontSize: 12, color: INK, marginBottom: 4 }}>
-                Sporingsoplysninger
-              </div>
-              <div style={{ fontFamily: FONT, fontSize: 12, color: INK2, marginBottom: order.tracking_url ? 6 : 0 }}>
-                Tracking-nummer: {order.tracking_number}
-              </div>
-              {order.tracking_url && (
-                <a href={order.tracking_url} target="_blank" rel="noopener noreferrer"
-                  style={{ fontFamily: FONT, fontSize: 12, color: PRIMARY, fontWeight: 700, textDecoration: 'none' }}>
-                  Spor pakken →
-                </a>
-              )}
-            </div>
-          )}
-
+          {/* Total */}
           <div style={{ marginTop: 14, paddingTop: 14, borderTop: `1.5px solid ${PAPER2}`, display: 'flex', justifyContent: 'space-between' }}>
             <span style={{ fontFamily: FONT, fontWeight: 800, fontSize: 13, color: INK }}>I alt</span>
             <span style={{ fontFamily: FONT, fontWeight: 800, fontSize: 15, color: PRIMARY }}>{fmtKr(grandTotal)}</span>
           </div>
-
           {order.paid_at && (
-            <div style={{ fontFamily: FONT, fontSize: 11, color: INK3, textAlign: 'right', marginTop: 4 }}>
+            <div style={{ fontFamily: FONT, fontSize: 11, color: INK3, textAlign: 'right', marginTop: 2 }}>
               Betalt {fmtDate(order.paid_at)}
             </div>
           )}
+
+          {/* Actions */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginTop: 14 }}>
+            {trackingUrl && (
+              <a href={trackingUrl} target="_blank" rel="noopener noreferrer" style={{
+                display: 'block', textAlign: 'center', padding: '11px', borderRadius: 99,
+                background: PRIMARY, color: '#fff', fontFamily: FONT, fontWeight: 700, fontSize: 13, textDecoration: 'none',
+              }}>
+                📦 Spor pakken
+              </a>
+            )}
+            {trackingNumber && !trackingUrl && (
+              <div style={{ textAlign: 'center', fontFamily: FONT, fontSize: 12, color: INK3 }}>
+                Tracking: {trackingNumber}
+              </div>
+            )}
+            {order.status === 'shipped' && (
+              <button
+                disabled={confirming}
+                onClick={handleConfirmReceived}
+                style={{
+                  padding: '11px', borderRadius: 99, border: `1.5px solid ${PRIMARY}`,
+                  background: confirming ? PAPER2 : GREEN_TINT,
+                  color: confirming ? INK3 : PRIMARY,
+                  fontFamily: FONT, fontWeight: 700, fontSize: 13, cursor: confirming ? 'default' : 'pointer',
+                }}>
+                {confirming ? 'Gemmer…' : '✅ Marker som modtaget'}
+              </button>
+            )}
+            <button
+              onClick={() => router.push('/beskeder')}
+              style={{
+                padding: '11px', borderRadius: 99, background: PAPER2, border: 'none',
+                fontFamily: FONT, fontWeight: 600, fontSize: 13, color: INK3, cursor: 'pointer',
+              }}>
+              💬 Chat med sælger
+            </button>
+          </div>
         </div>
       )}
     </div>
@@ -230,7 +274,8 @@ export default function MineOrdrerPage() {
         )}
 
         {!loading && orders.map(order => (
-          <OrderCard key={order.id} order={order} />
+          <OrderCard key={order.id} order={order}
+            onUpdate={(id, status) => setOrders(os => os.map(o => o.id === id ? { ...o, status } : o))} />
         ))}
       </div>
     </div>
