@@ -29,18 +29,24 @@ function PaymentForm({ orderId, grandTotal, breakdown }) {
       setError('Betalingen tog for lang tid — prøv igen.');
     }, 60000);
 
-    const { error: stripeError } = await stripe.confirmPayment({
-      elements,
-      confirmParams: {
-        return_url: `${window.location.origin}/betaling/success?order_id=${orderId}`,
-        payment_method_data: { billing_details: {} },
-      },
-    });
+    try {
+      const { error: stripeError } = await stripe.confirmPayment({
+        elements,
+        confirmParams: {
+          return_url: `${window.location.origin}/betaling/success?order_id=${orderId}`,
+        },
+      });
 
-    clearTimeout(timeoutId);
+      clearTimeout(timeoutId);
 
-    if (stripeError) {
-      setError(stripeError.message);
+      if (stripeError) {
+        setError(stripeError.message);
+        setPaying(false);
+      }
+      // If no error: Stripe redirects — nothing more to do here
+    } catch (err) {
+      clearTimeout(timeoutId);
+      setError('Der skete en teknisk fejl — prøv igen.');
       setPaying(false);
     }
   }
