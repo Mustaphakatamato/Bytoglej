@@ -51,14 +51,19 @@ export async function POST(req) {
       return NextResponse.json({ error: `Resend fejlede (${res.status})`, detail }, { status: 502 });
     }
 
-    // Persist to DB (fire-and-forget, don't fail the request if insert fails)
-    adminDb.from('feedback').insert({
-      category: category || 'general',
-      message: message.trim(),
-      institution_name: institutionName || null,
-      user_email: userEmail || null,
-      page: page || null,
-    }).then(({ error }) => { if (error) console.error('[feedback] DB insert fejl:', error.message); });
+    // Persist to DB — awaited so Vercel doesn't kill the function before insert completes
+    try {
+      const { error: dbErr } = await adminDb.from('feedback').insert({
+        category: category || 'general',
+        message: message.trim(),
+        institution_name: institutionName || null,
+        user_email: userEmail || null,
+        page: page || null,
+      });
+      if (dbErr) console.error('[feedback] DB insert fejl:', dbErr.message);
+    } catch (dbEx) {
+      console.error('[feedback] DB insert exception:', dbEx.message);
+    }
 
     return NextResponse.json({ success: true });
   } catch (e) {
