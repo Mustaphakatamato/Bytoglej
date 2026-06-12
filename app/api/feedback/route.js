@@ -53,15 +53,24 @@ export async function POST(req) {
 
     // Persist to DB — awaited so Vercel doesn't kill the function before insert completes
     try {
-      const { error: dbErr } = await adminDb.from('feedback').insert({
+      const payload = {
         category: category || 'general',
         message: message.trim(),
         institution_name: institutionName || null,
         user_email: userEmail || null,
         page: page || null,
         screenshot_url: screenshotUrl || null,
-      });
-      if (dbErr) console.error('[feedback] DB insert fejl:', dbErr.message);
+      };
+      const { error: dbErr } = await adminDb.from('feedback').insert(payload);
+      if (dbErr) {
+        console.error('[feedback] DB insert fejl:', dbErr.message);
+        // Fallback: retry without optional columns in case schema is outdated
+        if (dbErr.message?.includes('screenshot_url') || dbErr.message?.includes('column')) {
+          const { category: cat, message: msg, institution_name, user_email } = payload;
+          const { error: dbErr2 } = await adminDb.from('feedback').insert({ category: cat, message: msg, institution_name, user_email });
+          if (dbErr2) console.error('[feedback] DB insert fallback fejl:', dbErr2.message);
+        }
+      }
     } catch (dbEx) {
       console.error('[feedback] DB insert exception:', dbEx.message);
     }
