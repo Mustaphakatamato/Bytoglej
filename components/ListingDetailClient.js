@@ -630,7 +630,16 @@ export default function ListingDetailClient() {
                         </span>
                       </div>
                     )}
-                    <div style={{ fontFamily:FONT, fontWeight:800, fontSize:32, color: listing.original_price && listing.original_price > listing.price ? '#e11d48' : PRIMARY, letterSpacing:'-0.03em' }}>{listing.price} kr.</div>
+                    <div style={{ display:'flex', alignItems:'baseline', gap:10, flexWrap:'wrap' }}>
+                      <div style={{ fontFamily:FONT, fontWeight:800, fontSize:32, color: listing.original_price && listing.original_price > listing.price ? '#e11d48' : PRIMARY, letterSpacing:'-0.03em' }}>{listing.price} kr.</div>
+                      {(() => {
+                        const so = listing.shipping_options?.[0];
+                        if (!so?.allow_shipping) return null;
+                        return so.shipping_included_in_price
+                          ? <span style={{ fontSize:13, fontWeight:700, color:'#16a34a', background:'#F0FDF4', borderRadius:99, padding:'4px 12px', border:'1px solid #86efac', fontFamily:FONT }}>inkl. fragt</span>
+                          : <span style={{ fontSize:13, fontWeight:700, color:'#2563EB', background:'#EFF6FF', borderRadius:99, padding:'4px 12px', border:'1px solid #93c5fd', fontFamily:FONT }}>+ fragt</span>;
+                      })()}
+                    </div>
                   </div>
                 : listing.type === 'byt' ? <div style={{ fontSize:20, color:CORAL, fontWeight:800, fontFamily:FONT }}>Byttes kun</div>
                 : <div style={{ fontSize:20, color:ACCENT2, fontWeight:800, fontFamily:FONT }}>Afgiv bud</div>}
@@ -641,7 +650,7 @@ export default function ListingDetailClient() {
             {/* Action buttons */}
             {!isOwn ? (
               <div style={{ display:'flex', flexDirection:'column', gap:10, marginBottom:20 }}>
-                {listing.type==='køb' && <Btn variant="primary" color={PRIMARY} radius={22} onClick={handleAddToCart} style={{ justifyContent:'center', padding:'15px', fontSize:16 }}>{inCart ? '🛒 Gå til kurv →' : `🛒 Læg i kurv — ${listing.price} kr.`}</Btn>}
+                {listing.type==='køb' && <Btn variant="primary" color={PRIMARY} radius={22} onClick={handleAddToCart} style={{ justifyContent:'center', padding:'15px', fontSize:16 }}>{inCart ? '🛒 Gå til kurv →' : (() => { const so = listing.shipping_options?.[0]; const tag = so?.allow_shipping ? (so.shipping_included_in_price ? ' inkl. fragt' : ' + fragt') : ''; return `🛒 Læg i kurv — ${listing.price} kr.${tag}`; })()}</Btn>}
                 {listing.type==='byd' && <Btn variant="primary" color={ACCENT2} radius={22} onClick={()=>setBidModal(true)} style={{ justifyContent:'center', padding:'15px', fontSize:16 }}>📊 Afgiv bud</Btn>}
                 {listing.type==='byt' && <Btn variant="primary" color={ACCENT} radius={22} onClick={()=>setSwapModal(true)} style={{ justifyContent:'center', padding:'15px', fontSize:16 }}>🔄 Foreslå bytte</Btn>}
                 {listing.type==='søges' && <button onClick={()=>setSøgesModal(true)}
@@ -737,7 +746,7 @@ export default function ListingDetailClient() {
               if (!so && !listing.can_ship) return null;
               const rows = [];
               if (so?.allow_pickup) rows.push({ icon:'📍', label:'Afhentes', color:'#16a34a', bg:'#F0FDF4', detail: so.pickup_address || null, sub: so.pickup_hours?.text || so.pickup_notes || null });
-              if (so?.allow_shipping || (!so && listing.can_ship)) rows.push({ icon:'📦', label:'Sendes med pakkepost', color:'#2563EB', bg:'#EFF6FF', detail: so?.shipping_size_category ? `Pakkestr.: ${so.shipping_size_category}` : null, sub: so?.shipping_included_in_price ? 'Porto inkluderet i prisen' : 'Porto betales af køber' });
+              if (so?.allow_shipping || (!so && listing.can_ship)) rows.push({ icon:'📦', label:'Sendes med pakkepost', color:'#2563EB', bg:'#EFF6FF', detail: so?.shipping_size_category ? `Pakkestr.: ${so.shipping_size_category}` : null, subChip: so?.shipping_included_in_price == null ? null : (so?.shipping_included_in_price ? { text:'Porto inkluderet i prisen', bg:'#F0FDF4', color:'#16a34a', border:'#86efac' } : { text:'Porto betales af køber', bg:'#FEF9C3', color:'#92400e', border:'#fde047' }) });
               if (so?.allow_custom) rows.push({ icon:'🤝', label:'Aftalt levering', color:'#92400e', bg:'#FEF9C3', detail: 'Aftales individuelt', sub: null });
               if (!rows.length) return null;
               return (
@@ -751,6 +760,7 @@ export default function ListingDetailClient() {
                           <div style={{ fontFamily:FONT, fontWeight:700, fontSize:13, color:r.color }}>{r.label}</div>
                           {r.detail && <div style={{ fontSize:12, color:INK3, fontFamily:FONT, marginTop:2 }}>{r.detail}</div>}
                           {r.sub && <div style={{ fontSize:11, color:INK3, fontFamily:FONT, marginTop:1 }}>{r.sub}</div>}
+                          {r.subChip && <span style={{ display:'inline-block', marginTop:5, fontSize:11, fontWeight:700, color:r.subChip.color, background:r.subChip.bg, border:`1px solid ${r.subChip.border}`, borderRadius:99, padding:'2px 9px', fontFamily:FONT }}>{r.subChip.text}</span>}
                         </div>
                       </div>
                     ))}

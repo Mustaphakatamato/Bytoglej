@@ -90,7 +90,7 @@ export default function OpretOpslagPage() {
   const [delivery, setDelivery] = useState({
     pickup: false,   shipping: false,  custom: false,
     pickup_address: '', pickup_hours: '', pickup_notes: '',
-    size_category: '', shipping_included: false, custom_notes: '',
+    size_category: '', shipping_included: null, custom_notes: '',
   });
   const [priceEstimates, setPriceEstimates] = useState(null); // { min, max } DKK
   const [deliveryDefaultApplied, setDeliveryDefaultApplied] = useState(false);
@@ -409,6 +409,7 @@ export default function OpretOpslagPage() {
     if (!form.title.trim()) return;
     if (form.type === 'køb' && !String(form.price).trim()) { showToast('Angiv en pris for køb-opslag', 'error'); return; }
     if (!form.description.trim()) { showToast('Tilføj en beskrivelse', 'error'); return; }
+    if (delivery.shipping && delivery.shipping_included === null) { showToast('Vælg porto-håndtering for forsendelse', 'error'); return; }
     setSaving(true);
     try {
     const { data:{ user } } = await db.auth.getUser();
@@ -449,7 +450,7 @@ export default function OpretOpslagPage() {
         pickup_hours: delivery.pickup && delivery.pickup_hours ? { text: delivery.pickup_hours } : null,
         pickup_notes: delivery.pickup ? (delivery.pickup_notes || null) : null,
         shipping_size_category: delivery.shipping ? (delivery.size_category || null) : null,
-        shipping_included_in_price: delivery.shipping ? delivery.shipping_included : false,
+        shipping_included_in_price: delivery.shipping ? (delivery.shipping_included ?? false) : false,
       });
     }
     if (imgFiles.length > 0) {
@@ -802,7 +803,10 @@ export default function OpretOpslagPage() {
                               </div>
                             )}
                             <div>
-                              <label style={{ ...labelStyle, fontSize:12, marginBottom:6 }}>Porto-håndtering</label>
+                              <label style={{ ...labelStyle, fontSize:12, marginBottom:6 }}>
+                                Porto-håndtering <span style={{ color:'#e53e3e' }}>*</span>
+                                {delivery.shipping_included === null && <span style={{ fontWeight:400, color:'#e53e3e', fontSize:11, marginLeft:6 }}>— vælg en mulighed</span>}
+                              </label>
                               <div style={{ display:'flex', flexDirection:'column', gap:6 }}>
                                 {[
                                   { val:false, label:'Køber betaler porto oveni', sub:'Prisen du har sat er ekskl. porto' },
