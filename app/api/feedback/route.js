@@ -1,4 +1,12 @@
 import { NextResponse } from 'next/server';
+import { createClient } from '@supabase/supabase-js';
+
+const adminDb = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL,
+  process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
+  { auth: { persistSession: false } }
+);
+
 export async function POST(req) {
   try {
     const { category, message, institutionName, userEmail, page } = await req.json();
@@ -42,6 +50,16 @@ export async function POST(req) {
       console.error('[feedback] Resend fejl:', res.status, detail);
       return NextResponse.json({ error: `Resend fejlede (${res.status})`, detail }, { status: 502 });
     }
+
+    // Persist to DB (fire-and-forget, don't fail the request if insert fails)
+    adminDb.from('feedback').insert({
+      category: category || 'general',
+      message: message.trim(),
+      institution_name: institutionName || null,
+      user_email: userEmail || null,
+      page: page || null,
+    }).then(({ error }) => { if (error) console.error('[feedback] DB insert fejl:', error.message); });
+
     return NextResponse.json({ success: true });
   } catch (e) {
     return NextResponse.json({ error: e.message }, { status: 500 });

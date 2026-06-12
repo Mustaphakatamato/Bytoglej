@@ -70,6 +70,7 @@ const TABS = [
   { id: 'approvals',     label: 'Godkendelser',  Icon: () => <span style={{ fontSize:16 }}>✅</span> },
   { id: 'institutions',  label: 'Institutioner', Icon: IconBuilding },
   { id: 'listings',      label: 'Opslag',         Icon: IconList },
+  { id: 'feedback',      label: 'Feedback',       Icon: () => <span style={{ fontSize:16 }}>🚀</span> },
   { id: 'shipping',      label: 'Forsendelser',   Icon: () => <span style={{ fontSize:16 }}>📦</span> },
 ];
 
@@ -145,17 +146,22 @@ export default function AdminPage() {
   const [allInstitutions, setAllInstitutions] = useState([]);
   const [adminInst, setAdminInst] = useState(null);
   const [pendingApprovalCount, setPendingApprovalCount] = useState(0);
+  const [feedbackUnreadCount, setFeedbackUnreadCount] = useState(0);
   const w = useWindowWidth();
   const isMobile = w < 768;
 
   useEffect(() => { checkAuth(); }, []);
 
   useEffect(() => {
-    async function fetchPendingCount() {
-      const { count } = await db.from('institutions').select('id', { count: 'exact', head: true }).eq('is_approved', false);
-      setPendingApprovalCount(count || 0);
+    async function fetchCounts() {
+      const [{ count: approvals }, { count: unread }] = await Promise.all([
+        db.from('institutions').select('id', { count: 'exact', head: true }).eq('is_approved', false),
+        db.from('feedback').select('id', { count: 'exact', head: true }).eq('is_read', false),
+      ]);
+      setPendingApprovalCount(approvals || 0);
+      setFeedbackUnreadCount(unread || 0);
     }
-    fetchPendingCount();
+    fetchCounts();
   }, []);
 
   async function checkAuth() {
@@ -293,6 +299,11 @@ export default function AdminPage() {
                   {pendingApprovalCount}
                 </span>
               )}
+              {id === 'feedback' && feedbackUnreadCount > 0 && (
+                <span style={{ background: '#EF476F', color: '#fff', borderRadius: 99, fontSize: 10, fontWeight: 800, minWidth: 18, height: 18, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', padding: '0 5px' }}>
+                  {feedbackUnreadCount}
+                </span>
+              )}
             </button>
           ))}
         </div>
@@ -301,6 +312,7 @@ export default function AdminPage() {
         {tab === 'approvals'    && <ApprovalsTab isMobile={isMobile} />}
         {tab === 'institutions' && <InstitutionsTab institutions={allInstitutions} setAdminInst={setAdminInst} adminInst={adminInst} isMobile={isMobile} />}
         {tab === 'listings'     && <ListingsTab allInstitutions={allInstitutions} isMobile={isMobile} />}
+        {tab === 'feedback'     && <FeedbackTab isMobile={isMobile} onRead={n => setFeedbackUnreadCount(c => Math.max(0, c - n))} />}
         {tab === 'shipping'     && <ShippingAdminRedirect />}
       </div>
     </div>
@@ -866,6 +878,178 @@ function ListingsTab({ allInstitutions = [], isMobile }) {
           setListings(prev => prev.map(l => l.id === updated.id ? { ...l, ...updated } : l));
           setEditing(null);
         }} />
+      )}
+    </div>
+  );
+}
+
+// ── Feedback tab ─────────────────────────────────────────────────────────────
+
+const FEEDBACK_CATEGORIES = [
+  { key: 'all',        label: 'Alle',    emoji: null },
+  { key: 'bug',        label: 'Fejl',    emoji: '🐛' },
+  { key: 'suggestion', label: 'Forslag', emoji: '💡' },
+  { key: 'general',   label: 'Generel', emoji: '⭐' },
+];
+
+function FeedbackTab({ isMobile, onRead }) {
+  const [items, setItems] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [filter, setFilter] = useState('all');
+  const [expanded, setExpanded] = useState(null);
+
+  useEffect(() => {
+    db.from('feedback')
+      .select('*')
+      .order('created_at', { ascending: false })
+      .limit(300)
+      .then(({ data }) => { setItems(data || []); setLoading(false); });
+  }, []);
+
+  async function handleExpand(item) {
+    if (expanded === item.id) { setExpanded(null); return; }
+    setExpanded(item.id);
+    if (!item.is_read) {
+      await db.from('feedback').update({ is_read: true }).eq('id', item.id);
+      setItems(prev => prev.map(i => i.id === item.id ? { ...i, is_read: true } : i));
+      onRead(1);
+    }
+  }
+
+  async function markAllRead() {
+    const unread = items.filter(i => !i.is_read);
+    if (!unread.length) return;
+    await db.from('feedback').update({ is_read: true }).in('id', unread.map(i => i.id));
+    setItems(prev => prev.map(i => ({ ...i, is_read: true })));
+    onRead(unread.length);
+  }
+
+  const filtered = filter === 'all' ? items : items.filter(i => i.category === filter);
+  const unreadCount = items.filter(i => !i.is_read).length;
+
+  const catEmoji = { bug: '🐛', suggestion: '💡', general: '⭐' };
+  const catLabel = { bug: 'Fejl/bug', suggestion: 'Forslag', general: 'Generel' };
+  const catColor = {
+    bug:        { bg: '#FEF2F2', color: '#DC2626', border: '#FCA5A5' },
+    suggestion: { bg: '#EFF6FF', color: '#1D4ED8', border: '#BFDBFE' },
+    general:    { bg: '#FEF9C3', color: '#92400E', border: '#FDE68A' },
+  };
+
+  function fmtDate(iso) {
+    if (!iso) return '';
+    const d = new Date(iso);
+    return d.toLocaleDateString('da-DK', { day: 'numeric', month: 'short', year: 'numeric' }) + ' · ' +
+           d.toLocaleTimeString('da-DK', { hour: '2-digit', minute: '2-digit' });
+  }
+
+  return (
+    <div>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16, flexWrap: 'wrap', gap: 10 }}>
+        <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+          {FEEDBACK_CATEGORIES.map(c => {
+            const cnt = c.key === 'all' ? items.length : items.filter(i => i.category === c.key).length;
+            return (
+              <button key={c.key} onClick={() => setFilter(c.key)} style={{
+                padding: '6px 14px', borderRadius: 99,
+                border: `1.5px solid ${filter === c.key ? PRIMARY : PAPER3}`,
+                background: filter === c.key ? GREEN_TINT : PAPER2,
+                color: filter === c.key ? PRIMARY : INK3,
+                fontFamily: FONT, fontWeight: 600, fontSize: 13,
+                cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 5,
+              }}>
+                {c.emoji && <span>{c.emoji}</span>}
+                {c.label}
+                <span style={{
+                  background: filter === c.key ? PRIMARY : PAPER3,
+                  color: filter === c.key ? '#fff' : INK3,
+                  borderRadius: 99, fontSize: 11, fontWeight: 800,
+                  minWidth: 18, height: 18,
+                  display: 'inline-flex', alignItems: 'center', justifyContent: 'center', padding: '0 5px',
+                }}>{cnt}</span>
+              </button>
+            );
+          })}
+        </div>
+        {unreadCount > 0 && (
+          <button onClick={markAllRead} style={{ padding: '6px 14px', borderRadius: 99, border: `1.5px solid ${PAPER3}`, background: PAPER2, color: INK3, fontFamily: FONT, fontWeight: 600, fontSize: 12, cursor: 'pointer' }}>
+            Marker alle som læst ({unreadCount})
+          </button>
+        )}
+      </div>
+
+      {loading ? <Spinner /> : filtered.length === 0 ? (
+        <div style={{ padding: '60px 20px', textAlign: 'center' }}>
+          <div style={{ fontSize: 40, marginBottom: 12 }}>📭</div>
+          <div style={{ fontFamily: FONT, fontSize: 15, fontWeight: 700, color: INK }}>Ingen feedback endnu</div>
+        </div>
+      ) : (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+          {filtered.map(item => {
+            const cc = catColor[item.category] || catColor.general;
+            const isOpen = expanded === item.id;
+            return (
+              <div key={item.id} style={{
+                background: item.is_read ? PAPER2 : '#fff',
+                border: `1.5px solid ${item.is_read ? 'rgba(22,34,28,0.08)' : PRIMARY}`,
+                borderRadius: 14, overflow: 'hidden',
+                boxShadow: item.is_read ? 'none' : '0 2px 8px rgba(45,106,79,0.10)',
+                transition: 'border-color 0.15s',
+              }}>
+                <button onClick={() => handleExpand(item)} style={{
+                  width: '100%', display: 'flex', alignItems: 'center', gap: 12,
+                  padding: '14px 16px', background: 'none', border: 'none', cursor: 'pointer', textAlign: 'left',
+                }}>
+                  {/* Category badge */}
+                  <span style={{ fontSize: 20, flexShrink: 0, lineHeight: 1 }}>{catEmoji[item.category] || '⭐'}</span>
+
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    {/* First line: institution + page */}
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', marginBottom: 3 }}>
+                      <span style={{ fontFamily: FONT, fontWeight: 700, fontSize: 13, color: INK }}>
+                        {item.institution_name || item.user_email || 'Anonym'}
+                      </span>
+                      {item.page && (
+                        <span style={{ fontFamily: 'monospace', fontSize: 11, background: PAPER3, color: INK3, borderRadius: 6, padding: '1px 7px' }}>
+                          {item.page}
+                        </span>
+                      )}
+                    </div>
+                    {/* Message preview */}
+                    <div style={{ fontFamily: FONT, fontSize: 13, color: INK3, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                      {item.message}
+                    </div>
+                  </div>
+
+                  <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 4, flexShrink: 0 }}>
+                    <span style={{ background: cc.bg, color: cc.color, border: `1px solid ${cc.border}`, fontFamily: FONT, fontWeight: 700, fontSize: 11, padding: '2px 9px', borderRadius: 99 }}>
+                      {catLabel[item.category] || item.category}
+                    </span>
+                    <span style={{ fontFamily: FONT, fontSize: 11, color: INK3 }}>
+                      {new Date(item.created_at).toLocaleDateString('da-DK', { day: 'numeric', month: 'short' })}
+                    </span>
+                    {!item.is_read && (
+                      <span style={{ width: 8, height: 8, borderRadius: '50%', background: PRIMARY, display: 'inline-block' }} />
+                    )}
+                  </div>
+                </button>
+
+                {isOpen && (
+                  <div style={{ borderTop: `1px solid ${PAPER3}`, padding: '16px 18px', background: '#fafaf9' }}>
+                    <div style={{ fontFamily: FONT, fontSize: 14, color: INK, lineHeight: 1.6, whiteSpace: 'pre-wrap', marginBottom: 14 }}>
+                      {item.message}
+                    </div>
+                    <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap', borderTop: `1px solid ${PAPER3}`, paddingTop: 12 }}>
+                      {item.institution_name && <InfoItem label="Institution" value={item.institution_name} />}
+                      {item.user_email && <InfoItem label="E-mail" value={item.user_email} />}
+                      {item.page && <InfoItem label="Side" value={<span style={{ fontFamily: 'monospace', fontSize: 12 }}>{item.page}</span>} />}
+                      <InfoItem label="Tidspunkt" value={fmtDate(item.created_at)} />
+                    </div>
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
       )}
     </div>
   );
