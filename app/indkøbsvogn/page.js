@@ -131,15 +131,21 @@ export default function CartPage() {
 
   function loadPickupPoints(sellerName) {
     const zip = institution?.zipcode || institution?.zip_code || '2100';
-    setPickupState(p => ({ ...p, [sellerName]: { loading: true, points: [], chosen: null } }));
+    setPickupState(p => ({ ...p, [sellerName]: { loading: true, points: [], chosen: null, error: null } }));
     authedFetch(`/api/shipping/pickup-points?zip=${zip}&carrier=postnord`)
-      .then(r => r.ok ? r.json() : Promise.reject(r.status))
-      .then(json => {
-        setPickupState(p => ({ ...p, [sellerName]: { loading: false, points: json?.points || [], chosen: null } }));
+      .then(r => r.json().then(j => ({ ok: r.ok, status: r.status, json: j })))
+      .then(({ ok, status, json }) => {
+        if (!ok) {
+          const msg = json?.error || `Fejl ${status}`;
+          console.error('[pickup-points] API fejl:', msg);
+          setPickupState(p => ({ ...p, [sellerName]: { loading: false, points: [], chosen: null, error: msg } }));
+        } else {
+          setPickupState(p => ({ ...p, [sellerName]: { loading: false, points: json?.points || [], chosen: null, error: null } }));
+        }
       })
       .catch(err => {
-        console.error('[pickup-points]', err);
-        setPickupState(p => ({ ...p, [sellerName]: { loading: false, points: [], chosen: null } }));
+        console.error('[pickup-points] Netværksfejl:', err);
+        setPickupState(p => ({ ...p, [sellerName]: { loading: false, points: [], chosen: null, error: String(err) } }));
       });
   }
 
@@ -414,6 +420,11 @@ export default function CartPage() {
                     </div>
                     {ps.loading ? (
                       <div style={{ padding: '12px 14px', borderRadius: 12, background: PAPER2, fontFamily: FONT, fontSize: 13, color: INK3 }}>Henter pakkeshops…</div>
+                    ) : ps.error ? (
+                      <div style={{ padding: '12px 14px', borderRadius: 12, background: '#FEF2F2', border: '1px solid #FCA5A5', fontFamily: FONT, fontSize: 12, color: '#DC2626' }}>
+                        Kunne ikke hente pakkeshops: {ps.error}
+                        <button onClick={() => loadPickupPoints(name)} style={{ marginLeft: 8, fontFamily: FONT, fontSize: 12, color: PRIMARY, background: 'none', border: 'none', cursor: 'pointer', textDecoration: 'underline' }}>Prøv igen</button>
+                      </div>
                     ) : ps.points?.length ? (
                       <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
                         {ps.points.map(pt => (
