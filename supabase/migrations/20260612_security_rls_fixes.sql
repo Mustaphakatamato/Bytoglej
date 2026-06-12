@@ -1,34 +1,19 @@
--- ════════════════════════════════════════════════════════════════════
--- Sikkerhedsaudit 2026-06-12 — kritiske RLS-fixes inden go-live
+-- Sikkerhedsaudit 2026-06-12 - kritiske RLS-fixes inden go-live
 --
--- a) Bankkontodata: fjern fra public SELECT på institutions (view + kolonnerettigheder)
--- b) Beskeder: fjern "Public read" — kun deltagere må læse
--- c) Opslag: fjern "Public update/delete" — kun ejer må opdatere/slette
--- d) Institution members: kræv auth (kun institution/admin må indsætte/slette)
+-- a) Bankkontodata: fjern fra public SELECT paa institutions
+-- b) Beskeder: kun deltagere maa laese samtaler og beskeder
+-- c) Opslag: kun ejer maa opdatere/slette
+-- d) Institution members: kraev auth ved insert/delete
 --
--- Køres i Supabase SQL Editor eller via `supabase db push`.
--- ════════════════════════════════════════════════════════════════════
+-- Koeres i Supabase SQL Editor.
 
 
--- ────────────────────────────────────────────────────────────────────
--- a) BANKKONTODATA PÅ INSTITUTIONS
---
--- Problemet: bank_reg_nr og bank_account_nr kunne læses af alle via
--- public SELECT på institutions-tabellen.
---
--- Løsning:
---   1. Opret et view `institutions_public` UDEN bankfelterne, som
---      frontend kan bruge til offentlige institutionsdata.
---   2. Fjern tabel-niveau SELECT for anon/authenticated og giv i stedet
---      kolonne-niveau SELECT på alle kolonner UNDTAGEN bankfelterne.
---      (PostgREST/Supabase håndterer kolonnerettigheder: `select=*`
---      returnerer kun de kolonner rollen har adgang til.)
---   Service role (API-routes, fx create-intent) er upåvirket og kan
---   stadig læse bankfelterne.
--- ────────────────────────────────────────────────────────────────────
+-- ================================================================
+-- a) BANKKONTODATA PAA INSTITUTIONS
+-- Fjerner bank_reg_nr og bank_account_nr fra public SELECT.
+-- Service role (API-routes) er upaavirkede.
+-- ================================================================
 
--- 1) View uden bankfelter — bygges dynamisk så det altid matcher tabellens
---    aktuelle kolonner (minus bankfelterne).
 DO $$
 DECLARE
   cols text;
@@ -41,15 +26,13 @@ BEGIN
     AND column_name NOT IN ('bank_reg_nr', 'bank_account_nr');
 
   EXECUTE format(
-    'CREATE OR REPLACE VIEW public.institutions_public WITH (security_invoker = on) AS SELECT %s FROM public.institutions',
+    'CREATE OR REPLACE VIEW public.institutions_public AS SELECT %s FROM public.institutions',
     cols
   );
 END $$;
 
 GRANT SELECT ON public.institutions_public TO anon, authenticated;
 
--- 2) Kolonne-niveau rettigheder: fjern tabel-SELECT og giv kun adgang
---    til ikke-følsomme kolonner for anon og authenticated.
 REVOKE SELECT ON public.institutions FROM anon, authenticated;
 
 DO $$
@@ -67,12 +50,9 @@ BEGIN
 END $$;
 
 
--- ────────────────────────────────────────────────────────────────────
--- c) OPSLAG (LISTINGS): kun ejer må opdatere/slette
---
--- Problemet: "Public update" og "Public delete" policies tillod alle
--- (også uautentificerede) at ændre eller slette andres opslag.
--- ────────────────────────────────────────────────────────────────────
+-- ================================================================
+-- c) OPSLAG (LISTINGS): kun ejer maa opdatere/slette
+-- ================================================================
 
 DROP POLICY IF EXISTS "Public update" ON listings;
 DROP POLICY IF EXISTS "Public delete" ON listings;
@@ -86,14 +66,10 @@ CREATE POLICY "Owner deletes listing" ON listings
   USING (user_id = auth.uid());
 
 
--- ────────────────────────────────────────────────────────────────────
--- b) BESKEDER: kun deltagere må læse samtaler og chatbeskeder
---
--- Problemet: "Public read" policies gjorde alle samtaler og beskeder
--- læsbare for enhver — inkl. private aftaler og kontaktoplysninger.
--- ────────────────────────────────────────────────────────────────────
+-- ================================================================
+-- b) BESKEDER: kun deltagere maa laese samtaler og chatbeskeder
+-- ================================================================
 
--- Conversations: kun initiator eller ejer (de to deltagere) må læse
 DROP POLICY IF EXISTS "Public read conversations" ON conversations;
 
 CREATE POLICY "Participants read conversation" ON conversations
@@ -102,7 +78,6 @@ CREATE POLICY "Participants read conversation" ON conversations
     initiator_id = auth.uid() OR owner_id = auth.uid()
   );
 
--- Chat messages: kun deltagere i den tilhørende samtale må læse
 DROP POLICY IF EXISTS "Public read chat_messages" ON chat_messages;
 
 CREATE POLICY "Participants read messages" ON chat_messages
@@ -116,18 +91,9 @@ CREATE POLICY "Participants read messages" ON chat_messages
   );
 
 
--- ────────────────────────────────────────────────────────────────────
--- d) INSTITUTION MEMBERS: kræv auth ved insert/delete
---
--- Problemet: members_insert/members_delete havde intet auth-tjek, så
--- enhver kunne tilføje sig selv til (eller fjerne andre fra) en
--- institution.
---
--- Nu må kun:
---   - institutionens egen e-mail eller lederens e-mail, ELLER
---   - et eksisterende medlem med rollen 'admin'
--- indsætte eller slette medlemmer.
--- ────────────────────────────────────────────────────────────────────
+-- ================================================================
+-- d) INSTITUTION MEMBERS: kraev auth ved insert/delete
+-- ================================================================
 
 DROP POLICY IF EXISTS "members_insert" ON institution_members;
 DROP POLICY IF EXISTS "members_delete" ON institution_members;
