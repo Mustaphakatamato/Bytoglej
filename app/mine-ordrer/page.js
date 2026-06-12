@@ -5,13 +5,13 @@ import { db } from '@/lib/supabase';
 import { PRIMARY, GREEN_TINT, INK, INK2, INK3, PAPER, PAPER2, PAPER3, FONT, CORAL } from '@/lib/constants';
 
 const STATUS_CFG = {
-  pending:   { label: 'Afventer betaling', color: INK3,     bg: PAPER2 },
-  paid:      { label: 'Betalt',            color: '#92610A', bg: '#FEF3C7' },
-  shipped:   { label: 'Sendt',             color: PRIMARY,  bg: GREEN_TINT },
-  delivered: { label: 'Leveret',           color: '#166534', bg: '#DCFCE7' },
-  refunded:  { label: 'Refunderet',        color: CORAL,    bg: '#FEE2E2' },
-  failed:    { label: 'Mislykket',         color: CORAL,    bg: '#FEE2E2' },
-  cancelled: { label: 'Annulleret',        color: INK3,     bg: PAPER2 },
+  pending:   { label: '⏳ Afventer',   color: INK3,     bg: PAPER2 },
+  paid:      { label: '✅ Betalt',     color: '#92610A', bg: '#FEF3C7' },
+  shipped:   { label: '🚚 Sendt',      color: PRIMARY,  bg: GREEN_TINT },
+  delivered: { label: '📦 Leveret',    color: '#166534', bg: '#DCFCE7' },
+  refunded:  { label: '↩️ Refunderet', color: CORAL,    bg: '#FEE2E2' },
+  failed:    { label: 'Mislykket',     color: CORAL,    bg: '#FEE2E2' },
+  cancelled: { label: 'Annulleret',    color: INK3,     bg: PAPER2 },
 };
 
 const SHIPPING_LABELS = {
@@ -47,7 +47,9 @@ function StatusBadge({ status }) {
 function OrderCard({ order }) {
   const [open, setOpen] = useState(false);
   const groups = order.order_groups || [];
-  const grandTotal = groups.reduce((s, g) => s + (g.itemTotal || 0) + (g.shippingTotal || 0) + (g.serviceFee || 0), 0);
+  const firstItem = groups[0]?.items?.[0];
+  const itemCount = groups.reduce((s, g) => s + (g.items?.length || 0), 0);
+  const grandTotal = order.grand_total ?? groups.reduce((s, g) => s + (g.itemTotal || 0) + (g.shippingTotal || 0) + (g.serviceFee || 0), 0);
 
   return (
     <div style={{ background: '#fff', borderRadius: 16, border: `1.5px solid ${PAPER3}`, overflow: 'hidden', marginBottom: 12 }}>
@@ -60,7 +62,7 @@ function OrderCard({ order }) {
       >
         <div style={{ flex: 1, textAlign: 'left' }}>
           <div style={{ fontFamily: FONT, fontWeight: 700, fontSize: 13, color: INK, marginBottom: 4 }}>
-            Ordre #{order.id.slice(0, 8).toUpperCase()}
+            {firstItem ? `${firstItem.emoji || '📦'} ${firstItem.title}${itemCount > 1 ? ` +${itemCount - 1} mere` : ''}` : `Ordre #${order.id.slice(0, 8).toUpperCase()}`}
           </div>
           <div style={{ fontFamily: FONT, fontSize: 11, color: INK3 }}>{fmtDate(order.created_at)}</div>
         </div>
@@ -130,6 +132,23 @@ function OrderCard({ order }) {
             </div>
           ))}
 
+          {order.tracking_number && !groups.some(g => g.tracking_number) && (
+            <div style={{ background: GREEN_TINT, borderRadius: 10, padding: '10px 12px', marginTop: 10 }}>
+              <div style={{ fontFamily: FONT, fontWeight: 700, fontSize: 12, color: INK, marginBottom: 4 }}>
+                Sporingsoplysninger
+              </div>
+              <div style={{ fontFamily: FONT, fontSize: 12, color: INK2, marginBottom: order.tracking_url ? 6 : 0 }}>
+                Tracking-nummer: {order.tracking_number}
+              </div>
+              {order.tracking_url && (
+                <a href={order.tracking_url} target="_blank" rel="noopener noreferrer"
+                  style={{ fontFamily: FONT, fontSize: 12, color: PRIMARY, fontWeight: 700, textDecoration: 'none' }}>
+                  Spor pakken →
+                </a>
+              )}
+            </div>
+          )}
+
           <div style={{ marginTop: 14, paddingTop: 14, borderTop: `1.5px solid ${PAPER2}`, display: 'flex', justifyContent: 'space-between' }}>
             <span style={{ fontFamily: FONT, fontWeight: 800, fontSize: 13, color: INK }}>I alt</span>
             <span style={{ fontFamily: FONT, fontWeight: 800, fontSize: 15, color: PRIMARY }}>{fmtKr(grandTotal)}</span>
@@ -160,7 +179,7 @@ export default function MineOrdrerPage() {
         if (!user) { router.push('/login'); return; }
         const { data, error: dbErr } = await db
           .from('orders')
-          .select('*')
+          .select('id, created_at, grand_total, status, order_groups, tracking_number, tracking_url, paid_at')
           .eq('buyer_id', user.id)
           .order('created_at', { ascending: false });
         if (cancelled) return;
@@ -200,11 +219,11 @@ export default function MineOrdrerPage() {
         {!loading && !error && orders.length === 0 && (
           <div style={{ textAlign: 'center', padding: '60px 0' }}>
             <div style={{ fontSize: 48, marginBottom: 16 }}>&#128717;</div>
-            <div style={{ fontFamily: FONT, fontWeight: 700, fontSize: 16, color: INK, marginBottom: 8 }}>Ingen ordrer endnu</div>
+            <div style={{ fontFamily: FONT, fontWeight: 700, fontSize: 16, color: INK, marginBottom: 8 }}>Du har ingen ordrer endnu</div>
             <div style={{ fontFamily: FONT, fontSize: 13, color: INK3, marginBottom: 24 }}>
               N&#229;r du k&#248;ber noget p&#229; byt&amp;leg, vises dine ordrer her.
             </div>
-            <button onClick={() => router.push('/')} style={{ background: PRIMARY, color: '#fff', border: 'none', borderRadius: 99, padding: '12px 28px', fontFamily: FONT, fontWeight: 700, fontSize: 14, cursor: 'pointer' }}>
+            <button onClick={() => router.push('/opslag')} style={{ background: PRIMARY, color: '#fff', border: 'none', borderRadius: 99, padding: '12px 28px', fontFamily: FONT, fontWeight: 700, fontSize: 14, cursor: 'pointer' }}>
               Udforsk opslag &#8594;
             </button>
           </div>
