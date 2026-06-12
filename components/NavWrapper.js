@@ -851,6 +851,47 @@ function Nav({ pathname, navigate, loggedIn, setLoggedIn, unreadTotal, instituti
               </Link>
             )}
 
+            {/* Footer link sections */}
+            <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:'0 24px', borderTop:`1px solid rgba(22,34,28,0.07)`, paddingTop:16, marginBottom:16 }}>
+              <div>
+                <div style={{ fontSize:10, fontWeight:700, color:INK3, textTransform:'uppercase', letterSpacing:'0.08em', marginBottom:10, fontFamily:FONT }}>Markedsplads</div>
+                {[
+                  { href:'/opslag',                           label:'Alle opslag' },
+                  { href:'/opret-opslag',                     label:'Opret opslag' },
+                  { href:'/opslag?category=legetoj',          label:'🧸 Legetøj' },
+                  { href:'/opslag?category=udendoers',        label:'🌳 Udendørs' },
+                  { href:'/opslag?category=kreativitet',      label:'🎨 Kreativitet' },
+                ].map(({ href, label }) => (
+                  <Link key={href} href={href} onClick={()=>setMenuOpen(false)}
+                    style={{ display:'block', fontSize:13, color:INK3, textDecoration:'none', marginBottom:8, fontFamily:FONT }}>
+                    {label}
+                  </Link>
+                ))}
+              </div>
+              <div>
+                <div style={{ fontSize:10, fontWeight:700, color:INK3, textTransform:'uppercase', letterSpacing:'0.08em', marginBottom:10, fontFamily:FONT }}>Din institution</div>
+                {[
+                  !loggedIn && { href:'/signup',       label:'Tilmeld institution' },
+                  !loggedIn && { href:'/login',        label:'Log ind' },
+                  loggedIn  && { href:'/dashboard',    label:'Mit dashboard' },
+                  loggedIn  && { href:'/mine-opslag',  label:'Mine opslag' },
+                  loggedIn  && { href:'/profil',       label:'Min profil' },
+                ].filter(Boolean).map(({ href, label }) => (
+                  <Link key={href} href={href} onClick={()=>setMenuOpen(false)}
+                    style={{ display:'block', fontSize:13, color:INK3, textDecoration:'none', marginBottom:8, fontFamily:FONT }}>
+                    {label}
+                  </Link>
+                ))}
+              </div>
+            </div>
+
+            {/* Legal */}
+            <div style={{ display:'flex', gap:12, alignItems:'center', paddingBottom:4, marginBottom:16, borderBottom:`1px solid rgba(22,34,28,0.07)` }}>
+              <Link href="/privatlivspolitik" onClick={()=>setMenuOpen(false)} style={{ fontSize:11, color:INK3, textDecoration:'none', fontFamily:FONT }}>Privatlivspolitik</Link>
+              <Link href="/vilkaar" onClick={()=>setMenuOpen(false)} style={{ fontSize:11, color:INK3, textDecoration:'none', fontFamily:FONT }}>Vilkår</Link>
+              <span style={{ fontSize:11, color:INK3, fontFamily:FONT, marginLeft:'auto' }}>© {new Date().getFullYear()} byt&amp;leg</span>
+            </div>
+
             {/* Auth buttons */}
             {!loggedIn ? (
               <div style={{ display:'flex', gap:10 }}>
