@@ -89,7 +89,7 @@ function StripeOrderCard({ order, myGroup, onMarkedSent }) {
               </a>
             ) : isPaid ? (
               <div style={{ background:'#FEF9C3', borderRadius:12, padding:'10px 14px', fontFamily:FONT, fontSize:13, color:'#92400E' }}>
-                📧 Pakkemærkaten er sendt til din e-mail — tjek din indbakke.
+                📧 Pakkemærkaten genereres og sendes til institutionens e-mail — tjek indbakke og spam.
               </div>
             ) : null}
 
