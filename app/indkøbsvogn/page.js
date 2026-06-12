@@ -271,6 +271,7 @@ export default function CartPage() {
   }
 
   return (
+    <>
     <div style={{ minHeight: '100vh', background: PAPER, paddingTop: 84, paddingBottom: 60 }}>
       <div style={{ maxWidth: 1040, margin: '0 auto', padding: isMobile ? '0 16px' : '0 32px', display: isMobile ? 'block' : 'grid', gridTemplateColumns: '1fr 360px', gap: 32, alignItems: 'start' }}>
 
@@ -591,5 +592,6 @@ export default function CartPage() {
         </div>
       </div>
     )}
+    </>
   );
 }
