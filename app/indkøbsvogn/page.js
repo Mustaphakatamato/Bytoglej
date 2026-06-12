@@ -56,6 +56,7 @@ export default function CartPage() {
   const { cart, removeFromCart, clearCart, setSelectedConvId, showToast } = useApp();
   const { userId, institutionId, institution } = useActiveUser();
   const [sending, setSending] = useState(false);
+  const [showFeeInfo, setShowFeeInfo] = useState(false);
 
   // Group cart items by seller
   const groups = useMemo(() => {
@@ -500,9 +501,10 @@ export default function CartPage() {
               )}
 
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <span style={{ fontFamily: FONT, fontSize: 14, color: INK2, display: 'flex', alignItems: 'center', gap: 4 }}>
-                  🛡️ Bytoglej beskyttelse
-                </span>
+                <button type="button" onClick={() => setShowFeeInfo(true)} style={{ background: 'none', border: 'none', padding: 0, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6 }}>
+                  <span style={{ fontFamily: FONT, fontSize: 14, color: INK2 }}>Gebyr for Køberbeskyttelse</span>
+                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke={INK3} strokeWidth="2" strokeLinecap="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+                </button>
                 <span style={{ fontFamily: FONT, fontWeight: 600, fontSize: 14, color: INK }}>{serviceFeeTotal.toFixed(2).replace('.', ',')} kr.</span>
               </div>
             </div>
@@ -548,5 +550,46 @@ export default function CartPage() {
 
       </div>
     </div>
+
+    {/* Køberbeskyttelse info-modal */}
+    {showFeeInfo && (
+      <div onClick={() => setShowFeeInfo(false)} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.45)', zIndex: 1000, display: 'flex', alignItems: 'flex-end', justifyContent: 'center', padding: '0 0 0 0' }}>
+        <div onClick={e => e.stopPropagation()} style={{ background: '#fff', borderRadius: '24px 24px 0 0', padding: '28px 24px 36px', width: '100%', maxWidth: 520, boxShadow: '0 -4px 40px rgba(0,0,0,0.12)' }}>
+          <div style={{ width: 36, height: 4, borderRadius: 99, background: PAPER3, margin: '0 auto 24px' }} />
+
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 20 }}>
+            <div style={{ width: 44, height: 44, borderRadius: 12, background: GREEN_TINT, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 22, flexShrink: 0 }}>🛡️</div>
+            <div>
+              <div style={{ fontFamily: FONT, fontWeight: 800, fontSize: 17, color: INK, letterSpacing: '-0.02em' }}>Bytoglej Køberbeskyttelse</div>
+              <div style={{ fontFamily: FONT, fontSize: 13, color: INK3, marginTop: 2 }}>Gebyr: {serviceFeeTotal.toFixed(2).replace('.', ',')} kr.</div>
+            </div>
+          </div>
+
+          <p style={{ fontFamily: FONT, fontSize: 14, color: INK2, lineHeight: 1.65, marginBottom: 20 }}>
+            Bytoglej Køberbeskyttelse dækker dig i tilfælde, hvor tingene ikke går som forventet. Gebyret bidrager til at sikre en tryg handel for alle.
+          </p>
+
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 14, marginBottom: 24 }}>
+            {[
+              { icon: '📦', title: 'Varen ankommer ikke', text: 'Modtager du ikke varen inden for den forventede leveringstid, refunderer vi hele beløbet.' },
+              { icon: '🔍', title: 'Varen matcher ikke beskrivelsen', text: 'Er varen i væsentligt ringere stand end beskrevet, hjælper vi dig med at få pengene tilbage.' },
+              { icon: '🔒', title: 'Sikker betaling', text: 'Dine betalingsoplysninger håndteres af Stripe og deles aldrig med sælger.' },
+            ].map((item, i) => (
+              <div key={i} style={{ display: 'flex', gap: 14 }}>
+                <div style={{ width: 36, height: 36, borderRadius: 10, background: PAPER2, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 18, flexShrink: 0 }}>{item.icon}</div>
+                <div>
+                  <div style={{ fontFamily: FONT, fontWeight: 700, fontSize: 14, color: INK, marginBottom: 3 }}>{item.title}</div>
+                  <div style={{ fontFamily: FONT, fontSize: 13, color: INK3, lineHeight: 1.5 }}>{item.text}</div>
+                </div>
+              </div>
+            ))}
+          </div>
+
+          <button onClick={() => setShowFeeInfo(false)} style={{ width: '100%', padding: '14px', borderRadius: 99, background: PRIMARY, color: '#fff', border: 'none', fontFamily: FONT, fontWeight: 700, fontSize: 15, cursor: 'pointer' }}>
+            Forstået
+          </button>
+        </div>
+      </div>
+    )}
   );
 }
