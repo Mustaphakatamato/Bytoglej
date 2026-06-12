@@ -82,7 +82,7 @@ export async function POST(req) {
       buyer_name: buyer?.name || '',
       group_count: String(groups.length),
     },
-    description: `Bytoglej ordre — ${groups.map(g => g.sellerName).join(', ')}`,
+    description: `Bytogleg ordre — ${groups.map(g => g.sellerName).join(', ')}`,
   });
 
   // Insert order record

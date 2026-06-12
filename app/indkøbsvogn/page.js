@@ -561,13 +561,13 @@ export default function CartPage() {
           <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 20 }}>
             <div style={{ width: 44, height: 44, borderRadius: 12, background: GREEN_TINT, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 22, flexShrink: 0 }}>🛡️</div>
             <div>
-              <div style={{ fontFamily: FONT, fontWeight: 800, fontSize: 17, color: INK, letterSpacing: '-0.02em' }}>Bytoglej Køberbeskyttelse</div>
+              <div style={{ fontFamily: FONT, fontWeight: 800, fontSize: 17, color: INK, letterSpacing: '-0.02em' }}>Bytogleg Køberbeskyttelse</div>
               <div style={{ fontFamily: FONT, fontSize: 13, color: INK3, marginTop: 2 }}>Gebyr: {serviceFeeTotal.toFixed(2).replace('.', ',')} kr.</div>
             </div>
           </div>
 
           <p style={{ fontFamily: FONT, fontSize: 14, color: INK2, lineHeight: 1.65, marginBottom: 20 }}>
-            Bytoglej Køberbeskyttelse dækker dig i tilfælde, hvor tingene ikke går som forventet. Gebyret bidrager til at sikre en tryg handel for alle.
+            Bytogleg Køberbeskyttelse dækker dig i tilfælde, hvor tingene ikke går som forventet. Gebyret bidrager til at sikre en tryg handel for alle.
           </p>
 
           <div style={{ display: 'flex', flexDirection: 'column', gap: 14, marginBottom: 24 }}>

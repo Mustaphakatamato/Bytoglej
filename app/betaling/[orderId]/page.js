@@ -38,12 +38,14 @@ function PaymentForm({ orderId, grandTotal, breakdown }) {
 
   return (
     <form onSubmit={handleSubmit}>
-      <div style={{ marginBottom: 24 }}>
+      <div style={{ marginBottom: 24, position: 'relative' }}>
         <PaymentElement options={{
           layout: 'tabs',
           fields: { billingDetails: 'never' },
           terms: { card: 'never', ideal: 'never', sepaDebit: 'never', sofort: 'never', auBecsDebit: 'never', bancontact: 'never', giropay: 'never', p24: 'never' },
         }} />
+        {/* Skjul Stripe-badge (sidder i iframe, kan ikke fjernes via CSS) */}
+        <div style={{ position: 'absolute', bottom: 0, right: 0, width: 160, height: 30, background: '#fff', zIndex: 10, borderRadius: 4 }} />
       </div>
 
       {error && (
@@ -132,7 +134,7 @@ export default function BetalingPage() {
                 </div>
               )}
               <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 4 }}>
-                <span style={{ fontFamily: FONT, fontSize: 12, color: INK3 }}>Bytoglej beskyttelse</span>
+                <span style={{ fontFamily: FONT, fontSize: 12, color: INK3 }}>Bytogleg beskyttelse</span>
                 <span style={{ fontFamily: FONT, fontSize: 12, color: INK3 }}>{g.serviceFee?.toFixed(2)} kr.</span>
               </div>
             </div>
@@ -147,9 +149,9 @@ export default function BetalingPage() {
         <div style={{ background: GREEN_TINT, borderRadius: 14, border: `1px solid ${GREEN_SOFT}`, padding: '14px 16px', marginBottom: 24, display: 'flex', gap: 10 }}>
           <span style={{ fontSize: 18, flexShrink: 0 }}>🛡️</span>
           <div>
-            <div style={{ fontFamily: FONT, fontWeight: 700, fontSize: 13, color: INK, marginBottom: 4 }}>Bytoglej beskyttelse</div>
+            <div style={{ fontFamily: FONT, fontWeight: 700, fontSize: 13, color: INK, marginBottom: 4 }}>Bytogleg beskyttelse</div>
             <div style={{ fontFamily: FONT, fontSize: 12, color: INK3, lineHeight: 1.5 }}>
-              Bytoglej beskyttelse dækker dig hvis varen ikke ankommer eller ikke matcher beskrivelsen. Pakkemærkat oprettes automatisk.
+              Bytogleg beskyttelse dækker dig hvis varen ikke ankommer eller ikke matcher beskrivelsen. Pakkemærkat oprettes automatisk.
             </div>
           </div>
         </div>

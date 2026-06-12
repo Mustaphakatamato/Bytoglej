@@ -282,7 +282,7 @@ export default function ProfilPage() {
           {/* Bankkonto til udbetaling */}
           <div style={{ borderTop:'1px solid #f0eeeb', paddingTop:20 }}>
             <div style={{ fontSize:12, fontWeight:700, color:'#aaa', textTransform:'uppercase', letterSpacing:0.8, marginBottom:6 }}>Bankkonto til udbetaling</div>
-            <div style={{ fontSize:13, color:INK3, marginBottom:14, lineHeight:1.5 }}>Bytoglej overfører betaling for solgte varer hertil. Oplysningerne opbevares sikkert og deles ikke med købere.</div>
+            <div style={{ fontSize:13, color:INK3, marginBottom:14, lineHeight:1.5 }}>Bytogleg overfører betaling for solgte varer hertil. Oplysningerne opbevares sikkert og deles ikke med købere.</div>
             <div style={{ display:'grid', gridTemplateColumns:'140px 1fr', gap:12 }}>
               <div>
                 <label style={{ display:'block', fontSize:13, fontWeight:700, marginBottom:6 }}>Reg.nr.</label>
