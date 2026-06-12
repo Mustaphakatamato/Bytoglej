@@ -892,18 +892,32 @@ const FEEDBACK_CATEGORIES = [
   { key: 'general',   label: 'Generel', emoji: '⭐' },
 ];
 
+const FEEDBACK_STATUSES = [
+  { key: 'new',         label: 'Ny',           bg: PAPER3,    color: INK3,      border: 'transparent' },
+  { key: 'in_progress', label: 'Arbejder på',  bg: '#EFF6FF', color: '#1D4ED8', border: '#BFDBFE' },
+  { key: 'fixed',       label: 'Fikset ✓',     bg: '#D1FAE5', color: '#065F46', border: '#6EE7B7' },
+  { key: 'wont_fix',    label: 'Ikke relevant', bg: '#FEF2F2', color: '#DC2626', border: '#FCA5A5' },
+];
+
 function FeedbackTab({ isMobile, onRead }) {
   const [items, setItems] = useState([]);
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState('all');
   const [expanded, setExpanded] = useState(null);
+  const [lightbox, setLightbox] = useState(null);
 
   useEffect(() => {
+    // Fetch oldest-first so we can assign stable #1, #2, #3 IDs
     db.from('feedback')
       .select('*')
-      .order('created_at', { ascending: false })
+      .order('created_at', { ascending: true })
       .limit(300)
-      .then(({ data }) => { setItems(data || []); setLoading(false); });
+      .then(({ data }) => {
+        const withIds = (data || []).map((item, i) => ({ ...item, displayId: i + 1 }));
+        // Reverse for display (newest first) but IDs are stable
+        setItems(withIds.reverse());
+        setLoading(false);
+      });
   }, []);
 
   async function handleExpand(item) {
@@ -924,6 +938,11 @@ function FeedbackTab({ isMobile, onRead }) {
     onRead(unread.length);
   }
 
+  async function setStatus(id, status) {
+    await db.from('feedback').update({ status }).eq('id', id);
+    setItems(prev => prev.map(i => i.id === id ? { ...i, status } : i));
+  }
+
   const filtered = filter === 'all' ? items : items.filter(i => i.category === filter);
   const unreadCount = items.filter(i => !i.is_read).length;
 
@@ -942,8 +961,18 @@ function FeedbackTab({ isMobile, onRead }) {
            d.toLocaleTimeString('da-DK', { hour: '2-digit', minute: '2-digit' });
   }
 
+  const statusCfg = Object.fromEntries(FEEDBACK_STATUSES.map(s => [s.key, s]));
+
   return (
     <div>
+      {/* Lightbox */}
+      {lightbox && (
+        <div onClick={() => setLightbox(null)} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.85)', zIndex: 99999, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 24, cursor: 'zoom-out' }}>
+          <img src={lightbox} alt="Screenshot" style={{ maxWidth: '100%', maxHeight: '100%', borderRadius: 12, boxShadow: '0 20px 60px rgba(0,0,0,0.5)' }} onClick={e => e.stopPropagation()} />
+          <button onClick={() => setLightbox(null)} style={{ position: 'absolute', top: 16, right: 16, background: 'rgba(255,255,255,0.15)', border: 'none', borderRadius: '50%', width: 36, height: 36, color: '#fff', fontSize: 18, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>✕</button>
+        </div>
+      )}
+
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16, flexWrap: 'wrap', gap: 10 }}>
         <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
           {FEEDBACK_CATEGORIES.map(c => {
@@ -986,6 +1015,7 @@ function FeedbackTab({ isMobile, onRead }) {
         <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
           {filtered.map(item => {
             const cc = catColor[item.category] || catColor.general;
+            const sc = statusCfg[item.status || 'new'] || statusCfg.new;
             const isOpen = expanded === item.id;
             return (
               <div key={item.id} style={{
@@ -999,11 +1029,13 @@ function FeedbackTab({ isMobile, onRead }) {
                   width: '100%', display: 'flex', alignItems: 'center', gap: 12,
                   padding: '14px 16px', background: 'none', border: 'none', cursor: 'pointer', textAlign: 'left',
                 }}>
-                  {/* Category badge */}
-                  <span style={{ fontSize: 20, flexShrink: 0, lineHeight: 1 }}>{catEmoji[item.category] || '⭐'}</span>
+                  {/* ID + category emoji */}
+                  <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2, flexShrink: 0 }}>
+                    <span style={{ fontFamily: 'monospace', fontSize: 10, fontWeight: 700, color: INK3 }}>#{item.displayId}</span>
+                    <span style={{ fontSize: 20, lineHeight: 1 }}>{catEmoji[item.category] || '⭐'}</span>
+                  </div>
 
                   <div style={{ flex: 1, minWidth: 0 }}>
-                    {/* First line: institution + page */}
                     <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', marginBottom: 3 }}>
                       <span style={{ fontFamily: FONT, fontWeight: 700, fontSize: 13, color: INK }}>
                         {item.institution_name || item.user_email || 'Anonym'}
@@ -1013,8 +1045,10 @@ function FeedbackTab({ isMobile, onRead }) {
                           {item.page}
                         </span>
                       )}
+                      {item.screenshot_url && (
+                        <span style={{ fontSize: 11, color: INK3 }}>📸</span>
+                      )}
                     </div>
-                    {/* Message preview */}
                     <div style={{ fontFamily: FONT, fontSize: 13, color: INK3, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                       {item.message}
                     </div>
@@ -1035,9 +1069,47 @@ function FeedbackTab({ isMobile, onRead }) {
 
                 {isOpen && (
                   <div style={{ borderTop: `1px solid ${PAPER3}`, padding: '16px 18px', background: '#fafaf9' }}>
+                    {/* Full message */}
                     <div style={{ fontFamily: FONT, fontSize: 14, color: INK, lineHeight: 1.6, whiteSpace: 'pre-wrap', marginBottom: 14 }}>
                       {item.message}
                     </div>
+
+                    {/* Screenshot */}
+                    {item.screenshot_url && (
+                      <div style={{ marginBottom: 16 }}>
+                        <div style={{ fontFamily: FONT, fontSize: 11, fontWeight: 700, color: INK3, textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 6 }}>Screenshot</div>
+                        <img
+                          src={item.screenshot_url}
+                          alt="Screenshot"
+                          onClick={() => setLightbox(item.screenshot_url)}
+                          style={{ maxWidth: '100%', maxHeight: 200, objectFit: 'cover', borderRadius: 10, border: `1px solid ${PAPER3}`, cursor: 'zoom-in', display: 'block' }}
+                        />
+                      </div>
+                    )}
+
+                    {/* Status selector */}
+                    <div style={{ marginBottom: 14 }}>
+                      <div style={{ fontFamily: FONT, fontSize: 11, fontWeight: 700, color: INK3, textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 8 }}>Status</div>
+                      <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                        {FEEDBACK_STATUSES.map(s => {
+                          const active = (item.status || 'new') === s.key;
+                          return (
+                            <button key={s.key} onClick={() => setStatus(item.id, s.key)} style={{
+                              padding: '5px 12px', borderRadius: 99,
+                              border: `1.5px solid ${active ? s.border : PAPER3}`,
+                              background: active ? s.bg : '#fff',
+                              color: active ? s.color : INK3,
+                              fontFamily: FONT, fontWeight: active ? 700 : 500, fontSize: 12,
+                              cursor: 'pointer', transition: 'all 0.15s',
+                            }}>
+                              {s.label}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+
+                    {/* Metadata */}
                     <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap', borderTop: `1px solid ${PAPER3}`, paddingTop: 12 }}>
                       {item.institution_name && <InfoItem label="Institution" value={item.institution_name} />}
                       {item.user_email && <InfoItem label="E-mail" value={item.user_email} />}

@@ -9,7 +9,7 @@ const adminDb = createClient(
 
 export async function POST(req) {
   try {
-    const { category, message, institutionName, userEmail, page } = await req.json();
+    const { category, message, institutionName, userEmail, page, screenshotUrl } = await req.json();
     if (!message?.trim()) return NextResponse.json({ error: 'Besked mangler' }, { status: 400 });
 
     if (!process.env.RESEND_API_KEY) {
@@ -59,6 +59,7 @@ export async function POST(req) {
         institution_name: institutionName || null,
         user_email: userEmail || null,
         page: page || null,
+        screenshot_url: screenshotUrl || null,
       });
       if (dbErr) console.error('[feedback] DB insert fejl:', dbErr.message);
     } catch (dbEx) {
