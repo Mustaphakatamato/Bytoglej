@@ -22,6 +22,13 @@ function PaymentForm({ orderId, grandTotal, breakdown }) {
     setPaying(true);
     setError(null);
 
+    // Sikkerhedsnet: hvis confirmPayment hænger (fx netværkstimeout),
+    // resettes knappen automatisk efter 60 sekunder med en fejlbesked.
+    const timeoutId = setTimeout(() => {
+      setPaying(false);
+      setError('Betalingen tog for lang tid — prøv igen.');
+    }, 60000);
+
     const { error: stripeError } = await stripe.confirmPayment({
       elements,
       confirmParams: {
@@ -29,6 +36,8 @@ function PaymentForm({ orderId, grandTotal, breakdown }) {
         payment_method_data: { billing_details: {} },
       },
     });
+
+    clearTimeout(timeoutId);
 
     if (stripeError) {
       setError(stripeError.message);

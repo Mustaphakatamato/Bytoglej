@@ -76,11 +76,31 @@ export default function RedigerOpslagPage() {
     setExistingImgs(prev => prev.filter((_, j) => j !== i));
   }
 
+  // Billedvalidering: maks 10MB per billede, kun gængse billedformater
+  const MAX_IMAGE_SIZE = 10 * 1024 * 1024; // 10MB
+  const ALLOWED_IMAGE_TYPES = ['image/jpeg', 'image/png', 'image/webp', 'image/gif'];
+
   async function handleFileSelect(e) {
     const files = Array.from(e.target.files || []);
     if (!files.length) return;
+
+    // Validér type og størrelse før vi går videre
+    const validFiles = [];
+    for (const f of files) {
+      if (!ALLOWED_IMAGE_TYPES.includes(f.type)) {
+        showToast(`"${f.name}" er ikke et understøttet format — brug JPG, PNG, WEBP eller GIF`, 'error');
+        continue;
+      }
+      if (f.size > MAX_IMAGE_SIZE) {
+        showToast(`"${f.name}" er for stor — maks 10 MB per billede`, 'error');
+        continue;
+      }
+      validFiles.push(f);
+    }
+    if (!validFiles.length) { e.target.value = ''; return; }
+
     const remaining = 6 - totalImgs;
-    const toAdd = files.slice(0, remaining);
+    const toAdd = validFiles.slice(0, remaining);
     const previews = toAdd.map(f => URL.createObjectURL(f));
     setNewFiles(prev => [...prev, ...toAdd]);
     setNewPreviews(prev => [...prev, ...previews]);

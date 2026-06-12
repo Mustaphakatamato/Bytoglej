@@ -240,10 +240,13 @@ export default function CartPage() {
         return;
       }
 
-      // Clear cart for selected items
-      for (const group of selectedGroups) {
-        for (const item of group.items) removeFromCart(item.listingId);
-      }
+      // Ryd IKKE kurven her — gem de valgte vare-IDs i sessionStorage.
+      // Kurven ryddes først på success-siden når redirect_status=succeeded,
+      // så varerne ikke forsvinder hvis betalingen fejler eller browseren lukkes.
+      try {
+        const pendingIds = selectedGroups.flatMap(g => g.items.map(i => i.listingId)).filter(Boolean);
+        sessionStorage.setItem('pending_cart_ids', JSON.stringify(pendingIds));
+      } catch { /* sessionStorage utilgængelig — kurven beholdes blot */ }
 
       // Redirect to payment page with client secret
       const params = new URLSearchParams({

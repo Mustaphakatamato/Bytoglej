@@ -1,16 +1,73 @@
 'use client';
 import { Suspense, useEffect, useState } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
+import { db } from '@/lib/supabase';
+import { useApp } from '@/providers/AppProvider';
 import { PRIMARY, GREEN_TINT, GREEN_SOFT, INK, INK3, PAPER, PAPER3, FONT } from '@/lib/constants';
 
 function SuccessContent() {
   const searchParams = useSearchParams();
   const router = useRouter();
+  const { removeFromCart } = useApp();
   const orderId = searchParams.get('order_id');
   const status = searchParams.get('redirect_status');
   const [countdown, setCountdown] = useState(5);
 
-  const success = status === 'succeeded';
+  const succeededParam = status === 'succeeded';
+
+  // Ejerskabstjek: verificér at ordren tilhører den aktuelle bruger
+  // før vi viser "Betaling gennemført" og rydder kurven.
+  const [verifying, setVerifying] = useState(succeededParam);
+  const [verifyError, setVerifyError] = useState(null);
+
+  useEffect(() => {
+    if (!succeededParam) return;
+    let cancelled = false;
+
+    async function verifyOrder() {
+      try {
+        if (!orderId) {
+          if (!cancelled) { setVerifyError('Ordre-id mangler i adressen.'); setVerifying(false); }
+          return;
+        }
+        const { data: { user } } = await db.auth.getUser();
+        if (!user) {
+          if (!cancelled) { setVerifyError('Du skal være logget ind for at se denne ordre.'); setVerifying(false); }
+          return;
+        }
+        // RLS på orders tillader kun buyer_id = auth.uid(); .eq() er ekstra værn
+        const { data: order, error } = await db
+          .from('orders')
+          .select('id, buyer_id')
+          .eq('id', orderId)
+          .eq('buyer_id', user.id)
+          .maybeSingle();
+        if (cancelled) return;
+        if (error || !order) {
+          setVerifyError('Ordren blev ikke fundet eller tilhører ikke din konto.');
+          setVerifying(false);
+          return;
+        }
+        // Ordren er verificeret — ryd nu de gemte vare-IDs fra kurven
+        try {
+          const raw = sessionStorage.getItem('pending_cart_ids');
+          if (raw) {
+            const ids = JSON.parse(raw);
+            if (Array.isArray(ids)) for (const lid of ids) removeFromCart(lid);
+            sessionStorage.removeItem('pending_cart_ids');
+          }
+        } catch { /* ignorér — kurven ryddes blot ikke */ }
+        setVerifying(false);
+      } catch {
+        if (!cancelled) { setVerifyError('Kunne ikke verificere ordren — prøv igen.'); setVerifying(false); }
+      }
+    }
+
+    verifyOrder();
+    return () => { cancelled = true; };
+  }, [succeededParam, orderId]);
+
+  const success = succeededParam && !verifying && !verifyError;
 
   useEffect(() => {
     if (!success) return;
@@ -20,6 +77,29 @@ function SuccessContent() {
     }), 1000);
     return () => clearInterval(t);
   }, [success]);
+
+  if (succeededParam && verifying) {
+    return (
+      <div style={{ minHeight: '100vh', background: PAPER, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 24 }}>
+        <span style={{ fontFamily: FONT, color: INK3 }}>Bekræfter din ordre…</span>
+      </div>
+    );
+  }
+
+  if (succeededParam && verifyError) {
+    return (
+      <div style={{ minHeight: '100vh', background: PAPER, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 24 }}>
+        <div style={{ maxWidth: 480, width: '100%', textAlign: 'center' }}>
+          <div style={{ fontSize: 56, marginBottom: 20 }}>⚠️</div>
+          <h1 style={{ fontFamily: FONT, fontWeight: 800, fontSize: 24, color: INK, marginBottom: 10 }}>Kunne ikke bekræfte ordren</h1>
+          <p style={{ fontFamily: FONT, fontSize: 14, color: INK3, marginBottom: 28 }}>{verifyError}</p>
+          <button onClick={() => router.push('/beskeder')} style={{ background: PRIMARY, color: '#fff', border: 'none', borderRadius: 99, padding: '14px 32px', fontFamily: FONT, fontWeight: 700, fontSize: 15, cursor: 'pointer' }}>
+            Gå til beskeder
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div style={{ minHeight: '100vh', background: PAPER, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 24 }}>
