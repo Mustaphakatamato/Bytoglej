@@ -14,7 +14,8 @@ function StripeOrderCard({ order, myGroup, onMarkedSent }) {
   const [open, setOpen] = useState(false);
   const [marking, setMarking] = useState(false);
   const isPaid    = order.status === 'paid';
-  const isShipped = order.status === 'shipped' || order.status === 'delivered';
+  const isShipped = order.status === 'shipped';
+  const isDone    = order.status === 'delivered';
   const labelUrl  = myGroup.label_pdf_url;
   const tracking  = myGroup.tracking_number;
 
@@ -58,8 +59,13 @@ function StripeOrderCard({ order, myGroup, onMarkedSent }) {
           </span>
         )}
         {isShipped && (
+          <span style={{ background:'#DBEAFE', color:'#1D4ED8', borderRadius:99, fontSize:10, fontWeight:800, padding:'3px 8px', flexShrink:0 }}>
+            LABEL KLAR — AFSEND
+          </span>
+        )}
+        {isDone && (
           <span style={{ background:'#DCFCE7', color:'#166534', borderRadius:99, fontSize:10, fontWeight:800, padding:'3px 8px', flexShrink:0 }}>
-            AFSENDT
+            LEVERET
           </span>
         )}
       </button>
@@ -87,7 +93,7 @@ function StripeOrderCard({ order, myGroup, onMarkedSent }) {
               }}>
                 🖨️ Download pakkemærkat (PDF)
               </a>
-            ) : isPaid ? (
+            ) : (isPaid || isShipped) ? (
               <div style={{ background:'#FEF9C3', borderRadius:12, padding:'10px 14px', fontFamily:FONT, fontSize:13, color:'#92400E' }}>
                 📧 Pakkemærkaten genereres og sendes til institutionens e-mail — tjek indbakke og spam.
               </div>
@@ -99,7 +105,7 @@ function StripeOrderCard({ order, myGroup, onMarkedSent }) {
               </div>
             )}
 
-            {isPaid && (
+            {isShipped && (
               <button
                 disabled={marking}
                 onClick={handleMarkSent}
@@ -350,8 +356,8 @@ export default function MineOpgaverPage() {
 
   const activeChatTasks = chatTasks.filter(t => !t.deal_completed);
   const doneChatTasks   = chatTasks.filter(t => t.deal_completed);
-  const activeStripe    = stripeOrders.filter(o => o.status === 'paid');
-  const doneStripe      = stripeOrders.filter(o => o.status === 'shipped' || o.status === 'delivered');
+  const activeStripe    = stripeOrders.filter(o => o.status === 'paid' || o.status === 'shipped');
+  const doneStripe      = stripeOrders.filter(o => o.status === 'delivered');
 
   const totalActive  = activeStripe.length + activeChatTasks.length;
   const totalDone    = doneStripe.length + doneChatTasks.length;
