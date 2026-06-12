@@ -9,16 +9,30 @@ import { Spinner } from '@/components/ui';
 
 // ── Stripe order card (automatic label) ───────────────────────
 
-function StripeOrderCard({ order, myGroup }) {
+function StripeOrderCard({ order, myGroup, onMarkedSent }) {
+  const router = useRouter();
   const [open, setOpen] = useState(false);
-  const isPaid     = order.status === 'paid';
-  const isShipped  = order.status === 'shipped' || order.status === 'delivered';
-  const labelUrl   = myGroup.label_pdf_url;
-  const tracking   = myGroup.tracking_number;
+  const [marking, setMarking] = useState(false);
+  const isPaid    = order.status === 'paid';
+  const isShipped = order.status === 'shipped' || order.status === 'delivered';
+  const labelUrl  = myGroup.label_pdf_url;
+  const tracking  = myGroup.tracking_number;
 
   function fmtDate(iso) {
     if (!iso) return '';
     return new Date(iso).toLocaleDateString('da-DK', { day:'numeric', month:'short' });
+  }
+
+  async function handleMarkSent() {
+    setMarking(true);
+    const { data: { session } } = await db.auth.getSession();
+    const res = await fetch('/api/seller-mark-sent', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session?.access_token}` },
+      body: JSON.stringify({ orderId: order.id }),
+    });
+    setMarking(false);
+    if (res.ok) onMarkedSent(order.id);
   }
 
   return (
@@ -59,8 +73,13 @@ function StripeOrderCard({ order, myGroup }) {
             </div>
           ))}
 
-          <div style={{ marginTop:10, display:'flex', flexDirection:'column', gap:8 }}>
-            {labelUrl && (
+          <div style={{ borderTop:`1px dashed ${PAPER3}`, marginTop:10, paddingTop:10, display:'flex', justifyContent:'space-between' }}>
+            <span style={{ fontFamily:FONT, fontSize:12, color:INK3 }}>Levering</span>
+            <span style={{ fontFamily:FONT, fontSize:12, color:INK3 }}>{myGroup.shippingTotal ?? 0} kr.</span>
+          </div>
+
+          <div style={{ marginTop:12, display:'flex', flexDirection:'column', gap:8 }}>
+            {labelUrl ? (
               <a href={labelUrl} target="_blank" rel="noopener noreferrer" style={{
                 display:'block', textAlign:'center', padding:'11px', borderRadius:99,
                 background:PRIMARY, color:'#fff', fontFamily:FONT, fontWeight:700, fontSize:14,
@@ -68,17 +87,40 @@ function StripeOrderCard({ order, myGroup }) {
               }}>
                 🖨️ Download pakkemærkat (PDF)
               </a>
-            )}
-            {!labelUrl && isPaid && (
+            ) : isPaid ? (
               <div style={{ background:'#FEF9C3', borderRadius:12, padding:'10px 14px', fontFamily:FONT, fontSize:13, color:'#92400E' }}>
-                Pakkemærkaten sendes til din e-mail — tjek din indbakke.
+                📧 Pakkemærkaten er sendt til din e-mail — tjek din indbakke.
               </div>
-            )}
+            ) : null}
+
             {tracking && (
               <div style={{ fontFamily:FONT, fontSize:12, color:INK3, textAlign:'center' }}>
                 Tracking: {tracking}
               </div>
             )}
+
+            {isPaid && (
+              <button
+                disabled={marking}
+                onClick={handleMarkSent}
+                style={{
+                  padding:'11px', borderRadius:99, border:`1.5px solid ${PRIMARY}`,
+                  background: marking ? PAPER2 : GREEN_TINT,
+                  color: marking ? INK3 : PRIMARY,
+                  fontFamily:FONT, fontWeight:700, fontSize:13, cursor: marking ? 'default' : 'pointer',
+                }}>
+                {marking ? 'Gemmer…' : '🚚 Marker som afsendt'}
+              </button>
+            )}
+
+            <button
+              onClick={() => router.push('/beskeder')}
+              style={{
+                padding:'11px', borderRadius:99, background:PAPER2, border:'none',
+                fontFamily:FONT, fontWeight:600, fontSize:13, color:INK3, cursor:'pointer',
+              }}>
+              💬 Åbn beskeder med køber
+            </button>
           </div>
         </div>
       )}
@@ -355,7 +397,8 @@ export default function MineOpgaverPage() {
                   )}
                   {activeStripe.map(order =>
                     order.myGroups.map((g, gi) => (
-                      <StripeOrderCard key={`${order.id}-${gi}`} order={order} myGroup={g} />
+                      <StripeOrderCard key={`${order.id}-${gi}`} order={order} myGroup={g}
+                        onMarkedSent={id => setStripeOrders(os => os.map(o => o.id === id ? { ...o, status: 'shipped' } : o))} />
                     ))
                   )}
                   {activeChatTasks.map(conv => (
@@ -374,7 +417,7 @@ export default function MineOpgaverPage() {
                   )}
                   {doneStripe.map(order =>
                     order.myGroups.map((g, gi) => (
-                      <StripeOrderCard key={`${order.id}-${gi}`} order={order} myGroup={g} />
+                      <StripeOrderCard key={`${order.id}-${gi}`} order={order} myGroup={g} onMarkedSent={() => {}} />
                     ))
                   )}
                   {doneChatTasks.map(conv => (
