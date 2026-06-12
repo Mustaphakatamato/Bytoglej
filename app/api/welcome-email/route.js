@@ -1,11 +1,23 @@
 import { NextResponse } from 'next/server';
+import { requireAuth, UNAUTHORIZED } from '@/lib/api-auth';
+import { escapeHtml } from '@/lib/escape-html';
+
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 export async function POST(req) {
-  try {
-    const { email, contactName, institutionName } = await req.json();
-    if (!email) return NextResponse.json({ error: 'email required' }, { status: 400 });
+  const user = await requireAuth(req);
+  if (!user) return UNAUTHORIZED();
 
-    const firstName = contactName?.split(' ')[0] || 'der';
+  try {
+    const { email, contactName, institutionName: rawInstName } = await req.json();
+    if (!email || !EMAIL_RE.test(email)) return NextResponse.json({ error: 'Ugyldig e-mail' }, { status: 400 });
+    // Velkomstmail må kun sendes til brugerens egen adresse
+    if (user.email && email.toLowerCase() !== user.email.toLowerCase()) {
+      return NextResponse.json({ error: 'E-mail matcher ikke din konto' }, { status: 403 });
+    }
+
+    const firstName = escapeHtml(String(contactName || '').split(' ')[0] || 'der');
+    const institutionName = escapeHtml(String(rawInstName || '').slice(0, 200));
     const base = process.env.NEXT_PUBLIC_BASE_URL || 'https://bytogleg.dk';
 
     const res = await fetch('https://api.resend.com/emails', {

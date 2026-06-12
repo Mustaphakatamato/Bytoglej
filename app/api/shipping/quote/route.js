@@ -1,34 +1,13 @@
 import { NextResponse } from 'next/server';
 import { requireAuth, UNAUTHORIZED } from '@/lib/api-auth';
-
-// Shipmondo platform rates 2025/2026 for DK→DK (incl. all surcharges).
-// Source: shipmondo.com published rates. Quote API not supported for these carriers.
-const RATES = {
-  pdk_parcel_shop: {
-    // PDK_MC - PostNord Service Point
-    label: 'PostNord pakkeshop',
-    carrier_code: 'pdk', product_code: 'PDK_MC', type: 'parcel_shop',
-    prices: { small: 37.60, medium: 52.50, large: 82.00, xlarge: 135.00 },
-  },
-  gls_parcel_shop: {
-    // GLSDK_SD - GLS ShopDelivery
-    label: 'GLS pakkeshop',
-    carrier_code: 'gls', product_code: 'GLSDK_SD', type: 'parcel_shop',
-    prices: { small: 34.80, medium: 48.00, large: 75.00, xlarge: 125.00 },
-  },
-  dao_home: {
-    // DAO_STH - daoHOME
-    label: 'DAO hjemlevering',
-    carrier_code: 'dao', product_code: 'DAO_STH', type: 'home_delivery',
-    prices: { small: 49.00, medium: 65.00, large: 95.00, xlarge: 155.00 },
-  },
-};
+import { RATES } from '@/lib/shipping-rates';
 
 export async function GET(req) {
   if (!await requireAuth(req)) return UNAUTHORIZED();
 
   const { searchParams } = new URL(req.url);
-  const size = searchParams.get('size') || 'medium';
+  const rawSize = searchParams.get('size') || 'medium';
+  const size = ['small', 'medium', 'large', 'xlarge'].includes(rawSize) ? rawSize : 'medium';
 
   const options = Object.values(RATES).map(r => ({
     carrier_code: r.carrier_code,

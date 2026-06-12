@@ -1,12 +1,22 @@
 import { NextResponse } from 'next/server';
 import { Resend } from 'resend';
+import { requireAuth, UNAUTHORIZED } from '@/lib/api-auth';
+import { escapeHtml } from '@/lib/escape-html';
 
 const ADMIN_NOTIFICATION_EMAIL = process.env.ADMIN_NOTIFICATION_EMAIL || 'mustaphakatamato@live.dk';
 
 export async function POST(req) {
+  const user = await requireAuth(req);
+  if (!user) return UNAUTHORIZED();
+
   try {
     const resend = new Resend(process.env.RESEND_API_KEY);
-    const { listingId, listingTitle, reason, note, reporterName } = await req.json();
+    const body = await req.json();
+    const listingId = escapeHtml(String(body.listingId || '').slice(0, 100));
+    const listingTitle = escapeHtml(String(body.listingTitle || '').slice(0, 200));
+    const reason = escapeHtml(String(body.reason || '').slice(0, 200));
+    const note = escapeHtml(String(body.note || '').slice(0, 2000));
+    const reporterName = escapeHtml(String(body.reporterName || '').slice(0, 200));
     if (!listingId || !reason) return NextResponse.json({ error: 'Mangler data' }, { status: 400 });
 
     await resend.emails.send({

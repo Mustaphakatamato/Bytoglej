@@ -1,8 +1,19 @@
 import { NextResponse } from 'next/server';
+import { escapeHtml } from '@/lib/escape-html';
 
 export async function POST(req) {
   try {
-    const { institutionName, contactName, email, cvr, instType, city } = await req.json();
+    // Kaldes under signup (før login) — derfor ingen auth, men alt input
+    // escapes og begrænses, da det kun videresendes til admin-mailen.
+    const body = await req.json();
+    const institutionName = escapeHtml(String(body.institutionName || '').slice(0, 200));
+    const contactName = escapeHtml(String(body.contactName || '').slice(0, 200));
+    const email = escapeHtml(String(body.email || '').slice(0, 200));
+    const cvr = escapeHtml(String(body.cvr || '').slice(0, 50));
+    const instType = escapeHtml(String(body.instType || '').slice(0, 100));
+    const city = escapeHtml(String(body.city || '').slice(0, 100));
+    if (!institutionName) return NextResponse.json({ ok: true });
+
     const to = process.env.ADMIN_NOTIFICATION_EMAIL || 'mustaphakatamato@gmail.com';
     if (!process.env.RESEND_API_KEY) return NextResponse.json({ ok: true });
 

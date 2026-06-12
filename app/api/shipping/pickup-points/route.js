@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { requireAuth, UNAUTHORIZED } from '@/lib/api-auth';
 
 const BASE_URL = 'https://app.shipmondo.com/api/public/v3';
 const API_USER = process.env.SHIPMONDO_API_USER;
@@ -12,10 +13,14 @@ const MOCK_POINTS = [
 ];
 
 export async function GET(req) {
+  if (!await requireAuth(req)) return UNAUTHORIZED();
+
   const { searchParams } = new URL(req.url);
-  const zipcode     = searchParams.get('zip') || '2100';
-  const carrier     = searchParams.get('carrier') || 'postnord';
-  const limit       = parseInt(searchParams.get('limit') || '6', 10);
+  const rawZip      = searchParams.get('zip') || '2100';
+  const zipcode     = /^\d{3,4}$/.test(rawZip) ? rawZip : '2100';
+  const rawCarrier  = searchParams.get('carrier') || 'postnord';
+  const carrier     = ['postnord', 'pdk', 'dao', 'gls'].includes(rawCarrier) ? rawCarrier : 'postnord';
+  const limit       = Math.min(Math.max(parseInt(searchParams.get('limit') || '6', 10) || 6, 1), 20);
 
   if (IS_MOCK) {
     return NextResponse.json({ points: MOCK_POINTS.slice(0, limit).map(p => ({ ...p, carrier })), mock: true });

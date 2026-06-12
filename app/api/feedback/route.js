@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
+import { escapeHtml } from '@/lib/escape-html';
 
 const adminDb = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL,
@@ -9,8 +10,14 @@ const adminDb = createClient(
 
 export async function POST(req) {
   try {
-    const { category, message, institutionName, userEmail, page, screenshotUrl } = await req.json();
-    if (!message?.trim()) return NextResponse.json({ error: 'Besked mangler' }, { status: 400 });
+    const body = await req.json();
+    const category = String(body.category || 'general').slice(0, 50);
+    const message = String(body.message || '').trim().slice(0, 5000);
+    const institutionName = String(body.institutionName || '').slice(0, 200);
+    const userEmail = String(body.userEmail || '').slice(0, 200);
+    const page = String(body.page || '').slice(0, 500);
+    const screenshotUrl = String(body.screenshotUrl || '').slice(0, 1000) || null;
+    if (!message) return NextResponse.json({ error: 'Besked mangler' }, { status: 400 });
 
     if (!process.env.RESEND_API_KEY) {
       console.error('[feedback] RESEND_API_KEY er ikke sat');
@@ -18,7 +25,7 @@ export async function POST(req) {
     }
 
     const to = process.env.ADMIN_NOTIFICATION_EMAIL || 'mustaphakatamato@gmail.com';
-    const categoryLabel = { bug: '🐛 Fejl/bug', suggestion: '💡 Forslag', general: '⭐ Generel feedback' }[category] || category;
+    const categoryLabel = { bug: '🐛 Fejl/bug', suggestion: '💡 Forslag', general: '⭐ Generel feedback' }[category] || escapeHtml(category);
 
     const res = await fetch('https://api.resend.com/emails', {
       method: 'POST',
@@ -35,10 +42,10 @@ export async function POST(req) {
             <h2 style="color:#1B4332;margin:0 0 16px;">Ny pilot-feedback</h2>
             <table style="width:100%;border-collapse:collapse;">
               <tr><td style="padding:8px 0;color:#6B7570;width:120px;vertical-align:top;">Kategori</td><td style="padding:8px 0;font-weight:600;">${categoryLabel}</td></tr>
-              <tr><td style="padding:8px 0;color:#6B7570;vertical-align:top;">Institution</td><td style="padding:8px 0;">${institutionName || '—'}</td></tr>
-              <tr><td style="padding:8px 0;color:#6B7570;vertical-align:top;">E-mail</td><td style="padding:8px 0;">${userEmail || '—'}</td></tr>
-              <tr><td style="padding:8px 0;color:#6B7570;vertical-align:top;">Side</td><td style="padding:8px 0;font-family:monospace;font-size:13px;">${page || '—'}</td></tr>
-              <tr><td style="padding:8px 0;color:#6B7570;vertical-align:top;">Besked</td><td style="padding:8px 0;white-space:pre-wrap;">${message.trim()}</td></tr>
+              <tr><td style="padding:8px 0;color:#6B7570;vertical-align:top;">Institution</td><td style="padding:8px 0;">${escapeHtml(institutionName) || '—'}</td></tr>
+              <tr><td style="padding:8px 0;color:#6B7570;vertical-align:top;">E-mail</td><td style="padding:8px 0;">${escapeHtml(userEmail) || '—'}</td></tr>
+              <tr><td style="padding:8px 0;color:#6B7570;vertical-align:top;">Side</td><td style="padding:8px 0;font-family:monospace;font-size:13px;">${escapeHtml(page) || '—'}</td></tr>
+              <tr><td style="padding:8px 0;color:#6B7570;vertical-align:top;">Besked</td><td style="padding:8px 0;white-space:pre-wrap;">${escapeHtml(message)}</td></tr>
             </table>
           </div>
         `,

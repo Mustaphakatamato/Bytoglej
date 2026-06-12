@@ -6,8 +6,9 @@ import { createServerClient } from '@/lib/supabase-server';
 // Protected by CRON_SECRET env var
 
 export async function GET(req) {
+  // Fail closed: uden konfigureret CRON_SECRET må endpointet ikke kunne kaldes.
   const auth = req.headers.get('authorization');
-  if (process.env.CRON_SECRET && auth !== `Bearer ${process.env.CRON_SECRET}`) {
+  if (!process.env.CRON_SECRET || auth !== `Bearer ${process.env.CRON_SECRET}`) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 

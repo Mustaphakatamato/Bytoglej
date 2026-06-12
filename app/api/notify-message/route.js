@@ -2,14 +2,21 @@ import { NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { requireAuth, UNAUTHORIZED } from '@/lib/api-auth';
 import { sendPushToUser } from '@/lib/push';
+import { escapeHtml } from '@/lib/escape-html';
+
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 export async function POST(req) {
   if (!await requireAuth(req)) return UNAUTHORIZED();
   try {
-    const { ownerEmail, ownerName, senderName, listingTitle, listingEmoji, convId } =
-      await req.json();
+    const body = await req.json();
+    const ownerEmail = String(body.ownerEmail || '').trim();
+    const ownerName = String(body.ownerName || '').slice(0, 200);
+    const senderName = String(body.senderName || 'En bruger').slice(0, 200);
+    const listingTitle = String(body.listingTitle || '').slice(0, 200);
+    const listingEmoji = String(body.listingEmoji || '').slice(0, 10);
 
-    if (!ownerEmail) {
+    if (!ownerEmail || !EMAIL_RE.test(ownerEmail)) {
       return NextResponse.json({ error: 'ownerEmail er påkrævet' }, { status: 400 });
     }
 
@@ -61,7 +68,11 @@ export async function POST(req) {
   }
 }
 
-function emailHtml({ ownerName, senderName, listingTitle, listingEmoji, link }) {
+function emailHtml({ ownerName: rawOwnerName, senderName: rawSenderName, listingTitle: rawTitle, listingEmoji: rawEmoji, link }) {
+  const ownerName = escapeHtml(rawOwnerName);
+  const senderName = escapeHtml(rawSenderName);
+  const listingTitle = escapeHtml(rawTitle);
+  const listingEmoji = escapeHtml(rawEmoji);
   const greeting = ownerName ? `Hej ${ownerName},` : 'Hej,';
   return `<!DOCTYPE html>
 <html lang="da">

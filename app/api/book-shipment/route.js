@@ -1,8 +1,13 @@
 import { NextResponse } from 'next/server';
 import { createServerClient } from '@/lib/supabase-server';
 import { createShipment } from '@/lib/shipmondo/client';
+import { requireAuth, UNAUTHORIZED } from '@/lib/api-auth';
+import { escapeHtml } from '@/lib/escape-html';
 
 export async function POST(req) {
+  const user = await requireAuth(req);
+  if (!user) return UNAUTHORIZED();
+
   const supa = createServerClient();
   try {
     const { conversation_id, listing_id, delivery_method, buyer_name, seller_name } = await req.json();
@@ -11,10 +16,41 @@ export async function POST(req) {
 
     // Load conversation + institutions
     const { data: conv } = await supa.from('conversations')
-      .select('id,listing_id,owner_institution_id,initiator_institution_id,owner_name,initiator_name')
+      .select('id,listing_id,owner_id,initiator_id,owner_institution_id,initiator_institution_id,owner_name,initiator_name,shipment_id')
       .eq('id', conversation_id)
       .maybeSingle();
     if (!conv) return NextResponse.json({ error: 'Samtale ikke fundet' }, { status: 404 });
+
+    // Authorization: caller must be a participant in the conversation
+    // (direct user match, or member of one of the two institutions).
+    let isParticipant = conv.owner_id === user.id || conv.initiator_id === user.id;
+    if (!isParticipant) {
+      const instIds = [conv.owner_institution_id, conv.initiator_institution_id].filter(Boolean);
+      if (instIds.length && user.email) {
+        const [{ data: insts }, { data: mems }] = await Promise.all([
+          supa.from('institutions').select('id,email,leader_email').in('id', instIds),
+          supa.from('institution_members').select('institution_id').in('institution_id', instIds).ilike('email', user.email),
+        ]);
+        const emailLc = user.email.toLowerCase();
+        isParticipant =
+          (insts || []).some(i => [i.email, i.leader_email].filter(Boolean).some(e => e.toLowerCase() === emailLc)) ||
+          (mems || []).length > 0;
+      }
+    }
+    if (!isParticipant) {
+      return NextResponse.json({ error: 'Du har ikke adgang til denne samtale' }, { status: 403 });
+    }
+
+    // Idempotens: book ikke dobbelt for samme samtale
+    if (conv.shipment_id) {
+      const { data: existing } = await supa.from('shipments')
+        .select('id,tracking_number,tracking_url')
+        .eq('id', conv.shipment_id)
+        .maybeSingle();
+      if (existing) {
+        return NextResponse.json({ ok: true, already_booked: true, shipment_id: existing.id, tracking_number: existing.tracking_number, tracking_url: existing.tracking_url });
+      }
+    }
 
     const effectiveListingId = listing_id || conv.listing_id;
 
@@ -154,7 +190,7 @@ function shipmentEmailHtml({ institutionName, trackingNumber, trackingUrl, label
     </div>
     <div style="padding:40px;">
       <h1 style="font-size:22px;font-weight:800;color:#16221C;margin:0 0 16px;">Forsendelse booket 📦</h1>
-      <p style="font-size:15px;color:#3A473D;line-height:1.65;margin:0 0 24px;">Hej ${institutionName},<br><br>Forsendelsen er nu booket. Print labelen og klæb den på pakken.</p>
+      <p style="font-size:15px;color:#3A473D;line-height:1.65;margin:0 0 24px;">Hej ${escapeHtml(institutionName)},<br><br>Forsendelsen er nu booket. Print labelen og klæb den på pakken.</p>
       <div style="background:#F0FDF4;border-radius:14px;padding:16px 20px;margin-bottom:28px;">
         <div style="font-size:12px;color:#16a34a;font-weight:700;margin-bottom:4px;">TRACKINGNUMMER</div>
         <div style="font-size:18px;font-weight:800;color:#16221C;letter-spacing:0.05em;">${trackingNumber || '—'}</div>
