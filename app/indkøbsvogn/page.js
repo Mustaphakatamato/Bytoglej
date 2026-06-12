@@ -161,7 +161,17 @@ export default function CartPage() {
     const ds = deliveryState[g.ownerInstitutionName];
     return s + (ds?.price || 0);
   }, 0);
-  const grandTotal = itemsTotal + shippingTotal;
+
+  function calcServiceFee(itemTotal) {
+    return Math.round(Math.max(5, Math.min(50, itemTotal * 0.05)) * 100) / 100;
+  }
+
+  const serviceFeeTotal = selectedGroups.reduce((s, g) => {
+    const groupItemTotal = g.items.reduce((x, i) => x + (i.price || 0), 0);
+    return s + calcServiceFee(groupItemTotal);
+  }, 0);
+
+  const grandTotal = itemsTotal + shippingTotal + serviceFeeTotal;
 
   async function handleCheckout() {
     if (!userId) { router.push('/login'); return; }
@@ -183,92 +193,66 @@ export default function CartPage() {
     setSending(true);
     try {
       const senderName = institution?.name || 'Ukendt institution';
-      const myInstId = institutionId || null;
-      let lastConvId = null;
 
+      // Check buyer isn't buying their own items
       for (const group of selectedGroups) {
-        const name = group.ownerInstitutionName;
-        if (name?.toLowerCase() === senderName?.toLowerCase()) {
-          showToast('Du kan ikke købe dine egne opslag', 'error'); continue;
+        if (group.ownerInstitutionName?.toLowerCase() === senderName?.toLowerCase()) {
+          showToast('Du kan ikke købe dine egne opslag', 'error');
+          setSending(false);
+          return;
         }
-        const groupNote = notes[name]?.trim() || null;
-        const ds = deliveryState[name] || {};
-        const pp = pickupState[name]?.chosen || null;
-
-        const { data: ownerInst } = await db.from('institutions')
-          .select('id,email,name').ilike('name', name).maybeSingle();
-
-        const orFilter = myInstId
-          ? `initiator_institution_id.eq.${myInstId},initiator_id.eq.${userId}`
-          : `initiator_id.eq.${userId}`;
-        const firstItem = group.items[0];
-        const { data: existing } = await db.from('conversations')
-          .select('id,owner_unread').eq('listing_id', firstItem.listingId).or(orFilter).maybeSingle();
-
-        let convId, ownerUnread;
-        if (existing) {
-          convId = existing.id; ownerUnread = existing.owner_unread || 0;
-        } else {
-          const { data: conv } = await db.from('conversations').insert({
-            listing_id: firstItem.listingId,
-            listing_title: firstItem.listingTitle,
-            listing_emoji: firstItem.listingEmoji || '🛒',
-            listing_color: firstItem.listingColor,
-            listing_image: firstItem.images?.[0] || null,
-            initiator_id: userId,
-            initiator_name: senderName,
-            initiator_institution_id: myInstId,
-            owner_id: group.ownerId,
-            owner_name: name,
-            owner_institution_id: ownerInst?.id || null,
-          }).select().single();
-          convId = conv?.id; ownerUnread = 0;
-          if (conv && ownerInst?.email && ownerInst.email.toLowerCase() !== (institution?.email || '').toLowerCase()) {
-            authedFetch('/api/notify-message', {
-              method: 'POST', headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ ownerEmail: ownerInst.email, ownerName: ownerInst.name, senderName, listingTitle: firstItem.listingTitle, listingEmoji: firstItem.listingEmoji, convId }),
-            }).catch(() => {});
-          }
-        }
-        if (!convId) continue;
-
-        // Map UI method → DB delivery_method
-        const dbDeliveryMethod = (ds.method?.startsWith('parcel_shop_') || ds.method?.startsWith('home_')) ? 'shipping' : (ds.method || null);
-
-        const buyData = {
-          items: group.items.map(i => ({ listingId: i.listingId, title: i.listingTitle, price: i.price, emoji: i.listingEmoji, category: i.category })),
-          totalPrice: group.items.reduce((s, i) => s + (i.price || 0), 0),
-          shippingPrice: ds.price || null,
-          shippingMethod: ds.method || null,
-          pickupPoint: pp ? { id: pp.id, name: pp.name, address: pp.address } : null,
-          note: groupNote,
-          buyerName: senderName,
-          buyerAddress: institution?.address || null,
-          buyerZip: institution?.zipcode || null,
-          buyerCity: institution?.city || null,
-          delivery_method: dbDeliveryMethod,
-        };
-
-        const msgText = `Købsforespørgsel: ${group.items.map(i => i.listingTitle).join(', ')} — ${buyData.totalPrice + (ds.price || 0)} kr.`;
-        await db.from('chat_messages').insert({
-          conversation_id: convId, sender_id: userId, sender_name: senderName,
-          content: JSON.stringify(buyData), message_type: 'buy_request',
-        });
-        await db.from('conversations').update({
-          last_message: msgText,
-          last_message_at: new Date().toISOString(),
-          owner_unread: ownerUnread + 1,
-          ...(dbDeliveryMethod ? { delivery_method: dbDeliveryMethod } : {}),
-        }).eq('id', convId);
-
-        for (const item of group.items) removeFromCart(item.listingId);
-        lastConvId = convId;
       }
 
-      showToast(`${selectedGroups.length > 1 ? `${selectedGroups.length} forespørgsler` : 'Forespørgsel'} sendt! 🎉`);
-      if (lastConvId) setSelectedConvId(lastConvId);
-      router.push('/beskeder');
-    } catch {
+      // Build groups payload for payment intent
+      const groupsPayload = selectedGroups.map(group => {
+        const name = group.ownerInstitutionName;
+        const ds = deliveryState[name] || {};
+        const pp = pickupState[name]?.chosen || null;
+        return {
+          sellerName: name,
+          sellerId: group.ownerId,
+          sellerInstitutionId: null,
+          items: group.items.map(i => ({
+            listingId: i.listingId,
+            title: i.listingTitle,
+            price: i.price,
+            emoji: i.listingEmoji,
+            category: i.category,
+          })),
+          shippingMethod: ds.method || null,
+          shippingPrice: ds.price || 0,
+          pickupPoint: pp ? { id: pp.id, name: pp.name, address: pp.address } : null,
+          note: notes[name]?.trim() || null,
+        };
+      });
+
+      const res = await authedFetch('/api/payments/create-intent', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ groups: groupsPayload, buyerInstitutionId: institutionId }),
+      });
+      const data = await res.json();
+
+      if (!res.ok) {
+        showToast(data.error || 'Kunne ikke oprette betaling', 'error');
+        setSending(false);
+        return;
+      }
+
+      // Clear cart for selected items
+      for (const group of selectedGroups) {
+        for (const item of group.items) removeFromCart(item.listingId);
+      }
+
+      // Redirect to payment page with client secret
+      const params = new URLSearchParams({
+        cs: data.clientSecret,
+        total: String(data.grandTotal),
+        bd: encodeURIComponent(JSON.stringify(data.breakdown)),
+      });
+      router.push(`/betaling/${data.orderId}?${params}`);
+    } catch (e) {
+      console.error(e);
       showToast('Noget gik galt — prøv igen', 'error');
     }
     setSending(false);
@@ -514,6 +498,13 @@ export default function CartPage() {
                   <span style={{ fontFamily: FONT, fontSize: 13, color: INK3 }}>Vælg metode</span>
                 </div>
               )}
+
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <span style={{ fontFamily: FONT, fontSize: 14, color: INK2, display: 'flex', alignItems: 'center', gap: 4 }}>
+                  🛡️ Bytoglej beskyttelse
+                </span>
+                <span style={{ fontFamily: FONT, fontWeight: 600, fontSize: 14, color: INK }}>{serviceFeeTotal.toFixed(2).replace('.', ',')} kr.</span>
+              </div>
             </div>
 
             <div style={{ borderTop: `1px solid ${PAPER2}`, paddingTop: 16, marginBottom: 20 }}>
@@ -537,7 +528,7 @@ export default function CartPage() {
               cursor: (sending || selectedGroups.length === 0) ? 'not-allowed' : 'pointer',
               transition: 'all 0.2s', marginBottom: 10,
             }}>
-              {sending ? 'Sender…' : `Send forespørgsel →`}
+              {sending ? 'Opretter betaling…' : `Betal ${grandTotal.toFixed(2).replace('.', ',')} kr. →`}
             </button>
 
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}>

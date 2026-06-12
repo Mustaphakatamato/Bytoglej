@@ -64,6 +64,8 @@ export default function ProfilPage() {
     contact_name:          institution?.contact_name          || '',
     default_pickup_hours:  institution?.default_pickup_hours  || '',
     default_pickup_notes:  institution?.default_pickup_notes  || '',
+    bank_reg_nr:           institution?.bank_reg_nr           || '',
+    bank_account_nr:       institution?.bank_account_nr       || '',
   });
   const [saving, setSaving] = useState(false);
 
@@ -84,6 +86,8 @@ export default function ProfilPage() {
       contact_name:          institution.contact_name          || '',
       default_pickup_hours:  institution.default_pickup_hours  || '',
       default_pickup_notes:  institution.default_pickup_notes  || '',
+      bank_reg_nr:           institution.bank_reg_nr           || '',
+      bank_account_nr:       institution.bank_account_nr       || '',
     });
   }, [institution?.id]);
 
@@ -124,6 +128,8 @@ export default function ProfilPage() {
       contact_name:         form.contact_name,
       default_pickup_hours: form.default_pickup_hours || null,
       default_pickup_notes: form.default_pickup_notes || null,
+      bank_reg_nr:          form.bank_reg_nr || null,
+      bank_account_nr:      form.bank_account_nr || null,
     }).eq('email', institution.email);
     setSaving(false);
     if (error) { showToast('Noget gik galt', 'error'); return; }
@@ -269,6 +275,22 @@ export default function ProfilPage() {
                 <label style={{ display:'block', fontSize:13, fontWeight:700, marginBottom:6 }}>Bemærkning til afhentning <span style={{ fontWeight:400, color:INK3 }}>(valgfri)</span></label>
                 <input value={form.default_pickup_notes} onChange={e=>setForm(f=>({...f,default_pickup_notes:e.target.value}))}
                   placeholder="Fx: Brug indgangen til venstre, ring på dørklokken" style={INP} />
+              </div>
+            </div>
+          </div>
+
+          {/* Bankkonto til udbetaling */}
+          <div style={{ borderTop:'1px solid #f0eeeb', paddingTop:20 }}>
+            <div style={{ fontSize:12, fontWeight:700, color:'#aaa', textTransform:'uppercase', letterSpacing:0.8, marginBottom:6 }}>Bankkonto til udbetaling</div>
+            <div style={{ fontSize:13, color:INK3, marginBottom:14, lineHeight:1.5 }}>Bytoglej overfører betaling for solgte varer hertil. Oplysningerne opbevares sikkert og deles ikke med købere.</div>
+            <div style={{ display:'grid', gridTemplateColumns:'140px 1fr', gap:12 }}>
+              <div>
+                <label style={{ display:'block', fontSize:13, fontWeight:700, marginBottom:6 }}>Reg.nr.</label>
+                <input value={form.bank_reg_nr} onChange={e=>setForm(f=>({...f,bank_reg_nr:e.target.value.replace(/\D/g,'').slice(0,4)}))} placeholder="1234" maxLength={4} style={INP} />
+              </div>
+              <div>
+                <label style={{ display:'block', fontSize:13, fontWeight:700, marginBottom:6 }}>Kontonummer</label>
+                <input value={form.bank_account_nr} onChange={e=>setForm(f=>({...f,bank_account_nr:e.target.value.replace(/\D/g,'').slice(0,10)}))} placeholder="12345678" maxLength={10} style={INP} />
               </div>
             </div>
           </div>
