@@ -325,9 +325,9 @@ function HeroSection({ stats }) {
     }}>
       {/* Right: hero image */}
       <div style={{ position: 'absolute', inset: 0 }}>
-        <img src={heroImageUrl} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover', objectPosition: 'center', display: 'block' }} />
+        <img src={heroImageUrl} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover', objectPosition: '65% center', display: 'block' }} />
         {/* subtle right-to-left fade so card blends in */}
-        <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(to right, rgba(255,255,255,0.92) 0%, rgba(255,255,255,0.55) 45%, rgba(255,255,255,0) 70%)' }} />
+        <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(to right, rgba(255,255,255,0.88) 0%, rgba(255,255,255,0.50) 42%, rgba(255,255,255,0) 65%)' }} />
       </div>
 
       {/* Left: floating white card */}

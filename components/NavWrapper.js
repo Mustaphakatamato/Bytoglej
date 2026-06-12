@@ -684,7 +684,8 @@ function Nav({ pathname, navigate, loggedIn, setLoggedIn, unreadTotal, instituti
   useEffect(() => { setMenuOpen(false); }, [pathname]);
 
   const isHome = pathname === '/';
-  const transparent = isHome && !isMobile && !scrolled && !menuOpen;
+  const hasHeroImage = !!process.env.NEXT_PUBLIC_HERO_IMAGE_URL;
+  const transparent = isHome && !isMobile && !scrolled && !menuOpen && !hasHeroImage;
   const showCategoryStrip = !isMobile && !transparent && !scrolled && (pathname === '/' || pathname?.startsWith('/opslag'));
 
   function go(p) { navigate(p); }
