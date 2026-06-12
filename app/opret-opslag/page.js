@@ -429,6 +429,7 @@ export default function OpretOpslagPage() {
     if (!form.title.trim()) return;
     if (form.type === 'køb' && !String(form.price).trim()) { showToast('Angiv en pris for køb-opslag', 'error'); return; }
     if (!form.description.trim()) { showToast('Tilføj en beskrivelse', 'error'); return; }
+    if (delivery.shipping && !delivery.size_category) { showToast('Vælg pakkestørrelse for forsendelse', 'error'); return; }
     if (delivery.shipping && delivery.shipping_included === null) { showToast('Vælg porto-håndtering for forsendelse', 'error'); return; }
     setSaving(true);
     try {
