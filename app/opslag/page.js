@@ -594,7 +594,14 @@ function OpslagInner() {
                 return 'Alle opslag';
               })()}
             </button>
-            <span style={{ marginLeft: 'auto', fontSize: 12, color: INK3, fontFamily: FONT }}>{loading ? '' : `${filtered.length} opslag`}</span>
+            <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 8 }}>
+              {loggedIn && (filter !== 'alle' || search || category || subcategory) && (
+                <button onClick={() => setSaveSearchModal(true)} style={{ fontSize: 12, fontWeight: 700, color: '#fff', background: PRIMARY, border: 'none', borderRadius: 99, cursor: 'pointer', fontFamily: FONT, padding: '5px 12px', display: 'flex', alignItems: 'center', gap: 4 }}>
+                  🔔 Gem
+                </button>
+              )}
+              <span style={{ fontSize: 12, color: INK3, fontFamily: FONT }}>{loading ? '' : `${filtered.length} opslag`}</span>
+            </div>
           </div>
         )}
 
