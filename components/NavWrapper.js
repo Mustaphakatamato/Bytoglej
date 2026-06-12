@@ -80,7 +80,7 @@ function ToastDisplay({ msg, type='success', onDone }) {
   const w = useWindowWidth();
   const isMobile = w < 768;
   const icon = type==='success' ? '✅' : type==='error' ? '❌' : 'ℹ️';
-  const bottomOffset = isMobile ? 'calc(72px + max(16px, env(safe-area-inset-bottom, 16px)))' : 'max(32px, env(safe-area-inset-bottom, 32px))';
+  const bottomOffset = isMobile ? 'calc(84px + env(safe-area-inset-bottom, 0px) + 14px + 54px + 12px)' : 'max(32px, env(safe-area-inset-bottom, 32px))';
   return (
     <div style={{ position:'fixed', bottom:bottomOffset, left:'50%', transform:'translateX(-50%)', background:'#1c1a17', color:'#fff', borderRadius:20, padding:'13px 20px', fontWeight:700, fontSize:14, fontFamily:FONT, zIndex:2000, boxShadow:'0 10px 40px rgba(0,0,0,0.35)', display:'flex', alignItems:'flex-start', gap:10, animation:'slideUp 0.3s ease', maxWidth:'calc(100vw - 32px)', width:'max-content' }}>
       <span style={{ fontSize:18, flexShrink:0 }}>{icon}</span>
