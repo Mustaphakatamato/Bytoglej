@@ -294,6 +294,7 @@ export default function ProfilPage() {
               <MenuItem icon="🏷️" label="Mine opslag" value={activeListingCount !== null ? `${activeListingCount} aktive` : undefined} onClick={() => router.push('/mine-opslag')} />
               <MenuItem icon="📋" label="Mine opgaver" badge={pendingCount} onClick={() => router.push('/mine-opgaver')} />
               <MenuItem icon="🔄" label="Mine handler" onClick={() => router.push('/mine-handeler')} />
+              <MenuItem icon="🛍️" label="Mine ordrer" onClick={() => router.push('/mine-ordrer')} />
               <MenuItem icon="💬" label="Beskeder" onClick={() => router.push('/beskeder')} />
               <MenuItem icon="❤️" label="Favoritopslag" onClick={() => router.push('/favoritter')} />
               <MenuItem icon="🔍" label="Gemte søgninger" onClick={() => router.push('/gemte-soegninger')} />

@@ -94,7 +94,7 @@ function BottomNav({ pathname, navigate, loggedIn, unreadTotal }) {
   const isOpslag   = pathname?.startsWith('/opslag');
   const isOpret    = pathname?.startsWith('/opret-opslag');
   const isBeskeder = pathname?.startsWith('/beskeder');
-  const isProfile  = pathname?.startsWith('/profil') || pathname?.startsWith('/mine-opslag') || pathname?.startsWith('/mine-handeler') || pathname?.startsWith('/mine-opgaver') || pathname?.startsWith('/baeredygtighed') || pathname?.startsWith('/gemte-soegninger') || pathname?.startsWith('/favoritter') || pathname?.startsWith('/medarbejdere');
+  const isProfile  = pathname?.startsWith('/profil') || pathname?.startsWith('/mine-opslag') || pathname?.startsWith('/mine-handeler') || pathname?.startsWith('/mine-ordrer') || pathname?.startsWith('/mine-opgaver') || pathname?.startsWith('/baeredygtighed') || pathname?.startsWith('/gemte-soegninger') || pathname?.startsWith('/favoritter') || pathname?.startsWith('/medarbejdere');
 
   function tab(label, active, onClick, icon) {
     return (
@@ -782,6 +782,11 @@ function Nav({ pathname, navigate, loggedIn, setLoggedIn, unreadTotal, instituti
                         onMouseEnter={e=>e.currentTarget.style.background=GREEN_TINT} onMouseLeave={e=>e.currentTarget.style.background='transparent'}>
                         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
                         Mine handeler
+                      </Link>
+                      <Link href="/mine-ordrer" style={{ display:'flex', alignItems:'center', gap:9, padding:'11px 14px', fontSize:13, fontWeight:600, color:INK2, textDecoration:'none', borderBottom:`1px solid ${PAPER2}`, fontFamily:FONT }}
+                        onMouseEnter={e=>e.currentTarget.style.background=GREEN_TINT} onMouseLeave={e=>e.currentTarget.style.background='transparent'}>
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><circle cx="9" cy="21" r="1"/><circle cx="20" cy="21" r="1"/><path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"/></svg>
+                        Mine ordrer
                       </Link>
                       <Link href="/profil" style={{ display:'flex', alignItems:'center', gap:9, padding:'11px 14px', fontSize:13, fontWeight:600, color:INK2, textDecoration:'none', borderBottom:`1px solid ${PAPER2}`, fontFamily:FONT }}
                         onMouseEnter={e=>e.currentTarget.style.background=GREEN_TINT} onMouseLeave={e=>e.currentTarget.style.background='transparent'}>
