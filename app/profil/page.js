@@ -275,10 +275,10 @@ export default function ProfilPage() {
             </div>
             <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:8 }}>
               {[
-                { icon:'🏷️', value: activeListingCount ?? '—', label:'Aktive opslag', highlight: false, to:'/mine-opslag' },
-                { icon:'🔄', value: tradeCount ?? '—', label:'Gennemførte handler', highlight: false, to:'/mine-handeler' },
-                { icon:'📤', value: sentCount ?? '—', label:'Sendte forespørgsler', highlight: false, to:'/mine-forespørgsler' },
+                { icon:'🏷️', value: activeListingCount ?? '—', label:'Mine opslag', highlight: false, to:'/mine-opslag' },
                 { icon:'📋', value: pendingCount, label:'Opgaver', highlight: pendingCount > 0, to:'/mine-opgaver' },
+                { icon:'🛍️', value: '→', label:'Mine ordrer', highlight: false, to:'/mine-ordrer' },
+                { icon:'🔄', value: tradeCount ?? '—', label:'Mine handler', highlight: false, to:'/mine-handeler' },
               ].map(s => (
                 <div key={s.label} onClick={() => router.push(s.to)} style={{ background: s.highlight ? '#FEF9C3' : PAPER2, borderRadius:12, padding:'12px 8px', textAlign:'center', cursor:'pointer' }}>
                   <div style={{ fontSize:20, marginBottom:3 }}>{s.icon}</div>
@@ -290,13 +290,20 @@ export default function ProfilPage() {
           </div>
 
           <div style={{ display:'flex', flexDirection:'column', gap:10, padding:'0 0 12px' }}>
+            <div style={{ fontFamily:FONT, fontWeight:700, fontSize:11, color:INK3, textTransform:'uppercase', letterSpacing:'0.08em', padding:'4px 20px 0' }}>Jeg sælger</div>
             <MenuSection>
               <MenuItem icon="🏷️" label="Mine opslag" value={activeListingCount !== null ? `${activeListingCount} aktive` : undefined} onClick={() => router.push('/mine-opslag')} />
-              <MenuItem icon="📋" label="Mine opgaver" badge={pendingCount} onClick={() => router.push('/mine-opgaver')} />
-              <MenuItem icon="🔄" label="Mine handler" onClick={() => router.push('/mine-handeler')} />
+              <MenuItem icon="📋" label="Opgaver" badge={pendingCount} onClick={() => router.push('/mine-opgaver')} />
+            </MenuSection>
+            <div style={{ fontFamily:FONT, fontWeight:700, fontSize:11, color:INK3, textTransform:'uppercase', letterSpacing:'0.08em', padding:'4px 20px 0' }}>Jeg køber</div>
+            <MenuSection>
               <MenuItem icon="🛍️" label="Mine ordrer" onClick={() => router.push('/mine-ordrer')} />
+              <MenuItem icon="🔄" label="Mine handler" onClick={() => router.push('/mine-handeler')} />
+            </MenuSection>
+            <div style={{ fontFamily:FONT, fontWeight:700, fontSize:11, color:INK3, textTransform:'uppercase', letterSpacing:'0.08em', padding:'4px 20px 0' }}>Generelt</div>
+            <MenuSection>
               <MenuItem icon="💬" label="Beskeder" onClick={() => router.push('/beskeder')} />
-              <MenuItem icon="❤️" label="Favoritopslag" onClick={() => router.push('/favoritter')} />
+              <MenuItem icon="❤️" label="Favoritter" onClick={() => router.push('/favoritter')} />
               <MenuItem icon="🔍" label="Gemte søgninger" onClick={() => router.push('/gemte-soegninger')} />
               <MenuItem icon="👥" label="Medarbejdere" onClick={() => router.push('/medarbejdere')} />
             </MenuSection>
@@ -469,13 +476,9 @@ export default function ProfilPage() {
         {/* ── Main content ── */}
         <div style={{ flex:1, minWidth:0 }}>
 
-          {/* Section header */}
-          <div style={{ fontFamily:FONT, fontWeight:800, fontSize:22, color:INK, marginBottom:18 }}>
-            Mine aktiviteter
-          </div>
-
-          {/* Activity grid */}
-          <div style={{ display:'grid', gridTemplateColumns:'repeat(3, 1fr)', gap:14, marginBottom:28 }}>
+          {/* Jeg sælger */}
+          <div style={{ fontFamily:FONT, fontWeight:700, fontSize:12, color:INK3, textTransform:'uppercase', letterSpacing:'0.08em', marginBottom:10 }}>Jeg sælger</div>
+          <div style={{ display:'grid', gridTemplateColumns:'repeat(2, 1fr)', gap:14, marginBottom:28 }}>
             <ActivityCard
               icon="🏷️"
               label="Mine opslag"
@@ -485,45 +488,55 @@ export default function ProfilPage() {
             />
             <ActivityCard
               icon="📋"
-              label="Mine opgaver"
+              label="Opgaver"
               sublabel="Afventer handling"
               value={pendingCount}
               badge={pendingCount}
               highlight={pendingCount > 0}
               onClick={() => router.push('/mine-opgaver')}
             />
+          </div>
+
+          {/* Jeg køber */}
+          <div style={{ fontFamily:FONT, fontWeight:700, fontSize:12, color:INK3, textTransform:'uppercase', letterSpacing:'0.08em', marginBottom:10 }}>Jeg køber</div>
+          <div style={{ display:'grid', gridTemplateColumns:'repeat(2, 1fr)', gap:14, marginBottom:28 }}>
+            <ActivityCard
+              icon="🛍️"
+              label="Mine ordrer"
+              sublabel="Betalte køb"
+              value={null}
+              onClick={() => router.push('/mine-ordrer')}
+            />
             <ActivityCard
               icon="🔄"
               label="Mine handler"
-              sublabel="Gennemførte"
+              sublabel="Byt & aftaler"
               value={tradeCount ?? '—'}
               onClick={() => router.push('/mine-handeler')}
             />
+          </div>
+
+          {/* Generelt */}
+          <div style={{ fontFamily:FONT, fontWeight:700, fontSize:12, color:INK3, textTransform:'uppercase', letterSpacing:'0.08em', marginBottom:10 }}>Generelt</div>
+          <div style={{ display:'grid', gridTemplateColumns:'repeat(3, 1fr)', gap:14, marginBottom:28 }}>
             <ActivityCard
-              icon="📤"
-              label="Sendte forespørgsler"
-              sublabel="Igangværende"
-              value={sentCount ?? '—'}
-              onClick={() => router.push('/mine-forespørgsler')}
+              icon="💬"
+              label="Beskeder"
+              sublabel="Al kommunikation"
+              value={null}
+              onClick={() => router.push('/beskeder')}
             />
             <ActivityCard
               icon="❤️"
-              label="Favoritopslag"
+              label="Favoritter"
               sublabel="Gemte annoncer"
               value={null}
               onClick={() => router.push('/favoritter')}
             />
             <ActivityCard
-              icon="💬"
-              label="Beskeder"
-              sublabel="Indbakke"
-              value={null}
-              onClick={() => router.push('/beskeder')}
-            />
-            <ActivityCard
               icon="🔍"
               label="Gemte søgninger"
-              sublabel="Søgenotifikationer"
+              sublabel="Notifikationer"
               value={null}
               onClick={() => router.push('/gemte-soegninger')}
             />
