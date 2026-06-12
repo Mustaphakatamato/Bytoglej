@@ -56,7 +56,6 @@ function PaymentForm({ orderId, grandTotal, breakdown }) {
       <div style={{ marginBottom: 24 }}>
         <PaymentElement options={{
           layout: 'tabs',
-          fields: { billingDetails: 'never' },
           terms: { card: 'never', ideal: 'never', sepaDebit: 'never', sofort: 'never', auBecsDebit: 'never', bancontact: 'never', giropay: 'never', p24: 'never' },
         }} />
       </div>
