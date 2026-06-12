@@ -23,10 +23,11 @@ export async function GET(req) {
 
   try {
     const encoded = Buffer.from(`${API_USER}:${API_KEY}`).toString('base64');
+    const CARRIER_MAP = { postnord: 'pdk', dao: 'dao', gls: 'gls' };
     const params = new URLSearchParams({
-      zipcode,           // ← Shipmondo bruger 'zipcode' (ikke 'zip_code')
+      zipcode,
       country_code: 'DK',
-      carrier_code: carrier,
+      carrier_code: CARRIER_MAP[carrier] ?? carrier,
       quantity: String(limit),
     });
 
