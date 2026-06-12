@@ -273,38 +273,23 @@ export default function ProfilPage() {
                 )}
               </div>
             </div>
-            <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:8 }}>
-              {[
-                { icon:'🏷️', value: activeListingCount ?? '—', label:'Mine opslag', highlight: false, to:'/mine-opslag' },
-                { icon:'📋', value: pendingCount, label:'Opgaver', highlight: pendingCount > 0, to:'/mine-opgaver' },
-                { icon:'🛍️', value: '→', label:'Mine ordrer', highlight: false, to:'/mine-ordrer' },
-                { icon:'🔄', value: tradeCount ?? '—', label:'Mine handler', highlight: false, to:'/mine-handeler' },
-              ].map(s => (
-                <div key={s.label} onClick={() => router.push(s.to)} style={{ background: s.highlight ? '#FEF9C3' : PAPER2, borderRadius:12, padding:'12px 8px', textAlign:'center', cursor:'pointer' }}>
-                  <div style={{ fontSize:20, marginBottom:3 }}>{s.icon}</div>
-                  <div style={{ fontFamily:FONT, fontWeight:800, fontSize:17, color: s.highlight ? '#92400E' : INK }}>{s.value}</div>
-                  <div style={{ fontFamily:FONT, fontSize:11, color:INK3, marginTop:2 }}>{s.label}</div>
-                </div>
-              ))}
             </div>
-          </div>
 
           <div style={{ display:'flex', flexDirection:'column', gap:10, padding:'0 0 12px' }}>
             <div style={{ fontFamily:FONT, fontWeight:700, fontSize:11, color:INK3, textTransform:'uppercase', letterSpacing:'0.08em', padding:'4px 20px 0' }}>Jeg sælger</div>
             <MenuSection>
               <MenuItem icon="🏷️" label="Mine opslag" value={activeListingCount !== null ? `${activeListingCount} aktive` : undefined} onClick={() => router.push('/mine-opslag')} />
-              <MenuItem icon="📋" label="Opgaver" badge={pendingCount} onClick={() => router.push('/mine-opgaver')} />
+              <MenuItem icon="📋" label="Mine salg" badge={pendingCount} onClick={() => router.push('/mine-opgaver')} />
             </MenuSection>
             <div style={{ fontFamily:FONT, fontWeight:700, fontSize:11, color:INK3, textTransform:'uppercase', letterSpacing:'0.08em', padding:'4px 20px 0' }}>Jeg køber</div>
             <MenuSection>
               <MenuItem icon="🛍️" label="Mine ordrer" onClick={() => router.push('/mine-ordrer')} />
-              <MenuItem icon="🔄" label="Mine handler" onClick={() => router.push('/mine-handeler')} />
-            </MenuSection>
-            <div style={{ fontFamily:FONT, fontWeight:700, fontSize:11, color:INK3, textTransform:'uppercase', letterSpacing:'0.08em', padding:'4px 20px 0' }}>Generelt</div>
-            <MenuSection>
-              <MenuItem icon="💬" label="Beskeder" onClick={() => router.push('/beskeder')} />
+              <MenuItem icon="🔄" label="Byttehandler" onClick={() => router.push('/mine-handeler')} />
               <MenuItem icon="❤️" label="Favoritter" onClick={() => router.push('/favoritter')} />
               <MenuItem icon="🔍" label="Gemte søgninger" onClick={() => router.push('/gemte-soegninger')} />
+            </MenuSection>
+            <div style={{ fontFamily:FONT, fontWeight:700, fontSize:11, color:INK3, textTransform:'uppercase', letterSpacing:'0.08em', padding:'4px 20px 0' }}>Konto</div>
+            <MenuSection>
               <MenuItem icon="👥" label="Medarbejdere" onClick={() => router.push('/medarbejdere')} />
             </MenuSection>
             <MenuSection>
@@ -488,9 +473,9 @@ export default function ProfilPage() {
             />
             <ActivityCard
               icon="📋"
-              label="Opgaver"
-              sublabel="Afventer handling"
-              value={pendingCount}
+              label="Mine salg"
+              sublabel="Ordrer & opgaver"
+              value={pendingCount || null}
               badge={pendingCount}
               highlight={pendingCount > 0}
               onClick={() => router.push('/mine-opgaver')}
@@ -499,32 +484,20 @@ export default function ProfilPage() {
 
           {/* Jeg køber */}
           <div style={{ fontFamily:FONT, fontWeight:700, fontSize:12, color:INK3, textTransform:'uppercase', letterSpacing:'0.08em', marginBottom:10 }}>Jeg køber</div>
-          <div style={{ display:'grid', gridTemplateColumns:'repeat(2, 1fr)', gap:14, marginBottom:28 }}>
+          <div style={{ display:'grid', gridTemplateColumns:'repeat(3, 1fr)', gap:14, marginBottom:28 }}>
             <ActivityCard
               icon="🛍️"
               label="Mine ordrer"
-              sublabel="Betalte køb"
+              sublabel="Stripe-betalte køb"
               value={null}
               onClick={() => router.push('/mine-ordrer')}
             />
             <ActivityCard
               icon="🔄"
-              label="Mine handler"
+              label="Byttehandler"
               sublabel="Byt & aftaler"
               value={tradeCount ?? '—'}
               onClick={() => router.push('/mine-handeler')}
-            />
-          </div>
-
-          {/* Generelt */}
-          <div style={{ fontFamily:FONT, fontWeight:700, fontSize:12, color:INK3, textTransform:'uppercase', letterSpacing:'0.08em', marginBottom:10 }}>Generelt</div>
-          <div style={{ display:'grid', gridTemplateColumns:'repeat(3, 1fr)', gap:14, marginBottom:28 }}>
-            <ActivityCard
-              icon="💬"
-              label="Beskeder"
-              sublabel="Al kommunikation"
-              value={null}
-              onClick={() => router.push('/beskeder')}
             />
             <ActivityCard
               icon="❤️"
@@ -533,47 +506,27 @@ export default function ProfilPage() {
               value={null}
               onClick={() => router.push('/favoritter')}
             />
+          </div>
+
+          {/* Discover */}
+          <div style={{ fontFamily:FONT, fontWeight:700, fontSize:12, color:INK3, textTransform:'uppercase', letterSpacing:'0.08em', marginBottom:10 }}>Opdage</div>
+          <div style={{ display:'grid', gridTemplateColumns:'repeat(2, 1fr)', gap:14, marginBottom:28 }}>
             <ActivityCard
               icon="🔍"
               label="Gemte søgninger"
-              sublabel="Notifikationer"
+              sublabel="Søge-notifikationer"
               value={null}
               onClick={() => router.push('/gemte-soegninger')}
             />
+            <ActivityCard
+              icon="🌱"
+              label="Bæredygtighed"
+              sublabel={co2Total !== null ? `${co2Total.toFixed(1)} kg CO₂ sparet` : 'Se din impact'}
+              value={null}
+              onClick={() => router.push('/baeredygtighed/metode')}
+            />
           </div>
 
-          {/* Sustainability highlight */}
-          {co2Total !== null && co2Total > 0 && (
-            <div
-              onClick={() => router.push('/baeredygtighed/metode')}
-              style={{
-                background: 'linear-gradient(135deg, #d1fae5 0%, #a7f3d0 100%)',
-                border: '1px solid #6ee7b7',
-                borderRadius: 20,
-                padding: '24px 28px',
-                cursor: 'pointer',
-                display: 'flex',
-                alignItems: 'center',
-                gap: 20,
-                boxShadow: '0 1px 4px rgba(22,34,28,0.06)',
-              }}
-              onMouseEnter={e => e.currentTarget.style.boxShadow = '0 4px 16px rgba(22,34,28,0.12)'}
-              onMouseLeave={e => e.currentTarget.style.boxShadow = '0 1px 4px rgba(22,34,28,0.06)'}
-            >
-              <div style={{ fontSize:48, lineHeight:1, flexShrink:0 }}>🌱</div>
-              <div>
-                <div style={{ fontFamily:FONT, fontWeight:800, fontSize:28, color:'#065f46' }}>
-                  {co2Total.toFixed(1)} kg CO₂
-                </div>
-                <div style={{ fontFamily:FONT, fontSize:15, color:'#047857', fontWeight:600, marginTop:2 }}>
-                  sparet gennem byt og genbrug
-                </div>
-                <div style={{ fontFamily:FONT, fontSize:13, color:'#059669', marginTop:4 }}>
-                  Se bæredygtighedsrapport →
-                </div>
-              </div>
-            </div>
-          )}
         </div>
       </div>
     </div>

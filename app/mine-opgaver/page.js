@@ -7,15 +7,96 @@ import { useWindowWidth } from '@/lib/hooks';
 import { useApp } from '@/providers/AppProvider';
 import { Spinner } from '@/components/ui';
 
-function isShipping(conv) {
+// ── Stripe order card (automatic label) ───────────────────────
+
+function StripeOrderCard({ order, myGroup }) {
+  const [open, setOpen] = useState(false);
+  const isPaid     = order.status === 'paid';
+  const isShipped  = order.status === 'shipped' || order.status === 'delivered';
+  const labelUrl   = myGroup.label_pdf_url;
+  const tracking   = myGroup.tracking_number;
+
+  function fmtDate(iso) {
+    if (!iso) return '';
+    return new Date(iso).toLocaleDateString('da-DK', { day:'numeric', month:'short' });
+  }
+
+  return (
+    <div style={{ background:'#fff', borderRadius:16, border:`1px solid ${PAPER3}`, marginBottom:10, overflow:'hidden' }}>
+      <button onClick={() => setOpen(o => !o)} style={{
+        width:'100%', background:'none', border:'none', cursor:'pointer',
+        padding:'14px 16px', display:'flex', alignItems:'center', gap:12, textAlign:'left',
+      }}>
+        <div style={{ width:44, height:44, borderRadius:10, background:GREEN_TINT, flexShrink:0, display:'flex', alignItems:'center', justifyContent:'center', fontSize:20 }}>
+          {(myGroup.items?.[0]?.emoji) || '📦'}
+        </div>
+        <div style={{ flex:1, minWidth:0 }}>
+          <div style={{ fontFamily:FONT, fontWeight:700, fontSize:14, color:INK, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>
+            {(myGroup.items || []).map(i => i.title).join(', ')}
+          </div>
+          <div style={{ fontFamily:FONT, fontSize:12, color:INK3, marginTop:1 }}>
+            Køber: <strong style={{ color:INK }}>{order.buyer_name}</strong> · {fmtDate(order.paid_at)}
+          </div>
+        </div>
+        {isPaid && (
+          <span style={{ background:'#FEF9C3', color:'#92400E', borderRadius:99, fontSize:10, fontWeight:800, padding:'3px 8px', flexShrink:0 }}>
+            KLAR TIL AFSENDELSE
+          </span>
+        )}
+        {isShipped && (
+          <span style={{ background:'#DCFCE7', color:'#166534', borderRadius:99, fontSize:10, fontWeight:800, padding:'3px 8px', flexShrink:0 }}>
+            AFSENDT
+          </span>
+        )}
+      </button>
+
+      {open && (
+        <div style={{ borderTop:`1px solid ${PAPER2}`, padding:'14px 16px' }}>
+          {(myGroup.items || []).map((item, i) => (
+            <div key={i} style={{ display:'flex', justifyContent:'space-between', marginBottom:6 }}>
+              <span style={{ fontFamily:FONT, fontSize:13, color:INK }}>{item.emoji || '📦'} {item.title}</span>
+              <span style={{ fontFamily:FONT, fontSize:13, color:INK, fontWeight:600 }}>{item.price} kr.</span>
+            </div>
+          ))}
+
+          <div style={{ marginTop:10, display:'flex', flexDirection:'column', gap:8 }}>
+            {labelUrl && (
+              <a href={labelUrl} target="_blank" rel="noopener noreferrer" style={{
+                display:'block', textAlign:'center', padding:'11px', borderRadius:99,
+                background:PRIMARY, color:'#fff', fontFamily:FONT, fontWeight:700, fontSize:14,
+                textDecoration:'none',
+              }}>
+                🖨️ Download pakkemærkat (PDF)
+              </a>
+            )}
+            {!labelUrl && isPaid && (
+              <div style={{ background:'#FEF9C3', borderRadius:12, padding:'10px 14px', fontFamily:FONT, fontSize:13, color:'#92400E' }}>
+                Pakkemærkaten sendes til din e-mail — tjek din indbakke.
+              </div>
+            )}
+            {tracking && (
+              <div style={{ fontFamily:FONT, fontSize:12, color:INK3, textAlign:'center' }}>
+                Tracking: {tracking}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ── Chat-based task card (barter / pickup / custom) ────────────
+
+function isShippingConv(conv) {
   return conv.delivery_method === 'shipping' || !!conv.shipment_id;
 }
 
 function stepOf(conv) {
-  if (conv.deal_completed) return isShipping(conv) ? 3 : 2;
-  if (conv.shipment_id)   return 2; // label generated, awaiting "sent"
-  if (conv.is_handled)    return 1; // confirmed, needs packing/label
-  return 0;                          // new order
+  if (conv.deal_completed) return isShippingConv(conv) ? 3 : 2;
+  if (conv.shipment_id)   return 2;
+  if (conv.is_handled)    return 1;
+  return 0;
 }
 
 const STEPS_SHIP   = ['Ny ordre', 'Bekræftet', 'Label genereret', 'Afsendt'];
@@ -53,9 +134,9 @@ function ProgressBar({ step, shipping }) {
   );
 }
 
-function TaskCard({ conv, onAction, actionLoading }) {
+function ChatTaskCard({ conv, onAction, actionLoading }) {
   const step     = stepOf(conv);
-  const shipping = isShipping(conv);
+  const shipping = isShippingConv(conv);
   const router   = useRouter();
   const isNew    = step === 0;
   const isConf   = step === 1;
@@ -95,15 +176,6 @@ function TaskCard({ conv, onAction, actionLoading }) {
             {actionLoading===conv.id ? 'Bekræfter…' : '✅ Bekræft ordre'}
           </button>
         )}
-
-        {isConf && shipping && (
-          <button
-            onClick={() => router.push('/beskeder?conv=' + conv.id)}
-            style={{ flex:1, minWidth:120, padding:'10px', borderRadius:99, background:GREEN_TINT, color:PRIMARY, border:`1.5px solid ${PRIMARY}`, fontFamily:FONT, fontWeight:700, fontSize:13, cursor:'pointer' }}>
-            📦 Generer forsendelseslabel →
-          </button>
-        )}
-
         {isConf && !shipping && (
           <button
             disabled={actionLoading === conv.id}
@@ -112,7 +184,6 @@ function TaskCard({ conv, onAction, actionLoading }) {
             {actionLoading===conv.id ? 'Gemmer…' : '🤝 Marker som afhentet'}
           </button>
         )}
-
         {isLabeled && (
           <button
             disabled={actionLoading === conv.id}
@@ -121,11 +192,9 @@ function TaskCard({ conv, onAction, actionLoading }) {
             {actionLoading===conv.id ? 'Gemmer…' : '🚚 Marker som afsendt'}
           </button>
         )}
-
         {isDone && (
           <span style={{ fontFamily:FONT, fontSize:12, color:'#065F46', fontWeight:700, background:'#D1FAE5', borderRadius:99, padding:'8px 14px' }}>✓ Gennemført</span>
         )}
-
         <button
           onClick={() => router.push('/beskeder?conv=' + conv.id)}
           style={{ padding:'10px 14px', borderRadius:99, background:PAPER2, color:INK3, border:'none', fontFamily:FONT, fontWeight:600, fontSize:12, cursor:'pointer', marginLeft: isDone ? 'auto' : 0 }}>
@@ -136,13 +205,16 @@ function TaskCard({ conv, onAction, actionLoading }) {
   );
 }
 
+// ── Main page ─────────────────────────────────────────────────
+
 export default function MineOpgaverPage() {
   const router = useRouter();
   const { effectiveInstitution, showToast } = useApp();
   const ww = useWindowWidth();
   const isMobile = ww < 768;
 
-  const [tasks, setTasks] = useState([]);
+  const [stripeOrders, setStripeOrders] = useState([]);
+  const [chatTasks, setChatTasks] = useState([]);
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState('aktive');
   const [actionLoading, setActionLoading] = useState(null);
@@ -166,20 +238,42 @@ export default function MineOpgaverPage() {
     const instId = inst?.id;
     const instName = inst?.name;
 
+    // 1. Stripe orders where I'm a seller (JSONB contains match)
+    if (instId) {
+      const { data: orders } = await db
+        .from('orders')
+        .select('id, created_at, status, order_groups, buyer_name, buyer_email, paid_at')
+        .filter('order_groups', 'cs', JSON.stringify([{ sellerInstitutionId: instId }]))
+        .in('status', ['paid', 'shipped', 'delivered'])
+        .order('created_at', { ascending: false })
+        .limit(50);
+
+      if (orders) {
+        // Attach the relevant group(s) to each order
+        const withGroups = orders.map(o => ({
+          ...o,
+          myGroups: (o.order_groups || []).filter(g => g.sellerInstitutionId === instId),
+        })).filter(o => o.myGroups.length > 0);
+        setStripeOrders(withGroups);
+      }
+    }
+
+    // 2. Chat-based tasks (barter / pickup / legacy)
     const parts = [];
     if (instId)   parts.push(`owner_institution_id.eq.${instId}`);
     if (uid)      parts.push(`owner_id.eq.${uid}`);
     if (instName) parts.push(`owner_name.eq.${instName}`);
-    if (!parts.length) { setLoading(false); return; }
 
-    const { data } = await db.from('conversations')
-      .select('id,listing_title,listing_emoji,listing_color,listing_image,initiator_name,is_handled,handled_action,deal_completed,deal_type,delivery_method,shipment_id,last_message_at,owner_name,initiator_institution_id')
-      .or(parts.join(','))
-      .in('deal_type', ['køb','byd','byt','bundle'])
-      .order('last_message_at', { ascending: false })
-      .limit(100);
+    if (parts.length) {
+      const { data } = await db.from('conversations')
+        .select('id,listing_title,listing_emoji,listing_color,listing_image,initiator_name,is_handled,handled_action,deal_completed,deal_type,delivery_method,shipment_id,last_message_at,owner_name,initiator_institution_id')
+        .or(parts.join(','))
+        .in('deal_type', ['byt', 'bundle'])
+        .order('last_message_at', { ascending: false })
+        .limit(100);
+      setChatTasks(data || []);
+    }
 
-    setTasks(data || []);
     setLoading(false);
   }, [effectiveInstitution?.id]);
 
@@ -197,23 +291,21 @@ export default function MineOpgaverPage() {
         await db.from('chat_messages').insert({ conversation_id: conv.id, sender_id: user.id, sender_name: senderName, content: msg });
         const upd = { is_handled: true, handled_at: now, handled_action: 'order_confirmed', deal_type: 'køb', last_message: msg, last_message_at: now, initiator_unread: 1 };
         await db.from('conversations').update(upd).eq('id', conv.id);
-        setTasks(ts => ts.map(t => t.id === conv.id ? { ...t, ...upd } : t));
+        setChatTasks(ts => ts.map(t => t.id === conv.id ? { ...t, ...upd } : t));
         showToast?.('Ordre bekræftet!');
-
       } else if (action === 'mark_sent') {
-        const msg = `🚚 ${senderName} har afsendt pakken. Hold øje med din e-mail for sporingsinformation.`;
+        const msg = `🚚 ${senderName} har afsendt pakken.`;
         await db.from('chat_messages').insert({ conversation_id: conv.id, sender_id: user.id, sender_name: senderName, content: msg });
         const upd = { deal_completed: true, deal_completed_at: now, delivery_status: 'sent', last_message: msg, last_message_at: now, initiator_unread: 1 };
         await db.from('conversations').update(upd).eq('id', conv.id);
-        setTasks(ts => ts.map(t => t.id === conv.id ? { ...t, ...upd } : t));
+        setChatTasks(ts => ts.map(t => t.id === conv.id ? { ...t, ...upd } : t));
         showToast?.('Markeret som afsendt!');
-
       } else if (action === 'pickup_done') {
-        const msg = `🤝 ${senderName} har markeret varen som afhentet. Handlen er gennemført!`;
+        const msg = `🤝 ${senderName} har markeret varen som afhentet.`;
         await db.from('chat_messages').insert({ conversation_id: conv.id, sender_id: user.id, sender_name: senderName, content: msg });
         const upd = { deal_completed: true, deal_completed_at: now, last_message: msg, last_message_at: now, initiator_unread: 1 };
         await db.from('conversations').update(upd).eq('id', conv.id);
-        setTasks(ts => ts.map(t => t.id === conv.id ? { ...t, ...upd } : t));
+        setChatTasks(ts => ts.map(t => t.id === conv.id ? { ...t, ...upd } : t));
         showToast?.('Markeret som afhentet!');
       }
     } catch {
@@ -222,11 +314,13 @@ export default function MineOpgaverPage() {
     setActionLoading(null);
   }
 
-  const active  = tasks.filter(t => !t.deal_completed);
-  const done    = tasks.filter(t => t.deal_completed);
-  const newCnt  = active.filter(t => !t.is_handled).length;
-  const inProg  = active.filter(t => t.is_handled).length;
-  const shown   = filter === 'aktive' ? active : done;
+  const activeChatTasks = chatTasks.filter(t => !t.deal_completed);
+  const doneChatTasks   = chatTasks.filter(t => t.deal_completed);
+  const activeStripe    = stripeOrders.filter(o => o.status === 'paid');
+  const doneStripe      = stripeOrders.filter(o => o.status === 'shipped' || o.status === 'delivered');
+
+  const totalActive  = activeStripe.length + activeChatTasks.length;
+  const totalDone    = doneStripe.length + doneChatTasks.length;
 
   return (
     <div style={{ minHeight:'100vh', background:'#F6F2EA', paddingTop:isMobile?60:80, paddingBottom:90 }}>
@@ -236,21 +330,19 @@ export default function MineOpgaverPage() {
           <button onClick={() => router.push('/profil')} style={{ background:'none', border:'none', cursor:'pointer', padding:6, display:'flex', alignItems:'center' }}>
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke={INK} strokeWidth="2.2" strokeLinecap="round"><line x1="19" y1="12" x2="5" y2="12"/><polyline points="12 19 5 12 12 5"/></svg>
           </button>
-          <h1 style={{ fontFamily:FONT, fontWeight:800, fontSize:18, color:INK, margin:0, flex:1 }}>Mine opgaver</h1>
+          <h1 style={{ fontFamily:FONT, fontWeight:800, fontSize:18, color:INK, margin:0, flex:1 }}>Mine salg</h1>
+          {totalActive > 0 && (
+            <span style={{ background:'#FEF9C3', color:'#92400E', borderRadius:99, fontSize:12, fontWeight:700, padding:'4px 12px' }}>
+              {totalActive} afventer
+            </span>
+          )}
         </div>
 
-        {!loading && (newCnt > 0 || inProg > 0) && (
-          <div style={{ display:'flex', gap:8, padding:'12px 16px 0' }}>
-            {newCnt > 0 && <span style={{ background:'#FEF9C3', color:'#92400E', borderRadius:99, fontSize:12, fontWeight:700, padding:'4px 12px' }}>{newCnt} ny{newCnt !== 1 ? 'e' : ''} ordre</span>}
-            {inProg > 0 && <span style={{ background:GREEN_TINT, color:PRIMARY, borderRadius:99, fontSize:12, fontWeight:700, padding:'4px 12px' }}>{inProg} i gang</span>}
-          </div>
-        )}
-
         <div style={{ display:'flex', borderBottom:`2px solid ${PAPER3}`, background:'#fff', marginTop:12 }}>
-          {[['aktive','Aktive'], ['gennemforte','Gennemførte']].map(([val, lbl]) => (
+          {[['aktive',`Aktive (${totalActive})`], ['gennemforte',`Gennemførte (${totalDone})`]].map(([val, lbl]) => (
             <button key={val} onClick={() => setFilter(val)}
               style={{ flex:1, padding:'13px', border:'none', background:'none', cursor:'pointer', fontFamily:FONT, fontWeight:700, fontSize:15, color: filter===val ? PRIMARY : INK3, borderBottom: filter===val ? `2px solid ${PRIMARY}` : '2px solid transparent', marginBottom:-2 }}>
-              {lbl} ({val==='aktive' ? active.length : done.length})
+              {lbl}
             </button>
           ))}
         </div>
@@ -258,20 +350,47 @@ export default function MineOpgaverPage() {
         <div style={{ padding:'12px 16px 0' }}>
           {loading ? (
             <div style={{ padding:'60px 0', textAlign:'center' }}><Spinner /></div>
-          ) : shown.length === 0 ? (
-            <div style={{ padding:'60px 20px', textAlign:'center', background:'#fff', borderRadius:16 }}>
-              <div style={{ fontSize:48, marginBottom:12 }}>{filter==='aktive' ? '🎉' : '📭'}</div>
-              <div style={{ fontFamily:FONT, fontWeight:700, fontSize:16, color:INK, marginBottom:6 }}>
-                {filter==='aktive' ? 'Ingen aktive opgaver' : 'Ingen gennemførte handler endnu'}
-              </div>
-              <div style={{ fontFamily:FONT, fontSize:13, color:INK3 }}>
-                {filter==='aktive' ? 'Alle dine handler er gennemførte 🎉' : 'Handler vises her når de er afsluttet'}
-              </div>
-            </div>
           ) : (
-            shown.map(conv => (
-              <TaskCard key={conv.id} conv={conv} onAction={handleAction} actionLoading={actionLoading} />
-            ))
+            <>
+              {filter === 'aktive' && (
+                <>
+                  {activeStripe.length === 0 && activeChatTasks.length === 0 && (
+                    <div style={{ padding:'60px 20px', textAlign:'center', background:'#fff', borderRadius:16 }}>
+                      <div style={{ fontSize:48, marginBottom:12 }}>🎉</div>
+                      <div style={{ fontFamily:FONT, fontWeight:700, fontSize:16, color:INK, marginBottom:6 }}>Ingen aktive opgaver</div>
+                      <div style={{ fontFamily:FONT, fontSize:13, color:INK3 }}>Alt er klaret — godt gået!</div>
+                    </div>
+                  )}
+                  {activeStripe.map(order =>
+                    order.myGroups.map((g, gi) => (
+                      <StripeOrderCard key={`${order.id}-${gi}`} order={order} myGroup={g} />
+                    ))
+                  )}
+                  {activeChatTasks.map(conv => (
+                    <ChatTaskCard key={conv.id} conv={conv} onAction={handleAction} actionLoading={actionLoading} />
+                  ))}
+                </>
+              )}
+              {filter === 'gennemforte' && (
+                <>
+                  {doneStripe.length === 0 && doneChatTasks.length === 0 && (
+                    <div style={{ padding:'60px 20px', textAlign:'center', background:'#fff', borderRadius:16 }}>
+                      <div style={{ fontSize:48, marginBottom:12 }}>📭</div>
+                      <div style={{ fontFamily:FONT, fontWeight:700, fontSize:16, color:INK, marginBottom:6 }}>Ingen gennemførte handler endnu</div>
+                      <div style={{ fontFamily:FONT, fontSize:13, color:INK3 }}>Handler vises her når de er afsluttet</div>
+                    </div>
+                  )}
+                  {doneStripe.map(order =>
+                    order.myGroups.map((g, gi) => (
+                      <StripeOrderCard key={`${order.id}-${gi}`} order={order} myGroup={g} />
+                    ))
+                  )}
+                  {doneChatTasks.map(conv => (
+                    <ChatTaskCard key={conv.id} conv={conv} onAction={handleAction} actionLoading={actionLoading} />
+                  ))}
+                </>
+              )}
+            </>
           )}
         </div>
       </div>
