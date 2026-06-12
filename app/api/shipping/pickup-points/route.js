@@ -1,10 +1,7 @@
 import { NextResponse } from 'next/server';
-import { requireAuth, UNAUTHORIZED } from '@/lib/api-auth';
 import { listPickupPoints } from '@/lib/shipmondo/client';
 
 export async function GET(req) {
-  if (!await requireAuth(req)) return UNAUTHORIZED();
-
   const { searchParams } = new URL(req.url);
   const zip_code = searchParams.get('zip') || '2100';
   const carrier  = searchParams.get('carrier') || 'postnord';
