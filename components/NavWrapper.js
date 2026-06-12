@@ -82,8 +82,9 @@ function ToastDisplay({ msg, type='success', onDone }) {
   const icon = type==='success' ? '✅' : type==='error' ? '❌' : 'ℹ️';
   const bottomOffset = isMobile ? 'calc(72px + max(16px, env(safe-area-inset-bottom, 16px)))' : 'max(32px, env(safe-area-inset-bottom, 32px))';
   return (
-    <div style={{ position:'fixed', bottom:bottomOffset, left:'50%', transform:'translateX(-50%)', background:'#1c1a17', color:'#fff', borderRadius:99, padding:'13px 26px', fontWeight:700, fontSize:14, fontFamily:FONT, zIndex:2000, boxShadow:'0 10px 40px rgba(0,0,0,0.35)', display:'flex', alignItems:'center', gap:10, whiteSpace:'nowrap', animation:'slideUp 0.3s ease', maxWidth:'calc(100vw - 32px)' }}>
-      <span style={{ fontSize:18 }}>{icon}</span> {msg}
+    <div style={{ position:'fixed', bottom:bottomOffset, left:'50%', transform:'translateX(-50%)', background:'#1c1a17', color:'#fff', borderRadius:20, padding:'13px 20px', fontWeight:700, fontSize:14, fontFamily:FONT, zIndex:2000, boxShadow:'0 10px 40px rgba(0,0,0,0.35)', display:'flex', alignItems:'flex-start', gap:10, animation:'slideUp 0.3s ease', maxWidth:'calc(100vw - 32px)', width:'max-content' }}>
+      <span style={{ fontSize:18, flexShrink:0 }}>{icon}</span>
+      <span style={{ lineHeight:1.4 }}>{msg}</span>
     </div>
   );
 }
