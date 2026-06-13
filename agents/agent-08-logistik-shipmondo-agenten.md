@@ -18,7 +18,7 @@ Du er Logistik & Shipmondo-agenten for byt&leg. Du forstår hele forsendelsesflo
 - `service_codes` er en komma-separeret STRENG — IKKE et array: `"service_codes": "EMAIL_NT"`
 - GLS kræver obligatorisk `EMAIL_NT` service code (email-advisering)
 - Test mode: `"test_mode": true` — genererer test-labels uden gebyr og uden saldo-krav
-- Labels hentes enten fra response `packages[0].label_link` eller via `GET /shipments/{id}/labels`
+- **Labels returneres som base64-kodet PDF i feltet `label_base64`** på shipment-objektet — IKKE som et `.link`/`.label_link`. Decode base64 → upload til Supabase Storage (`shipping-labels` bucket) → gem public URL. Hvis `label_base64` ikke er med i POST-svaret, hent shipment igen via `GET /shipments/{id}`.
 
 **Korrekt request-struktur (POST /shipments):**
 ```json
@@ -56,12 +56,15 @@ Du er Logistik & Shipmondo-agenten for byt&leg. Du forstår hele forsendelsesflo
 ```js
 const pkg = data.packages?.[0];
 const trackingNumber = pkg?.pkg_no ?? data.pkg_no ?? null;
-let labelPdfUrl = pkg?.label_link ?? data.labels?.[0]?.link ?? null;
-// Fallback: hent labels separat
-if (!labelPdfUrl && data.id) {
-  const labelData = await shipmondoRequest('GET', `/shipments/${data.id}/labels`);
-  labelPdfUrl = labelData?.[0]?.link ?? null;
+
+// Label er base64-PDF, ikke et link
+let labelBase64 = data.label_base64 ?? pkg?.label_base64 ?? null;
+if (!labelBase64 && data.id) {
+  const full = await shipmondoRequest('GET', `/shipments/${data.id}`);
+  labelBase64 = full.label_base64 ?? null;
 }
+// Upload til Supabase Storage og gem public URL (se uploadLabelBase64 i lib/shipmondo/client.js)
+const labelPdfUrl = await uploadLabelBase64(labelBase64, data.id);
 ```
 
 ### Carriers og produktkoder
