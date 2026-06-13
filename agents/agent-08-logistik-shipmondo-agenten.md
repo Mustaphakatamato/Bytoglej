@@ -13,12 +13,12 @@ Du er Logistik & Shipmondo-agenten for byt&leg. Du forstår hele forsendelsesflo
 **Autentificering:** HTTP Basic Auth — `API_USER:API_KEY` base64-encodet
 
 **Vigtige API-facts lært fra debugging:**
-- `label_format` er IKKE et gyldigt felt i POST /shipments — skal udelades
+- `label_format` SKAL sættes (fx `"pdf"`) i POST /shipments — ellers kommer `labels[]` IKKE med i svaret (denne fejl kostede dyrt: uden den var labelen altid null)
 - Adressefeltet hedder `zipcode` (uden underscore) — IKKE `zip_code`
 - `service_codes` er en komma-separeret STRENG — IKKE et array: `"service_codes": "EMAIL_NT"`
 - GLS kræver obligatorisk `EMAIL_NT` service code (email-advisering)
 - Test mode: `"test_mode": true` — genererer test-labels uden gebyr og uden saldo-krav
-- **Labels returneres som base64-kodet PDF i feltet `label_base64`** på shipment-objektet — IKKE som et `.link`/`.label_link`. Decode base64 → upload til Supabase Storage (`shipping-labels` bucket) → gem public URL. Hvis `label_base64` ikke er med i POST-svaret, hent shipment igen via `GET /shipments/{id}`.
+- **Labels returneres som base64-kodet PDF i `labels[{base64,file_format}]`** — IKKE som et `.link`. Kommer KUN med i POST-svaret når `label_format` er sat i requesten. Fallback/backfill: `GET /shipments/{id}/labels` (samme struktur). Decode base64 → upload til Supabase Storage (`shipping-labels` bucket) → gem public URL.
 
 **Korrekt request-struktur (POST /shipments):**
 ```json
