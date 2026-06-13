@@ -167,14 +167,10 @@ export default function OpretOpslagPage() {
 
   useEffect(() => {
     if (!delivery.shipping || !delivery.size_category) { setPriceEstimates(null); return; }
-    db.auth.getSession().then(({ data: { session } }) => {
-      fetch(`/api/shipping/quote?size=${delivery.size_category}`, {
-        headers: session?.access_token ? { Authorization: `Bearer ${session.access_token}` } : {},
-      })
-        .then(r => r.ok ? r.json() : null)
-        .then(json => { if (json?.min) setPriceEstimates({ min: json.min, max: json.max }); })
-        .catch(() => {});
-    });
+    authedFetch(`/api/shipping/quote?size=${delivery.size_category}`)
+      .then(r => r.ok ? r.json() : null)
+      .then(json => { if (json?.min) setPriceEstimates({ min: json.min, max: json.max }); })
+      .catch(() => {});
   }, [delivery.shipping, delivery.size_category]);
 
   useEffect(() => {
