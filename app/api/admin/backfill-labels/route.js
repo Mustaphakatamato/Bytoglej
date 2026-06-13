@@ -1,6 +1,5 @@
 import { NextResponse } from 'next/server';
 import { requireAuth, UNAUTHORIZED } from '@/lib/api-auth';
-import { checkIsAdmin } from '@/lib/admin';
 import { createServerClient } from '@/lib/supabase-server';
 import { getLabelUrlForShipment } from '@/lib/shipmondo/client';
 
@@ -10,11 +9,19 @@ import { getLabelUrlForShipment } from '@/lib/shipmondo/client';
 export async function GET(req) {
   const user = await requireAuth(req);
   if (!user) return UNAUTHORIZED();
-  if (!(await checkIsAdmin(user.id))) {
-    return NextResponse.json({ error: 'Kun admins' }, { status: 403 });
-  }
 
   const supa = createServerClient();
+
+  // Admin-tjek via service-role (omgår RLS — checkIsAdmin's anon-klient
+  // kan ikke se admins-tabellen server-side pga. auth.uid()=user_id policy)
+  const { data: adminRow } = await supa
+    .from('admins')
+    .select('user_id')
+    .eq('user_id', user.id)
+    .maybeSingle();
+  if (!adminRow) {
+    return NextResponse.json({ error: 'Kun admins' }, { status: 403 });
+  }
 
   // Find shippede ordrer der har en Shipmondo-forsendelse men mangler label-URL
   const { data: orders, error } = await supa
