@@ -10,7 +10,12 @@ import { authedFetch } from '@/lib/authed-fetch';
 
 // ── Helpers ────────────────────────────────────────────────────
 
-function RadioRow({ chosen, value, onChoose, icon, label, sublabel, price, loading, priceFixed }) {
+// Dansk kr-format: komma + to decimaler
+function fmtKr(n) {
+  return `${Number(n || 0).toFixed(2).replace('.', ',')} kr.`;
+}
+
+function RadioRow({ chosen, value, onChoose, icon, label, sublabel, price, estimate, loading, isFree }) {
   const active = chosen === value;
   return (
     <button type="button" onClick={() => onChoose(value)} style={{
@@ -27,13 +32,15 @@ function RadioRow({ chosen, value, onChoose, icon, label, sublabel, price, loadi
         {sublabel && <div style={{ fontFamily: FONT, fontSize: 12, color: INK3, marginTop: 2 }}>{sublabel}</div>}
       </div>
       <div style={{ flexShrink: 0, textAlign: 'right' }}>
-        {loading
-          ? <span style={{ fontSize: 12, color: INK3, fontFamily: FONT }}>Henter…</span>
-          : price != null
-            ? <span style={{ fontFamily: FONT, fontWeight: 700, fontSize: 14, color: active ? PRIMARY : INK2 }}>
-                {priceFixed ? 'Ca.' : 'Fra'} {price} kr.
-              </span>
-            : null}
+        {isFree
+          ? <span style={{ fontFamily: FONT, fontWeight: 700, fontSize: 14, color: active ? PRIMARY : INK2 }}>Gratis</span>
+          : loading
+            ? <span style={{ fontSize: 12, color: INK3, fontFamily: FONT, animation: 'ltbPulse 1.1s ease-in-out infinite', whiteSpace: 'nowrap' }}>Henter priser…</span>
+            : price != null
+              ? <span style={{ fontFamily: FONT, fontWeight: 700, fontSize: 14, color: active ? PRIMARY : INK2, whiteSpace: 'nowrap' }}>{fmtKr(price)}</span>
+              : estimate != null
+                ? <span style={{ fontFamily: FONT, fontWeight: 700, fontSize: 14, color: active ? PRIMARY : INK2, whiteSpace: 'nowrap' }}>Ca. {fmtKr(estimate)}</span>
+                : null}
       </div>
       <div style={{
         width: 20, height: 20, borderRadius: '50%', flexShrink: 0,
@@ -85,6 +92,7 @@ export default function CartPage() {
   // Live Shipmondo-priser pr. gruppe+metode: { [sellerName]: { [method]: price_dkk } }
   // Hentes ved indlæsning så kurven viser samme pris som checkout opkræver.
   const [livePrices, setLivePrices] = useState({});
+  const [livePricesLoading, setLivePricesLoading] = useState({}); // { [sellerName]: bool }
 
   // Pickup points: sellerName → { loading, points, chosen }
   const [pickupState, setPickupState] = useState({});
@@ -141,6 +149,7 @@ export default function CartPage() {
         ...(q.home_delivery?.options || []).map(o => `home_${o.carrier_code}`),
       ];
       if (!methods.length) return;
+      setLivePricesLoading(p => ({ ...p, [name]: true }));
       authedFetch('/api/shipping/live-quote', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -148,7 +157,8 @@ export default function CartPage() {
       })
         .then(r => r.ok ? r.json() : null)
         .then(json => { if (json?.prices) setLivePrices(p => ({ ...p, [name]: { ...p[name], ...json.prices } })); })
-        .catch(() => {});
+        .catch(() => {})
+        .finally(() => setLivePricesLoading(p => ({ ...p, [name]: false })));
     });
   }, [groups, quotes, quotesLoading, shippingOptions, institutionId]);
 
@@ -336,6 +346,7 @@ export default function CartPage() {
 
   return (
     <>
+    <style>{`@keyframes ltbPulse { 0%,100% { opacity: .45 } 50% { opacity: 1 } }`}</style>
     <div style={{ minHeight: '100vh', background: PAPER, paddingTop: 84, paddingBottom: 60 }}>
       <div style={{ maxWidth: 1040, margin: '0 auto', padding: isMobile ? '0 16px' : '0 32px', display: isMobile ? 'block' : 'grid', gridTemplateColumns: '1fr 360px', gap: 32, alignItems: 'start' }}>
 
@@ -424,7 +435,7 @@ export default function CartPage() {
                         onChoose={() => setDeliveryMethod(name, 'pickup', 0)}
                         icon="📍" label="Afhentes hos sælger"
                         sublabel={firstSo?.pickup_address || null}
-                        price={0}
+                        isFree
                       />
                     )}
 
@@ -439,9 +450,9 @@ export default function CartPage() {
                         }}
                         icon="📦" label={opt.label}
                         sublabel="Afhent på pakkeshop nær dig"
-                        price={livePrices[name]?.[`parcel_shop_${opt.carrier_code}`] ?? opt.price_dkk}
-                        loading={quotesLoading && !quote}
-                        priceFixed={true}
+                        price={livePrices[name]?.[`parcel_shop_${opt.carrier_code}`]}
+                        estimate={opt.price_dkk}
+                        loading={(livePricesLoading[name] || (quotesLoading && !quote)) && livePrices[name]?.[`parcel_shop_${opt.carrier_code}`] == null}
                       />
                     ))}
 
@@ -456,9 +467,9 @@ export default function CartPage() {
                         }}
                         icon="🏠" label={opt.label}
                         sublabel={institution ? [institution.address, institution.zipcode, institution.city].filter(Boolean).join(', ') : 'Leveres til institutionens adresse'}
-                        price={livePrices[name]?.[`home_${opt.carrier_code}`] ?? opt.price_dkk}
-                        loading={quotesLoading && !quote}
-                        priceFixed={true}
+                        price={livePrices[name]?.[`home_${opt.carrier_code}`]}
+                        estimate={opt.price_dkk}
+                        loading={(livePricesLoading[name] || (quotesLoading && !quote)) && livePrices[name]?.[`home_${opt.carrier_code}`] == null}
                       />
                     ))}
 
