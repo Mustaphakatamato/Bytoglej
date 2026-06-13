@@ -153,8 +153,8 @@ export async function POST(req) {
           carrier,
           service_type: serviceType,
           size_category: sizeCategory,
-          from_zip: seller?.zipcode,
-          to_zip: g.pickupPoint?.zipcode || buyer?.zipcode,
+          sender:   { name: seller?.name, address: seller?.address, zip: seller?.zipcode, city: seller?.city, email: seller?.email },
+          receiver: { name: buyer?.name,  address: buyer?.address,  zip: buyer?.zipcode,  city: buyer?.city,  email: buyer?.email },
           service_point_id: g.pickupPoint?.id,
         });
         if (quote?.price_dkk > 0) shippingTotal = Math.round(quote.price_dkk * 100) / 100;
