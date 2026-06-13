@@ -82,6 +82,10 @@ export default function CartPage() {
   const [quotes, setQuotes] = useState({});
   const [quotesLoading, setQuotesLoading] = useState(false);
 
+  // Live Shipmondo-priser pr. gruppe+metode: { [sellerName]: { [method]: price_dkk } }
+  // Hentes ved indlæsning så kurven viser samme pris som checkout opkræver.
+  const [livePrices, setLivePrices] = useState({});
+
   // Pickup points: sellerName → { loading, points, chosen }
   const [pickupState, setPickupState] = useState({});
 
@@ -121,6 +125,32 @@ export default function CartPage() {
       });
     });
   }, [cart?.length]);
+
+  // Hent live Shipmondo-priser for alle leveringsmuligheder så snart estimat-quotes er klar,
+  // så kurven viser den eksakte pris (samme som checkout) uden brugeren skal vælge først.
+  useEffect(() => {
+    if (!institutionId || !groups.length || quotesLoading || !Object.keys(quotes).length) return;
+    groups.forEach(group => {
+      const name = group.ownerInstitutionName;
+      const firstLid = group.items?.[0]?.listingId;
+      const size = shippingOptions[firstLid]?.shipping_size_category || 'medium';
+      const q = quotes[size];
+      if (!q) return;
+      const methods = [
+        ...(q.parcel_shop?.options || []).map(o => `parcel_shop_${o.carrier_code}`),
+        ...(q.home_delivery?.options || []).map(o => `home_${o.carrier_code}`),
+      ];
+      if (!methods.length) return;
+      authedFetch('/api/shipping/live-quote', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ sellerName: name, buyerInstitutionId: institutionId, sizeCategory: size, methods }),
+      })
+        .then(r => r.ok ? r.json() : null)
+        .then(json => { if (json?.prices) setLivePrices(p => ({ ...p, [name]: { ...p[name], ...json.prices } })); })
+        .catch(() => {});
+    });
+  }, [groups, quotes, quotesLoading, shippingOptions, institutionId]);
 
   function isSelected(name) { return name in selected ? selected[name] : true; }
   function toggleSelected(name) { setSelected(p => ({ ...p, [name]: !isSelected(name) })); }
@@ -168,15 +198,17 @@ export default function CartPage() {
       const res = await authedFetch('/api/shipping/live-quote', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ sellerName, buyerInstitutionId: institutionId, sizeCategory: size, shippingMethod: method, servicePointId }),
+        body: JSON.stringify({ sellerName, buyerInstitutionId: institutionId, sizeCategory: size, methods: [method], servicePointId }),
       });
       const json = await res.json();
+      const livePrice = json?.prices?.[method];
+      if (livePrice != null) setLivePrices(p => ({ ...p, [sellerName]: { ...p[sellerName], [method]: livePrice } }));
       setDeliveryState(p => ({
         ...p,
         [sellerName]: {
           ...p[sellerName],
           priceLoading: false,
-          ...(json?.price_dkk != null ? { price: json.price_dkk } : {}),
+          ...(livePrice != null ? { price: livePrice } : {}),
         },
       }));
     } catch {
@@ -401,12 +433,13 @@ export default function CartPage() {
                         key={opt.product_code}
                         chosen={ds.method} value={`parcel_shop_${opt.carrier_code}`}
                         onChoose={() => {
-                          setDeliveryState(p => ({ ...p, [name]: { ...p[name], method: `parcel_shop_${opt.carrier_code}`, price: opt.price_dkk, pickupPoint: null, selectedCarrier: opt.carrier_code } }));
+                          const lp = livePrices[name]?.[`parcel_shop_${opt.carrier_code}`];
+                          setDeliveryState(p => ({ ...p, [name]: { ...p[name], method: `parcel_shop_${opt.carrier_code}`, price: lp ?? opt.price_dkk, pickupPoint: null, selectedCarrier: opt.carrier_code } }));
                           loadPickupPoints(name, opt.carrier_code);
                         }}
                         icon="📦" label={opt.label}
                         sublabel="Afhent på pakkeshop nær dig"
-                        price={ds.method === `parcel_shop_${opt.carrier_code}` && ds.price != null ? ds.price : opt.price_dkk}
+                        price={livePrices[name]?.[`parcel_shop_${opt.carrier_code}`] ?? opt.price_dkk}
                         loading={quotesLoading && !quote}
                         priceFixed={true}
                       />
@@ -417,12 +450,13 @@ export default function CartPage() {
                         key={opt.product_code}
                         chosen={ds.method} value={`home_${opt.carrier_code}`}
                         onChoose={() => {
-                          setDeliveryState(p => ({ ...p, [name]: { ...p[name], method: `home_${opt.carrier_code}`, price: opt.price_dkk, pickupPoint: null } }));
-                          fetchLivePrice(name, `home_${opt.carrier_code}`, null);
+                          const lp = livePrices[name]?.[`home_${opt.carrier_code}`];
+                          setDeliveryState(p => ({ ...p, [name]: { ...p[name], method: `home_${opt.carrier_code}`, price: lp ?? opt.price_dkk, pickupPoint: null } }));
+                          if (lp == null) fetchLivePrice(name, `home_${opt.carrier_code}`, null);
                         }}
                         icon="🏠" label={opt.label}
                         sublabel={institution ? [institution.address, institution.zipcode, institution.city].filter(Boolean).join(', ') : 'Leveres til institutionens adresse'}
-                        price={ds.method === `home_${opt.carrier_code}` && ds.price != null ? ds.price : opt.price_dkk}
+                        price={livePrices[name]?.[`home_${opt.carrier_code}`] ?? opt.price_dkk}
                         loading={quotesLoading && !quote}
                         priceFixed={true}
                       />

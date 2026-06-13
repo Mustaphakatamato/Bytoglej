@@ -12,12 +12,11 @@ export async function POST(req) {
   let body;
   try { body = await req.json(); } catch { return NextResponse.json({ error: 'Ugyldig forespørgsel' }, { status: 400 }); }
 
-  const { sellerName, buyerInstitutionId, sizeCategory = 'medium', shippingMethod, servicePointId } = body;
-
-  // Pickup/custom har ingen fragtpris
-  if (!shippingMethod || shippingMethod === 'pickup' || shippingMethod === 'custom') {
-    return NextResponse.json({ price_dkk: 0, live: false });
-  }
+  const { sellerName, buyerInstitutionId, sizeCategory = 'medium', servicePointId } = body;
+  // methods: liste af leveringsmetoder (fx ['parcel_shop_gls','home_dao']) → pris pr. metode.
+  // Bagudkompatibel: hvis kun shippingMethod sendes, behandles den som en enkelt metode.
+  const methods = Array.isArray(body.methods) ? body.methods : (body.shippingMethod ? [body.shippingMethod] : []);
+  if (!methods.length) return NextResponse.json({ prices: {} });
 
   const supa = createServerClient();
   const [{ data: seller }, { data: buyer }] = await Promise.all([
@@ -29,23 +28,25 @@ export async function POST(req) {
       : Promise.resolve({ data: null }),
   ]);
 
-  const carrier = shippingMethod.replace('parcel_shop_', '').replace('home_', '');
-  const serviceType = shippingMethod.startsWith('parcel_shop_') ? 'parcel_shop' : 'home_delivery';
+  const sender   = { name: seller?.name, address: seller?.address, zip: seller?.zipcode, city: seller?.city, email: seller?.email };
+  const receiver = { name: buyer?.name,  address: buyer?.address,  zip: buyer?.zipcode,  city: buyer?.city,  email: buyer?.email };
 
-  try {
-    const quote = await getPriceQuote({
-      carrier,
-      service_type: serviceType,
-      size_category: sizeCategory,
-      sender:   { name: seller?.name, address: seller?.address, zip: seller?.zipcode, city: seller?.city, email: seller?.email },
-      receiver: { name: buyer?.name,  address: buyer?.address,  zip: buyer?.zipcode,  city: buyer?.city,  email: buyer?.email },
-      service_point_id: servicePointId,
-    });
-    if (quote?.price_dkk > 0) {
-      return NextResponse.json({ price_dkk: Math.round(quote.price_dkk * 100) / 100, live: true });
+  const prices = {};
+  await Promise.all(methods.map(async (method) => {
+    if (!method || method === 'pickup' || method === 'custom') { prices[method] = 0; return; }
+    const carrier = method.replace('parcel_shop_', '').replace('home_', '');
+    const serviceType = method.startsWith('parcel_shop_') ? 'parcel_shop' : 'home_delivery';
+    try {
+      const quote = await getPriceQuote({
+        carrier, service_type: serviceType, size_category: sizeCategory,
+        sender, receiver,
+        service_point_id: method.startsWith('parcel_shop_') ? servicePointId : undefined,
+      });
+      prices[method] = quote?.price_dkk > 0 ? Math.round(quote.price_dkk * 100) / 100 : null;
+    } catch {
+      prices[method] = null;
     }
-    return NextResponse.json({ price_dkk: null, live: false });
-  } catch (e) {
-    return NextResponse.json({ price_dkk: null, live: false, error: e.message });
-  }
+  }));
+
+  return NextResponse.json({ prices });
 }
