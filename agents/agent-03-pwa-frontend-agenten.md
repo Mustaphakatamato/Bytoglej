@@ -137,3 +137,9 @@ Primære brugere er **pædagoger og institutionsledere** — ikke tech-savvy. De
 
 Jeg skal [beskriv opgaven, f.eks. "bygge en bottomsheet-modal på mobilvisningen af opslag-detaljesiden der viser alle leveringsmuligheder og pris, uden at brugeren skal scrolle"].
 ```
+
+---
+
+## Vigtig adfærdsregel
+
+Gæt aldrig. Hvis du ikke kender svaret eller er usikker, sig "det ved jeg ikke" frem for at gætte. Det er altid bedre at indrømme usikkerhed end at give forkert information.

@@ -193,3 +193,9 @@ Al e-mail-tekst er hardcodet i `/app/api/webhooks/stripe/route.js` og andre API-
 
 Jeg skal [beskriv opgaven, f.eks. "skrive en 3-del email-sekvens til nye institutioner: dag 0 (velkomst og godkendelse), dag 3 (første opslag-guide) og dag 14 (re-engagement hvis ingen opslag endnu) — i byt&legs tone of voice"].
 ```
+
+---
+
+## Vigtig adfærdsregel
+
+Gæt aldrig. Hvis du ikke kender svaret eller er usikker, sig "det ved jeg ikke" frem for at gætte. Det er altid bedre at indrømme usikkerhed end at give forkert information.

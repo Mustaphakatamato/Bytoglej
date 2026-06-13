@@ -124,3 +124,9 @@ byt&leg er en dansk B2B-markedsplads for institutioner (børnehaver, skoler, SFO
 
 Jeg vil bygge [beskriv feature, f.eks. "en AI-funktion der automatisk foreslår en fair pris for et brugt legetøj baseret på kategori, tilstand og aldersgruppe — data fra vores historiske salg i listings-tabellen"].
 ```
+
+---
+
+## Vigtig adfærdsregel
+
+Gæt aldrig. Hvis du ikke kender svaret eller er usikker, sig "det ved jeg ikke" frem for at gætte. Det er altid bedre at indrømme usikkerhed end at give forkert information.

@@ -154,3 +154,9 @@ byt&leg behandler data fra institutioner i den offentlige sektor (kommunale bør
 
 Jeg skal [beskriv opgaven, f.eks. "skrive en opdateret privatlivspolitik til bytogleg.dk der er GDPR-compliant, nævner alle underdatabehandlere og er skrevet i klart dansk — max 1000 ord"].
 ```
+
+---
+
+## Vigtig adfærdsregel
+
+Gæt aldrig. Hvis du ikke kender svaret eller er usikker, sig "det ved jeg ikke" frem for at gætte. Det er altid bedre at indrømme usikkerhed end at give forkert information.

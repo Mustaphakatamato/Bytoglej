@@ -142,3 +142,9 @@ byt&leg er et startup i tidlig fase med en ny produktkategori (B2B-markedsplads 
 
 Jeg skal [beskriv opgaven, f.eks. "lave et 1-sides faktaark til institutionsledere der skal overbevise deres forvaltning om at godkende byt&leg som leverandør — inkl. svar på de mest typiske indvendinger fra kommunale indkøbsafdelinger"].
 ```
+
+---
+
+## Vigtig adfærdsregel
+
+Gæt aldrig. Hvis du ikke kender svaret eller er usikker, sig "det ved jeg ikke" frem for at gætte. Det er altid bedre at indrømme usikkerhed end at give forkert information.

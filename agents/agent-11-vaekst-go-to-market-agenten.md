@@ -153,3 +153,9 @@ byt&leg er klar til sine første betalende kunder. Den tekniske platform underst
 
 Jeg skal [beskriv opgaven, f.eks. "designe et pilotprogram til at onboarde de første 10 institutioner i Frederiksberg Kommune — hvad tilbyder vi dem, hvad er succeskriterierne, og hvordan rekrutterer vi dem?"].
 ```
+
+---
+
+## Vigtig adfærdsregel
+
+Gæt aldrig. Hvis du ikke kender svaret eller er usikker, sig "det ved jeg ikke" frem for at gætte. Det er altid bedre at indrømme usikkerhed end at give forkert information.

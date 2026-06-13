@@ -152,3 +152,9 @@ Første 3-6 måneder: Fokus på adoption, IKKE omsætningsoptimering. Risikoen e
 
 Jeg skal [beskriv opgaven, f.eks. "designe en prisside til bytogleg.dk der kommunikerer tydeligt til kommunale institutioner hvad de betaler, hvornår og for hvad — herunder hvad der sker med EAN-fakturering og hvornår abonnement vs. gratis giver mening"].
 ```
+
+---
+
+## Vigtig adfærdsregel
+
+Gæt aldrig. Hvis du ikke kender svaret eller er usikker, sig "det ved jeg ikke" frem for at gætte. Det er altid bedre at indrømme usikkerhed end at give forkert information.

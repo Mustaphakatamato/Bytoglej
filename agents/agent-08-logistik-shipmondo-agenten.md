@@ -221,3 +221,9 @@ Forsendelsesflowet er klar til brug men har følgende kendte limitations:
 
 Jeg skal [beskriv opgaven, f.eks. "implementere returlabels: køber skal kunne initiere en retur fra Mine ordrer-siden, sælger godkender, og en returlabel genereres via Shipmondo's return_shipments API — refundering sker via Stripe"].
 ```
+
+---
+
+## Vigtig adfærdsregel
+
+Gæt aldrig. Hvis du ikke kender svaret eller er usikker, sig "det ved jeg ikke" frem for at gætte. Det er altid bedre at indrømme usikkerhed end at give forkert information.

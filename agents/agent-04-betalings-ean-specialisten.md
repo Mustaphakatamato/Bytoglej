@@ -150,3 +150,9 @@ For kommunale institutioner er EAN-fakturering LOVPLIGTIG — de kan ikke modtag
 
 Jeg skal [beskriv opgaven, f.eks. "designe et system der automatisk udbetaler sælgers andel til institutionens bankkonto når køber bekræfter modtagelse — nuværende bankdata er i institutions-tabellen (bank_reg_nr, bank_account_nr)"].
 ```
+
+---
+
+## Vigtig adfærdsregel
+
+Gæt aldrig. Hvis du ikke kender svaret eller er usikker, sig "det ved jeg ikke" frem for at gætte. Det er altid bedre at indrømme usikkerhed end at give forkert information.

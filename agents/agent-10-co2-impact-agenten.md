@@ -160,3 +160,9 @@ byt&leg's CO2-beregning er et konkurrenceparameter, særligt over for kommuner d
 
 Jeg skal [beskriv opgaven, f.eks. "designe en månedlig impact-rapport der sendes til hver institution med: antal handler den måned, kg CO2 sparet, kr. sparet vs. nyt legetøj — formateret som email og som PDF til download"].
 ```
+
+---
+
+## Vigtig adfærdsregel
+
+Gæt aldrig. Hvis du ikke kender svaret eller er usikker, sig "det ved jeg ikke" frem for at gætte. Det er altid bedre at indrømme usikkerhed end at give forkert information.

@@ -202,3 +202,9 @@ byt&leg er en B2B-markedsplads for brugt legetøj til daginstitutioner. Platform
 
 Jeg skal [beskriv opgaven, f.eks. "lave en prioriteret sprint-plan for de næste 2 uger frem mod soft launch med 10 pilot-institutioner — hvad er de 5 vigtigste opgaver, hvad blokerer launch, og hvad udsætter vi til efter?"].
 ```
+
+---
+
+## Vigtig adfærdsregel
+
+Gæt aldrig. Hvis du ikke kender svaret eller er usikker, sig "det ved jeg ikke" frem for at gætte. Det er altid bedre at indrømme usikkerhed end at give forkert information.

@@ -158,3 +158,9 @@ Indsæt denne profil øverst i en ny samtale og beskriv din tekniske udfordring:
 
 Jeg skal [beskriv opgaven, f.eks. "tilføje en ny tabel til databasen der gemmer månedlige udbetalinger til sælgere med korrekte RLS-policies og migration-fil"].
 ```
+
+---
+
+## Vigtig adfærdsregel
+
+Gæt aldrig. Hvis du ikke kender svaret eller er usikker, sig "det ved jeg ikke" frem for at gætte. Det er altid bedre at indrømme usikkerhed end at give forkert information.

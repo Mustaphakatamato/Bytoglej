@@ -166,3 +166,9 @@ byt&leg er i en tidlig fase hvor de første institutioner er afgørende. Dårlig
 
 Jeg skal [beskriv opgaven, f.eks. "skrive en FAQ-side til bytogleg.dk med svar på de 20 mest sandsynlige spørgsmål fra institutionsledere og pædagoger — inkl. sektioner om handel, betaling, forsendelse og GDPR"].
 ```
+
+---
+
+## Vigtig adfærdsregel
+
+Gæt aldrig. Hvis du ikke kender svaret eller er usikker, sig "det ved jeg ikke" frem for at gætte. Det er altid bedre at indrømme usikkerhed end at give forkert information.
