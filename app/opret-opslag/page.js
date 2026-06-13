@@ -9,7 +9,10 @@ import { useApp, useActiveUser } from '@/providers/AppProvider';
 import { Spinner } from '@/components/ui';
 import { authedFetch } from '@/lib/authed-fetch';
 
-
+// Dansk kr-format: komma som decimaltegn, to decimaler
+function fmtKr(n) {
+  return `${Number(n || 0).toFixed(2).replace('.', ',')} kr.`;
+}
 
 function PreviewCard({ form, imgPreview }) {
   const tc = TYPE_CFG[form.type] || { label: form.type, color: INK3, bg: PAPER2 };
@@ -820,7 +823,7 @@ export default function OpretOpslagPage() {
                             </div>
                             {priceEstimates && (
                               <div style={{ background:'#DBEAFE', borderRadius:10, padding:'10px 14px', fontSize:13, color:'#1D4ED8', fontFamily:FONT, fontWeight:600 }}>
-                                💡 Estimeret porto: ca. {priceEstimates.min}–{priceEstimates.max} kr. afhængig af transportør
+                                💡 Estimeret porto: ca. {fmtKr(priceEstimates.min)}–{fmtKr(priceEstimates.max)} afhængig af transportør
                               </div>
                             )}
                             <div>

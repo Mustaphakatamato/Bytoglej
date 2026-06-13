@@ -13,10 +13,12 @@ export async function GET(req) {
   const size = ['small', 'medium', 'large', 'xlarge'].includes(rawSize) ? rawSize : 'medium';
   const fromZip = searchParams.get('from') || undefined;
   const toZip = searchParams.get('to') || undefined;
+  const debug = searchParams.get('debug') === '1';
 
   const options = await Promise.all(Object.values(RATES).map(async (r) => {
     let price = r.prices[size] ?? r.prices.medium;
     let live = false;
+    let debugError = null;
     try {
       const carrier = r.carrier_code === 'pdk' ? 'postnord' : r.carrier_code;
       const serviceType = r.type;
@@ -25,8 +27,8 @@ export async function GET(req) {
         from_zip: fromZip, to_zip: toZip,
       });
       if (quote?.price_dkk > 0) { price = Math.round(quote.price_dkk * 100) / 100; live = true; }
-    } catch {
-      // fald tilbage til fast tabel-pris
+    } catch (e) {
+      debugError = e.message;   // fald tilbage til fast tabel-pris
     }
     return {
       carrier_code: r.carrier_code,
@@ -35,6 +37,7 @@ export async function GET(req) {
       type:         r.type,
       price_dkk:    price,
       live,
+      ...(debug ? { debug_error: debugError } : {}),
     };
   }));
 
