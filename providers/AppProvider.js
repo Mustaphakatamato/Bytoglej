@@ -267,13 +267,13 @@ export function AppProvider({ children }) {
 
   useEffect(() => {
     fetchListings();
-    db.auth.getSession().then(({ data: { session } }) => {
-      if (session) {
-        setRealUserId(session.user.id);
-        setRealEmail(session.user.email);
+    db.auth.getUser().then(({ data: { user } }) => {
+      if (user) {
+        setRealUserId(user.id);
+        setRealEmail(user.email);
         setLoggedIn(true);
-        loadInstitution(session.user.email, session.user.id);
-        fetchUnread(session.user.id);
+        loadInstitution(user.email, user.id);
+        fetchUnread(user.id);
         registerPush();
       }
     });
