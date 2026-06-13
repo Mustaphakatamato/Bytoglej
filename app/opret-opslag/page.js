@@ -91,7 +91,7 @@ export default function OpretOpslagPage() {
 
   // Leveringsvalg
   const [delivery, setDelivery] = useState({
-    pickup: false,   shipping: false,  custom: false,
+    pickup: true,    shipping: false,  custom: false,   // afhentning er altid muligt
     pickup_address: '', pickup_hours: '', pickup_notes: '',
     size_category: '', shipping_included: null, custom_notes: '',
   });
@@ -140,7 +140,7 @@ export default function OpretOpslagPage() {
     if (!d) return;
     setDelivery(prev => ({
       ...prev,
-      pickup:   d.pickup   ?? prev.pickup,
+      pickup:   true,   // afhentning er altid muligt — aldrig et tilvalg
       shipping: d.shipping ?? prev.shipping,
       custom:   d.custom   ?? prev.custom,
       size_category: d.size || prev.size_category,
@@ -460,15 +460,15 @@ export default function OpretOpslagPage() {
       await db.from('listings').update({ urgency: form.urgency || 'ingen' }).eq('id', listing.id).then(() => {});
     }
     // Save delivery/shipping options
-    if (listing?.id && !isSøges && (delivery.pickup || delivery.shipping || delivery.custom)) {
+    if (listing?.id && !isSøges) {
       await db.from('shipping_options').insert({
         listing_id: listing.id,
-        allow_pickup: delivery.pickup,
+        allow_pickup: true,   // afhentning er altid muligt
         allow_shipping: delivery.shipping,
         allow_custom: delivery.custom,
-        pickup_address: delivery.pickup ? (delivery.pickup_address || null) : null,
-        pickup_hours: delivery.pickup && delivery.pickup_hours ? { text: delivery.pickup_hours } : null,
-        pickup_notes: delivery.pickup ? (delivery.pickup_notes || null) : null,
+        pickup_address: delivery.pickup_address || null,
+        pickup_hours: delivery.pickup_hours ? { text: delivery.pickup_hours } : null,
+        pickup_notes: delivery.pickup_notes || null,
         shipping_size_category: delivery.shipping ? (delivery.size_category || null) : null,
         shipping_included_in_price: delivery.shipping ? (delivery.shipping_included ?? false) : false,
       });
@@ -725,21 +725,20 @@ export default function OpretOpslagPage() {
 
                 {form.type !== 'søges' && (
                   <div>
-                    <label style={labelStyle}>Levering <span style={{ color:'#e53e3e' }}>*</span> <span style={{ fontWeight:400, color:INK3 }}>— vælg mindst én</span></label>
+                    <label style={labelStyle}>Levering <span style={{ color:'#e53e3e' }}>*</span> <span style={{ fontWeight:400, color:INK3 }}>— afhentning er altid muligt; vælg evt. flere</span></label>
                     <div style={{ display:'flex', flexDirection:'column', gap:10 }}>
 
-                      {/* 1: Afhentning */}
-                      <div style={{ borderRadius:14, border:`1.5px solid ${delivery.pickup ? PRIMARY : PAPER3}`, background: delivery.pickup ? GREEN_TINT : '#fff', overflow:'hidden', transition:'all 0.15s' }}>
-                        <button type="button" onClick={()=>setDelivery(d=>({...d, pickup:!d.pickup}))}
-                          style={{ display:'flex', alignItems:'center', gap:12, width:'100%', padding:'13px 16px', background:'transparent', border:'none', cursor:'pointer', textAlign:'left' }}>
-                          <div style={{ width:20, height:20, borderRadius:5, border:`2px solid ${delivery.pickup ? PRIMARY : PAPER3}`, background:delivery.pickup ? PRIMARY : 'transparent', display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0 }}>
-                            {delivery.pickup && <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>}
+                      {/* 1: Afhentning — altid muligt, ikke et tilvalg */}
+                      <div style={{ borderRadius:14, border:`1.5px solid ${PRIMARY}`, background: GREEN_TINT, overflow:'hidden' }}>
+                        <div style={{ display:'flex', alignItems:'center', gap:12, width:'100%', padding:'13px 16px' }}>
+                          <div style={{ width:20, height:20, borderRadius:5, background:PRIMARY, display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0 }}>
+                            <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
                           </div>
                           <div style={{ flex:1 }}>
-                            <div style={{ fontFamily:FONT, fontWeight:700, fontSize:14, color: delivery.pickup ? PRIMARY : INK }}>📍 Afhentes hos os</div>
-                            <div style={{ fontSize:12, color:INK3, marginTop:1 }}>Køber henter selv — gratis og nemt</div>
+                            <div style={{ fontFamily:FONT, fontWeight:700, fontSize:14, color: PRIMARY }}>📍 Afhentes hos os <span style={{ fontWeight:600, fontSize:11, color:PRIMARY, background:'#fff', borderRadius:99, padding:'1px 8px', marginLeft:4 }}>altid muligt</span></div>
+                            <div style={{ fontSize:12, color:INK3, marginTop:1 }}>Køber kan altid hente selv — gratis. Udfyld evt. adresse og tider nedenfor.</div>
                           </div>
-                        </button>
+                        </div>
                         {delivery.pickup && (
                           <div style={{ padding:'0 16px 16px', display:'flex', flexDirection:'column', gap:10 }}>
                             <div>

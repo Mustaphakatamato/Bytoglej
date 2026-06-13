@@ -351,7 +351,7 @@ export default function CartPage() {
             const sel = isSelected(name);
             const firstSo = shippingOptions[group.items[0]?.listingId];
             const canShip = firstSo?.allow_shipping || (!firstSo && listingsCanShip[group.items[0]?.listingId]);
-            const canPickup = firstSo?.allow_pickup;
+            const canPickup = true;   // afhentning er altid muligt
             const canCustom = firstSo?.allow_custom;
             const sizeKey = firstSo?.shipping_size_category || 'medium';
             const quote = quotes[sizeKey];
