@@ -101,6 +101,7 @@ export async function POST(req) {
 
   const updatedGroups = [];
   let anyShipment = false;
+  let shipmentError = null;
 
   for (const g of groups) {
     let shipmentResult = null;
@@ -140,6 +141,7 @@ export async function POST(req) {
         anyShipment = true;
       } catch (err) {
         console.error('[stripe-webhook] Shipmondo fejl:', err.message);
+        shipmentError = err.message;
       }
     }
 
@@ -265,6 +267,7 @@ export async function POST(req) {
   const firstShipped = updatedGroups.find(g => g.shipmondo_shipment_id);
   await supa.from('orders').update({
     order_groups: updatedGroups,
+    shipment_error: firstShipped ? null : shipmentError,
     ...(firstShipped ? {
       shipmondo_shipment_id: firstShipped.shipmondo_shipment_id,
       tracking_number:       firstShipped.tracking_number,
