@@ -32,6 +32,8 @@ export async function middleware(request) {
 
 export const config = {
   matcher: [
-    '/((?!_next/static|_next/image|favicon.ico|sw\\.js|manifest\\.json|.*\\.(?:svg|png|jpg|jpeg|gif|webp|ico)$).*)',
+    // Ekskluder webhooks (Stripe/Shipmondo sender raw POST-body — middleware må ikke røre dem)
+    // Ekskluder statiske assets
+    '/((?!api/webhooks|_next/static|_next/image|favicon.ico|sw\\.js|manifest\\.json|.*\\.(?:svg|png|jpg|jpeg|gif|webp|ico)$).*)',
   ],
 };
