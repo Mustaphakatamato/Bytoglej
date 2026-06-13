@@ -3,6 +3,7 @@ import Stripe from 'stripe';
 import { requireAuth, UNAUTHORIZED } from '@/lib/api-auth';
 import { createServerClient } from '@/lib/supabase-server';
 import { getShippingPrice } from '@/lib/shipping-rates';
+import { getPriceQuote } from '@/lib/shipmondo/client';
 
 function getStripe() {
   if (!process.env.STRIPE_SECRET_KEY) throw new Error('STRIPE_SECRET_KEY er ikke sat');
@@ -121,20 +122,13 @@ export async function POST(req) {
       });
     }
 
-    // Validate shipping method + price server-side
+    // Validate shipping method server-side
     const sizeCategory = items[0]?.sizeCategory || 'medium';
     const shippingMethod = typeof g.shippingMethod === 'string' ? g.shippingMethod : null;
-    const shippingTotal = getShippingPrice(shippingMethod, sizeCategory);
-    if (shippingTotal === null) {
-      return NextResponse.json({ error: 'Ugyldig leveringsmetode' }, { status: 400 });
-    }
-
-    const serviceFee = calcServiceFee(itemTotal);
-    const groupTotal = Math.round((itemTotal + shippingTotal + serviceFee) * 100) / 100;
-    grandTotal += groupTotal;
 
     // Fetch seller institution by the listing's institution name (authoritative),
-    // falling back to the name supplied by the client.
+    // falling back to the name supplied by the client. Hentes før pris-quote
+    // fordi vi bruger sælgers postnummer som afsender.
     const sellerName = sellerInstitutionName || g.sellerName;
     let seller = null;
     if (sellerName) {
@@ -145,6 +139,33 @@ export async function POST(req) {
         .maybeSingle();
       seller = data;
     }
+
+    // Autoritativ fragtpris: live quote fra Shipmondo (inkl. moms), fallback til fast tabel.
+    let shippingTotal = getShippingPrice(shippingMethod, sizeCategory);
+    if (shippingTotal === null) {
+      return NextResponse.json({ error: 'Ugyldig leveringsmetode' }, { status: 400 });
+    }
+    if (shippingMethod && shippingMethod !== 'pickup' && shippingMethod !== 'custom') {
+      try {
+        const carrier = shippingMethod.replace('parcel_shop_', '').replace('home_', '');
+        const serviceType = shippingMethod.startsWith('parcel_shop_') ? 'parcel_shop' : 'home_delivery';
+        const quote = await getPriceQuote({
+          carrier,
+          service_type: serviceType,
+          size_category: sizeCategory,
+          from_zip: seller?.zipcode,
+          to_zip: g.pickupPoint?.zipcode || buyer?.zipcode,
+          service_point_id: g.pickupPoint?.id,
+        });
+        if (quote?.price_dkk > 0) shippingTotal = Math.round(quote.price_dkk * 100) / 100;
+      } catch (e) {
+        console.error('[create-intent] Shipmondo quote fejlede — bruger fast tabel:', e.message);
+      }
+    }
+
+    const serviceFee = calcServiceFee(itemTotal);
+    const groupTotal = Math.round((itemTotal + shippingTotal + serviceFee) * 100) / 100;
+    grandTotal += groupTotal;
 
     orderGroups.push({
       sellerName: seller?.name || sellerName,
