@@ -71,8 +71,9 @@ function SuccessContent() {
 
   useEffect(() => {
     if (!success) return;
+    const dest = orderId ? `/mine-ordrer?order=${orderId}` : '/mine-ordrer';
     const t = setInterval(() => setCountdown(c => {
-      if (c <= 1) { clearInterval(t); router.push('/beskeder'); return 0; }
+      if (c <= 1) { clearInterval(t); router.push(dest); return 0; }
       return c - 1;
     }), 1000);
     return () => clearInterval(t);
@@ -93,8 +94,8 @@ function SuccessContent() {
           <div style={{ fontSize: 56, marginBottom: 20 }}>⚠️</div>
           <h1 style={{ fontFamily: FONT, fontWeight: 800, fontSize: 24, color: INK, marginBottom: 10 }}>Kunne ikke bekræfte ordren</h1>
           <p style={{ fontFamily: FONT, fontSize: 14, color: INK3, marginBottom: 28 }}>{verifyError}</p>
-          <button onClick={() => router.push('/beskeder')} style={{ background: PRIMARY, color: '#fff', border: 'none', borderRadius: 99, padding: '14px 32px', fontFamily: FONT, fontWeight: 700, fontSize: 15, cursor: 'pointer' }}>
-            Gå til beskeder
+          <button onClick={() => router.push('/mine-ordrer')} style={{ background: PRIMARY, color: '#fff', border: 'none', borderRadius: 99, padding: '14px 32px', fontFamily: FONT, fontWeight: 700, fontSize: 15, cursor: 'pointer' }}>
+            Gå til mine ordrer
           </button>
         </div>
       </div>
@@ -109,7 +110,7 @@ function SuccessContent() {
             <div style={{ fontSize: 64, marginBottom: 20 }}>🎉</div>
             <h1 style={{ fontFamily: FONT, fontWeight: 800, fontSize: 26, color: INK, letterSpacing: '-0.03em', marginBottom: 10 }}>Betaling gennemført!</h1>
             <p style={{ fontFamily: FONT, fontSize: 14, color: INK3, lineHeight: 1.6, marginBottom: 28 }}>
-              Sælger har modtaget besked og pakkemærkaten er oprettet automatisk. Du kan følge din ordre i beskeder.
+              Sælger har modtaget besked og pakkemærkaten er oprettet automatisk. Du kan følge din ordre under mine ordrer.
             </p>
 
             <div style={{ background: GREEN_TINT, borderRadius: 16, border: `1px solid ${GREEN_SOFT}`, padding: '18px 20px', marginBottom: 24, textAlign: 'left' }}>
@@ -128,8 +129,8 @@ function SuccessContent() {
               </div>
             </div>
 
-            <button onClick={() => router.push('/beskeder')} style={{ background: PRIMARY, color: '#fff', border: 'none', borderRadius: 99, padding: '14px 32px', fontFamily: FONT, fontWeight: 700, fontSize: 15, cursor: 'pointer', marginBottom: 12 }}>
-              Gå til beskeder →
+            <button onClick={() => router.push(orderId ? `/mine-ordrer?order=${orderId}` : '/mine-ordrer')} style={{ background: PRIMARY, color: '#fff', border: 'none', borderRadius: 99, padding: '14px 32px', fontFamily: FONT, fontWeight: 700, fontSize: 15, cursor: 'pointer', marginBottom: 12 }}>
+              Se min ordre →
             </button>
             <div style={{ fontFamily: FONT, fontSize: 12, color: INK3 }}>Omdirigerer om {countdown} sekunder…</div>
           </>

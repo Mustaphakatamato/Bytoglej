@@ -1,6 +1,6 @@
 'use client';
-import { useState, useEffect } from 'react';
-import { useRouter } from 'next/navigation';
+import { useState, useEffect, useRef, Suspense } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { db } from '@/lib/supabase';
 import { PRIMARY, GREEN_TINT, INK, INK2, INK3, PAPER, PAPER2, PAPER3, FONT, CORAL } from '@/lib/constants';
 
@@ -79,9 +79,16 @@ function OrderProgress({ status }) {
   );
 }
 
-function OrderCard({ order, onUpdate }) {
+function OrderCard({ order, onUpdate, autoOpen }) {
   const router = useRouter();
-  const [open, setOpen] = useState(false);
+  const [open, setOpen] = useState(autoOpen ?? false);
+  const cardRef = useRef(null);
+
+  useEffect(() => {
+    if (autoOpen && cardRef.current) {
+      setTimeout(() => cardRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 150);
+    }
+  }, [autoOpen]);
   const [confirming, setConfirming] = useState(false);
   const groups = order.order_groups || [];
   const firstItem = groups[0]?.items?.[0];
@@ -101,7 +108,7 @@ function OrderCard({ order, onUpdate }) {
   }
 
   return (
-    <div style={{ background: '#fff', borderRadius: 16, border: `1.5px solid ${PAPER3}`, overflow: 'hidden', marginBottom: 12 }}>
+    <div ref={cardRef} style={{ background: '#fff', borderRadius: 16, border: `1.5px solid ${autoOpen ? '#2D6A4F' : PAPER3}`, overflow: 'hidden', marginBottom: 12, transition: 'border-color 0.3s' }}>
       <button
         onClick={() => setOpen(o => !o)}
         style={{ width: '100%', background: 'none', border: 'none', cursor: 'pointer', padding: '16px 18px', display: 'flex', alignItems: 'center', gap: 12 }}
@@ -209,8 +216,10 @@ function OrderCard({ order, onUpdate }) {
   );
 }
 
-export default function MineOrdrerPage() {
+function MineOrdrerContent() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const highlightId = searchParams.get('order');
   const [orders, setOrders] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -274,10 +283,18 @@ export default function MineOrdrerPage() {
         )}
 
         {!loading && orders.map(order => (
-          <OrderCard key={order.id} order={order}
+          <OrderCard key={order.id} order={order} autoOpen={highlightId === order.id}
             onUpdate={(id, status) => setOrders(os => os.map(o => o.id === id ? { ...o, status } : o))} />
         ))}
       </div>
     </div>
+  );
+}
+
+export default function MineOrdrerPage() {
+  return (
+    <Suspense fallback={<div style={{ minHeight: '100vh', background: '#F6F2EA', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><span style={{ fontFamily: 'sans-serif', color: '#7B8F87' }}>Indlæser…</span></div>}>
+      <MineOrdrerContent />
+    </Suspense>
   );
 }
