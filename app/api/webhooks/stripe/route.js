@@ -368,8 +368,8 @@ function sellerOrderEmailHtml({ sellerName, items, itemTotal, shippingMethod, pi
       { icon: '📍', text: `Aflever pakken på nærmeste ${methodLabel.includes('hjemlevering') ? 'afleveringssted' : methodLabel.toLowerCase()} eller afleveringssted.` },
     ]
     : [
-      { icon: '📦', text: 'Pak varen forsvarligt og gør den klar.' },
-      { icon: '💬', text: 'Aftal overdragelse med køberen via beskeder på byt&amp;leg.' },
+      { icon: '💬', text: 'Aftal tid og sted for afhentning med køberen via beskeder på byt&amp;leg.' },
+      { icon: '🤝', text: 'Overdrag varen til køberen ved afhentningen.' },
     ];
 
   return `<!DOCTYPE html>
@@ -382,7 +382,7 @@ function sellerOrderEmailHtml({ sellerName, items, itemTotal, shippingMethod, pi
     <div style="background:linear-gradient(160deg,#133F2B 0%,#2A7D4F 100%);border-radius:20px 20px 0 0;padding:44px 44px 36px;text-align:center;">
       <div style="display:inline-block;background:rgba(255,255,255,0.12);border-radius:14px;padding:10px 22px;color:#fff;font-size:26px;font-weight:900;letter-spacing:-0.04em;margin-bottom:20px;">byt<span style="opacity:0.55">&amp;</span>leg.</div>
       <h1 style="color:#fff;font-size:26px;font-weight:800;margin:0 0 10px;letter-spacing:-0.03em;">Tillykke, du har solgt noget! 🎉</h1>
-      <p style="color:rgba(255,255,255,0.7);font-size:15px;margin:0;line-height:1.55;">Betalingen er modtaget og bekræftet — nu skal varen bare afsted.</p>
+      <p style="color:rgba(255,255,255,0.7);font-size:15px;margin:0;line-height:1.55;">Betalingen er modtaget og bekræftet — ${isShipping ? 'nu skal varen bare afsted.' : 'nu skal varen bare overdrages.'}</p>
     </div>
 
     <!-- Body -->
@@ -441,6 +441,9 @@ function buyerOrderEmailHtml({ buyerName, groups, orderId, grandTotal }) {
   const base = process.env.NEXT_PUBLIC_BASE_URL || 'https://bytogleg.dk';
   const name = escapeHtml(String(buyerName || 'køber'));
 
+  const anyShipping = (groups || []).some(g => g.shippingMethod && g.shippingMethod !== 'pickup' && g.shippingMethod !== 'custom');
+  const anyPickup = (groups || []).some(g => g.shippingMethod === 'pickup');
+
   const groupRows = (groups || []).map(g => {
     const itemRows = (g.items || []).map(i => `
         <tr>
@@ -483,7 +486,7 @@ function buyerOrderEmailHtml({ buyerName, groups, orderId, grandTotal }) {
     <div style="background:linear-gradient(160deg,#133F2B 0%,#2A7D4F 100%);border-radius:20px 20px 0 0;padding:44px 44px 36px;text-align:center;">
       <div style="display:inline-block;background:rgba(255,255,255,0.12);border-radius:14px;padding:10px 22px;color:#fff;font-size:26px;font-weight:900;letter-spacing:-0.04em;margin-bottom:20px;">byt<span style="opacity:0.55">&amp;</span>leg.</div>
       <h1 style="color:#fff;font-size:26px;font-weight:800;margin:0 0 10px;letter-spacing:-0.03em;">Din betaling er gennemført! 🎉</h1>
-      <p style="color:rgba(255,255,255,0.7);font-size:15px;margin:0;line-height:1.55;">Sælger er notificeret og pakker varen til dig.</p>
+      <p style="color:rgba(255,255,255,0.7);font-size:15px;margin:0;line-height:1.55;">${anyShipping ? 'Sælger er notificeret og pakker varen til dig.' : 'Sælger er notificeret — aftal afhentning i beskeder.'}</p>
     </div>
 
     <!-- Body -->
@@ -513,9 +516,15 @@ function buyerOrderEmailHtml({ buyerName, groups, orderId, grandTotal }) {
       <!-- Hvad sker der nu -->
       <div style="font-weight:800;font-size:14px;color:#16221C;margin:0 0 14px;">Hvad sker der nu?</div>
       ${[
-        { icon: '📦', text: 'Sælger pakker varen og printer pakkemærkaten.' },
-        { icon: '🚚', text: 'Du modtager en notifikation når pakken er sendt.' },
-        { icon: '🏠', text: 'Pakken leveres til dit valgte afhentningssted.' },
+        ...(anyShipping ? [
+          { icon: '📦', text: 'Sælger pakker varen og printer pakkemærkaten.' },
+          { icon: '🚚', text: 'Du modtager en notifikation når pakken er sendt.' },
+          { icon: '🏠', text: 'Pakken leveres til dit valgte afhentningssted.' },
+        ] : []),
+        ...(anyPickup ? [
+          { icon: '💬', text: 'Aftal tid og sted for afhentning med sælger via beskeder på byt&amp;leg.' },
+          { icon: '🤝', text: 'Du henter varen hos sælger på det aftalte tidspunkt.' },
+        ] : []),
       ].map((s, i) => `
       <div style="display:flex;gap:14px;margin-bottom:14px;align-items:flex-start;">
         <div style="flex-shrink:0;width:34px;height:34px;background:#e8f5ee;border-radius:10px;font-size:17px;text-align:center;line-height:34px;">${s.icon}</div>
