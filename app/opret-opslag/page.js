@@ -80,6 +80,7 @@ export default function OpretOpslagPage() {
   const [institution, setInstitution] = useState(ctxInstitution || null);
   const [imgFiles, setImgFiles] = useState([]);
   const [imgPreviews, setImgPreviews] = useState([]);
+  const [imgError, setImgError] = useState(false);
   const [draggingIdx, setDraggingIdx] = useState(null);
   const dragState = useRef({ dragging: null, lastOver: null });
   const [copiedFrom, setCopiedFrom] = useState(null);
@@ -221,6 +222,7 @@ export default function OpretOpslagPage() {
     const newPreviews = safe.map(f => URL.createObjectURL(f));
     setImgFiles(prev => [...prev, ...safe]);
     setImgPreviews(prev => [...prev, ...newPreviews]);
+    setImgError(false);
     e.target.value = '';
   }
 
@@ -364,6 +366,7 @@ export default function OpretOpslagPage() {
       const preview = URL.createObjectURL(file);
       setImgFiles(prev => prev.length < 6 ? [file, ...prev] : prev);
       setImgPreviews(prev => prev.length < 6 ? [preview, ...prev] : prev);
+      setImgError(false);
       showToast('AI har udfyldt felterne — tjek og juster 🎉');
     } catch { setScanError('Scan mislykkedes — prøv igen'); }
     setScanning(false);
@@ -498,7 +501,8 @@ export default function OpretOpslagPage() {
 
   const deliveryValid = true;   // afhentning er altid muligt → levering er altid gyldig
   const step1Valid = form.title.trim() && (form.type !== 'køb' || form.price) && deliveryValid;
-  const step2Valid = form.description.trim();
+  const needsImage = form.type !== 'søges';
+  const step2Valid = form.description.trim() && (!needsImage || imgFiles.length > 0);
 
   return (
     <div style={{ minHeight:'100vh', background:PAPER }} className="page-enter">
@@ -854,7 +858,9 @@ export default function OpretOpslagPage() {
 
                 {true && <div>
                   <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:10 }}>
-                    <label style={{ ...labelStyle, marginBottom:0 }}>{form.type === 'søges' ? 'Billeder' : 'Billeder'} <span style={{ fontWeight:400, color:INK3 }}>(op til 6 — valgfri)</span></label>
+                    <label style={{ ...labelStyle, marginBottom:0 }}>
+                    Billeder {needsImage ? <span style={{ color:'#e53e3e' }}>*</span> : <span style={{ fontWeight:400, color:INK3 }}>(valgfri)</span>}
+                  </label>
                     {imgFiles.length > 0 && imgFiles.length < 6 && !checkingImages && (
                       <button type="button" onClick={()=>fileRef.current?.click()} style={{ fontSize:12, fontWeight:700, color:PRIMARY, background:GREEN_TINT, border:'none', borderRadius:99, padding:'5px 12px', cursor:'pointer', fontFamily:FONT }}>+ Tilføj</button>
                     )}
@@ -911,13 +917,25 @@ export default function OpretOpslagPage() {
                     </div>
                   )}
                   {imgPreviews.length > 1 && <div style={{ fontSize:11, color:INK3, textAlign:'center', marginTop:6, fontFamily:FONT }}>Hold og træk billeder for at ændre rækkefølge · Det første er forsiden</div>}
+                  {imgError && needsImage && (
+                    <div style={{ display:'flex', alignItems:'center', gap:8, background:'#FEF2F2', border:'1px solid #FECACA', borderRadius:10, padding:'10px 14px', marginTop:8 }}>
+                      <span style={{ fontSize:16, flexShrink:0 }}>⚠️</span>
+                      <span style={{ fontFamily:FONT, fontSize:13, fontWeight:600, color:'#B91C1C' }}>Du skal uploade mindst ét billede for at oprette et opslag.</span>
+                    </div>
+                  )}
                 </div>}
 
                 <div style={{ display:'flex', gap:10, marginTop:4 }}>
                   <button onClick={()=>{ setStep(1); scrollTop(); }} style={{ flex:1, padding:'13px', borderRadius:99, background:PAPER2, color:INK2, border:'none', fontFamily:FONT, fontWeight:700, fontSize:14, cursor:'pointer' }}>
                     ← Tilbage
                   </button>
-                  <button onClick={handleCreate} disabled={saving||!step2Valid} style={{ flex:2, padding:'13px', borderRadius:99, background: saving||!step2Valid ? PAPER3 : PRIMARY, color: saving||!step2Valid ? INK3 : '#fff', border:'none', fontFamily:FONT, fontWeight:700, fontSize:15, cursor: saving||!step2Valid ? 'not-allowed' : 'pointer', display:'flex', alignItems:'center', justifyContent:'center', gap:8, transition:'all 0.2s' }}>
+                  <button
+                    onClick={() => {
+                      if (needsImage && imgFiles.length === 0) { setImgError(true); return; }
+                      handleCreate();
+                    }}
+                    disabled={saving || !form.description.trim()}
+                    style={{ flex:2, padding:'13px', borderRadius:99, background: saving || !form.description.trim() ? PAPER3 : PRIMARY, color: saving || !form.description.trim() ? INK3 : '#fff', border:'none', fontFamily:FONT, fontWeight:700, fontSize:15, cursor: saving || !form.description.trim() ? 'not-allowed' : 'pointer', display:'flex', alignItems:'center', justifyContent:'center', gap:8, transition:'all 0.2s' }}>
                     {saving ? <><Spinner /> Publicerer…</> : '✓ Publicer opslag'}
                   </button>
                 </div>
