@@ -5,6 +5,10 @@ import { PRIMARY, GREEN_TINT, GREEN_SOFT, PAPER2, INK, INK3, CORAL, TYPE_CFG, CO
 import { CATEGORIES } from '@/lib/categories';
 import { db } from '@/lib/supabase';
 
+export function calcServiceFee(price) {
+  return Math.round(Math.max(5, Math.min(50, price * 0.05)) * 100) / 100;
+}
+
 import { useApp } from '@/providers/AppProvider';
 
 export default function ListingCard({ listing, onClick, favs, toggleFav, onInstitutionClick }) {
@@ -132,6 +136,9 @@ export default function ListingCard({ listing, onClick, favs, toggleFav, onInsti
                   <span style={{ fontFamily:FONT, fontWeight:700, fontSize:13, color:INK3, textDecoration:'line-through', marginRight:6 }}>{listing.original_price} kr.</span>
                 )}
                 <span style={{ fontFamily:FONT, fontWeight:800, fontSize:17, color: listing.original_price && listing.original_price > listing.price ? '#e11d48' : PRIMARY }}>{listing.price} kr.</span>
+                <div style={{ fontFamily:FONT, fontSize:11, color:INK3, marginTop:2 }}>
+                  Inkl. beskyttelse: {listing.price + calcServiceFee(listing.price)} kr.
+                </div>
               </div>
             : <div style={{ fontSize: 13, color: CORAL, fontWeight: 700, marginBottom: 4, fontFamily: FONT }}>Byttes kun</div>
           }
