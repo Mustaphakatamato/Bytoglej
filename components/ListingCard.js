@@ -14,11 +14,11 @@ import { useApp } from '@/providers/AppProvider';
 export function BuyerProtectionPopup({ price, fee, onClose }) {
   const total = price + fee;
   return (
-    <div onClick={onClose} style={{ position:'fixed', inset:0, background:'rgba(22,34,28,0.5)', zIndex:9999, display:'flex', alignItems:'flex-end', justifyContent:'center', padding:'0 0 0' }}>
-      <div onClick={e=>e.stopPropagation()} style={{ background:'#fff', borderRadius:'20px 20px 0 0', width:'100%', maxWidth:480, padding:'28px 24px 36px' }}>
+    <div onClick={onClose} style={{ position:'fixed', inset:0, background:'rgba(22,34,28,0.5)', zIndex:9999, display:'flex', alignItems:'center', justifyContent:'center', padding:24 }}>
+      <div onClick={e=>e.stopPropagation()} style={{ background:'#fff', borderRadius:20, width:'100%', maxWidth:420, padding:'28px 24px', boxShadow:'0 24px 64px rgba(22,34,28,0.22)' }}>
         <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:24 }}>
           <span style={{ fontFamily:FONT, fontWeight:800, fontSize:17, color:'#111' }}>Prisoversigt</span>
-          <button onClick={onClose} style={{ background:'none', border:'none', fontSize:20, cursor:'pointer', color:'#888', lineHeight:1 }}>✕</button>
+          <button onClick={onClose} style={{ background:'none', border:'none', fontSize:20, cursor:'pointer', color:'#888', lineHeight:1, padding:4 }}>✕</button>
         </div>
         <div style={{ display:'flex', alignItems:'center', gap:14, paddingBottom:18, borderBottom:'1px solid #eee' }}>
           <div style={{ width:40, height:40, borderRadius:8, background:'#f0f0f0', flexShrink:0 }} />
@@ -40,7 +40,7 @@ export function BuyerProtectionPopup({ price, fee, onClose }) {
           </div>
         </div>
         <div style={{ marginTop:20, marginBottom:20, fontFamily:FONT, fontSize:13, color:'#666', lineHeight:1.6 }}>
-          Vores gebyr for køberbeskyttelse er obligatorisk ved køb på byt&leg. Det tilføjes til hvert køb og dækker dig hvis varen ikke ankommer som beskrevet.
+          Vores gebyr for køberbeskyttelse er obligatorisk ved køb på byt&amp;leg. Det tilføjes til hvert køb og dækker dig hvis varen ikke ankommer som beskrevet.
         </div>
         <div style={{ background:'#f5f5f5', borderRadius:12, padding:'14px 16px', marginBottom:24, display:'flex', justifyContent:'space-between', alignItems:'center' }}>
           <span style={{ fontFamily:FONT, fontWeight:700, fontSize:15, color:'#111' }}>I alt inkl. beskyttelse</span>
