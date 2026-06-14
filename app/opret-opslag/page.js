@@ -555,6 +555,9 @@ export default function OpretOpslagPage() {
                 <style>{`
                   @keyframes spin { to { transform: rotate(360deg); } }
                   @keyframes pulse { 0%,100% { opacity:1; } 50% { opacity:0.4; } }
+                  input[type=number]::-webkit-inner-spin-button,
+                  input[type=number]::-webkit-outer-spin-button { -webkit-appearance:none; margin:0; }
+                  input[type=number] { -moz-appearance:textfield; }
                 `}</style>
 
                 {/* AI assistant: søges text input OR image scan */}
