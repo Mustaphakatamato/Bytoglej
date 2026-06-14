@@ -94,7 +94,7 @@ export default function OpretOpslagPage() {
   // Afhentning er altid muligt (håndteres i kurven). Her vælger sælger kun om
   // der også tilbydes forsendelse, og i så fald størrelse + porto-håndtering.
   const [delivery, setDelivery] = useState({
-    shipping: false, size_category: '', shipping_included: null,
+    shipping: false, size_category: '',
   });
   const [priceEstimates, setPriceEstimates] = useState(null); // { min, max } DKK
   const [deliveryDefaultApplied, setDeliveryDefaultApplied] = useState(false);
@@ -413,7 +413,6 @@ export default function OpretOpslagPage() {
     if (form.type === 'køb' && !String(form.price).trim()) { showToast('Angiv en pris for køb-opslag', 'error'); return; }
     if (!form.description.trim()) { showToast('Tilføj en beskrivelse', 'error'); return; }
     if (delivery.shipping && !delivery.size_category) { showToast('Vælg pakkestørrelse for forsendelse', 'error'); return; }
-    if (delivery.shipping && delivery.shipping_included === null) { showToast('Vælg porto-håndtering for forsendelse', 'error'); return; }
     setSaving(true);
     try {
     const { data:{ user } } = await db.auth.getUser();
@@ -451,7 +450,7 @@ export default function OpretOpslagPage() {
         allow_shipping: delivery.shipping,
         allow_custom: false,
         shipping_size_category: delivery.shipping ? (delivery.size_category || null) : null,
-        shipping_included_in_price: delivery.shipping ? (delivery.shipping_included ?? false) : false,
+        shipping_included_in_price: false,
       });
     }
     if (imgFiles.length > 0) {
@@ -750,26 +749,8 @@ export default function OpretOpslagPage() {
                                 💡 Estimeret porto: ca. {fmtKr(priceEstimates.min)}–{fmtKr(priceEstimates.max)} afhængig af transportør
                               </div>
                             )}
-                            <div>
-                              <label style={{ ...labelStyle, fontSize:12, marginBottom:6 }}>
-                                Porto-håndtering <span style={{ color:'#e53e3e' }}>*</span>
-                                {delivery.shipping_included === null && <span style={{ fontWeight:400, color:'#e53e3e', fontSize:11, marginLeft:6 }}>— vælg en mulighed</span>}
-                              </label>
-                              <div style={{ display:'flex', flexDirection:'column', gap:6 }}>
-                                {[
-                                  { val:false, label:'Køber betaler porto oveni', sub:'Prisen du har sat er ekskl. porto' },
-                                  { val:true,  label:'Inkluderet i prisen',         sub:'Du har lagt porto ind i prisen' },
-                                ].map(opt => (
-                                  <button key={String(opt.val)} type="button" onClick={()=>setDelivery(d=>({...d,shipping_included:opt.val}))}
-                                    style={{ display:'flex', alignItems:'center', gap:10, padding:'10px 14px', borderRadius:10, border:`1.5px solid ${delivery.shipping_included===opt.val?'#2563EB':PAPER3}`, background:delivery.shipping_included===opt.val?'#EFF6FF':'#fff', cursor:'pointer', textAlign:'left' }}>
-                                    <div style={{ width:16, height:16, borderRadius:'50%', border:`2px solid ${delivery.shipping_included===opt.val?'#2563EB':PAPER3}`, background:delivery.shipping_included===opt.val?'#2563EB':'transparent', flexShrink:0 }} />
-                                    <div>
-                                      <div style={{ fontFamily:FONT, fontWeight:700, fontSize:13, color:delivery.shipping_included===opt.val?'#2563EB':INK }}>{opt.label}</div>
-                                      <div style={{ fontSize:11, color:INK3 }}>{opt.sub}</div>
-                                    </div>
-                                  </button>
-                                ))}
-                              </div>
+                            <div style={{ background:'#EFF6FF', borderRadius:10, padding:'10px 14px', fontSize:13, color:'#1D4ED8', fontFamily:FONT, fontWeight:600 }}>
+                              ℹ️ Prisen du har sat er ekskl. porto — køber betaler porto oveni ved checkout.
                             </div>
                           </div>
                         )}
