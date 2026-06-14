@@ -62,8 +62,6 @@ export default function ProfilPage() {
     leader_phone:          institution?.leader_phone          || '',
     leader_email:          institution?.leader_email          || '',
     contact_name:          institution?.contact_name          || '',
-    default_pickup_hours:  institution?.default_pickup_hours  || '',
-    default_pickup_notes:  institution?.default_pickup_notes  || '',
     bank_reg_nr:           institution?.bank_reg_nr           || '',
     bank_account_nr:       institution?.bank_account_nr       || '',
   });
@@ -84,8 +82,6 @@ export default function ProfilPage() {
       leader_phone:          institution.leader_phone          || '',
       leader_email:          institution.leader_email          || '',
       contact_name:          institution.contact_name          || '',
-      default_pickup_hours:  institution.default_pickup_hours  || '',
-      default_pickup_notes:  institution.default_pickup_notes  || '',
       bank_reg_nr:           institution.bank_reg_nr           || '',
       bank_account_nr:       institution.bank_account_nr       || '',
     });
@@ -126,8 +122,6 @@ export default function ProfilPage() {
       leader_phone:         form.leader_phone,
       leader_email:         form.leader_email,
       contact_name:         form.contact_name,
-      default_pickup_hours: form.default_pickup_hours || null,
-      default_pickup_notes: form.default_pickup_notes || null,
       bank_reg_nr:          form.bank_reg_nr || null,
       bank_account_nr:      form.bank_account_nr || null,
     }).eq('email', institution.email);
@@ -139,7 +133,7 @@ export default function ProfilPage() {
         if (coords) db.from('institutions').update({ latitude: coords.lat, longitude: coords.lon }).eq('email', institution.email);
       });
     }
-    onInstChange({ ...institution, ...form, children_count: Number(form.children_count) || null, default_pickup_hours: form.default_pickup_hours || null, default_pickup_notes: form.default_pickup_notes || null });
+    onInstChange({ ...institution, ...form, children_count: Number(form.children_count) || null });
     showToast('Profil opdateret ✓');
     router.push('/profil');
   }
@@ -259,24 +253,6 @@ export default function ProfilPage() {
           <div style={{ borderTop:'1px solid #f0eeeb', paddingTop:20 }}>
             <div style={{ fontSize:12, fontWeight:700, color:'#aaa', textTransform:'uppercase', letterSpacing:0.8, marginBottom:14 }}>Kontaktperson (byt&amp;leg)</div>
             <div><label style={{ display:'block', fontSize:13, fontWeight:700, marginBottom:6 }}>Dit fulde navn</label>{inp(form.contact_name,'contact_name','Fornavn Efternavn')}</div>
-          </div>
-
-          {/* Standardindstillinger for afhentning */}
-          <div style={{ borderTop:'1px solid #f0eeeb', paddingTop:20 }}>
-            <div style={{ fontSize:12, fontWeight:700, color:'#aaa', textTransform:'uppercase', letterSpacing:0.8, marginBottom:6 }}>Standardindstillinger for afhentning</div>
-            <div style={{ fontSize:13, color:INK3, marginBottom:14, lineHeight:1.5 }}>Udfyldes automatisk når du opretter et opslag med afhentning — du kan altid tilpasse det pr. opslag.</div>
-            <div style={{ display:'flex', flexDirection:'column', gap:12 }}>
-              <div>
-                <label style={{ display:'block', fontSize:13, fontWeight:700, marginBottom:6 }}>Åbningstider for afhentning</label>
-                <input value={form.default_pickup_hours} onChange={e=>setForm(f=>({...f,default_pickup_hours:e.target.value}))}
-                  placeholder="Fx: Hverdage 8-16, aftales i chatten" style={INP} />
-              </div>
-              <div>
-                <label style={{ display:'block', fontSize:13, fontWeight:700, marginBottom:6 }}>Bemærkning til afhentning <span style={{ fontWeight:400, color:INK3 }}>(valgfri)</span></label>
-                <input value={form.default_pickup_notes} onChange={e=>setForm(f=>({...f,default_pickup_notes:e.target.value}))}
-                  placeholder="Fx: Brug indgangen til venstre, ring på dørklokken" style={INP} />
-              </div>
-            </div>
           </div>
 
           {/* Bankkonto til udbetaling */}
