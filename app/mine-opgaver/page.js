@@ -26,10 +26,10 @@ function StripeOrderCard({ order, myGroup, onMarkedSent }) {
 
   async function handleMarkSent() {
     setMarking(true);
-    const { data: { session } } = await db.auth.getSession();
     const res = await fetch('/api/seller-mark-sent', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session?.access_token}` },
+      credentials: 'same-origin',
+      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ orderId: order.id }),
     });
     setMarking(false);
@@ -287,11 +287,8 @@ export default function MineOpgaverPage() {
     const instName = inst?.name;
 
     // 1. Stripe orders where I'm a seller — via service-role API route (bypasses RLS)
-    const { data: { session } } = await db.auth.getSession();
-    if (session?.access_token) {
-      const res = await fetch('/api/seller-orders', {
-        headers: { Authorization: `Bearer ${session.access_token}` },
-      });
+    {
+      const res = await fetch('/api/seller-orders', { credentials: 'same-origin' });
       if (res.ok) {
         const json = await res.json();
         setStripeOrders(json.orders || []);
