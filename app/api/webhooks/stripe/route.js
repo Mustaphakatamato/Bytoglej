@@ -379,7 +379,7 @@ export function sellerOrderEmailHtml({ sellerName, items, itemTotal, shippingMet
   <div style="max-width:580px;margin:48px auto 32px;">
 
     <!-- Header -->
-    <div style="background:linear-gradient(160deg,#133F2B 0%,#2A7D4F 100%);border-radius:20px 20px 0 0;padding:44px 44px 36px;text-align:center;">
+    <div style="background-color:#1B4332;background:linear-gradient(160deg,#133F2B 0%,#2A7D4F 100%);border-radius:20px 20px 0 0;padding:44px 44px 36px;text-align:center;">
       <div style="display:inline-block;background:rgba(255,255,255,0.12);border-radius:14px;padding:10px 22px;color:#fff;font-size:26px;font-weight:900;letter-spacing:-0.04em;margin-bottom:20px;">byt<span style="opacity:0.55">&amp;</span>leg.</div>
       <h1 style="color:#fff;font-size:26px;font-weight:800;margin:0 0 10px;letter-spacing:-0.03em;">Tillykke, du har solgt noget! 🎉</h1>
       <p style="color:rgba(255,255,255,0.7);font-size:15px;margin:0;line-height:1.55;">Betalingen er modtaget og bekræftet — ${isShipping ? 'nu skal varen bare afsted.' : 'nu skal varen bare overdrages.'}</p>
@@ -483,7 +483,7 @@ export function buyerOrderEmailHtml({ buyerName, groups, orderId, grandTotal }) 
   <div style="max-width:580px;margin:48px auto 32px;">
 
     <!-- Header -->
-    <div style="background:linear-gradient(160deg,#133F2B 0%,#2A7D4F 100%);border-radius:20px 20px 0 0;padding:44px 44px 36px;text-align:center;">
+    <div style="background-color:#1B4332;background:linear-gradient(160deg,#133F2B 0%,#2A7D4F 100%);border-radius:20px 20px 0 0;padding:44px 44px 36px;text-align:center;">
       <div style="display:inline-block;background:rgba(255,255,255,0.12);border-radius:14px;padding:10px 22px;color:#fff;font-size:26px;font-weight:900;letter-spacing:-0.04em;margin-bottom:20px;">byt<span style="opacity:0.55">&amp;</span>leg.</div>
       <h1 style="color:#fff;font-size:26px;font-weight:800;margin:0 0 10px;letter-spacing:-0.03em;">Din betaling er gennemført! 🎉</h1>
       <p style="color:rgba(255,255,255,0.7);font-size:15px;margin:0;line-height:1.55;">${anyShipping ? 'Sælger er notificeret og pakker varen til dig.' : 'Sælger er notificeret — aftal afhentning i beskeder.'}</p>
