@@ -4,6 +4,7 @@ import { useRouter } from 'next/navigation';
 import { db } from '@/lib/supabase';
 import { PRIMARY, GREEN_DEEP, GREEN_SOFT, GREEN_TINT, PAPER, PAPER2, PAPER3, INK, INK2, INK3, CORAL, SKY, ACCENT, ACCENT2, FONT } from '@/lib/constants';
 import { useWindowWidth } from '@/lib/hooks';
+import { calcServiceFee, BuyerProtectionPopup } from '@/components/ListingCard';
 
 function timeAgo(dateStr) {
   if (!dateStr) return null;
@@ -93,6 +94,7 @@ export default function ListingDetailClient() {
   const [isFav, setIsFav] = useState(favs?.includes(listing?.id) || false);
   const [localFavCount, setLocalFavCount] = useState(listing?.fav_count || 0);
   const [shareModal, setShareModal] = useState(false);
+  const [showFeePopup, setShowFeePopup] = useState(false);
   const [adminEditModal, setAdminEditModal] = useState(false);
   const [adminEditForm, setAdminEditForm] = useState(null);
   const [adminEditSaving, setAdminEditSaving] = useState(false);
@@ -621,27 +623,40 @@ export default function ListingDetailClient() {
             {/* Price */}
             <div style={{ marginBottom:16 }}>
               {listing.price
-                ? <div>
-                    {listing.original_price && listing.original_price > listing.price && (
-                      <div style={{ display:'flex', alignItems:'center', gap:8, marginBottom:4 }}>
-                        <span style={{ fontFamily:FONT, fontWeight:700, fontSize:18, color:INK3, textDecoration:'line-through' }}>{listing.original_price} kr.</span>
-                        <span style={{ fontFamily:FONT, fontWeight:700, fontSize:12, background:'#FEE2E2', color:'#e11d48', borderRadius:99, padding:'2px 8px' }}>
-                          -{Math.round((1 - listing.price / listing.original_price) * 100)}%
-                        </span>
+                ? (() => {
+                    const fee = calcServiceFee(listing.price);
+                    const total = listing.price + fee;
+                    return (
+                      <div>
+                        {listing.original_price && listing.original_price > listing.price && (
+                          <div style={{ display:'flex', alignItems:'center', gap:8, marginBottom:4 }}>
+                            <span style={{ fontFamily:FONT, fontWeight:700, fontSize:18, color:INK3, textDecoration:'line-through' }}>{listing.original_price} kr.</span>
+                            <span style={{ fontFamily:FONT, fontWeight:700, fontSize:12, background:'#FEE2E2', color:'#e11d48', borderRadius:99, padding:'2px 8px' }}>
+                              -{Math.round((1 - listing.price / listing.original_price) * 100)}%
+                            </span>
+                          </div>
+                        )}
+                        {/* Sælgers pris — lille og grå */}
+                        <div style={{ fontFamily:FONT, fontSize:15, color:INK3, marginBottom:4 }}>{listing.price} kr.</div>
+                        {/* Inkl. beskyttelse — stor og fremhævet */}
+                        <div style={{ display:'flex', alignItems:'center', gap:10, flexWrap:'wrap' }}>
+                          <div style={{ fontFamily:FONT, fontWeight:800, fontSize:32, color:PRIMARY, letterSpacing:'-0.03em' }}>
+                            {total.toFixed(2).replace('.',',')} kr. inkl.
+                          </div>
+                          <button onClick={() => setShowFeePopup(true)} style={{ background:'none', border:'none', padding:0, cursor:'pointer', display:'flex', alignItems:'center', flexShrink:0 }}>
+                            <svg width="22" height="22" viewBox="0 0 24 24" fill="none"><path d="M12 2L4 6v6c0 5.25 3.5 10.15 8 11.35C16.5 22.15 20 17.25 20 12V6L12 2z" fill={PRIMARY} opacity="0.85"/><path d="M9 12l2 2 4-4" stroke="#fff" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"/></svg>
+                          </button>
+                          {(() => {
+                            const so = listing.shipping_options?.[0];
+                            const canShip = so?.allow_shipping || (!so && listing.can_ship);
+                            if (!canShip) return null;
+                            return <span style={{ fontSize:13, fontWeight:700, color:'#2563EB', background:'#EFF6FF', borderRadius:99, padding:'4px 12px', border:'1px solid #93c5fd', fontFamily:FONT }}>+ fragt</span>;
+                          })()}
+                        </div>
+                        {showFeePopup && <BuyerProtectionPopup price={listing.price} fee={fee} onClose={() => setShowFeePopup(false)} />}
                       </div>
-                    )}
-                    <div style={{ display:'flex', alignItems:'baseline', gap:10, flexWrap:'wrap' }}>
-                      <div style={{ fontFamily:FONT, fontWeight:800, fontSize:32, color: listing.original_price && listing.original_price > listing.price ? '#e11d48' : PRIMARY, letterSpacing:'-0.03em' }}>{listing.price} kr.</div>
-                      {(() => {
-                        const so = listing.shipping_options?.[0];
-                        const canShip = so?.allow_shipping || (!so && listing.can_ship);
-                        if (!canShip) return null;
-                        return so?.shipping_included_in_price
-                          ? <span style={{ fontSize:13, fontWeight:700, color:'#16a34a', background:'#F0FDF4', borderRadius:99, padding:'4px 12px', border:'1px solid #86efac', fontFamily:FONT }}>inkl. fragt</span>
-                          : <span style={{ fontSize:13, fontWeight:700, color:'#2563EB', background:'#EFF6FF', borderRadius:99, padding:'4px 12px', border:'1px solid #93c5fd', fontFamily:FONT }}>+ fragt</span>;
-                      })()}
-                    </div>
-                  </div>
+                    );
+                  })()
                 : listing.type === 'byt' ? <div style={{ fontSize:20, color:CORAL, fontWeight:800, fontFamily:FONT }}>Byttes kun</div>
                 : <div style={{ fontSize:20, color:ACCENT2, fontWeight:800, fontFamily:FONT }}>Afgiv bud</div>}
               {bidCount > 0 && <div style={{ color:INK3, fontSize:12, fontFamily:FONT, marginTop:4 }}>{bidCount} bud afgivet</div>}
