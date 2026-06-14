@@ -324,7 +324,7 @@ function fmtKr(n) {
   return `${Number(n || 0).toFixed(2).replace('.', ',')} kr.`;
 }
 
-function sellerOrderEmailHtml({ sellerName, items, itemTotal, shippingMethod, pickupPoint, labelUrl, trackingNumber, orderId }) {
+export function sellerOrderEmailHtml({ sellerName, items, itemTotal, shippingMethod, pickupPoint, labelUrl, trackingNumber, orderId }) {
   const base = process.env.NEXT_PUBLIC_BASE_URL || 'https://bytogleg.dk';
   const name = escapeHtml(String(sellerName || 'sælger'));
   const methodLabel = SHIPPING_LABELS[shippingMethod] || 'Forsendelse';
@@ -437,7 +437,7 @@ function sellerOrderEmailHtml({ sellerName, items, itemTotal, shippingMethod, pi
 
 // ── Køber-email ────────────────────────────────────────────────
 
-function buyerOrderEmailHtml({ buyerName, groups, orderId, grandTotal }) {
+export function buyerOrderEmailHtml({ buyerName, groups, orderId, grandTotal }) {
   const base = process.env.NEXT_PUBLIC_BASE_URL || 'https://bytogleg.dk';
   const name = escapeHtml(String(buyerName || 'køber'));
 
