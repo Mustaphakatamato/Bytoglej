@@ -1,5 +1,6 @@
 'use client';
-import { useState } from 'react';
+import { useState, useEffect, useRef } from 'react';
+import { createPortal } from 'react-dom';
 import { useRouter } from 'next/navigation';
 import { PRIMARY, GREEN_TINT, GREEN_SOFT, PAPER2, INK, INK3, CORAL, TYPE_CFG, CONDITION_COLORS, FONT } from '@/lib/constants';
 import { CATEGORIES } from '@/lib/categories';
@@ -13,7 +14,11 @@ import { useApp } from '@/providers/AppProvider';
 
 export function BuyerProtectionPopup({ price, fee, onClose }) {
   const total = price + fee;
-  return (
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => { setMounted(true); }, []);
+  if (!mounted) return null;
+
+  const modal = (
     <div onClick={onClose} style={{ position:'fixed', inset:0, background:'rgba(22,34,28,0.5)', zIndex:9999, display:'flex', alignItems:'center', justifyContent:'center', padding:24 }}>
       <div onClick={e=>e.stopPropagation()} style={{ background:'#fff', borderRadius:20, width:'100%', maxWidth:420, padding:'28px 24px', boxShadow:'0 24px 64px rgba(22,34,28,0.22)' }}>
         <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:24 }}>
@@ -52,6 +57,8 @@ export function BuyerProtectionPopup({ price, fee, onClose }) {
       </div>
     </div>
   );
+
+  return createPortal(modal, document.body);
 }
 
 export default function ListingCard({ listing, onClick, favs, toggleFav, onInstitutionClick }) {
