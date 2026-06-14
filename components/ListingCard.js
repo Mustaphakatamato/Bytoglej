@@ -12,7 +12,7 @@ export function calcServiceFee(price) {
 
 import { useApp } from '@/providers/AppProvider';
 
-export function BuyerProtectionPopup({ price, fee, onClose }) {
+export function BuyerProtectionPopup({ price, fee, onClose, image, emoji }) {
   const total = price + fee;
   const [mounted, setMounted] = useState(false);
   useEffect(() => { setMounted(true); }, []);
@@ -26,7 +26,11 @@ export function BuyerProtectionPopup({ price, fee, onClose }) {
           <button onClick={onClose} style={{ background:'none', border:'none', fontSize:20, cursor:'pointer', color:'#888', lineHeight:1, padding:4 }}>✕</button>
         </div>
         <div style={{ display:'flex', alignItems:'center', gap:14, paddingBottom:18, borderBottom:'1px solid #eee' }}>
-          <div style={{ width:40, height:40, borderRadius:8, background:'#f0f0f0', flexShrink:0 }} />
+          <div style={{ width:40, height:40, borderRadius:8, background:'#f0f0f0', flexShrink:0, overflow:'hidden', display:'flex', alignItems:'center', justifyContent:'center' }}>
+            {image
+              ? <img src={image} alt="" style={{ width:'100%', height:'100%', objectFit:'cover' }} />
+              : <span style={{ fontSize:22 }}>{emoji || '📦'}</span>}
+          </div>
           <div>
             <div style={{ fontFamily:FONT, fontSize:14, color:'#111', fontWeight:600 }}>Varens pris</div>
             <div style={{ fontFamily:FONT, fontSize:14, color:'#111' }}>{price.toFixed(2).replace('.',',')} kr.</div>
@@ -194,7 +198,7 @@ export default function ListingCard({ listing, onClick, favs, toggleFav, onInsti
                         <svg width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M12 2L4 6v6c0 5.25 3.5 10.15 8 11.35C16.5 22.15 20 17.25 20 12V6L12 2z" fill={PRIMARY} opacity="0.85"/><path d="M9 12l2 2 4-4" stroke="#fff" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"/></svg>
                       </button>
                     </div>
-                    {showFeePopup && <BuyerProtectionPopup price={listing.price} fee={fee} onClose={() => setShowFeePopup(false)} />}
+                    {showFeePopup && <BuyerProtectionPopup price={listing.price} fee={fee} image={listing.images?.[0]} emoji={listing.emoji} onClose={() => setShowFeePopup(false)} />}
                   </div>
                 );
               })()

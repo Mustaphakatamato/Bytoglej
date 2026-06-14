@@ -653,7 +653,7 @@ export default function ListingDetailClient() {
                             return <span style={{ fontSize:13, fontWeight:700, color:'#2563EB', background:'#EFF6FF', borderRadius:99, padding:'4px 12px', border:'1px solid #93c5fd', fontFamily:FONT }}>+ fragt</span>;
                           })()}
                         </div>
-                        {showFeePopup && <BuyerProtectionPopup price={listing.price} fee={fee} onClose={() => setShowFeePopup(false)} />}
+                        {showFeePopup && <BuyerProtectionPopup price={listing.price} fee={fee} image={listing.images?.[0]} emoji={listing.emoji} onClose={() => setShowFeePopup(false)} />}
                       </div>
                     );
                   })()
