@@ -92,6 +92,7 @@ export async function POST(req) {
       .from('listings')
       .update({
         is_sold: true,
+        is_active: false,
         sold_at: new Date().toISOString(),
         sold_to: order.buyer_name || null,
         sold_to_institution_id: order.buyer_institution_id || null,
