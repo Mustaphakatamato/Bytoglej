@@ -11,12 +11,56 @@ export function calcServiceFee(price) {
 
 import { useApp } from '@/providers/AppProvider';
 
+export function BuyerProtectionPopup({ price, fee, onClose }) {
+  const total = price + fee;
+  return (
+    <div onClick={onClose} style={{ position:'fixed', inset:0, background:'rgba(22,34,28,0.5)', zIndex:9999, display:'flex', alignItems:'flex-end', justifyContent:'center', padding:'0 0 0' }}>
+      <div onClick={e=>e.stopPropagation()} style={{ background:'#fff', borderRadius:'20px 20px 0 0', width:'100%', maxWidth:480, padding:'28px 24px 36px' }}>
+        <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:24 }}>
+          <span style={{ fontFamily:FONT, fontWeight:800, fontSize:17, color:'#111' }}>Prisoversigt</span>
+          <button onClick={onClose} style={{ background:'none', border:'none', fontSize:20, cursor:'pointer', color:'#888', lineHeight:1 }}>✕</button>
+        </div>
+        <div style={{ display:'flex', alignItems:'center', gap:14, paddingBottom:18, borderBottom:'1px solid #eee' }}>
+          <div style={{ width:40, height:40, borderRadius:8, background:'#f0f0f0', flexShrink:0 }} />
+          <div>
+            <div style={{ fontFamily:FONT, fontSize:14, color:'#111', fontWeight:600 }}>Varens pris</div>
+            <div style={{ fontFamily:FONT, fontSize:14, color:'#111' }}>{price.toFixed(2).replace('.',',')} kr.</div>
+          </div>
+        </div>
+        <div style={{ display:'flex', alignItems:'center', gap:14, paddingTop:18, paddingBottom:18, borderBottom:'1px solid #eee' }}>
+          <div style={{ width:40, height:40, borderRadius:'50%', background:'#E6F4F1', display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0 }}>
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none"><path d="M12 2L4 6v6c0 5.25 3.5 10.15 8 11.35C16.5 22.15 20 17.25 20 12V6L12 2z" fill="#2D6A4F"/><path d="M9 12l2 2 4-4" stroke="#fff" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></svg>
+          </div>
+          <div style={{ flex:1 }}>
+            <div style={{ fontFamily:FONT, fontSize:14, color:'#111', fontWeight:600, display:'flex', alignItems:'center', gap:6 }}>
+              Gebyr for køberbeskyttelse
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#aaa" strokeWidth="2" strokeLinecap="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+            </div>
+            <div style={{ fontFamily:FONT, fontSize:14, color:'#111' }}>{fee.toFixed(2).replace('.',',')} kr.</div>
+          </div>
+        </div>
+        <div style={{ marginTop:20, marginBottom:20, fontFamily:FONT, fontSize:13, color:'#666', lineHeight:1.6 }}>
+          Vores gebyr for køberbeskyttelse er obligatorisk ved køb på byt&leg. Det tilføjes til hvert køb og dækker dig hvis varen ikke ankommer som beskrevet.
+        </div>
+        <div style={{ background:'#f5f5f5', borderRadius:12, padding:'14px 16px', marginBottom:24, display:'flex', justifyContent:'space-between', alignItems:'center' }}>
+          <span style={{ fontFamily:FONT, fontWeight:700, fontSize:15, color:'#111' }}>I alt inkl. beskyttelse</span>
+          <span style={{ fontFamily:FONT, fontWeight:800, fontSize:16, color:'#2D6A4F' }}>{total.toFixed(2).replace('.',',')} kr.</span>
+        </div>
+        <button onClick={onClose} style={{ width:'100%', padding:'16px', borderRadius:99, background:'#2D6A4F', color:'#fff', border:'none', fontFamily:FONT, fontWeight:700, fontSize:15, cursor:'pointer' }}>
+          OK, luk
+        </button>
+      </div>
+    </div>
+  );
+}
+
 export default function ListingCard({ listing, onClick, favs, toggleFav, onInstitutionClick }) {
   const router = useRouter();
   const { realUserId, institution } = useApp();
   const isOwn = listing.user_id === realUserId || (institution?.name && listing.institution_name === institution.name);
   const isFav = favs.includes(listing.id);
   const [popping, setPopping] = useState(false);
+  const [showFeePopup, setShowFeePopup] = useState(false);
   const [imgIdx, setImgIdx] = useState(0);
   const [hovered, setHovered] = useState(false);
   const imgs = listing.images?.length ? listing.images : [];
@@ -131,15 +175,22 @@ export default function ListingCard({ listing, onClick, favs, toggleFav, onInsti
 
         <div style={{ marginTop: 'auto' }}>
           {listing.price
-            ? <div style={{ marginBottom:4 }}>
-                {listing.original_price && listing.original_price > listing.price && (
-                  <span style={{ fontFamily:FONT, fontWeight:700, fontSize:13, color:INK3, textDecoration:'line-through', marginRight:6 }}>{listing.original_price} kr.</span>
-                )}
-                <span style={{ fontFamily:FONT, fontWeight:800, fontSize:17, color: listing.original_price && listing.original_price > listing.price ? '#e11d48' : PRIMARY }}>{listing.price} kr.</span>
-                <div style={{ fontFamily:FONT, fontSize:11, color:INK3, marginTop:2 }}>
-                  Inkl. beskyttelse: {listing.price + calcServiceFee(listing.price)} kr.
-                </div>
-              </div>
+            ? (() => {
+                const fee = calcServiceFee(listing.price);
+                const total = listing.price + fee;
+                return (
+                  <div style={{ marginBottom:4 }}>
+                    <div style={{ fontFamily:FONT, fontSize:12, color:INK3, marginBottom:2 }}>{listing.price} kr.</div>
+                    <div style={{ display:'flex', alignItems:'center', gap:5 }}>
+                      <span style={{ fontFamily:FONT, fontWeight:800, fontSize:17, color:PRIMARY }}>{total.toFixed(2).replace('.',',')} kr. inkl.</span>
+                      <button onClick={e=>{ e.stopPropagation(); setShowFeePopup(true); }} style={{ background:'none', border:'none', padding:0, cursor:'pointer', display:'flex', alignItems:'center', color:PRIMARY, flexShrink:0 }}>
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M12 2L4 6v6c0 5.25 3.5 10.15 8 11.35C16.5 22.15 20 17.25 20 12V6L12 2z" fill={PRIMARY} opacity="0.85"/><path d="M9 12l2 2 4-4" stroke="#fff" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"/></svg>
+                      </button>
+                    </div>
+                    {showFeePopup && <BuyerProtectionPopup price={listing.price} fee={fee} onClose={() => setShowFeePopup(false)} />}
+                  </div>
+                );
+              })()
             : <div style={{ fontSize: 13, color: CORAL, fontWeight: 700, marginBottom: 4, fontFamily: FONT }}>Byttes kun</div>
           }
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
