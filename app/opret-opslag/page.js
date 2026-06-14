@@ -705,7 +705,7 @@ export default function OpretOpslagPage() {
                   <div>
                     <label style={labelStyle}>Levering</label>
                     <div style={{ background:GREEN_TINT, border:`1px solid ${GREEN_SOFT}`, borderRadius:12, padding:'11px 14px', marginBottom:10, fontFamily:FONT, fontSize:13, color:INK2, lineHeight:1.5 }}>
-                      📍 Køber kan altid <strong>hente selv hos jer</strong> — det aftaler I direkte. Vil du også tilbyde forsendelse, så slå det til nedenfor.
+                      📍 Køber kan <strong>hente selv hos jer</strong> — det aftaler I direkte. Vil du også tilbyde forsendelse, så slå det til nedenfor.
                     </div>
                     <div style={{ display:'flex', flexDirection:'column', gap:10 }}>
 
