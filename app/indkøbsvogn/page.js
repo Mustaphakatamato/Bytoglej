@@ -93,6 +93,7 @@ export default function CartPage() {
   // Hentes ved indlæsning så kurven viser samme pris som checkout opkræver.
   const [livePrices, setLivePrices] = useState({});
   const [livePricesLoading, setLivePricesLoading] = useState({}); // { [sellerName]: bool }
+  const [sellerInfo, setSellerInfo] = useState({}); // { [name]: { address, zipcode, city } } til afhentnings-adresse
 
   // Pickup points: sellerName → { loading, points, chosen }
   const [pickupState, setPickupState] = useState({});
@@ -161,6 +162,18 @@ export default function CartPage() {
         .finally(() => setLivePricesLoading(p => ({ ...p, [name]: false })));
     });
   }, [groups, quotes, quotesLoading, shippingOptions, institutionId]);
+
+  // Hent sælgeres adresser så afhentnings-muligheden kan vise "hos [navn], [adresse]"
+  useEffect(() => {
+    const names = [...new Set(groups.map(g => g.ownerInstitutionName).filter(Boolean))];
+    if (!names.length) return;
+    db.from('institutions').select('name, address, zipcode, city').in('name', names)
+      .then(({ data }) => {
+        const m = {};
+        for (const i of (data || [])) m[i.name] = i;
+        setSellerInfo(m);
+      });
+  }, [groups]);
 
   function isSelected(name) { return name in selected ? selected[name] : true; }
   function toggleSelected(name) { setSelected(p => ({ ...p, [name]: !isSelected(name) })); }
@@ -362,8 +375,6 @@ export default function CartPage() {
             const sel = isSelected(name);
             const firstSo = shippingOptions[group.items[0]?.listingId];
             const canShip = firstSo?.allow_shipping || (!firstSo && listingsCanShip[group.items[0]?.listingId]);
-            const canPickup = true;   // afhentning er altid muligt
-            const canCustom = firstSo?.allow_custom;
             const sizeKey = firstSo?.shipping_size_category || 'medium';
             const quote = quotes[sizeKey];
             const ds = deliveryState[name] || {};
@@ -424,8 +435,8 @@ export default function CartPage() {
                   </div>
                 )}
 
-                {/* Delivery method */}
-                {(canShip || canPickup || canCustom) && (
+                {/* Delivery method — afhentning er altid en mulighed */}
+                {(
                   <div style={{ padding: '16px 20px', borderBottom: `1px solid ${PAPER2}` }}>
                     <div style={{ fontFamily: FONT, fontWeight: 700, fontSize: 14, color: INK, marginBottom: 12 }}>Leveringsmulighed</div>
 
@@ -433,8 +444,12 @@ export default function CartPage() {
                       <RadioRow
                         chosen={ds.method} value="pickup"
                         onChoose={() => setDeliveryMethod(name, 'pickup', 0)}
-                        icon="📍" label="Afhentes hos sælger"
-                        sublabel={firstSo?.pickup_address || null}
+                        icon="📍" label={`Jeg henter selv hos ${name}`}
+                        sublabel={
+                          [sellerInfo[name]?.address, sellerInfo[name]?.zipcode, sellerInfo[name]?.city].filter(Boolean).join(', ')
+                          || firstSo?.pickup_address
+                          || 'I aftaler tid og sted direkte i beskeder'
+                        }
                         isFree
                       />
                     )}
@@ -473,15 +488,6 @@ export default function CartPage() {
                       />
                     ))}
 
-                    {canCustom && (
-                      <RadioRow
-                        chosen={ds.method} value="custom"
-                        onChoose={() => setDeliveryMethod(name, 'custom', 0)}
-                        icon="🤝" label="Aftales individuelt"
-                        sublabel="I aftaler levering direkte i chatten"
-                        price={null}
-                      />
-                    )}
                   </div>
                 )}
 

@@ -90,10 +90,10 @@ export default function OpretOpslagPage() {
   });
 
   // Leveringsvalg
+  // Afhentning er altid muligt (håndteres i kurven). Her vælger sælger kun om
+  // der også tilbydes forsendelse, og i så fald størrelse + porto-håndtering.
   const [delivery, setDelivery] = useState({
-    pickup: true,    shipping: false,  custom: false,   // afhentning er altid muligt
-    pickup_address: '', pickup_hours: '', pickup_notes: '',
-    size_category: '', shipping_included: null, custom_notes: '',
+    shipping: false, size_category: '', shipping_included: null,
   });
   const [priceEstimates, setPriceEstimates] = useState(null); // { min, max } DKK
   const [deliveryDefaultApplied, setDeliveryDefaultApplied] = useState(false);
@@ -140,30 +140,11 @@ export default function OpretOpslagPage() {
     if (!d) return;
     setDelivery(prev => ({
       ...prev,
-      pickup:   true,   // afhentning er altid muligt — aldrig et tilvalg
       shipping: d.shipping ?? prev.shipping,
-      custom:   d.custom   ?? prev.custom,
       size_category: d.size || prev.size_category,
     }));
     setDeliveryDefaultApplied(true);
-    if (institution?.address) setDelivery(prev => ({ ...prev, pickup_address: institution.address + (institution.zipcode ? `, ${institution.zipcode}` : '') + (institution.city ? ` ${institution.city}` : '') }));
   }, [form.category]);
-
-  useEffect(() => {
-    if (institution) {
-      const updates = {};
-      if (!delivery.pickup_address) {
-        const addr = [institution.address, institution.zipcode, institution.city].filter(Boolean).join(', ');
-        if (addr) updates.pickup_address = addr;
-      }
-      if (!delivery.pickup_hours && institution.default_pickup_hours)
-        updates.pickup_hours = institution.default_pickup_hours;
-      if (!delivery.pickup_notes && institution.default_pickup_notes)
-        updates.pickup_notes = institution.default_pickup_notes;
-      if (Object.keys(updates).length)
-        setDelivery(prev => ({ ...prev, ...updates }));
-    }
-  }, [institution]);
 
   useEffect(() => {
     if (!delivery.shipping || !delivery.size_category) { setPriceEstimates(null); return; }
@@ -463,12 +444,9 @@ export default function OpretOpslagPage() {
     if (listing?.id && !isSøges) {
       await db.from('shipping_options').insert({
         listing_id: listing.id,
-        allow_pickup: true,   // afhentning er altid muligt
+        allow_pickup: true,      // afhentning er altid muligt — køber aftaler direkte
         allow_shipping: delivery.shipping,
-        allow_custom: delivery.custom,
-        pickup_address: delivery.pickup_address || null,
-        pickup_hours: delivery.pickup_hours ? { text: delivery.pickup_hours } : null,
-        pickup_notes: delivery.pickup_notes || null,
+        allow_custom: false,
         shipping_size_category: delivery.shipping ? (delivery.size_category || null) : null,
         shipping_included_in_price: delivery.shipping ? (delivery.shipping_included ?? false) : false,
       });
@@ -518,7 +496,7 @@ export default function OpretOpslagPage() {
   const inputStyle = { width:'100%', padding:'12px 14px', borderRadius:12, border:`1.5px solid ${PAPER3}`, fontSize:14, outline:'none', fontFamily:FONT, background:'#fff', color:INK, boxSizing:'border-box' };
   const labelStyle = { display:'block', fontSize:13, fontWeight:700, marginBottom:7, fontFamily:FONT, color:INK2 };
 
-  const deliveryValid = form.type === 'søges' || delivery.pickup || delivery.shipping || delivery.custom;
+  const deliveryValid = true;   // afhentning er altid muligt → levering er altid gyldig
   const step1Valid = form.title.trim() && (form.type !== 'køb' || form.price) && deliveryValid;
   const step2Valid = form.description.trim();
 
@@ -725,66 +703,13 @@ export default function OpretOpslagPage() {
 
                 {form.type !== 'søges' && (
                   <div>
-                    <label style={labelStyle}>Levering <span style={{ color:'#e53e3e' }}>*</span> <span style={{ fontWeight:400, color:INK3 }}>— afhentning er altid muligt; vælg evt. flere</span></label>
+                    <label style={labelStyle}>Levering</label>
+                    <div style={{ background:GREEN_TINT, border:`1px solid ${GREEN_SOFT}`, borderRadius:12, padding:'11px 14px', marginBottom:10, fontFamily:FONT, fontSize:13, color:INK2, lineHeight:1.5 }}>
+                      📍 Køber kan altid <strong>hente selv hos jer</strong> — det aftaler I direkte. Vil du også tilbyde forsendelse, så slå det til nedenfor.
+                    </div>
                     <div style={{ display:'flex', flexDirection:'column', gap:10 }}>
 
-                      {/* 1: Afhentning — altid muligt, ikke et tilvalg */}
-                      <div style={{ borderRadius:14, border:`1.5px solid ${PRIMARY}`, background: GREEN_TINT, overflow:'hidden' }}>
-                        <div style={{ display:'flex', alignItems:'center', gap:12, width:'100%', padding:'13px 16px' }}>
-                          <div style={{ width:20, height:20, borderRadius:5, background:PRIMARY, display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0 }}>
-                            <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
-                          </div>
-                          <div style={{ flex:1 }}>
-                            <div style={{ fontFamily:FONT, fontWeight:700, fontSize:14, color: PRIMARY }}>📍 Afhentes hos os <span style={{ fontWeight:600, fontSize:11, color:PRIMARY, background:'#fff', borderRadius:99, padding:'1px 8px', marginLeft:4 }}>altid muligt</span></div>
-                            <div style={{ fontSize:12, color:INK3, marginTop:1 }}>Køber kan altid hente selv — gratis. Udfyld evt. adresse og tider nedenfor.</div>
-                          </div>
-                        </div>
-                        {delivery.pickup && (
-                          <div style={{ padding:'0 16px 16px', display:'flex', flexDirection:'column', gap:10 }}>
-                            <div>
-                              <label style={{ ...labelStyle, fontSize:12, marginBottom:4 }}>Afhentningsadresse</label>
-                              <input value={delivery.pickup_address} onChange={e=>setDelivery(d=>({...d,pickup_address:e.target.value}))}
-                                placeholder="Fx: Skolevej 12, 8000 Aarhus C" style={{ ...inputStyle, fontSize:13, padding:'9px 12px' }} />
-                            </div>
-                            <div>
-                              <label style={{ ...labelStyle, fontSize:12, marginBottom:4 }}>Åbningstider for afhentning</label>
-                              <input value={delivery.pickup_hours} onChange={e=>setDelivery(d=>({...d,pickup_hours:e.target.value}))}
-                                placeholder="Fx: Hverdage 8-16, aftales i chatten" style={{ ...inputStyle, fontSize:13, padding:'9px 12px' }} />
-                            </div>
-                            <div>
-                              <label style={{ ...labelStyle, fontSize:12, marginBottom:4 }}>Bemærkninger <span style={{ fontWeight:400, color:INK3 }}>(valgfri)</span></label>
-                              <input value={delivery.pickup_notes} onChange={e=>setDelivery(d=>({...d,pickup_notes:e.target.value}))}
-                                placeholder="Fx: Brug indgangen til venstre" style={{ ...inputStyle, fontSize:13, padding:'9px 12px' }} />
-                            </div>
-                            {/* Save as default / hint to set default */}
-                            {(delivery.pickup_hours || delivery.pickup_notes) &&
-                             (delivery.pickup_hours !== institution?.default_pickup_hours ||
-                              delivery.pickup_notes  !== institution?.default_pickup_notes) ? (
-                              <button type="button" onClick={async () => {
-                                if (!institution?.email) return;
-                                await db.from('institutions').update({
-                                  default_pickup_hours: delivery.pickup_hours || null,
-                                  default_pickup_notes: delivery.pickup_notes || null,
-                                }).eq('email', institution.email);
-                                setInstitution(i => ({ ...i, default_pickup_hours: delivery.pickup_hours || null, default_pickup_notes: delivery.pickup_notes || null }));
-                                setGlobalInstitution(i => i ? { ...i, default_pickup_hours: delivery.pickup_hours || null, default_pickup_notes: delivery.pickup_notes || null } : i);
-                                showToast('Standard gemt ✓');
-                              }} style={{ display:'flex', alignItems:'center', gap:6, background:GREEN_TINT, border:`1px solid ${PRIMARY}`, borderRadius:99, padding:'6px 14px', fontSize:12, fontWeight:700, color:PRIMARY, cursor:'pointer', fontFamily:FONT, alignSelf:'flex-start' }}>
-                                💾 Sæt som standard til fremtidige opslag
-                              </button>
-                            ) : !institution?.default_pickup_hours ? (
-                              <div style={{ fontSize:12, color:INK3, fontFamily:FONT, display:'flex', alignItems:'center', gap:6 }}>
-                                Ingen standard sat —{' '}
-                                <button type="button" onClick={() => router.push('/profil/rediger')} style={{ background:'none', border:'none', cursor:'pointer', fontSize:12, fontWeight:700, color:PRIMARY, padding:0, fontFamily:FONT }}>
-                                  sæt det i din profil →
-                                </button>
-                              </div>
-                            ) : null}
-                          </div>
-                        )}
-                      </div>
-
-                      {/* 2: Pakke */}
+                      {/* Pakke (valgfri) */}
                       <div style={{ borderRadius:14, border:`1.5px solid ${delivery.shipping ? '#2563EB' : PAPER3}`, background: delivery.shipping ? '#EFF6FF' : '#fff', overflow:'hidden', transition:'all 0.15s' }}>
                         <button type="button" onClick={()=>setDelivery(d=>({...d, shipping:!d.shipping}))}
                           style={{ display:'flex', alignItems:'center', gap:12, width:'100%', padding:'13px 16px', background:'transparent', border:'none', cursor:'pointer', textAlign:'left' }}>
@@ -846,33 +771,6 @@ export default function OpretOpslagPage() {
                         )}
                       </div>
 
-                      {/* 3: Individuel */}
-                      <div style={{ borderRadius:14, border:`1.5px solid ${delivery.custom ? '#D97706' : PAPER3}`, background: delivery.custom ? '#FFFBEB' : '#fff', overflow:'hidden', transition:'all 0.15s' }}>
-                        <button type="button" onClick={()=>setDelivery(d=>({...d, custom:!d.custom}))}
-                          style={{ display:'flex', alignItems:'center', gap:12, width:'100%', padding:'13px 16px', background:'transparent', border:'none', cursor:'pointer', textAlign:'left' }}>
-                          <div style={{ width:20, height:20, borderRadius:5, border:`2px solid ${delivery.custom ? '#D97706' : PAPER3}`, background:delivery.custom ? '#D97706' : 'transparent', display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0 }}>
-                            {delivery.custom && <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>}
-                          </div>
-                          <div style={{ flex:1 }}>
-                            <div style={{ fontFamily:FONT, fontWeight:700, fontSize:14, color: delivery.custom ? '#D97706' : INK }}>🤝 Vi aftaler levering individuelt</div>
-                            <div style={{ fontSize:12, color:INK3, marginTop:1 }}>Mødes halvvejs, I leverer selv, eller andet — aftales i chatten</div>
-                          </div>
-                        </button>
-                        {delivery.custom && (
-                          <div style={{ padding:'0 16px 16px' }}>
-                            <label style={{ ...labelStyle, fontSize:12, marginBottom:4 }}>Beskrivelse <span style={{ fontWeight:400, color:INK3 }}>(valgfri)</span></label>
-                            <input value={delivery.custom_notes} onChange={e=>setDelivery(d=>({...d,custom_notes:e.target.value}))}
-                              placeholder="Fx: Vi kan levere inden for 10 km, eller mødes i Aarhus midtby" style={{ ...inputStyle, fontSize:13, padding:'9px 12px' }} />
-                          </div>
-                        )}
-                      </div>
-
-                      {/* Validering */}
-                      {!delivery.pickup && !delivery.shipping && !delivery.custom && (
-                        <div style={{ fontSize:12, color:'#B91C1C', fontFamily:FONT, fontWeight:600, padding:'6px 2px' }}>
-                          ⚠️ Vælg mindst én leveringsmulighed
-                        </div>
-                      )}
                     </div>
                   </div>
                 )}
