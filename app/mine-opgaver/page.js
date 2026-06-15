@@ -305,7 +305,7 @@ export default function MineOpgaverPage() {
       const { data } = await db.from('conversations')
         .select('id,listing_title,listing_emoji,listing_color,listing_image,initiator_name,is_handled,handled_action,deal_completed,deal_type,delivery_method,shipment_id,last_message_at,owner_name,initiator_institution_id')
         .or(parts.join(','))
-        .in('deal_type', ['byt', 'bundle'])
+        .in('deal_type', ['byt', 'bundle', 'køb'])
         .order('last_message_at', { ascending: false })
         .limit(100);
       setChatTasks(data || []);
