@@ -75,6 +75,7 @@ export default function OpretOpslagPage() {
   const [aiImproving, setAiImproving] = useState(false);
   const [aiSuggestion, setAiSuggestion] = useState(null);
   const [aiFilledFields, setAiFilledFields] = useState({ title: false, description: false });
+  const [priceSuggestion, setPriceSuggestion] = useState(null); // { basis, comparable_count, suggested_min, suggested_max, suggested_price }
   const [aiApply, setAiApply] = useState({ title: true, description: true });
   const [aiRegenerating, setAiRegenerating] = useState({ title: false, description: false });
   const [institution, setInstitution] = useState(ctxInstitution || null);
@@ -353,8 +354,11 @@ export default function OpretOpslagPage() {
         condition: json.condition || f.condition,
         age_group: json.age_group || f.age_group,
         description: json.description || f.description,
+        // Forudfyld pris med forslaget (kun for køb, og kun hvis feltet er tomt)
+        price: (f.type === 'køb' && !f.price && json.price?.suggested_price) ? String(json.price.suggested_price) : f.price,
       }));
       setAiFilledFields({ title: !!json.title, description: !!json.description });
+      setPriceSuggestion(json.price || null);
       const preview = URL.createObjectURL(file);
       setImgFiles(prev => prev.length < 6 ? [file, ...prev] : prev);
       setImgPreviews(prev => prev.length < 6 ? [preview, ...prev] : prev);
@@ -679,6 +683,13 @@ export default function OpretOpslagPage() {
                   <div>
                     <label style={labelStyle}>Pris (kr.) <span style={{ color:'#e53e3e' }}>*</span></label>
                     <input type="number" value={form.price} onChange={e=>setForm({...form,price:e.target.value})} placeholder="Fx 250" min="1" style={{ ...inputStyle, border:`1.5px solid ${!form.price?'#FCA5A5':PAPER3}` }} />
+                    {priceSuggestion?.suggested_min != null && (
+                      <div style={{ marginTop:6, display:'flex', alignItems:'center', gap:6, fontFamily:FONT, fontSize:12, color:INK3 }}>
+                        <span>✨</span>
+                        <span>Foreslået: <strong style={{ color:INK }}>{priceSuggestion.suggested_min}–{priceSuggestion.suggested_max} kr.</strong></span>
+                        <span style={{ color:INK3 }}>· {priceSuggestion.basis === 'median' ? `baseret på ${priceSuggestion.comparable_count} lignende varer` : 'AI-estimat'}</span>
+                      </div>
+                    )}
                   </div>
                 )}
                 {form.type === 'byd' && (
