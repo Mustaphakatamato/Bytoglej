@@ -17,14 +17,21 @@ function fmtKr(n) {
 
 // Vælg den billigste carrier blandt options for en given type (prefix 'parcel_shop' | 'home').
 // Bruger live-priser når de er hentet, ellers tabel-estimatet.
+// Når live-priser er hentet springes carriers der fejlede (null/0) over — fx en carrier
+// der ikke er aktiveret på Shipmondo-kontoen — så de ikke vælges på et forkert estimat.
 function cheapestOption(options, livePricesForName, prefix) {
   if (!options?.length) return null;
+  const haveLive = livePricesForName && Object.keys(livePricesForName).length > 0;
   let best = null, bestPrice = Infinity;
   for (const opt of options) {
     const method = `${prefix}_${opt.carrier_code}`;
-    const price = livePricesForName?.[method] ?? opt.price_dkk;
+    const live = livePricesForName?.[method];
+    if (haveLive && (live == null || live <= 0)) continue; // carrier utilgængelig live
+    const price = live ?? opt.price_dkk;
     if (price != null && price < bestPrice) { bestPrice = price; best = opt; }
   }
+  // Hvis alle live-priser fejlede, fald tilbage til billigste estimat.
+  if (!best) best = options[0];
   return best;
 }
 
