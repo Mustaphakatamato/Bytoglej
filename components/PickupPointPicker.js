@@ -40,7 +40,7 @@ export default function PickupPointPicker({ points, cheapestCarrier, onConfirm, 
 
     if (!mapInstanceRef.current) {
       mapInstanceRef.current = L.map(mapRef.current, { center, zoom: 12, zoomControl: true, scrollWheelZoom: true });
-      L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', { attribution: '© OpenStreetMap © CARTO', maxZoom: 19 }).addTo(mapInstanceRef.current);
+      L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', { attribution: '© OpenStreetMap © CARTO', maxZoom: 19 }).addTo(mapInstanceRef.current);
       markersRef.current = L.layerGroup().addTo(mapInstanceRef.current);
       // Fit til alle punkter
       if (valid.length > 1) {
@@ -64,23 +64,24 @@ export default function PickupPointPicker({ points, cheapestCarrier, onConfirm, 
   useEffect(() => {
     if (!mapInstanceRef.current || !markersRef.current) return;
     const L = require('leaflet');
-    const LOGO = { pdk: '/carriers/postnord.svg', gls: '/carriers/gls.svg', dao: '/carriers/dao.svg' };
+    // Kompakte brandfarvede mærker (Vinted-stil) — kun carrier-mærke, ingen pris.
+    const MARK = { pdk: { bg: '#005CB9', txt: 'pn' }, gls: { bg: '#06038D', txt: 'GLS' }, dao: { bg: '#E2001A', txt: 'dao' } };
     markersRef.current.clearLayers();
     points.forEach(p => {
       if (p.lat == null || p.lng == null) return;
       const isSel = p.id === selectedId;
-      const color = CARRIER_COLOR[p.carrier_code] || PRIMARY;
+      const m = MARK[p.carrier_code] || { bg: PRIMARY, txt: p.carrier_name };
+      const size = isSel ? 30 : 24;
       const html = `<div style="
-        display:flex;align-items:center;gap:4px;
-        background:#fff;border:2px solid ${isSel ? PRIMARY : color};border-radius:999px;
-        padding:3px 7px;white-space:nowrap;box-shadow:0 2px 8px rgba(0,0,0,0.28);
-        font-family:${FONT};font-size:11px;font-weight:800;color:${INK};cursor:pointer;
-        transform:${isSel ? 'scale(1.14)' : 'scale(1)'};transition:transform .12s;
-      ">
-        <img src="${LOGO[p.carrier_code] || ''}" height="11" style="height:11px;width:auto;display:block"/>
-        ${p.price != null ? `<span>${fmtKr(p.price).replace(' kr.', '')}</span>` : ''}
-      </div>`;
-      const icon = L.divIcon({ className: '', html, iconAnchor: [22, 12] });
+        width:${size}px;height:${size}px;border-radius:7px;
+        background:${m.bg};color:#fff;border:2px solid #fff;
+        box-shadow:0 2px 6px rgba(0,0,0,0.35)${isSel ? `,0 0 0 3px ${PRIMARY}` : ''};
+        display:flex;align-items:center;justify-content:center;
+        font-family:${FONT};font-weight:800;font-size:${p.carrier_code === 'gls' ? 9 : 10}px;
+        letter-spacing:-0.02em;cursor:pointer;transition:all .12s;
+        text-transform:${p.carrier_code === 'dao' ? 'lowercase' : 'none'};
+      ">${m.txt}</div>`;
+      const icon = L.divIcon({ className: '', html, iconAnchor: [size / 2, size / 2] });
       L.marker([p.lat, p.lng], { icon, zIndexOffset: isSel ? 1000 : 0 }).addTo(markersRef.current)
         .on('click', (e) => { L.DomEvent.stopPropagation(e); setSelectedId(p.id); });
     });
