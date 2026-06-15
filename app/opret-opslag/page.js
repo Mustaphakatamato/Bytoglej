@@ -96,7 +96,6 @@ export default function OpretOpslagPage() {
   const [delivery, setDelivery] = useState({
     shipping: false, weight_g: null,
   });
-  const [hoveredBand, setHoveredBand] = useState(null);
   const [deliveryDefaultApplied, setDeliveryDefaultApplied] = useState(false);
 
   useEffect(() => {
@@ -733,24 +732,16 @@ export default function OpretOpslagPage() {
                                   { weight_g: 20000, label: '15–20 kg', examples: 'Elektrisk elbil, mindre trampolin' },
                                 ].map(band => {
                                   const sel = delivery.weight_g === band.weight_g;
-                                  const hovered = hoveredBand === band.weight_g;
                                   return (
-                                    <div key={band.weight_g} style={{ position:'relative' }}>
-                                      <button type="button"
-                                        onClick={() => setDelivery(d => ({ ...d, weight_g: band.weight_g }))}
-                                        onMouseEnter={() => setHoveredBand(band.weight_g)}
-                                        onMouseLeave={() => setHoveredBand(null)}
-                                        style={{ width:'100%', display:'flex', alignItems:'center', gap:8, padding:'10px 12px', borderRadius:10, border:`1.5px solid ${sel ? '#2563EB' : PAPER3}`, background: sel ? '#EFF6FF' : '#fff', cursor:'pointer', textAlign:'left', transition:'all 0.12s' }}>
-                                        <div style={{ width:14, height:14, borderRadius:'50%', border:`2px solid ${sel ? '#2563EB' : PAPER3}`, background: sel ? '#2563EB' : 'transparent', flexShrink:0 }} />
-                                        <span style={{ fontFamily:FONT, fontWeight:600, fontSize:13, color: sel ? '#2563EB' : INK }}>{band.label}</span>
-                                      </button>
-                                      {hovered && (
-                                        <div style={{ position:'absolute', bottom:'calc(100% + 6px)', left:'50%', transform:'translateX(-50%)', background:'#1e293b', color:'#fff', borderRadius:8, padding:'6px 10px', fontSize:11, fontFamily:FONT, whiteSpace:'nowrap', zIndex:100, pointerEvents:'none', boxShadow:'0 2px 8px rgba(0,0,0,0.18)' }}>
-                                          {band.examples}
-                                          <div style={{ position:'absolute', top:'100%', left:'50%', transform:'translateX(-50%)', width:0, height:0, borderLeft:'5px solid transparent', borderRight:'5px solid transparent', borderTop:'5px solid #1e293b' }} />
-                                        </div>
-                                      )}
-                                    </div>
+                                    <button key={band.weight_g} type="button"
+                                      onClick={() => setDelivery(d => ({ ...d, weight_g: band.weight_g }))}
+                                      style={{ display:'flex', alignItems:'flex-start', gap:8, padding:'10px 12px', borderRadius:10, border:`1.5px solid ${sel ? '#2563EB' : PAPER3}`, background: sel ? '#EFF6FF' : '#fff', cursor:'pointer', textAlign:'left', transition:'all 0.12s' }}>
+                                      <div style={{ width:14, height:14, borderRadius:'50%', border:`2px solid ${sel ? '#2563EB' : PAPER3}`, background: sel ? '#2563EB' : 'transparent', flexShrink:0, marginTop:2 }} />
+                                      <div>
+                                        <div style={{ fontFamily:FONT, fontWeight:600, fontSize:13, color: sel ? '#2563EB' : INK }}>{band.label}</div>
+                                        <div style={{ fontFamily:FONT, fontSize:11, color:INK3, marginTop:2, lineHeight:1.4 }}>{band.examples}</div>
+                                      </div>
+                                    </button>
                                   );
                                 })}
                               </div>
