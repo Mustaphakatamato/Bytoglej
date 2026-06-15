@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation';
 import { PRIMARY, GREEN_DEEP, GREEN_SOFT, GREEN_TINT, PAPER, PAPER2, PAPER3, INK, INK2, INK3, CORAL, SKY, TYPE_CFG, FONT } from '@/lib/constants';
 import { useWindowWidth, useDebounce, useFeedListings } from '@/lib/hooks';
 import { SkeletonCard } from '@/components/ui';
-import ListingCard from '@/components/ListingCard';
+import ListingCard, { calcServiceFee, BuyerProtectionPopup } from '@/components/ListingCard';
 import PullToRefresh from '@/components/PullToRefresh';
 import { useApp } from '@/providers/AppProvider';
 import { db } from '@/lib/supabase';
@@ -20,6 +20,7 @@ function MobileCard({ listing, onClick, favs, toggleFav }) {
   const isFav = favs.includes(listing.id);
   const [popping, setPopping] = useState(false);
   const [imgIdx, setImgIdx] = useState(0);
+  const [showFeePopup, setShowFeePopup] = useState(false);
   const imgs = listing.images?.length ? listing.images : [];
   const hasMultiple = imgs.length > 1;
   const startX = useRef(0);
@@ -73,12 +74,22 @@ function MobileCard({ listing, onClick, favs, toggleFav }) {
       <div style={{ padding: '8px 10px 10px' }}>
         <div style={{ fontFamily: FONT, fontWeight: 700, fontSize: 13, color: INK, lineHeight: 1.3, marginBottom: 4, overflow: 'hidden', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical' }}>{listing.title}</div>
         {listing.price
-          ? <div style={{ display:'flex', alignItems:'baseline', gap:5, flexWrap:'wrap' }}>
-              {listing.original_price && listing.original_price > listing.price && (
-                <span style={{ fontFamily:FONT, fontWeight:700, fontSize:12, color:INK3, textDecoration:'line-through' }}>{listing.original_price} kr.</span>
-              )}
-              <span style={{ fontFamily:FONT, fontWeight:800, fontSize:15, color: listing.original_price && listing.original_price > listing.price ? '#e11d48' : INK }}>{listing.price} kr.</span>
-            </div>
+          ? (() => {
+              const fee = calcServiceFee(listing.price);
+              const total = listing.price + fee;
+              return (
+                <div>
+                  <div style={{ fontFamily:FONT, fontSize:11, color:INK3, marginBottom:1 }}>{listing.price} kr.</div>
+                  <div style={{ display:'flex', alignItems:'center', gap:4 }}>
+                    <span style={{ fontFamily:FONT, fontWeight:800, fontSize:14, color:INK }}>{total.toFixed(2).replace('.',',')} kr. inkl.</span>
+                    <button onClick={e=>{ e.stopPropagation(); setShowFeePopup(true); }} style={{ background:'none', border:'none', padding:0, cursor:'pointer', display:'flex', alignItems:'center', flexShrink:0 }}>
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none"><path d="M12 2L4 6v6c0 5.25 3.5 10.15 8 11.35C16.5 22.15 20 17.25 20 12V6L12 2z" fill="#2D6A4F" opacity="0.85"/><path d="M9 12l2 2 4-4" stroke="#fff" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"/></svg>
+                    </button>
+                  </div>
+                  {showFeePopup && <BuyerProtectionPopup price={listing.price} fee={fee} image={listing.images?.[0]} emoji={listing.emoji} onClose={() => setShowFeePopup(false)} />}
+                </div>
+              );
+            })()
           : <div style={{ fontFamily: FONT, fontWeight: 700, fontSize: 12, color: CORAL }}>Byttes kun</div>}
         {listing.condition && <div style={{ fontSize: 11, color: INK3, marginTop: 2 }}>{listing.condition}</div>}
       </div>
