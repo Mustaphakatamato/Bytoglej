@@ -557,7 +557,10 @@ export default function CartPage() {
                 {/* Delivery method — afhentning er altid en mulighed */}
                 {(
                   <div style={{ padding: '16px 20px', borderBottom: `1px solid ${PAPER2}` }}>
-                    <div style={{ fontFamily: FONT, fontWeight: 700, fontSize: 14, color: INK, marginBottom: 12 }}>Leveringsmulighed</div>
+                    <div style={{ fontFamily: FONT, fontWeight: 700, fontSize: 14, color: INK, marginBottom: 4 }}>Leveringsmulighed</div>
+                    <div style={{ fontFamily: FONT, fontSize: 12, color: INK3, marginBottom: 12, display: 'flex', alignItems: 'center', gap: 5 }}>
+                      <span>ℹ️</span><span>Porto beregnes ud fra pakkens størrelse og vægt</span>
+                    </div>
 
                     {canPickup && (
                       <RadioRow
