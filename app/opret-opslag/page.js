@@ -94,8 +94,9 @@ export default function OpretOpslagPage() {
   // Afhentning er altid muligt (håndteres i kurven). Her vælger sælger kun om
   // der også tilbydes forsendelse, og i så fald størrelse + porto-håndtering.
   const [delivery, setDelivery] = useState({
-    shipping: false, weight_kg: '',
+    shipping: false, weight_g: null,
   });
+  const [hoveredBand, setHoveredBand] = useState(null);
   const [deliveryDefaultApplied, setDeliveryDefaultApplied] = useState(false);
 
   useEffect(() => {
@@ -110,27 +111,27 @@ export default function OpretOpslagPage() {
     });
   }, []);
 
-  // Smart defaults for delivery based on category (weight_kg hint for auto-suggestion)
+  // Smart defaults for delivery based on category (weight_g in grams)
   const CATEGORY_DELIVERY = {
-    'books':               { pickup:true, shipping:true,  weight_kg: 0.8  },
-    'puzzles':             { pickup:true, shipping:true,  weight_kg: 0.8  },
-    'board-games':         { pickup:true, shipping:true,  weight_kg: 1.5  },
-    'plush-small':         { pickup:true, shipping:true,  weight_kg: 0.5  },
-    'plush-large':         { pickup:true, shipping:true,  weight_kg: 1.5  },
-    'wooden-toys':         { pickup:true, shipping:true,  weight_kg: 2.0  },
-    'plastic-toys-small':  { pickup:true, shipping:true,  weight_kg: 0.8  },
-    'plastic-toys-medium': { pickup:true, shipping:true,  weight_kg: 2.0  },
-    'plastic-toys-large':  { pickup:true, shipping:false, weight_kg: 6.0  },
-    'construction-toys':   { pickup:true, shipping:true,  weight_kg: 3.0  },
+    'books':               { pickup:true, shipping:true,  weight_g: 1000  },
+    'puzzles':             { pickup:true, shipping:true,  weight_g: 1000  },
+    'board-games':         { pickup:true, shipping:true,  weight_g: 5000  },
+    'plush-small':         { pickup:true, shipping:true,  weight_g: 1000  },
+    'plush-large':         { pickup:true, shipping:true,  weight_g: 5000  },
+    'wooden-toys':         { pickup:true, shipping:true,  weight_g: 5000  },
+    'plastic-toys-small':  { pickup:true, shipping:true,  weight_g: 1000  },
+    'plastic-toys-medium': { pickup:true, shipping:true,  weight_g: 5000  },
+    'plastic-toys-large':  { pickup:true, shipping:false, weight_g: 10000 },
+    'construction-toys':   { pickup:true, shipping:true,  weight_g: 5000  },
     'outdoor-toys':        { pickup:true, shipping:false                   },
     'ride-on-toys':        { pickup:true, shipping:false                   },
-    'electronic-toys':     { pickup:true, shipping:true,  weight_kg: 2.0  },
+    'electronic-toys':     { pickup:true, shipping:true,  weight_g: 5000  },
     'children-furniture':  { pickup:true, shipping:false                   },
-    'baby-equipment':      { pickup:true, shipping:true,  weight_kg: 3.0  },
-    'musical-instruments': { pickup:true, shipping:true,  weight_kg: 2.0  },
+    'baby-equipment':      { pickup:true, shipping:true,  weight_g: 5000  },
+    'musical-instruments': { pickup:true, shipping:true,  weight_g: 5000  },
     'sports-equipment':    { pickup:true, shipping:false                   },
-    'costumes-roleplay':   { pickup:true, shipping:true,  weight_kg: 1.0  },
-    'art-craft-supplies':  { pickup:true, shipping:true,  weight_kg: 0.8  },
+    'costumes-roleplay':   { pickup:true, shipping:true,  weight_g: 1000  },
+    'art-craft-supplies':  { pickup:true, shipping:true,  weight_g: 1000  },
     'other':               { pickup:true, shipping:false                   },
   };
 
@@ -141,9 +142,8 @@ export default function OpretOpslagPage() {
     setDelivery(prev => ({
       ...prev,
       shipping: d.shipping ?? prev.shipping,
-      weight_kg: d.weight_kg != null ? String(d.weight_kg) : prev.weight_kg,
+      weight_g: d.weight_g ?? prev.weight_g,
     }));
-
     setDeliveryDefaultApplied(true);
   }, [form.category]);
 
@@ -405,7 +405,7 @@ export default function OpretOpslagPage() {
     if (!form.title.trim()) return;
     if (form.type === 'køb' && !String(form.price).trim()) { showToast('Angiv en pris for køb-opslag', 'error'); return; }
     if (!form.description.trim()) { showToast('Tilføj en beskrivelse', 'error'); return; }
-    if (delivery.shipping && !delivery.weight_kg) { showToast('Angiv pakkens vægt for forsendelse', 'error'); return; }
+    if (delivery.shipping && !delivery.weight_g) { showToast('Vælg pakkevægt for forsendelse', 'error'); return; }
     setSaving(true);
     try {
     const { data:{ user } } = await db.auth.getUser();
@@ -442,7 +442,7 @@ export default function OpretOpslagPage() {
         allow_pickup: true,      // afhentning er altid muligt — køber aftaler direkte
         allow_shipping: delivery.shipping,
         allow_custom: false,
-        shipping_size_category: delivery.shipping && delivery.weight_kg ? String(Math.round(parseFloat(delivery.weight_kg) * 1000)) : null,
+        shipping_size_category: delivery.shipping && delivery.weight_g ? String(delivery.weight_g) : null,
         shipping_included_in_price: false,
       });
     }
@@ -724,15 +724,35 @@ export default function OpretOpslagPage() {
                           <div style={{ padding:'0 16px 16px', display:'flex', flexDirection:'column', gap:12 }}>
                             <div>
                               <label style={{ ...labelStyle, fontSize:12, marginBottom:6 }}>Hvad vejer pakken ca.?</label>
-                              <div style={{ display:'flex', alignItems:'center', gap:8 }}>
-                                <input
-                                  type="number" min="0.1" max="20" step="0.1"
-                                  value={delivery.weight_kg}
-                                  onChange={e => setDelivery(d => ({ ...d, weight_kg: e.target.value }))}
-                                  placeholder="fx 1.5"
-                                  style={{ width:90, padding:'8px 10px', borderRadius:8, border:`1.5px solid ${PAPER3}`, fontFamily:FONT, fontSize:14, outline:'none' }}
-                                />
-                                <span style={{ fontFamily:FONT, fontSize:13, color:INK3 }}>kg</span>
+                              <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:6 }}>
+                                {[
+                                  { weight_g: 1000,  label: '0–1 kg',   examples: 'Lille bog, puslespil, lille bamse' },
+                                  { weight_g: 5000,  label: '1–5 kg',   examples: 'Brætspil, LEGO-sæt, mellemstor bamse' },
+                                  { weight_g: 10000, label: '5–10 kg',  examples: 'Kasse med LEGO, større boldspil' },
+                                  { weight_g: 15000, label: '10–15 kg', examples: 'Stor legetøjskasse, trampolin-dele' },
+                                  { weight_g: 20000, label: '15–20 kg', examples: 'Større legesæt, løbecykel' },
+                                ].map(band => {
+                                  const sel = delivery.weight_g === band.weight_g;
+                                  const hovered = hoveredBand === band.weight_g;
+                                  return (
+                                    <div key={band.weight_g} style={{ position:'relative' }}>
+                                      <button type="button"
+                                        onClick={() => setDelivery(d => ({ ...d, weight_g: band.weight_g }))}
+                                        onMouseEnter={() => setHoveredBand(band.weight_g)}
+                                        onMouseLeave={() => setHoveredBand(null)}
+                                        style={{ width:'100%', display:'flex', alignItems:'center', gap:8, padding:'10px 12px', borderRadius:10, border:`1.5px solid ${sel ? '#2563EB' : PAPER3}`, background: sel ? '#EFF6FF' : '#fff', cursor:'pointer', textAlign:'left', transition:'all 0.12s' }}>
+                                        <div style={{ width:14, height:14, borderRadius:'50%', border:`2px solid ${sel ? '#2563EB' : PAPER3}`, background: sel ? '#2563EB' : 'transparent', flexShrink:0 }} />
+                                        <span style={{ fontFamily:FONT, fontWeight:600, fontSize:13, color: sel ? '#2563EB' : INK }}>{band.label}</span>
+                                      </button>
+                                      {hovered && (
+                                        <div style={{ position:'absolute', bottom:'calc(100% + 6px)', left:'50%', transform:'translateX(-50%)', background:'#1e293b', color:'#fff', borderRadius:8, padding:'6px 10px', fontSize:11, fontFamily:FONT, whiteSpace:'nowrap', zIndex:100, pointerEvents:'none', boxShadow:'0 2px 8px rgba(0,0,0,0.18)' }}>
+                                          {band.examples}
+                                          <div style={{ position:'absolute', top:'100%', left:'50%', transform:'translateX(-50%)', width:0, height:0, borderLeft:'5px solid transparent', borderRight:'5px solid transparent', borderTop:'5px solid #1e293b' }} />
+                                        </div>
+                                      )}
+                                    </div>
+                                  );
+                                })}
                               </div>
                             </div>
                             <div style={{ background:'#EFF6FF', borderRadius:10, padding:'10px 14px', fontSize:13, color:'#1D4ED8', fontFamily:FONT, fontWeight:600 }}>
