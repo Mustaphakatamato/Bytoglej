@@ -15,6 +15,19 @@ function fmtKr(n) {
   return `${Number(n || 0).toFixed(2).replace('.', ',')} kr.`;
 }
 
+// Vælg den billigste carrier blandt options for en given type (prefix 'parcel_shop' | 'home').
+// Bruger live-priser når de er hentet, ellers tabel-estimatet.
+function cheapestOption(options, livePricesForName, prefix) {
+  if (!options?.length) return null;
+  let best = null, bestPrice = Infinity;
+  for (const opt of options) {
+    const method = `${prefix}_${opt.carrier_code}`;
+    const price = livePricesForName?.[method] ?? opt.price_dkk;
+    if (price != null && price < bestPrice) { bestPrice = price; best = opt; }
+  }
+  return best;
+}
+
 function RadioRow({ chosen, value, onChoose, icon, label, sublabel, price, estimate, loading, isFree }) {
   const active = chosen === value;
   return (
@@ -515,39 +528,53 @@ export default function CartPage() {
                       />
                     )}
 
-                    {canShip && (quote?.parcel_shop?.options ?? []).map(opt => (
-                      <RadioRow
-                        key={opt.product_code}
-                        chosen={ds.method} value={`parcel_shop_${opt.carrier_code}`}
-                        onChoose={() => {
-                          const lp = livePrices[name]?.[`parcel_shop_${opt.carrier_code}`];
-                          setDeliveryState(p => ({ ...p, [name]: { ...p[name], method: `parcel_shop_${opt.carrier_code}`, price: lp ?? opt.price_dkk, pickupPoint: null, selectedCarrier: opt.carrier_code } }));
-                          loadPickupPoints(name, opt.carrier_code);
-                        }}
-                        icon="📦" label={opt.label}
-                        sublabel="Afhent på pakkeshop nær dig"
-                        price={livePrices[name]?.[`parcel_shop_${opt.carrier_code}`]}
-                        estimate={opt.price_dkk}
-                        loading={(livePricesLoading[name] || (quotesLoading && !quote)) && livePrices[name]?.[`parcel_shop_${opt.carrier_code}`] == null}
-                      />
-                    ))}
+                    {canShip && (() => {
+                      // Køber får automatisk den billigste carrier — intet carrier-valg.
+                      const cheapestParcel = cheapestOption(quote?.parcel_shop?.options, livePrices[name], 'parcel_shop');
+                      const cheapestHome   = cheapestOption(quote?.home_delivery?.options, livePrices[name], 'home');
+                      const loadingPrice = (n, m) => (livePricesLoading[n] || (quotesLoading && !quote)) && livePrices[n]?.[m] == null;
+                      return (
+                        <>
+                          {cheapestParcel && (() => {
+                            const method = `parcel_shop_${cheapestParcel.carrier_code}`;
+                            const lp = livePrices[name]?.[method];
+                            return (
+                              <RadioRow
+                                chosen={ds.method} value={method}
+                                onChoose={() => {
+                                  setDeliveryState(p => ({ ...p, [name]: { ...p[name], method, price: lp ?? cheapestParcel.price_dkk, pickupPoint: null, selectedCarrier: cheapestParcel.carrier_code } }));
+                                  loadPickupPoints(name, cheapestParcel.carrier_code);
+                                }}
+                                icon="📦" label="Pakkeshop"
+                                sublabel="Afhent på pakkeshop nær dig"
+                                price={lp}
+                                estimate={cheapestParcel.price_dkk}
+                                loading={loadingPrice(name, method)}
+                              />
+                            );
+                          })()}
 
-                    {canShip && (quote?.home_delivery?.options ?? []).map(opt => (
-                      <RadioRow
-                        key={opt.product_code}
-                        chosen={ds.method} value={`home_${opt.carrier_code}`}
-                        onChoose={() => {
-                          const lp = livePrices[name]?.[`home_${opt.carrier_code}`];
-                          setDeliveryState(p => ({ ...p, [name]: { ...p[name], method: `home_${opt.carrier_code}`, price: lp ?? opt.price_dkk, pickupPoint: null } }));
-                          if (lp == null) fetchLivePrice(name, `home_${opt.carrier_code}`, null);
-                        }}
-                        icon="🏠" label={opt.label}
-                        sublabel={institution ? [institution.address, institution.zipcode, institution.city].filter(Boolean).join(', ') : 'Leveres til institutionens adresse'}
-                        price={livePrices[name]?.[`home_${opt.carrier_code}`]}
-                        estimate={opt.price_dkk}
-                        loading={(livePricesLoading[name] || (quotesLoading && !quote)) && livePrices[name]?.[`home_${opt.carrier_code}`] == null}
-                      />
-                    ))}
+                          {cheapestHome && (() => {
+                            const method = `home_${cheapestHome.carrier_code}`;
+                            const lp = livePrices[name]?.[method];
+                            return (
+                              <RadioRow
+                                chosen={ds.method} value={method}
+                                onChoose={() => {
+                                  setDeliveryState(p => ({ ...p, [name]: { ...p[name], method, price: lp ?? cheapestHome.price_dkk, pickupPoint: null } }));
+                                  if (lp == null) fetchLivePrice(name, method, null);
+                                }}
+                                icon="🏠" label="Hjemlevering"
+                                sublabel={institution ? [institution.address, institution.zipcode, institution.city].filter(Boolean).join(', ') : 'Leveres til institutionens adresse'}
+                                price={lp}
+                                estimate={cheapestHome.price_dkk}
+                                loading={loadingPrice(name, method)}
+                              />
+                            );
+                          })()}
+                        </>
+                      );
+                    })()}
 
                   </div>
                 )}
