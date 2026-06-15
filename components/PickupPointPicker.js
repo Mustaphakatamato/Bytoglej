@@ -13,12 +13,36 @@ function translateDay(h) {
   return String(h).replace(/^(\w+):/, (_, d) => `${DAYS_DA[d] || d}:`);
 }
 
+function fmtDist(m) {
+  if (m == null) return null;
+  return m < 1000 ? `${m} m` : `${(m / 1000).toFixed(1).replace('.', ',')} km`;
+}
+
+// Kompakt brandfarvet mærke (Vinted-stil). active = valgt eller hover.
+const MARK = { pdk: { bg: '#005CB9', txt: 'pn' }, gls: { bg: '#06038D', txt: 'GLS' }, dao: { bg: '#E2001A', txt: 'dao' } };
+function makeMarkerIcon(L, p, active) {
+  const m = MARK[p.carrier_code] || { bg: PRIMARY, txt: p.carrier_name };
+  const size = active ? 30 : 24;
+  const html = `<div style="
+    width:${size}px;height:${size}px;border-radius:7px;
+    background:${m.bg};color:#fff;border:2px solid #fff;
+    box-shadow:0 2px 6px rgba(0,0,0,0.35)${active ? `,0 0 0 3px ${PRIMARY}` : ''};
+    display:flex;align-items:center;justify-content:center;
+    font-family:${FONT};font-weight:800;font-size:${p.carrier_code === 'gls' ? 9 : 10}px;
+    letter-spacing:-0.02em;cursor:pointer;transition:all .12s;
+    text-transform:${p.carrier_code === 'dao' ? 'lowercase' : 'none'};
+  ">${m.txt}</div>`;
+  return L.divIcon({ className: '', html, iconAnchor: [size / 2, size / 2] });
+}
+
 // Vinted-lignende kort-vælger: viser udleveringssteder fra alle carriers på et kort
-// + en liste. Køber vælger ét sted (og dermed carrier). Billigste fremhæves.
-export default function PickupPointPicker({ points, cheapestCarrier, onConfirm, onClose, addressLabel }) {
+// + en liste sorteret efter afstand. Køber vælger ét sted (og dermed carrier).
+export default function PickupPointPicker({ points, cheapestCarrier, buyerCoords, onConfirm, onClose, addressLabel }) {
   const [mounted, setMounted] = useState(false);
   const [selectedId, setSelectedId] = useState(null);
+  const [hoveredId, setHoveredId] = useState(null);
   const [expanded, setExpanded] = useState(false);
+  const markerByIdRef = useRef({});
   const mapRef = useRef(null);
   const mapInstanceRef = useRef(null);
   const markersRef = useRef(null);
@@ -66,32 +90,41 @@ export default function PickupPointPicker({ points, cheapestCarrier, onConfirm, 
     };
   }, [mounted]); // eslint-disable-line
 
-  // Tegn/opdater markers når kortet er klar eller valg ændres
+  // Tegn markers når kortet er klar / valg ændres. Gemmer refs til hurtig hover-opdatering.
   useEffect(() => {
     if (!mapInstanceRef.current || !markersRef.current) return;
     const L = require('leaflet');
-    // Kompakte brandfarvede mærker (Vinted-stil) — kun carrier-mærke, ingen pris.
-    const MARK = { pdk: { bg: '#005CB9', txt: 'pn' }, gls: { bg: '#06038D', txt: 'GLS' }, dao: { bg: '#E2001A', txt: 'dao' } };
     markersRef.current.clearLayers();
+    markerByIdRef.current = {};
+    // Køber-markør (blå prik)
+    if (buyerCoords?.lat != null) {
+      const userHtml = `<div style="width:14px;height:14px;border-radius:50%;background:#3B82F6;border:3px solid #fff;box-shadow:0 0 0 3px rgba(59,130,246,0.35),0 2px 6px rgba(0,0,0,0.25)"></div>`;
+      L.marker([buyerCoords.lat, buyerCoords.lng], { icon: L.divIcon({ className: '', html: userHtml, iconAnchor: [7, 7] }), zIndexOffset: 500 })
+        .addTo(markersRef.current).bindTooltip('Din adresse', { direction: 'top' });
+    }
     points.forEach(p => {
       if (p.lat == null || p.lng == null) return;
       const isSel = p.id === selectedId;
-      const m = MARK[p.carrier_code] || { bg: PRIMARY, txt: p.carrier_name };
-      const size = isSel ? 30 : 24;
-      const html = `<div style="
-        width:${size}px;height:${size}px;border-radius:7px;
-        background:${m.bg};color:#fff;border:2px solid #fff;
-        box-shadow:0 2px 6px rgba(0,0,0,0.35)${isSel ? `,0 0 0 3px ${PRIMARY}` : ''};
-        display:flex;align-items:center;justify-content:center;
-        font-family:${FONT};font-weight:800;font-size:${p.carrier_code === 'gls' ? 9 : 10}px;
-        letter-spacing:-0.02em;cursor:pointer;transition:all .12s;
-        text-transform:${p.carrier_code === 'dao' ? 'lowercase' : 'none'};
-      ">${m.txt}</div>`;
-      const icon = L.divIcon({ className: '', html, iconAnchor: [size / 2, size / 2] });
-      L.marker([p.lat, p.lng], { icon, zIndexOffset: isSel ? 1000 : 0 }).addTo(markersRef.current)
+      const marker = L.marker([p.lat, p.lng], { icon: makeMarkerIcon(L, p, isSel), zIndexOffset: isSel ? 1000 : 0 })
+        .addTo(markersRef.current)
         .on('click', (e) => { L.DomEvent.stopPropagation(e); setSelectedId(p.id); });
+      markerByIdRef.current[p.id] = marker;
     });
-  }, [points, selectedId, mounted]);
+  }, [points, selectedId, mounted, buyerCoords]);
+
+  // Hover: fremhæv kun den berørte markør (uden at gentegne alle).
+  useEffect(() => {
+    if (!mapInstanceRef.current) return;
+    const L = require('leaflet');
+    const m = markerByIdRef.current[hoveredId];
+    const p = points.find(x => x.id === hoveredId);
+    if (m && p) { m.setIcon(makeMarkerIcon(L, p, true)); m.setZIndexOffset(1200); }
+    return () => {
+      const m2 = markerByIdRef.current[hoveredId];
+      const p2 = points.find(x => x.id === hoveredId);
+      if (m2 && p2) { m2.setIcon(makeMarkerIcon(L, p2, p2.id === selectedId)); m2.setZIndexOffset(p2.id === selectedId ? 1000 : 0); }
+    };
+  }, [hoveredId]); // eslint-disable-line
 
   // Pan til valgt punkt
   useEffect(() => {
@@ -101,9 +134,12 @@ export default function PickupPointPicker({ points, cheapestCarrier, onConfirm, 
 
   if (!mounted) return null;
 
+  // Sortér efter afstand fra køberens adresse (nærmeste først). Fald tilbage til pris.
   const sorted = [...points].sort((a, b) => {
-    if (a.price == null) return 1; if (b.price == null) return -1;
-    return a.price - b.price;
+    if (a.distance_m != null && b.distance_m != null) return a.distance_m - b.distance_m;
+    if (a.distance_m != null) return -1;
+    if (b.distance_m != null) return 1;
+    return (a.price ?? 9e9) - (b.price ?? 9e9);
   });
 
   return createPortal(
@@ -113,7 +149,7 @@ export default function PickupPointPicker({ points, cheapestCarrier, onConfirm, 
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '16px 20px', borderBottom: `1px solid ${PAPER2}` }}>
           <div>
             <div style={{ fontFamily: FONT, fontWeight: 800, fontSize: 17, color: INK }}>Vælg et afhentningssted</div>
-            {addressLabel && <div style={{ fontFamily: FONT, fontSize: 12, color: INK3, marginTop: 2 }}>Nær {addressLabel}</div>}
+            {addressLabel && <div style={{ fontFamily: FONT, fontSize: 12, color: INK3, marginTop: 2, display: 'flex', alignItems: 'center', gap: 5 }}><span>📍</span>{addressLabel} · sorteret efter afstand</div>}
           </div>
           <button onClick={onClose} style={{ width: 32, height: 32, borderRadius: '50%', border: 'none', background: PAPER2, color: INK2, fontSize: 16, cursor: 'pointer', flexShrink: 0 }}>✕</button>
         </div>
@@ -129,15 +165,21 @@ export default function PickupPointPicker({ points, cheapestCarrier, onConfirm, 
               const isSel = p.id === selectedId;
               const isCheapest = p.carrier_code === cheapestCarrier && p.price != null;
               return (
-                <button key={p.id} type="button" onClick={() => setSelectedId(p.id)}
-                  style={{ width: '100%', textAlign: 'left', padding: '12px 16px', border: 'none', borderBottom: `1px solid ${PAPER3}`, borderLeft: `3px solid ${isSel ? PRIMARY : 'transparent'}`, background: isSel ? GREEN_TINT : '#fff', cursor: 'pointer', display: 'flex', flexDirection: 'column', gap: 4 }}>
+                <button key={p.id} type="button"
+                  onClick={() => setSelectedId(p.id)}
+                  onMouseEnter={() => setHoveredId(p.id)}
+                  onMouseLeave={() => setHoveredId(h => h === p.id ? null : h)}
+                  style={{ width: '100%', textAlign: 'left', padding: '12px 16px', border: 'none', borderBottom: `1px solid ${PAPER3}`, borderLeft: `3px solid ${isSel ? PRIMARY : 'transparent'}`, background: isSel ? GREEN_TINT : (hoveredId === p.id ? '#FAFAF7' : '#fff'), cursor: 'pointer', display: 'flex', flexDirection: 'column', gap: 4 }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                     <CarrierLogo carrier={p.carrier_code} />
                     {isCheapest && <span style={{ fontSize: 10, fontWeight: 800, color: '#059669', background: '#D1FAE5', borderRadius: 99, padding: '1px 7px' }}>BILLIGST</span>}
                     <span style={{ marginLeft: 'auto', fontFamily: FONT, fontWeight: 800, fontSize: 14, color: INK }}>{p.price != null ? fmtKr(p.price) : '—'}</span>
                   </div>
                   <div style={{ fontFamily: FONT, fontWeight: 700, fontSize: 13, color: isSel ? PRIMARY : INK }}>{p.name}</div>
-                  <div style={{ fontFamily: FONT, fontSize: 12, color: INK3 }}>{p.address}</div>
+                  <div style={{ fontFamily: FONT, fontSize: 12, color: INK3, display: 'flex', justifyContent: 'space-between', gap: 8 }}>
+                    <span style={{ minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{p.address}</span>
+                    {fmtDist(p.distance_m) && <span style={{ flexShrink: 0, fontWeight: 600 }}>{fmtDist(p.distance_m)}</span>}
+                  </div>
                 </button>
               );
             })}

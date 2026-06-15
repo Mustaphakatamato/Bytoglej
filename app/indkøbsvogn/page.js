@@ -261,7 +261,7 @@ export default function CartPage() {
         body: JSON.stringify({ zip, sizeCategory: size, sellerName, buyerInstitutionId: institutionId }),
       });
       const json = await res.json();
-      setPickerData(p => ({ ...p, [sellerName]: { loading: false, points: json.points || [], cheapest_carrier: json.cheapest_carrier } }));
+      setPickerData(p => ({ ...p, [sellerName]: { loading: false, points: json.points || [], cheapest_carrier: json.cheapest_carrier, buyer_coords: json.buyer_coords } }));
     } catch {
       setPickerData(p => ({ ...p, [sellerName]: { loading: false, points: [], error: true } }));
     }
@@ -814,7 +814,8 @@ export default function CartPage() {
         : <PickupPointPicker
             points={pickerData[pickerFor]?.points || []}
             cheapestCarrier={pickerData[pickerFor]?.cheapest_carrier}
-            addressLabel={[institution?.zipcode, institution?.city].filter(Boolean).join(' ') || null}
+            buyerCoords={pickerData[pickerFor]?.buyer_coords || null}
+            addressLabel={[institution?.address, [institution?.zipcode, institution?.city].filter(Boolean).join(' ')].filter(Boolean).join(', ') || null}
             onConfirm={(pt) => confirmPickupPoint(pickerFor, pt)}
             onClose={() => setPickerFor(null)}
           />

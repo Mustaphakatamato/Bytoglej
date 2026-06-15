@@ -22,6 +22,25 @@ const MOCK_POINTS = [
   { id: 'pp-dao-1', carrier_code: 'dao', carrier_name: 'dao', name: 'Spar Karlslunde', address: 'Karlslunde Centervej 1, 2690 Karlslunde', lat: 55.5602, lng: 12.2210, opening_hours: ['Man-Søn: 07-20'], distance_m: 1200, price: 48.0 },
 ];
 
+function haversineM(lat1, lon1, lat2, lon2) {
+  const R = 6371000, toRad = x => x * Math.PI / 180;
+  const dLat = toRad(lat2 - lat1), dLon = toRad(lon2 - lon1);
+  const a = Math.sin(dLat / 2) ** 2 + Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLon / 2) ** 2;
+  return Math.round(2 * R * Math.asin(Math.sqrt(a)));
+}
+
+async function geocode(address, zip, city) {
+  try {
+    const q = encodeURIComponent(`${address || ''}, ${zip || ''} ${city || ''}, Denmark`);
+    const r = await fetch(`https://nominatim.openstreetmap.org/search?q=${q}&format=json&limit=1`, {
+      headers: { 'User-Agent': 'bytogleg/1.0 (forsendelse)' },
+    });
+    const d = await r.json();
+    if (d?.[0]) return { lat: parseFloat(d[0].lat), lng: parseFloat(d[0].lon) };
+  } catch { /* geocoding er best-effort */ }
+  return null;
+}
+
 async function fetchPoints(carrierCode, zipcode, qty) {
   try {
     const params = new URLSearchParams({ zipcode, country_code: 'DK', carrier_code: carrierCode, quantity: String(qty) });
@@ -92,10 +111,18 @@ export async function POST(req) {
   }));
 
   const points = perCarrier.flat().filter(p => p.lat != null && p.lng != null);
+
+  // Geokod køberens adresse → beregn afstand til hver shop, så listen kan sortere på nærhed.
+  const buyerCoords = await geocode(buyer?.address, buyer?.zipcode || zip, buyer?.city);
+  if (buyerCoords) {
+    for (const p of points) p.distance_m = haversineM(buyerCoords.lat, buyerCoords.lng, p.lat, p.lng);
+  }
+
   const cheapest = points.filter(p => p.price != null).sort((a, b) => a.price - b.price)[0] ?? null;
 
   return NextResponse.json({
     points,
+    buyer_coords: buyerCoords,
     cheapest_carrier: cheapest?.carrier_code ?? null,
     cheapest_price:   cheapest?.price ?? null,
   });
