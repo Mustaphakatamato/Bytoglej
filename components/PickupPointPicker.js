@@ -60,27 +60,31 @@ export default function PickupPointPicker({ points, cheapestCarrier, onConfirm, 
     };
   }, [mounted]); // eslint-disable-line
 
-  // Tegn/opdater markers når valg ændres
+  // Tegn/opdater markers når kortet er klar eller valg ændres
   useEffect(() => {
     if (!mapInstanceRef.current || !markersRef.current) return;
     const L = require('leaflet');
+    const LOGO = { pdk: '/carriers/postnord.svg', gls: '/carriers/gls.svg', dao: '/carriers/dao.svg' };
     markersRef.current.clearLayers();
     points.forEach(p => {
       if (p.lat == null || p.lng == null) return;
       const isSel = p.id === selectedId;
       const color = CARRIER_COLOR[p.carrier_code] || PRIMARY;
       const html = `<div style="
-        background:${isSel ? PRIMARY : '#fff'};color:${isSel ? '#fff' : color};
-        border:2px solid ${isSel ? PRIMARY : color};border-radius:999px;
-        padding:3px 8px;font-size:11px;font-weight:800;white-space:nowrap;
-        box-shadow:0 2px 8px rgba(0,0,0,0.25);font-family:${FONT};cursor:pointer;
-        transform:${isSel ? 'scale(1.12)' : 'scale(1)'};transition:transform .12s;
-      ">${p.price != null ? fmtKr(p.price).replace(' kr.', '') : p.carrier_name}</div>`;
-      const icon = L.divIcon({ className: '', html, iconAnchor: [0, 0] });
-      L.marker([p.lat, p.lng], { icon }).addTo(markersRef.current)
+        display:flex;align-items:center;gap:4px;
+        background:#fff;border:2px solid ${isSel ? PRIMARY : color};border-radius:999px;
+        padding:3px 7px;white-space:nowrap;box-shadow:0 2px 8px rgba(0,0,0,0.28);
+        font-family:${FONT};font-size:11px;font-weight:800;color:${INK};cursor:pointer;
+        transform:${isSel ? 'scale(1.14)' : 'scale(1)'};transition:transform .12s;
+      ">
+        <img src="${LOGO[p.carrier_code] || ''}" height="11" style="height:11px;width:auto;display:block"/>
+        ${p.price != null ? `<span>${fmtKr(p.price).replace(' kr.', '')}</span>` : ''}
+      </div>`;
+      const icon = L.divIcon({ className: '', html, iconAnchor: [22, 12] });
+      L.marker([p.lat, p.lng], { icon, zIndexOffset: isSel ? 1000 : 0 }).addTo(markersRef.current)
         .on('click', (e) => { L.DomEvent.stopPropagation(e); setSelectedId(p.id); });
     });
-  }, [points, selectedId]);
+  }, [points, selectedId, mounted]);
 
   // Pan til valgt punkt
   useEffect(() => {
