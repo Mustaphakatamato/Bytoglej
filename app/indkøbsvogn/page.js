@@ -8,6 +8,7 @@ import { useWindowWidth } from '@/lib/hooks';
 import { CATEGORIES } from '@/lib/categories';
 import { authedFetch } from '@/lib/authed-fetch';
 import CarrierLogo from '@/components/CarrierLogo';
+import PickupPointPicker from '@/components/PickupPointPicker';
 
 // ── Helpers ────────────────────────────────────────────────────
 
@@ -122,6 +123,9 @@ export default function CartPage() {
 
   // Pickup points: sellerName → { loading, points, chosen }
   const [pickupState, setPickupState] = useState({});
+  // Vinted-lignende kort-vælger: hvilken sælger er åben + cachede punkter på tværs af carriers
+  const [pickerFor, setPickerFor] = useState(null);
+  const [pickerData, setPickerData] = useState({}); // { [sellerName]: { loading, points, cheapest_carrier, error } }
 
   // Load shipping_options + listings.can_ship + price quotes
   useEffect(() => {
@@ -240,6 +244,36 @@ export default function CartPage() {
     setDeliveryState(p => ({ ...p, [sellerName]: { ...p[sellerName], pickupPoint: point } }));
     const method = deliveryState[sellerName]?.method;
     if (method) fetchLivePrice(sellerName, method, point.id);
+  }
+
+  // Åbner kort-vælgeren og henter udleveringssteder fra alle carriers (cachet pr. sælger).
+  async function openPickupPicker(sellerName) {
+    setPickerFor(sellerName);
+    if (pickerData[sellerName]?.points?.length) return;
+    setPickerData(p => ({ ...p, [sellerName]: { loading: true, points: [] } }));
+    const group = groups.find(g => g.ownerInstitutionName === sellerName);
+    const firstLid = group?.items?.[0]?.listingId;
+    const size = shippingOptions[firstLid]?.shipping_size_category || 'medium';
+    const zip = institution?.zipcode || institution?.zip_code || '2100';
+    try {
+      const res = await authedFetch('/api/shipping/pickup-points-all', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ zip, sizeCategory: size, sellerName, buyerInstitutionId: institutionId }),
+      });
+      const json = await res.json();
+      setPickerData(p => ({ ...p, [sellerName]: { loading: false, points: json.points || [], cheapest_carrier: json.cheapest_carrier } }));
+    } catch {
+      setPickerData(p => ({ ...p, [sellerName]: { loading: false, points: [], error: true } }));
+    }
+  }
+
+  // Kaldes når køber bekræfter et udleveringssted i kort-vælgeren — sætter carrier + pris + punkt.
+  function confirmPickupPoint(sellerName, point) {
+    const method = `parcel_shop_${point.carrier_code}`;
+    const chosen = { id: point.id, name: point.name, address: point.address, carrier_code: point.carrier_code };
+    setDeliveryState(p => ({ ...p, [sellerName]: { ...p[sellerName], method, price: point.price, pickupPoint: chosen, selectedCarrier: point.carrier_code } }));
+    setPickupState(p => ({ ...p, [sellerName]: { ...p[sellerName], chosen } }));
+    setPickerFor(null);
   }
 
   // Henter den eksakte Shipmondo-pris så kurven matcher det checkout opkræver.
@@ -547,21 +581,19 @@ export default function CartPage() {
                       return (
                         <>
                           {cheapestParcel && (() => {
-                            const method = `parcel_shop_${cheapestParcel.carrier_code}`;
-                            const lp = livePrices[name]?.[method];
+                            const isParcel = ds.method?.startsWith('parcel_shop_');
+                            const shownCarrier = ds.selectedCarrier || cheapestParcel.carrier_code;
+                            const cheapestLp = livePrices[name]?.[`parcel_shop_${cheapestParcel.carrier_code}`];
                             return (
                               <RadioRow
-                                chosen={ds.method} value={method}
-                                onChoose={() => {
-                                  setDeliveryState(p => ({ ...p, [name]: { ...p[name], method, price: lp ?? cheapestParcel.price_dkk, pickupPoint: null, selectedCarrier: cheapestParcel.carrier_code } }));
-                                  loadPickupPoints(name, cheapestParcel.carrier_code);
-                                }}
+                                chosen={isParcel ? ds.method : null} value={`parcel_shop_${shownCarrier}`}
+                                onChoose={() => openPickupPicker(name)}
                                 icon="📦" label="Pakkeshop"
-                                carrierBadge={<CarrierLogo carrier={cheapestParcel.carrier_code} />}
-                                sublabel="Billigste fragt — afhent på pakkeshop nær dig"
-                                price={lp}
+                                carrierBadge={<CarrierLogo carrier={shownCarrier} />}
+                                sublabel={ds.pickupPoint ? `📍 ${ds.pickupPoint.name}` : 'Vælg afhentningssted nær dig'}
+                                price={isParcel ? ds.price : cheapestLp}
                                 estimate={cheapestParcel.price_dkk}
-                                loading={loadingPrice(name, method)}
+                                loading={loadingPrice(name, `parcel_shop_${cheapestParcel.carrier_code}`)}
                               />
                             );
                           })()}
@@ -592,42 +624,20 @@ export default function CartPage() {
                   </div>
                 )}
 
-                {/* Pickup point selector */}
+                {/* Valgt afhentningssted (vælges i kort-modalen) */}
                 {ds.method?.startsWith('parcel_shop_') && (
                   <div style={{ padding: '0 20px 16px', borderBottom: `1px solid ${PAPER2}` }}>
-                    <div style={{ fontFamily: FONT, fontWeight: 700, fontSize: 13, color: INK, marginBottom: 10 }}>
-                      Leveringsoplysninger
-                    </div>
-                    {ps.loading ? (
-                      <div style={{ padding: '12px 14px', borderRadius: 12, background: PAPER2, fontFamily: FONT, fontSize: 13, color: INK3 }}>Henter pakkeshops…</div>
-                    ) : ps.error ? (
-                      <div style={{ padding: '12px 14px', borderRadius: 12, background: '#FEF2F2', border: '1px solid #FCA5A5', fontFamily: FONT, fontSize: 12, color: '#DC2626' }}>
-                        Kunne ikke hente pakkeshops: {ps.error}
-                        <button onClick={() => loadPickupPoints(name)} style={{ marginLeft: 8, fontFamily: FONT, fontSize: 12, color: PRIMARY, background: 'none', border: 'none', cursor: 'pointer', textDecoration: 'underline' }}>Prøv igen</button>
-                      </div>
-                    ) : ps.points?.length ? (
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-                        {ps.points.map(pt => (
-                          <button key={pt.id} type="button" onClick={() => choosePickupPoint(name, pt)} style={{
-                            display: 'flex', alignItems: 'center', gap: 10, padding: '10px 14px', borderRadius: 12,
-                            border: `1.5px solid ${ps.chosen?.id === pt.id ? PRIMARY : PAPER3}`,
-                            background: ps.chosen?.id === pt.id ? GREEN_TINT : '#fff',
-                            cursor: 'pointer', textAlign: 'left', transition: 'all 0.12s',
-                          }}>
-                            <span style={{ fontSize: 16 }}>📍</span>
-                            <div style={{ flex: 1, minWidth: 0 }}>
-                              <div style={{ fontFamily: FONT, fontWeight: 700, fontSize: 13, color: ps.chosen?.id === pt.id ? PRIMARY : INK }}>{pt.name}</div>
-                              <div style={{ fontFamily: FONT, fontSize: 11, color: INK3, marginTop: 1 }}>{pt.address}</div>
-                              {pt.distance_m && <div style={{ fontFamily: FONT, fontSize: 11, color: INK3 }}>{pt.distance_m < 1000 ? `${pt.distance_m} m` : `${(pt.distance_m / 1000).toFixed(1)} km`} væk</div>}
-                            </div>
-                            {ps.chosen?.id === pt.id && (
-                              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke={PRIMARY} strokeWidth="2.5" strokeLinecap="round"><polyline points="20 6 9 17 4 12"/></svg>
-                            )}
-                          </button>
-                        ))}
+                    {ds.pickupPoint ? (
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '12px 14px', borderRadius: 12, border: `1.5px solid ${PRIMARY}`, background: GREEN_TINT }}>
+                        <span style={{ fontSize: 16 }}>📍</span>
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                          <div style={{ fontFamily: FONT, fontWeight: 700, fontSize: 13, color: PRIMARY }}>{ds.pickupPoint.name}</div>
+                          <div style={{ fontFamily: FONT, fontSize: 11, color: INK3, marginTop: 1 }}>{ds.pickupPoint.address}</div>
+                        </div>
+                        <button type="button" onClick={() => openPickupPicker(name)} style={{ flexShrink: 0, fontFamily: FONT, fontSize: 12, fontWeight: 700, color: PRIMARY, background: '#fff', border: `1.5px solid ${PRIMARY}`, borderRadius: 99, padding: '6px 14px', cursor: 'pointer' }}>Skift</button>
                       </div>
                     ) : (
-                      <button type="button" onClick={() => loadPickupPoints(name)} style={{ width: '100%', padding: '12px 14px', borderRadius: 12, border: `1.5px dashed ${PAPER3}`, background: PAPER2, fontFamily: FONT, fontSize: 13, color: INK3, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 8, justifyContent: 'center' }}>
+                      <button type="button" onClick={() => openPickupPicker(name)} style={{ width: '100%', padding: '12px 14px', borderRadius: 12, border: `1.5px dashed ${PAPER3}`, background: PAPER2, fontFamily: FONT, fontSize: 13, fontWeight: 600, color: PRIMARY, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 8, justifyContent: 'center' }}>
                         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke={PRIMARY} strokeWidth="2" strokeLinecap="round"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
                         Vælg et afhentningssted
                       </button>
@@ -793,6 +803,21 @@ export default function CartPage() {
           </button>
         </div>
       </div>
+    )}
+
+    {/* Kort-vælger til afhentningssted (alle carriers) */}
+    {pickerFor && (
+      pickerData[pickerFor]?.loading
+        ? <div style={{ position: 'fixed', inset: 0, background: 'rgba(22,34,28,0.55)', zIndex: 10000, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <div style={{ background: '#fff', borderRadius: 16, padding: '24px 32px', fontFamily: FONT, fontSize: 14, color: INK3 }}>Henter afhentningssteder…</div>
+          </div>
+        : <PickupPointPicker
+            points={pickerData[pickerFor]?.points || []}
+            cheapestCarrier={pickerData[pickerFor]?.cheapest_carrier}
+            addressLabel={[institution?.zipcode, institution?.city].filter(Boolean).join(' ') || null}
+            onConfirm={(pt) => confirmPickupPoint(pickerFor, pt)}
+            onClose={() => setPickerFor(null)}
+          />
     )}
     </>
   );
