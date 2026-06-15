@@ -681,10 +681,14 @@ export default function CartPage() {
               {selectedGroups.map(g => {
                 const ds = deliveryState[g.ownerInstitutionName] || {};
                 if (!ds.method || ds.price == null) return null;
+                const isShip = ds.method?.startsWith('parcel_shop_') || ds.method?.startsWith('home_');
                 const label = ds.method?.startsWith('parcel_shop_') ? 'Pakkeshop' : ds.method?.startsWith('home_') ? 'Hjemlevering' : 'Afhentning';
+                const carrierCode = isShip ? ds.method.replace('parcel_shop_', '').replace('home_', '') : null;
                 return (
-                  <div key={g.ownerInstitutionName} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <span style={{ fontFamily: FONT, fontSize: 14, color: INK2 }}>Levering ({label})</span>
+                  <div key={g.ownerInstitutionName} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8 }}>
+                    <span style={{ fontFamily: FONT, fontSize: 14, color: INK2, display: 'flex', alignItems: 'center', gap: 6, minWidth: 0 }}>
+                      Levering ({label}) {carrierCode && <CarrierLogo carrier={carrierCode} />}
+                    </span>
                     <span style={{ fontFamily: FONT, fontWeight: 600, fontSize: 14, color: ds.price > 0 ? INK : '#16a34a' }}>
                       {ds.price > 0 ? `${ds.price.toFixed(2).replace('.', ',')} kr.` : 'Gratis'}
                     </span>

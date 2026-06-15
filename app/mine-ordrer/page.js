@@ -3,6 +3,7 @@ import { useState, useEffect, useRef, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { db } from '@/lib/supabase';
 import { PRIMARY, GREEN_TINT, INK, INK2, INK3, PAPER, PAPER2, PAPER3, FONT, CORAL } from '@/lib/constants';
+import CarrierLogo from '@/components/CarrierLogo';
 
 const STATUS_CFG = {
   pending:   { label: '⏳ Afventer',   color: INK3,     bg: PAPER2 },
@@ -148,12 +149,19 @@ function OrderCard({ order, onUpdate, autoOpen }) {
                 </div>
               ))}
               <div style={{ marginTop: 6, paddingTop: 6, borderTop: `1px dashed ${PAPER3}` }}>
-                {g.shippingTotal > 0 && (
-                  <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 3 }}>
-                    <span style={{ fontFamily: FONT, fontSize: 12, color: INK3 }}>Levering ({SHIPPING_LABELS[g.shippingMethod] || g.shippingMethod})</span>
-                    <span style={{ fontFamily: FONT, fontSize: 12, color: INK3 }}>{fmtKr(g.shippingTotal)}</span>
-                  </div>
-                )}
+                {g.shippingTotal > 0 && (() => {
+                  const carrierCode = g.shippingMethod?.startsWith('parcel_shop_') || g.shippingMethod?.startsWith('home_')
+                    ? g.shippingMethod.replace('parcel_shop_', '').replace('home_', '') : null;
+                  const typeLabel = g.shippingMethod?.startsWith('parcel_shop_') ? 'Pakkeshop' : g.shippingMethod?.startsWith('home_') ? 'Hjemlevering' : (SHIPPING_LABELS[g.shippingMethod] || g.shippingMethod);
+                  return (
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8, marginBottom: 3 }}>
+                      <span style={{ fontFamily: FONT, fontSize: 12, color: INK3, display: 'flex', alignItems: 'center', gap: 6 }}>
+                        Levering ({typeLabel}) {carrierCode && <CarrierLogo carrier={carrierCode} />}
+                      </span>
+                      <span style={{ fontFamily: FONT, fontSize: 12, color: INK3 }}>{fmtKr(g.shippingTotal)}</span>
+                    </div>
+                  );
+                })()}
                 <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                   <span style={{ fontFamily: FONT, fontSize: 12, color: INK3 }}>Bytogleg beskyttelse</span>
                   <span style={{ fontFamily: FONT, fontSize: 12, color: INK3 }}>{fmtKr(g.serviceFee)}</span>
