@@ -324,13 +324,13 @@ export default function ProfilPage() {
                 {bundleTiers.map((tier, idx) => (
                   <div key={idx} style={{ display:'flex', alignItems:'center', gap:12, padding:'12px 14px', background:'#f8f7f5', borderRadius:12, border:'1px solid #e8e5e1' }}>
                     <div style={{ flex:1 }}>
-                      <div style={{ fontSize:12, color:INK3, marginBottom:4 }}>Artikler</div>
+                      <div style={{ fontSize:12, color:INK3, marginBottom:4 }}>Antal varer</div>
                       <select
                         value={tier.min_items}
                         onChange={e => setBundleTiers(ts => ts.map((t, i) => i === idx ? { ...t, min_items: Number(e.target.value) } : t))}
                         style={{ width:'100%', padding:'8px 10px', borderRadius:8, border:'1.5px solid #e5e5e5', fontSize:14, fontFamily:FONT, background:'#fff', outline:'none' }}
                       >
-                        {[2,3,4,5,6,7,8,9,10].map(n => <option key={n} value={n}>{n} artikler</option>)}
+                        {[2,3,4,5,6,7,8,9,10].map(n => <option key={n} value={n}>{n} varer</option>)}
                       </select>
                     </div>
                     <div style={{ flex:1 }}>
