@@ -780,47 +780,6 @@ function CtaBanner() {
   );
 }
 
-/* ── Shipping info banner ─────────────────────────────────── */
-function ShippingBanner({ isMobile }) {
-  const [visible, setVisible] = useState(false);
-  useEffect(() => {
-    if (typeof window !== 'undefined' && !localStorage.getItem('shipping_banner_dismissed')) {
-      setVisible(true);
-    }
-  }, []);
-  if (!visible) return null;
-  function dismiss() {
-    setVisible(false);
-    localStorage.setItem('shipping_banner_dismissed', '1');
-  }
-  return (
-    <div style={{
-      position: 'fixed',
-      bottom: isMobile ? 'calc(58px + env(safe-area-inset-bottom, 0px))' : 24,
-      left: isMobile ? 0 : '50%',
-      right: isMobile ? 0 : undefined,
-      transform: isMobile ? undefined : 'translateX(-50%)',
-      zIndex: 850,
-      background: '#fff',
-      borderTop: isMobile ? '1px solid rgba(22,34,28,0.10)' : undefined,
-      borderRadius: isMobile ? 0 : 12,
-      boxShadow: isMobile ? '0 -2px 12px rgba(22,34,28,0.08)' : '0 4px 24px rgba(22,34,28,0.14)',
-      padding: '12px 16px',
-      display: 'flex',
-      alignItems: 'center',
-      gap: 10,
-      minWidth: isMobile ? undefined : 320,
-    }}>
-      <span style={{ fontFamily: FONT, fontSize: 14, color: INK, flex: 1 }}>
-        🚚 Fragtgebyrer tilføjes ved betaling.
-      </span>
-      <button onClick={dismiss} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '2px 4px', color: INK3, fontSize: 18, lineHeight: 1, flexShrink: 0 }} aria-label="Luk">
-        ×
-      </button>
-    </div>
-  );
-}
-
 /* ── Page ─────────────────────────────────────────────────── */
 export default function HomePage() {
   const router = useRouter();
@@ -850,14 +809,11 @@ export default function HomePage() {
 
   if (isMobile) {
     return (
-      <>
-        <PullToRefresh onRefresh={fetchListings}>
-          <MobileHomeFeed listings={visibleListings} loading={loadingListings} />
-          <HowStepsSection />
-          <MissionSection />
-        </PullToRefresh>
-        <ShippingBanner isMobile />
-      </>
+      <PullToRefresh onRefresh={fetchListings}>
+        <MobileHomeFeed listings={visibleListings} loading={loadingListings} />
+        <HowStepsSection />
+        <MissionSection />
+      </PullToRefresh>
     );
   }
 
@@ -874,7 +830,6 @@ export default function HomePage() {
       <MissionSection />
       <PlatformCO2Stat />
       <CtaBanner />
-      <ShippingBanner isMobile={false} />
     </>
   );
 }
