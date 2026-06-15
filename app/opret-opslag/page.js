@@ -436,7 +436,7 @@ export default function OpretOpslagPage() {
     }
     // Save delivery/shipping options
     if (listing?.id && !isSøges) {
-      await db.from('shipping_options').insert({
+      const { error: soError } = await db.from('shipping_options').insert({
         listing_id: listing.id,
         allow_pickup: true,      // afhentning er altid muligt — køber aftaler direkte
         allow_shipping: delivery.shipping,
@@ -444,6 +444,8 @@ export default function OpretOpslagPage() {
         shipping_size_category: delivery.shipping && delivery.weight_g ? String(delivery.weight_g) : null,
         shipping_included_in_price: false,
       });
+      // Fejl her må ikke være tavs — ellers mister opslaget sin vægt/forsendelse uden advarsel.
+      if (soError) console.error('shipping_options insert error:', soError);
     }
     if (imgFiles.length > 0) {
       const urls = [];
