@@ -53,6 +53,7 @@ export function AppProvider({ children }) {
   const [adminInst,       setAdminInst]       = useState(null);
   const [allInstitutions, setAllInstitutions] = useState([]);
   const [listings,        setListings]        = useState([]);
+  const [hiddenInstNames, setHiddenInstNames] = useState(new Set());
   const [refreshSeed,     setRefreshSeed]     = useState(0);
   const [loadingListings, setLoadingListings] = useState(true);
   const [loadingMore,     setLoadingMore]     = useState(false);
@@ -123,16 +124,20 @@ export function AppProvider({ children }) {
 
   async function fetchListings() {
     setLoadingListings(true);
-    const { data } = await db.from('listings')
-      .select(LISTING_COLS)
-      .eq('is_active', true)
-      .order('created_at', { ascending: false })
-      .range(0, PAGE_SIZE - 1);
+    const [{ data }, { data: hiddenData }] = await Promise.all([
+      db.from('listings')
+        .select(LISTING_COLS)
+        .eq('is_active', true)
+        .order('created_at', { ascending: false })
+        .range(0, PAGE_SIZE - 1),
+      db.from('institutions').select('name').eq('profile_public', false),
+    ]);
     if (data) {
       setListings(data);
       setHasMore(data.length === PAGE_SIZE);
       listingsOffsetRef.current = data.length;
     }
+    if (hiddenData) setHiddenInstNames(new Set(hiddenData.map(i => i.name)));
     setLoadingListings(false);
     setRefreshSeed(s => s + 1);
   }
@@ -334,7 +339,7 @@ export function AppProvider({ children }) {
     isAdmin, adminInst, setAdminInst,
     allInstitutions,
     pendingApproval,
-    listings, loadingListings, fetchListings, refreshSeed,
+    listings, loadingListings, fetchListings, refreshSeed, hiddenInstNames,
     loadMoreListings, hasMore, loadingMore,
     realUserId, realEmail,
     unreadTotal, fetchUnread,

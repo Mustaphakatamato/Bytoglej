@@ -171,7 +171,7 @@ function levenshtein(a, b) {
 function SearchBar({ transparent, router }) {
   const searchParams = useSearchParams();
   const pathname = usePathname();
-  const { listings: allListings, realUserId, institution } = useApp();
+  const { listings: allListings, realUserId, institution, hiddenInstNames } = useApp();
   const listings = allListings.filter(l =>
     l.user_id !== realUserId && !(institution?.name && l.institution_name === institution.name)
   );
@@ -237,6 +237,7 @@ function SearchBar({ transparent, router }) {
     }
     const instSeen = new Set();
     for (const l of listings) {
+      if (hiddenInstNames?.has(l.institution_name)) continue;
       if (!instSeen.has(l.institution_name) && l.institution_name?.toLowerCase().includes(term)) {
         instSeen.add(l.institution_name);
         tryAdd(institutions, l.institution_name, `/institution/${encodeURIComponent(l.institution_name)}`);
