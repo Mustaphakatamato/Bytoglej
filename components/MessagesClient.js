@@ -12,6 +12,32 @@ import { calculateCO2Savings } from '@/lib/co2/calculator';
 import { geocodeForCO2, getRoutingDistanceKm } from '@/lib/co2/geocoding';
 const INK2 = '#3A473D';
 
+// Komprimer billede client-side før upload. Forhindrer "object exceeded the
+// maximum allowed size" og gør upload hurtig, men beholder god kvalitet hos
+// modtageren (op til 1600px på længste led, JPEG kvalitet 0.82).
+function compressImage(file, maxPx = 1600, quality = 0.82) {
+  return new Promise(resolve => {
+    if (!file?.type?.startsWith('image/')) { resolve(file); return; }
+    const img = new Image();
+    const url = URL.createObjectURL(file);
+    img.onload = () => {
+      URL.revokeObjectURL(url);
+      const scale = Math.min(1, maxPx / Math.max(img.width, img.height));
+      const canvas = document.createElement('canvas');
+      canvas.width = Math.round(img.width * scale);
+      canvas.height = Math.round(img.height * scale);
+      canvas.getContext('2d').drawImage(img, 0, 0, canvas.width, canvas.height);
+      canvas.toBlob(
+        blob => resolve(blob && blob.size < file.size
+          ? new File([blob], file.name.replace(/\.[^.]+$/, '') + '.jpg', { type: 'image/jpeg' })
+          : file),
+        'image/jpeg', quality);
+    };
+    img.onerror = () => { URL.revokeObjectURL(url); resolve(file); };
+    img.src = url;
+  });
+}
+
 function ConvSwipeRow({ children, enabled, onSwipeLeft, onSwipeRight, leftBg, rightBg, leftLabel, rightLabel }) {
   const [offset, setOffset] = useState(0);
   const [settling, setSettling] = useState(false);
@@ -449,10 +475,11 @@ export default function MessagesClient() {
 
   async function uploadImages(files, convId) {
     const urls = [];
-    for (const file of files) {
-      const ext = file.name.split('.').pop() || 'jpg';
+    for (const rawFile of files) {
+      const file = await compressImage(rawFile);
+      const ext = (file.type === 'image/jpeg') ? 'jpg' : (file.name.split('.').pop() || 'jpg');
       const path = `${convId}/${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`;
-      const { data: uploadData, error } = await db.storage.from('chat-images').upload(path, file, { upsert: true });
+      const { data: uploadData, error } = await db.storage.from('chat-images').upload(path, file, { upsert: true, contentType: file.type });
       if (!error && uploadData) {
         const { data: urlData } = db.storage.from('chat-images').getPublicUrl(uploadData.path ?? path);
         if (urlData?.publicUrl) urls.push(urlData.publicUrl);
