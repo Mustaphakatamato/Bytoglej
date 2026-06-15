@@ -282,6 +282,25 @@ export default function InstitutionPage() {
           )}
         </div>
 
+        {/* Bundlerabat-banner (Vinted-stil) */}
+        {inst?.bundle_discount_enabled && Array.isArray(inst?.bundle_discount_tiers) && inst.bundle_discount_tiers.length > 0 && !selectMode && (() => {
+          const maxPct = Math.max(...inst.bundle_discount_tiers.map(t => t.percent || 0));
+          return (
+            <div style={{ background:'#fff', border:`1px solid ${PAPER3}`, borderRadius:16, padding:isMobile?'14px 16px':'16px 20px', marginBottom:24, display:'flex', alignItems:'center', gap:14, boxShadow:'0 2px 12px rgba(0,0,0,0.04)' }}>
+              <div style={{ width:44, height:44, borderRadius:12, background:GREEN_TINT, display:'flex', alignItems:'center', justifyContent:'center', fontSize:22, flexShrink:0 }}>📦</div>
+              <div style={{ flex:1, minWidth:0 }}>
+                <div style={{ fontFamily:FONT, fontWeight:800, fontSize:isMobile?15:16, color:INK, letterSpacing:'-0.02em' }}>Køb bundle</div>
+                <div style={{ fontFamily:FONT, fontSize:13, color:INK3, marginTop:1 }}>Op til {maxPct}% rabat når du køber flere varer fra {institutionName}</div>
+              </div>
+              {listings.length > 0 && (
+                <button onClick={enterSelectMode} style={{ background:PRIMARY, border:'none', borderRadius:99, padding:isMobile?'10px 16px':'11px 22px', fontFamily:FONT, fontWeight:700, fontSize:isMobile?13:14, color:'#fff', cursor:'pointer', whiteSpace:'nowrap', flexShrink:0 }}>
+                  Lav et bundle
+                </button>
+              )}
+            </div>
+          );
+        })()}
+
         {/* Listings grid */}
         {loading ? (
           <div style={{ textAlign:'center', padding:'40px 0', color:'#bbb' }}>

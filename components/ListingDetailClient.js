@@ -119,6 +119,7 @@ export default function ListingDetailClient() {
   const [reportReason,     setReportReason]     = useState('');
   const [reportNote,       setReportNote]       = useState('');
   const [reportSending,    setReportSending]    = useState(false);
+  const [sellerBundle,     setSellerBundle]     = useState(null);
 
   useEffect(() => {
     if (!listing) return;
@@ -186,6 +187,21 @@ export default function ListingDetailClient() {
         if (!data || data.length < 3) return;
         const avg = data.reduce((s,r) => s + (r.description_score + r.contact_score) / 2, 0) / data.length;
         setTrustScore({ pct: Math.round((avg / 3) * 100), count: data.length });
+      });
+  }, [listing?.institution_name]);
+
+  useEffect(() => {
+    if (!listing?.institution_name) { setSellerBundle(null); return; }
+    db.from('institutions')
+      .select('bundle_discount_enabled, bundle_discount_tiers')
+      .eq('name', listing.institution_name)
+      .maybeSingle()
+      .then(({ data }) => {
+        if (data?.bundle_discount_enabled && Array.isArray(data.bundle_discount_tiers) && data.bundle_discount_tiers.length) {
+          setSellerBundle(data.bundle_discount_tiers);
+        } else {
+          setSellerBundle(null);
+        }
       });
   }, [listing?.institution_name]);
 
@@ -905,6 +921,22 @@ export default function ListingDetailClient() {
       {/* Other listings from same institution */}
       {instListings.length > 0 && (
         <div style={{ maxWidth:1140, margin:'0 auto', padding:isMobile?'24px 16px 40px':'32px 24px 56px' }}>
+          {/* Bundlerabat-banner (Vinted-stil) */}
+          {sellerBundle && !isOwn && (() => {
+            const maxPct = Math.max(...sellerBundle.map(t => t.percent || 0));
+            return (
+              <div style={{ background:'#fff', border:`1px solid ${PAPER3}`, borderRadius:16, padding:isMobile?'14px 16px':'16px 20px', marginBottom:20, display:'flex', alignItems:'center', gap:14 }}>
+                <div style={{ width:44, height:44, borderRadius:12, background:GREEN_TINT, display:'flex', alignItems:'center', justifyContent:'center', fontSize:22, flexShrink:0 }}>📦</div>
+                <div style={{ flex:1, minWidth:0 }}>
+                  <div style={{ fontFamily:FONT, fontWeight:800, fontSize:isMobile?15:16, color:INK, letterSpacing:'-0.02em' }}>Køb bundle</div>
+                  <div style={{ fontFamily:FONT, fontSize:13, color:INK3, marginTop:1 }}>Op til {maxPct}% rabat når du køber flere varer fra {listing.institution_name}</div>
+                </div>
+                <button onClick={()=>goToInstitution(listing.institution_name)} style={{ background:PRIMARY, border:'none', borderRadius:99, padding:isMobile?'10px 16px':'11px 22px', fontFamily:FONT, fontWeight:700, fontSize:isMobile?13:14, color:'#fff', cursor:'pointer', whiteSpace:'nowrap', flexShrink:0 }}>
+                  Lav et bundle
+                </button>
+              </div>
+            );
+          })()}
           <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:20 }}>
             <div>
               <h2 style={{ fontFamily:FONT, fontWeight:800, fontSize:isMobile?18:22, color:INK, marginBottom:4 }}>
