@@ -107,7 +107,16 @@ export default function PickupPointPicker({ points, cheapestCarrier, buyerCoords
       const isSel = p.id === selectedId;
       const marker = L.marker([p.lat, p.lng], { icon: makeMarkerIcon(L, p, isSel), zIndexOffset: isSel ? 1000 : 0 })
         .addTo(markersRef.current)
-        .on('click', (e) => { L.DomEvent.stopPropagation(e); setSelectedId(p.id); });
+        .on('click', (e) => { L.DomEvent.stopPropagation(e); setSelectedId(p.id); })
+        .on('mouseover', () => setHoveredId(p.id))
+        .on('mouseout', () => setHoveredId(h => h === p.id ? null : h));
+      // Lille info-boks ved hover (Vinted-stil): navn + adresse + pris.
+      const tip = `<div style="font-family:${FONT};min-width:140px">
+        <div style="font-weight:800;font-size:12px;color:${INK}">${p.name}</div>
+        <div style="font-size:11px;color:${INK3};margin-top:2px">${p.address}</div>
+        ${p.price != null ? `<div style="font-size:11px;font-weight:700;color:${PRIMARY};margin-top:3px">${fmtKr(p.price)}</div>` : ''}
+      </div>`;
+      marker.bindTooltip(tip, { direction: 'top', offset: [0, -14], opacity: 1, className: 'ltb-pp-tip' });
       markerByIdRef.current[p.id] = marker;
     });
   }, [points, selectedId, mounted, buyerCoords]);
@@ -144,6 +153,10 @@ export default function PickupPointPicker({ points, cheapestCarrier, buyerCoords
 
   return createPortal(
     <div onClick={onClose} style={{ position: 'fixed', inset: 0, background: 'rgba(22,34,28,0.55)', zIndex: 10000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
+      <style>{`
+        .leaflet-tooltip.ltb-pp-tip { background:#fff; border:none; border-radius:10px; box-shadow:0 4px 16px rgba(0,0,0,0.22); padding:8px 11px; }
+        .leaflet-tooltip.ltb-pp-tip:before { border-top-color:#fff; }
+      `}</style>
       <div onClick={e => e.stopPropagation()} style={{ background: '#fff', borderRadius: 20, width: '100%', maxWidth: 920, maxHeight: '90vh', overflow: 'hidden', display: 'flex', flexDirection: 'column', boxShadow: '0 20px 60px rgba(0,0,0,0.3)' }}>
         {/* Header */}
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '16px 20px', borderBottom: `1px solid ${PAPER2}` }}>

@@ -29,15 +29,32 @@ function haversineM(lat1, lon1, lat2, lon2) {
   return Math.round(2 * R * Math.asin(Math.sqrt(a)));
 }
 
-async function geocode(address, zip, city) {
+async function nominatim(q) {
   try {
-    const q = encodeURIComponent(`${address || ''}, ${zip || ''} ${city || ''}, Denmark`);
-    const r = await fetch(`https://nominatim.openstreetmap.org/search?q=${q}&format=json&limit=1`, {
+    const r = await fetch(`https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(q)}&format=json&limit=1`, {
       headers: { 'User-Agent': 'bytogleg/1.0 (forsendelse)' },
     });
     const d = await r.json();
     if (d?.[0]) return { lat: parseFloat(d[0].lat), lng: parseFloat(d[0].lon) };
-  } catch { /* geocoding er best-effort */ }
+  } catch { /* best-effort */ }
+  return null;
+}
+
+async function geocode(address, zip, city) {
+  // Fjern etage/dør-suffiks (fx "3. th.", "st. tv.") der ofte forhindrer et match.
+  const clean = String(address || '')
+    .replace(/,?\s*\d*\.?\s*(sal|tv|th|mf)\.?.*$/i, '')
+    .replace(/,\s*\d+\.\s*$/,'')
+    .trim();
+  // 1) Forsøg fuld (renset) adresse, 2) fald tilbage til postnr + by (centroid).
+  if (clean) {
+    const hit = await nominatim(`${clean}, ${zip || ''} ${city || ''}, Denmark`);
+    if (hit) return hit;
+  }
+  if (zip || city) {
+    const hit = await nominatim(`${zip || ''} ${city || ''}, Denmark`);
+    if (hit) return hit;
+  }
   return null;
 }
 
