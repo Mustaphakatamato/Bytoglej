@@ -36,6 +36,27 @@ export default function RedigerOpslagPage() {
     tags: [], min_bid: '', category: '', subcategory: '',
   });
 
+  // Forsendelse: sælger angiver om pakke kan sendes + vægt (i gram).
+  const [delivery, setDelivery] = useState({ shipping: false, weight_g: 1000 });
+  const [hoveredBand, setHoveredBand] = useState(null);
+
+  // Map en gemt shipping_size_category (vægt-i-gram-streng eller legacy-nøgle) til et vægtbånd i gram.
+  function sizeToWeightG(size) {
+    if (size == null) return 1000;
+    const legacy = { small: 1000, medium: 5000, large: 15000, xlarge: 20000 };
+    if (size in legacy) return legacy[size];
+    const g = parseInt(size, 10);
+    return isNaN(g) ? 1000 : g;
+  }
+
+  const WEIGHT_BANDS_UI = [
+    { weight_g: 1000,  label: '0–1 kg',   examples: 'Lille bamse, børnebog, lille puslespil' },
+    { weight_g: 5000,  label: '1–5 kg',   examples: 'Monopoly, LEGO Classic-sæt, løbecykel' },
+    { weight_g: 10000, label: '5–10 kg',  examples: 'Stort DUPLO-sæt, legetøjskøkken (lille)' },
+    { weight_g: 15000, label: '10–15 kg', examples: 'Træ-køkken, aktivitetsbord, stor DUPLO-kasse' },
+    { weight_g: 20000, label: '15–20 kg', examples: 'Elektrisk elbil, mindre trampolin' },
+  ];
+
   useEffect(() => {
     async function load() {
       const { data: { user } } = await db.auth.getUser();
@@ -50,6 +71,12 @@ export default function RedigerOpslagPage() {
       }
       setListing(l);
       setExistingImgs(l.images || []);
+      // Hent eksisterende forsendelses-indstillinger
+      const { data: so } = await db.from('shipping_options').select('allow_shipping, shipping_size_category').eq('listing_id', id).maybeSingle();
+      setDelivery({
+        shipping: so?.allow_shipping ?? !!l.can_ship,
+        weight_g: sizeToWeightG(so?.shipping_size_category),
+      });
       setForm({
         title: l.title || '',
         type: l.type || 'køb',
@@ -208,10 +235,23 @@ export default function RedigerOpslagPage() {
       category: form.category || null,
       subcategory: form.subcategory || null,
       images: allImages,
+      can_ship: delivery.shipping || false,
     }).eq('id', id);
 
+    if (error) { setSaving(false); showToast('Noget gik galt — prøv igen', 'error'); return; }
+
+    // Gem/opdater forsendelses-indstillinger
+    const { error: soError } = await db.from('shipping_options').upsert({
+      listing_id: id,
+      allow_pickup: true,
+      allow_shipping: delivery.shipping,
+      allow_custom: false,
+      shipping_size_category: delivery.shipping && delivery.weight_g ? String(delivery.weight_g) : null,
+      shipping_included_in_price: false,
+    }, { onConflict: 'listing_id' });
+    if (soError) console.error('shipping_options upsert error:', soError);
+
     setSaving(false);
-    if (error) { showToast('Noget gik galt — prøv igen', 'error'); return; }
 
     // Update original_price separately — fails silently if column doesn't exist yet
     db.from('listings').update({ original_price: originalPrice }).eq('id', id).then(() => {});
@@ -367,6 +407,55 @@ export default function RedigerOpslagPage() {
                   {CONDITIONS.map(c => (
                     <button key={c} onClick={() => setForm({ ...form, condition: c })} style={{ padding: '9px 18px', borderRadius: 99, fontSize: 13, fontWeight: 600, border: form.condition === c ? `2px solid ${PRIMARY}` : '2px solid transparent', background: form.condition === c ? GREEN_TINT : PAPER2, color: form.condition === c ? PRIMARY : INK3, fontFamily: FONT, cursor: 'pointer', transition: 'all 0.12s' }}>{c}</button>
                   ))}
+                </div>
+              </div>
+
+              {/* Forsendelse */}
+              <div>
+                <label style={labelStyle}>Forsendelse</label>
+                <div style={{ borderRadius: 14, border: `1.5px solid ${delivery.shipping ? '#2563EB' : PAPER3}`, background: delivery.shipping ? '#EFF6FF' : '#fff', overflow: 'hidden', transition: 'all 0.15s' }}>
+                  <button type="button" onClick={() => setDelivery(d => ({ ...d, shipping: !d.shipping }))}
+                    style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 10, padding: '14px 16px', background: 'none', border: 'none', cursor: 'pointer', textAlign: 'left' }}>
+                    <div style={{ width: 20, height: 20, borderRadius: 5, border: `2px solid ${delivery.shipping ? '#2563EB' : PAPER3}`, background: delivery.shipping ? '#2563EB' : 'transparent', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                      {delivery.shipping && <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12" /></svg>}
+                    </div>
+                    <div style={{ fontFamily: FONT, fontWeight: 700, fontSize: 14, color: delivery.shipping ? '#2563EB' : INK }}>📦 Vi kan sende med pakke</div>
+                  </button>
+
+                  {delivery.shipping && (
+                    <div style={{ padding: '0 16px 16px', display: 'flex', flexDirection: 'column', gap: 12 }}>
+                      <div>
+                        <label style={{ ...labelStyle, fontSize: 12, marginBottom: 6 }}>Hvad vejer pakken ca.?</label>
+                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6 }}>
+                          {WEIGHT_BANDS_UI.map(band => {
+                            const sel = delivery.weight_g === band.weight_g;
+                            const hovered = hoveredBand === band.weight_g;
+                            return (
+                              <div key={band.weight_g} style={{ position: 'relative' }}>
+                                <button type="button"
+                                  onClick={() => setDelivery(d => ({ ...d, weight_g: band.weight_g }))}
+                                  onMouseEnter={() => setHoveredBand(band.weight_g)}
+                                  onMouseLeave={() => setHoveredBand(null)}
+                                  style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 8, padding: '10px 12px', borderRadius: 10, border: `1.5px solid ${sel ? '#2563EB' : PAPER3}`, background: sel ? '#EFF6FF' : '#fff', cursor: 'pointer', textAlign: 'left', transition: 'all 0.12s' }}>
+                                  <div style={{ width: 14, height: 14, borderRadius: '50%', border: `2px solid ${sel ? '#2563EB' : PAPER3}`, background: sel ? '#2563EB' : 'transparent', flexShrink: 0 }} />
+                                  <span style={{ fontFamily: FONT, fontWeight: 600, fontSize: 13, color: sel ? '#2563EB' : INK }}>{band.label}</span>
+                                </button>
+                                {hovered && (
+                                  <div style={{ position: 'absolute', bottom: 'calc(100% + 6px)', left: '50%', transform: 'translateX(-50%)', background: '#1e293b', color: '#fff', borderRadius: 8, padding: '6px 10px', fontSize: 11, fontFamily: FONT, whiteSpace: 'nowrap', zIndex: 100, pointerEvents: 'none', boxShadow: '0 2px 8px rgba(0,0,0,0.18)' }}>
+                                    {band.examples}
+                                    <div style={{ position: 'absolute', top: '100%', left: '50%', transform: 'translateX(-50%)', width: 0, height: 0, borderLeft: '5px solid transparent', borderRight: '5px solid transparent', borderTop: '5px solid #1e293b' }} />
+                                  </div>
+                                )}
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </div>
+                      <div style={{ background: '#EFF6FF', borderRadius: 10, padding: '10px 14px', fontSize: 13, color: '#1D4ED8', fontFamily: FONT, fontWeight: 600 }}>
+                        ℹ️ Prisen du har sat er ekskl. porto — køber betaler den billigste porto oveni ved checkout.
+                      </div>
+                    </div>
+                  )}
                 </div>
               </div>
 
