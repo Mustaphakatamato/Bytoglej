@@ -47,6 +47,13 @@ export default function PickupPointPicker({ points, cheapestCarrier, onConfirm, 
         const b = L.latLngBounds(valid.map(p => [p.lat, p.lng]));
         mapInstanceRef.current.fitBounds(b, { padding: [40, 40] });
       }
+      // Kortet initialiseres inde i et modal hvor containeren endnu ikke har sin endelige
+      // størrelse → tiles placeres forkert (hvide felter). invalidateSize retter layoutet,
+      // når modalen er malet. Kør et par gange for at fange animation/forsinket layout.
+      const fixSize = () => mapInstanceRef.current?.invalidateSize();
+      requestAnimationFrame(fixSize);
+      setTimeout(fixSize, 150);
+      setTimeout(fixSize, 400);
     }
     return () => {
       if (mapInstanceRef.current) { mapInstanceRef.current.remove(); mapInstanceRef.current = null; }
@@ -101,7 +108,7 @@ export default function PickupPointPicker({ points, cheapestCarrier, onConfirm, 
         </div>
 
         {/* Body: liste + kort */}
-        <div style={{ display: 'flex', flex: 1, minHeight: 0 }}>
+        <div style={{ display: 'flex', flex: 1, minHeight: 0, height: 'min(60vh, 540px)' }}>
           {/* Liste */}
           <div style={{ width: 340, maxWidth: '45%', overflowY: 'auto', borderRight: `1px solid ${PAPER2}`, flexShrink: 0 }}>
             {sorted.length === 0 && (
