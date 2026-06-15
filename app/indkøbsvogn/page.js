@@ -7,6 +7,7 @@ import { PRIMARY, GREEN_TINT, GREEN_SOFT, GREEN_DEEP, PAPER, PAPER2, PAPER3, INK
 import { useWindowWidth } from '@/lib/hooks';
 import { CATEGORIES } from '@/lib/categories';
 import { authedFetch } from '@/lib/authed-fetch';
+import CarrierLogo from '@/components/CarrierLogo';
 
 // ── Helpers ────────────────────────────────────────────────────
 
@@ -35,7 +36,7 @@ function cheapestOption(options, livePricesForName, prefix) {
   return best;
 }
 
-function RadioRow({ chosen, value, onChoose, icon, label, sublabel, price, estimate, loading, isFree }) {
+function RadioRow({ chosen, value, onChoose, icon, label, sublabel, price, estimate, loading, isFree, carrierBadge }) {
   const active = chosen === value;
   return (
     <button type="button" onClick={() => onChoose(value)} style={{
@@ -48,7 +49,10 @@ function RadioRow({ chosen, value, onChoose, icon, label, sublabel, price, estim
     }}>
       <span style={{ fontSize: 20, flexShrink: 0 }}>{icon}</span>
       <div style={{ flex: 1, minWidth: 0 }}>
-        <div style={{ fontFamily: FONT, fontWeight: 700, fontSize: 14, color: active ? PRIMARY : INK }}>{label}</div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+          <span style={{ fontFamily: FONT, fontWeight: 700, fontSize: 14, color: active ? PRIMARY : INK }}>{label}</span>
+          {carrierBadge}
+        </div>
         {sublabel && <div style={{ fontFamily: FONT, fontSize: 12, color: INK3, marginTop: 2 }}>{sublabel}</div>}
       </div>
       <div style={{ flexShrink: 0, textAlign: 'right' }}>
@@ -553,7 +557,8 @@ export default function CartPage() {
                                   loadPickupPoints(name, cheapestParcel.carrier_code);
                                 }}
                                 icon="📦" label="Pakkeshop"
-                                sublabel="Afhent på pakkeshop nær dig"
+                                carrierBadge={<CarrierLogo carrier={cheapestParcel.carrier_code} />}
+                                sublabel="Billigste fragt — afhent på pakkeshop nær dig"
                                 price={lp}
                                 estimate={cheapestParcel.price_dkk}
                                 loading={loadingPrice(name, method)}
@@ -572,6 +577,7 @@ export default function CartPage() {
                                   if (lp == null) fetchLivePrice(name, method, null);
                                 }}
                                 icon="🏠" label="Hjemlevering"
+                                carrierBadge={<CarrierLogo carrier={cheapestHome.carrier_code} />}
                                 sublabel={institution ? [institution.address, institution.zipcode, institution.city].filter(Boolean).join(', ') : 'Leveres til institutionens adresse'}
                                 price={lp}
                                 estimate={cheapestHome.price_dkk}
