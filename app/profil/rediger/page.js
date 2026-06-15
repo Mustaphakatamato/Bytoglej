@@ -2,7 +2,7 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { db } from '@/lib/supabase';
-import { PRIMARY, GREEN_DEEP, INK, INK2, INK3, PAPER2, PAPER3, FONT } from '@/lib/constants';
+import { PRIMARY, GREEN_DEEP, GREEN_TINT, INK, INK2, INK3, PAPER, PAPER2, PAPER3, FONT } from '@/lib/constants';
 import { useWindowWidth, geocodeAddress } from '@/lib/hooks';
 import { useApp } from '@/providers/AppProvider';
 import { Btn, Spinner } from '@/components/ui';
@@ -16,6 +16,15 @@ const PW_RULES = [
   { id:'spec',  label:'Mindst ét specialtegn (!@#…)',test: p => /[^A-Za-z0-9]/.test(p) },
 ];
 
+// Sektioner i venstre sidebar — deep-linkes via #hash
+const SECTIONS = [
+  { key:'profil',         label:'Profiloplysninger',  icon:'👤' },
+  { key:'betaling',       label:'Betaling',            icon:'💳' },
+  { key:'bundle',         label:'Bundlerabatter',      icon:'📦' },
+  { key:'notifikationer', label:'Notifikationer',      icon:'🔔' },
+  { key:'sikkerhed',      label:'Sikkerhed',           icon:'🔒' },
+];
+
 function SChoiceGroup({ value, onChange, options, primary }) {
   return (
     <div style={{ display:'flex', gap:8, flexWrap:'wrap' }}>
@@ -25,6 +34,16 @@ function SChoiceGroup({ value, onChange, options, primary }) {
           {o}
         </button>
       ))}
+    </div>
+  );
+}
+
+// Sektionsoverskrift inde i content-panelet
+function SectionHead({ title, desc }) {
+  return (
+    <div style={{ marginBottom:20 }}>
+      <h2 style={{ fontFamily:FONT, fontWeight:800, fontSize:20, color:INK, letterSpacing:'-0.02em', margin:0 }}>{title}</h2>
+      {desc && <p style={{ fontSize:13, color:INK3, lineHeight:1.5, margin:'6px 0 0' }}>{desc}</p>}
     </div>
   );
 }
@@ -42,12 +61,26 @@ function Modal({ title, icon, onClose, children }) {
   );
 }
 
-export default function ProfilPage() {
+export default function IndstillingerPage() {
   const router = useRouter();
   const { effectiveInstitution, setInstitution, adminInst, setAdminInst, showToast } = useApp();
   const institution = effectiveInstitution;
   const ww = useWindowWidth();
-  const isMobile = ww < 768;
+  const isMobile = ww > 0 && ww < 768;
+
+  // Aktiv sektion — initialiseres fra #hash så dropdown kan deep-linke
+  const [section, setSection] = useState('profil');
+  useEffect(() => {
+    const h = typeof window !== 'undefined' ? window.location.hash.replace('#', '') : '';
+    if (h && SECTIONS.some(s => s.key === h)) setSection(h);
+  }, []);
+  function goSection(key) {
+    setSection(key);
+    if (typeof window !== 'undefined') {
+      window.history.replaceState(null, '', `#${key}`);
+      window.scrollTo({ top: 0, behavior: 'instant' });
+    }
+  }
 
   const [form, setForm] = useState({
     institution_type:      institution?.institution_type      || '',
@@ -75,6 +108,13 @@ export default function ProfilPage() {
   const [bundleEnabled, setBundleEnabled] = useState(institution?.bundle_discount_enabled ?? false);
   const [bundleTiers, setBundleTiers] = useState(institution?.bundle_discount_tiers ?? DEFAULT_TIERS);
   const [bundleSaving, setBundleSaving] = useState(false);
+
+  // Notifikationer
+  const [notifPermission, setNotifPermission] = useState('default');
+  const [notifLoading, setNotifLoading] = useState(false);
+  useEffect(() => {
+    if (typeof Notification !== 'undefined') setNotifPermission(Notification.permission);
+  }, []);
 
   useEffect(() => {
     if (!institution) return;
@@ -145,8 +185,7 @@ export default function ProfilPage() {
       });
     }
     onInstChange({ ...institution, ...form, children_count: Number(form.children_count) || null });
-    showToast('Profil opdateret ✓');
-    router.push('/profil');
+    showToast('Ændringer gemt ✓');
   }
 
   async function handleBundleSave() {
@@ -160,6 +199,58 @@ export default function ProfilPage() {
     if (error) { showToast('Noget gik galt', 'error'); return; }
     onInstChange({ ...institution, bundle_discount_enabled: bundleEnabled, bundle_discount_tiers: bundleTiers });
     showToast('Bundlerabatter gemt ✓');
+  }
+
+  async function handleNotifToggle() {
+    if (notifPermission === 'denied') {
+      showToast('Push-notifikationer er blokeret i din browser. Tillad dem i browser-indstillinger for bytogleg.dk og prøv igen.', 'error');
+      return;
+    }
+    if (notifPermission === 'granted') {
+      setNotifLoading(true);
+      try {
+        const reg = await navigator.serviceWorker.ready;
+        const sub = await reg.pushManager.getSubscription();
+        if (sub) {
+          await sub.unsubscribe();
+          const { data: { session } } = await db.auth.getSession();
+          if (session) {
+            await fetch('/api/push-subscribe', {
+              method: 'DELETE',
+              headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session.access_token}` },
+              body: JSON.stringify({ endpoint: sub.endpoint }),
+            });
+          }
+        }
+        setNotifPermission('default');
+        showToast('Notifikationer slået fra');
+      } catch {}
+      setNotifLoading(false);
+      return;
+    }
+    setNotifLoading(true);
+    try {
+      const permission = await Notification.requestPermission();
+      setNotifPermission(permission);
+      if (permission !== 'granted') { setNotifLoading(false); return; }
+      const reg = await navigator.serviceWorker.ready;
+      const vapidKey = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY;
+      if (!vapidKey) { setNotifLoading(false); return; }
+      const pad = '='.repeat((4 - vapidKey.length % 4) % 4);
+      const b64 = (vapidKey + pad).replace(/-/g, '+').replace(/_/g, '/');
+      const key = Uint8Array.from([...window.atob(b64)].map(c => c.charCodeAt(0)));
+      const sub = await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: key });
+      const { data: { session } } = await db.auth.getSession();
+      if (session && sub) {
+        await fetch('/api/push-subscribe', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session.access_token}` },
+          body: JSON.stringify({ subscription: sub }),
+        });
+      }
+      showToast('Notifikationer aktiveret ✓');
+    } catch {}
+    setNotifLoading(false);
   }
 
   async function handleEmailChange() {
@@ -208,203 +299,294 @@ export default function ProfilPage() {
 
   const pwRulesMet = PW_RULES.filter(r => r.test(pwForm.next));
 
+  // ── Sidebar nav ──
+  const sidebarNav = (
+    <div style={{ display:'flex', flexDirection: isMobile ? 'row' : 'column', gap: isMobile ? 8 : 4, overflowX: isMobile ? 'auto' : 'visible', paddingBottom: isMobile ? 4 : 0, scrollbarWidth:'none' }}>
+      {SECTIONS.map(s => {
+        const active = section === s.key;
+        return (
+          <button key={s.key} type="button" onClick={() => goSection(s.key)}
+            style={{
+              display:'flex', alignItems:'center', gap:10, flexShrink:0,
+              padding: isMobile ? '9px 14px' : '11px 14px',
+              borderRadius: isMobile ? 99 : 12,
+              border: isMobile ? `1.5px solid ${active ? PRIMARY : PAPER3}` : 'none',
+              background: active ? (isMobile ? PRIMARY : GREEN_TINT) : (isMobile ? '#fff' : 'transparent'),
+              color: active ? (isMobile ? '#fff' : PRIMARY) : INK2,
+              fontFamily:FONT, fontWeight: active ? 700 : 600, fontSize:14,
+              cursor:'pointer', whiteSpace:'nowrap', textAlign:'left', width: isMobile ? 'auto' : '100%',
+              transition:'all 0.12s',
+            }}>
+            <span style={{ fontSize:16 }}>{s.icon}</span>
+            {s.label}
+          </button>
+        );
+      })}
+    </div>
+  );
+
   return (
-    <div style={{ minHeight:'100vh', paddingTop:80, background:'#f8f5f0' }} className="page-enter">
-      <div style={{ maxWidth:760, margin:'0 auto', padding:isMobile?'24px 16px':'36px 24px' }}>
-        <div style={{ display:'flex', alignItems:'center', gap:16, marginBottom:28 }}>
+    <div style={{ minHeight:'100vh', paddingTop:80, paddingBottom: isMobile ? 90 : 60, background:'#f8f5f0' }} className="page-enter">
+      <div style={{ maxWidth:1080, margin:'0 auto', padding:isMobile?'20px 16px':'32px 24px' }}>
+
+        {/* Header */}
+        <div style={{ display:'flex', alignItems:'center', gap:14, marginBottom:24 }}>
           <button onClick={()=>router.push('/profil')} style={{ background:'#fff', border:'1.5px solid #e5e5e5', borderRadius:12, padding:'8px 16px', fontSize:13, fontWeight:700, cursor:'pointer', display:'flex', alignItems:'center', gap:6 }}>← Tilbage</button>
-          <h1 style={{ fontFamily:FONT, fontWeight:900, fontSize:isMobile?22:26, margin:0 }}>Rediger institutionsprofil</h1>
+          <h1 style={{ fontFamily:FONT, fontWeight:900, fontSize:isMobile?22:28, margin:0 }}>Indstillinger</h1>
         </div>
 
-        <div style={{ background:'#fff', borderRadius:22, padding:isMobile?20:32, boxShadow:'0 2px 12px rgba(0,0,0,0.06)', display:'flex', flexDirection:'column', gap:24 }}>
+        <div style={{ display:'flex', flexDirection: isMobile ? 'column' : 'row', gap: isMobile ? 16 : 28, alignItems:'flex-start' }}>
 
-          {/* CVR info */}
-          <div style={{ background:'#f0f9f4', border:'1.5px solid #c6e8d4', borderRadius:14, padding:'14px 18px' }}>
-            <div style={{ fontSize:12, color:'#5a9a74', fontWeight:700, marginBottom:4 }}>Fra CVR-registret (kan ikke ændres)</div>
-            <div style={{ fontWeight:800, fontSize:16 }}>{institution?.name}</div>
-            <div style={{ fontSize:13, color:'#888' }}>{institution?.pnr ? `P-nummer: ${institution.pnr}` : `CVR: ${institution?.cvr}`}</div>
-            {institution?.kommune && <div style={{ fontSize:13, color:'#888', marginTop:2 }}>🏛️ Under: {institution.kommune}</div>}
-          </div>
-
-          {/* Om institutionen */}
-          <div>
-            <div style={{ fontSize:12, fontWeight:700, color:'#aaa', textTransform:'uppercase', letterSpacing:0.8, marginBottom:14 }}>Om institutionen</div>
-            <div style={{ display:'flex', flexDirection:'column', gap:12 }}>
-              <div>
-                <label style={{ display:'block', fontSize:13, fontWeight:700, marginBottom:6 }}>Institutionstype</label>
-                <SChoiceGroup value={form.institution_type} onChange={v=>setForm(f=>({...f,institution_type:v}))} primary={PRIMARY} options={['Vuggestue','Børnehave','Integreret institution','SFO / KSFO','Andet']} />
-              </div>
-              <div>
-                <label style={{ display:'block', fontSize:13, fontWeight:700, marginBottom:6 }}>Driftsform</label>
-                <SChoiceGroup value={form.ownership_type} onChange={v=>setForm(f=>({...f,ownership_type:v}))} primary={PRIMARY} options={['Offentlig','Privat','Selvejende']} />
-              </div>
-              <div>
-                <label style={{ display:'block', fontSize:13, fontWeight:700, marginBottom:6 }}>Antal indskrevne børn</label>
-                {inp(form.children_count, 'children_count', 'Fx 60', 'number')}
+          {/* ── Sidebar ── */}
+          {isMobile ? (
+            sidebarNav
+          ) : (
+            <div style={{ width:240, flexShrink:0, position:'sticky', top:100 }}>
+              <div style={{ background:'#fff', borderRadius:18, padding:'10px', boxShadow:'0 1px 6px rgba(22,34,28,0.07)' }}>
+                {sidebarNav}
               </div>
             </div>
-          </div>
+          )}
 
-          {/* Kontaktoplysninger */}
-          <div style={{ borderTop:'1px solid #f0eeeb', paddingTop:20 }}>
-            <div style={{ fontSize:12, fontWeight:700, color:'#aaa', textTransform:'uppercase', letterSpacing:0.8, marginBottom:14 }}>Kontaktoplysninger</div>
-            <div style={{ display:'flex', flexDirection:'column', gap:12 }}>
-              <div style={{ display:'grid', gridTemplateColumns:'1fr 120px', gap:12 }}>
-                <div><label style={{ display:'block', fontSize:13, fontWeight:700, marginBottom:6 }}>Adresse</label>{inp(form.address,'address','')}</div>
-                <div><label style={{ display:'block', fontSize:13, fontWeight:700, marginBottom:6 }}>Postnr.</label>{inp(form.zipcode,'zipcode','')}</div>
-              </div>
-              <div><label style={{ display:'block', fontSize:13, fontWeight:700, marginBottom:6 }}>By</label>{inp(form.city,'city','')}</div>
-              <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:12 }}>
-                <div><label style={{ display:'block', fontSize:13, fontWeight:700, marginBottom:6 }}>Telefon</label><input type="tel" value={form.phone} onChange={e=>setForm(f=>({...f,phone:e.target.value.replace(/[^+\d\s]/g,'')}))} placeholder="+45 12 34 56 78" style={INP} /></div>
-                <div><label style={{ display:'block', fontSize:13, fontWeight:700, marginBottom:6 }}>Hjemmeside</label>{inp(form.website,'website','https://...')}</div>
-              </div>
-            </div>
-          </div>
+          {/* ── Content panel ── */}
+          <div style={{ flex:1, minWidth:0, width: isMobile ? '100%' : 'auto' }}>
+            <div style={{ background:'#fff', borderRadius:22, padding:isMobile?20:32, boxShadow:'0 2px 12px rgba(0,0,0,0.06)' }}>
 
-          {/* Institutionsleder */}
-          <div style={{ borderTop:'1px solid #f0eeeb', paddingTop:20 }}>
-            <div style={{ fontSize:12, fontWeight:700, color:'#aaa', textTransform:'uppercase', letterSpacing:0.8, marginBottom:14 }}>Institutionsleder</div>
-            <div style={{ display:'flex', flexDirection:'column', gap:12 }}>
-              <div><label style={{ display:'block', fontSize:13, fontWeight:700, marginBottom:6 }}>Fulde navn</label>{inp(form.leader_name,'leader_name','Fornavn Efternavn')}</div>
-              <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:12 }}>
-                <div><label style={{ display:'block', fontSize:13, fontWeight:700, marginBottom:6 }}>Telefon</label><input type="tel" value={form.leader_phone} onChange={e=>setForm(f=>({...f,leader_phone:e.target.value.replace(/[^+\d\s]/g,'')}))} placeholder="+45 12 34 56 78" style={INP} /></div>
-                <div><label style={{ display:'block', fontSize:13, fontWeight:700, marginBottom:6 }}>E-mail</label>{inp(form.leader_email,'leader_email','leder@institution.dk')}</div>
-              </div>
-            </div>
-          </div>
+              {/* ── PROFILOPLYSNINGER ── */}
+              {section === 'profil' && (
+                <div style={{ display:'flex', flexDirection:'column', gap:24 }}>
+                  <SectionHead title="Profiloplysninger" desc="Oplysninger om din institution. Adresse og kontaktinfo bruges ved forsendelse og fakturering." />
 
-          {/* Kontaktperson */}
-          <div style={{ borderTop:'1px solid #f0eeeb', paddingTop:20 }}>
-            <div style={{ fontSize:12, fontWeight:700, color:'#aaa', textTransform:'uppercase', letterSpacing:0.8, marginBottom:14 }}>Kontaktperson (byt&amp;leg)</div>
-            <div><label style={{ display:'block', fontSize:13, fontWeight:700, marginBottom:6 }}>Dit fulde navn</label>{inp(form.contact_name,'contact_name','Fornavn Efternavn')}</div>
-          </div>
+                  {/* CVR info */}
+                  <div style={{ background:'#f0f9f4', border:'1.5px solid #c6e8d4', borderRadius:14, padding:'14px 18px' }}>
+                    <div style={{ fontSize:12, color:'#5a9a74', fontWeight:700, marginBottom:4 }}>Fra CVR-registret (kan ikke ændres)</div>
+                    <div style={{ fontWeight:800, fontSize:16 }}>{institution?.name}</div>
+                    <div style={{ fontSize:13, color:'#888' }}>{institution?.pnr ? `P-nummer: ${institution.pnr}` : `CVR: ${institution?.cvr}`}</div>
+                    {institution?.kommune && <div style={{ fontSize:13, color:'#888', marginTop:2 }}>🏛️ Under: {institution.kommune}</div>}
+                  </div>
 
-          {/* Bankkonto til udbetaling */}
-          <div style={{ borderTop:'1px solid #f0eeeb', paddingTop:20 }}>
-            <div style={{ fontSize:12, fontWeight:700, color:'#aaa', textTransform:'uppercase', letterSpacing:0.8, marginBottom:6 }}>Bankkonto til udbetaling</div>
-            <div style={{ fontSize:13, color:INK3, marginBottom:14, lineHeight:1.5 }}>Bytogleg overfører betaling for solgte varer hertil. Oplysningerne opbevares sikkert og deles ikke med købere.</div>
-            <div style={{ display:'grid', gridTemplateColumns:'140px 1fr', gap:12 }}>
-              <div>
-                <label style={{ display:'block', fontSize:13, fontWeight:700, marginBottom:6 }}>Reg.nr.</label>
-                <input value={form.bank_reg_nr} onChange={e=>setForm(f=>({...f,bank_reg_nr:e.target.value.replace(/\D/g,'').slice(0,4)}))} placeholder="1234" maxLength={4} style={INP} />
-              </div>
-              <div>
-                <label style={{ display:'block', fontSize:13, fontWeight:700, marginBottom:6 }}>Kontonummer</label>
-                <input value={form.bank_account_nr} onChange={e=>setForm(f=>({...f,bank_account_nr:e.target.value.replace(/\D/g,'').slice(0,10)}))} placeholder="12345678" maxLength={10} style={INP} />
-              </div>
-            </div>
-          </div>
-
-          {/* Bundlerabatter */}
-          <div style={{ borderTop:'1px solid #f0eeeb', paddingTop:20 }}>
-            <div style={{ fontSize:12, fontWeight:700, color:'#aaa', textTransform:'uppercase', letterSpacing:0.8, marginBottom:6 }}>Bundlerabatter</div>
-            <div style={{ fontSize:13, color:INK3, marginBottom:16, lineHeight:1.5 }}>
-              Giv købere en automatisk rabat når de køber flere varer fra dig på samme ordre. Rabatten beregnes af varernes samlede pris.
-            </div>
-
-            {/* Toggle */}
-            <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', padding:'14px 16px', background:'#f8f7f5', borderRadius:14, marginBottom:16, border:'1px solid #e8e5e1' }}>
-              <div>
-                <div style={{ fontFamily:FONT, fontWeight:700, fontSize:14, color:INK }}>Aktivér bundlerabatter</div>
-                <div style={{ fontSize:12, color:INK3, marginTop:2 }}>Vises automatisk i købers kurv</div>
-              </div>
-              <button
-                type="button"
-                onClick={() => setBundleEnabled(v => !v)}
-                style={{ width:48, height:26, borderRadius:99, border:'none', cursor:'pointer', position:'relative', background: bundleEnabled ? PRIMARY : '#d1d5db', transition:'background 0.2s', flexShrink:0 }}
-              >
-                <div style={{ position:'absolute', top:3, left: bundleEnabled ? 25 : 3, width:20, height:20, borderRadius:'50%', background:'#fff', transition:'left 0.2s', boxShadow:'0 1px 4px rgba(0,0,0,0.2)' }} />
-              </button>
-            </div>
-
-            {/* Tiers */}
-            {bundleEnabled && (
-              <div style={{ display:'flex', flexDirection:'column', gap:10, marginBottom:16 }}>
-                <div style={{ fontSize:13, fontWeight:700, color:INK2 }}>Konfigurer rabatter</div>
-                {bundleTiers.map((tier, idx) => (
-                  <div key={idx} style={{ display:'flex', alignItems:'center', gap:12, padding:'12px 14px', background:'#f8f7f5', borderRadius:12, border:'1px solid #e8e5e1' }}>
-                    <div style={{ flex:1 }}>
-                      <div style={{ fontSize:12, color:INK3, marginBottom:4 }}>Antal varer</div>
-                      <select
-                        value={tier.min_items}
-                        onChange={e => setBundleTiers(ts => ts.map((t, i) => i === idx ? { ...t, min_items: Number(e.target.value) } : t))}
-                        style={{ width:'100%', padding:'8px 10px', borderRadius:8, border:'1.5px solid #e5e5e5', fontSize:14, fontFamily:FONT, background:'#fff', outline:'none' }}
-                      >
-                        {[2,3,4,5,6,7,8,9,10].map(n => <option key={n} value={n}>{n} varer</option>)}
-                      </select>
+                  {/* Om institutionen */}
+                  <div>
+                    <div style={{ fontSize:12, fontWeight:700, color:'#aaa', textTransform:'uppercase', letterSpacing:0.8, marginBottom:14 }}>Om institutionen</div>
+                    <div style={{ display:'flex', flexDirection:'column', gap:12 }}>
+                      <div>
+                        <label style={{ display:'block', fontSize:13, fontWeight:700, marginBottom:6 }}>Institutionstype</label>
+                        <SChoiceGroup value={form.institution_type} onChange={v=>setForm(f=>({...f,institution_type:v}))} primary={PRIMARY} options={['Vuggestue','Børnehave','Integreret institution','SFO / KSFO','Andet']} />
+                      </div>
+                      <div>
+                        <label style={{ display:'block', fontSize:13, fontWeight:700, marginBottom:6 }}>Driftsform</label>
+                        <SChoiceGroup value={form.ownership_type} onChange={v=>setForm(f=>({...f,ownership_type:v}))} primary={PRIMARY} options={['Offentlig','Privat','Selvejende']} />
+                      </div>
+                      <div>
+                        <label style={{ display:'block', fontSize:13, fontWeight:700, marginBottom:6 }}>Antal indskrevne børn</label>
+                        {inp(form.children_count, 'children_count', 'Fx 60', 'number')}
+                      </div>
                     </div>
-                    <div style={{ flex:1 }}>
-                      <div style={{ fontSize:12, color:INK3, marginBottom:4 }}>Rabat</div>
-                      <select
-                        value={tier.percent}
-                        onChange={e => setBundleTiers(ts => ts.map((t, i) => i === idx ? { ...t, percent: Number(e.target.value) } : t))}
-                        style={{ width:'100%', padding:'8px 10px', borderRadius:8, border:'1.5px solid #e5e5e5', fontSize:14, fontFamily:FONT, background:'#fff', outline:'none' }}
-                      >
-                        {[5,10,15,20,25,30].map(p => <option key={p} value={p}>{p}%</option>)}
-                      </select>
+                  </div>
+
+                  {/* Kontaktoplysninger */}
+                  <div style={{ borderTop:'1px solid #f0eeeb', paddingTop:20 }}>
+                    <div style={{ fontSize:12, fontWeight:700, color:'#aaa', textTransform:'uppercase', letterSpacing:0.8, marginBottom:14 }}>Kontaktoplysninger</div>
+                    <div style={{ display:'flex', flexDirection:'column', gap:12 }}>
+                      <div style={{ display:'grid', gridTemplateColumns:'1fr 120px', gap:12 }}>
+                        <div><label style={{ display:'block', fontSize:13, fontWeight:700, marginBottom:6 }}>Adresse</label>{inp(form.address,'address','')}</div>
+                        <div><label style={{ display:'block', fontSize:13, fontWeight:700, marginBottom:6 }}>Postnr.</label>{inp(form.zipcode,'zipcode','')}</div>
+                      </div>
+                      <div><label style={{ display:'block', fontSize:13, fontWeight:700, marginBottom:6 }}>By</label>{inp(form.city,'city','')}</div>
+                      <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:12 }}>
+                        <div><label style={{ display:'block', fontSize:13, fontWeight:700, marginBottom:6 }}>Telefon</label><input type="tel" value={form.phone} onChange={e=>setForm(f=>({...f,phone:e.target.value.replace(/[^+\d\s]/g,'')}))} placeholder="+45 12 34 56 78" style={INP} /></div>
+                        <div><label style={{ display:'block', fontSize:13, fontWeight:700, marginBottom:6 }}>Hjemmeside</label>{inp(form.website,'website','https://...')}</div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Institutionsleder */}
+                  <div style={{ borderTop:'1px solid #f0eeeb', paddingTop:20 }}>
+                    <div style={{ fontSize:12, fontWeight:700, color:'#aaa', textTransform:'uppercase', letterSpacing:0.8, marginBottom:14 }}>Institutionsleder</div>
+                    <div style={{ display:'flex', flexDirection:'column', gap:12 }}>
+                      <div><label style={{ display:'block', fontSize:13, fontWeight:700, marginBottom:6 }}>Fulde navn</label>{inp(form.leader_name,'leader_name','Fornavn Efternavn')}</div>
+                      <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:12 }}>
+                        <div><label style={{ display:'block', fontSize:13, fontWeight:700, marginBottom:6 }}>Telefon</label><input type="tel" value={form.leader_phone} onChange={e=>setForm(f=>({...f,leader_phone:e.target.value.replace(/[^+\d\s]/g,'')}))} placeholder="+45 12 34 56 78" style={INP} /></div>
+                        <div><label style={{ display:'block', fontSize:13, fontWeight:700, marginBottom:6 }}>E-mail</label>{inp(form.leader_email,'leader_email','leder@institution.dk')}</div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Kontaktperson */}
+                  <div style={{ borderTop:'1px solid #f0eeeb', paddingTop:20 }}>
+                    <div style={{ fontSize:12, fontWeight:700, color:'#aaa', textTransform:'uppercase', letterSpacing:0.8, marginBottom:14 }}>Kontaktperson (byt&amp;leg)</div>
+                    <div><label style={{ display:'block', fontSize:13, fontWeight:700, marginBottom:6 }}>Dit fulde navn</label>{inp(form.contact_name,'contact_name','Fornavn Efternavn')}</div>
+                  </div>
+
+                  {/* Save */}
+                  <div style={{ borderTop:'1px solid #f0eeeb', paddingTop:20, display:'flex', justifyContent:'flex-end' }}>
+                    <Btn variant="primary" color={PRIMARY} radius={22} onClick={handleSave} disabled={saving} style={{ justifyContent:'center', padding:'13px 28px', fontSize:15 }}>
+                      {saving ? <><Spinner/>Gemmer…</> : '✓ Gem oplysninger'}
+                    </Btn>
+                  </div>
+                </div>
+              )}
+
+              {/* ── BETALING ── */}
+              {section === 'betaling' && (
+                <div style={{ display:'flex', flexDirection:'column', gap:24 }}>
+                  <SectionHead title="Betaling" desc="Bytogleg overfører betaling for solgte varer til denne konto. Oplysningerne opbevares sikkert og deles aldrig med købere." />
+
+                  <div>
+                    <div style={{ fontSize:12, fontWeight:700, color:'#aaa', textTransform:'uppercase', letterSpacing:0.8, marginBottom:14 }}>Bankkonto til udbetaling</div>
+                    <div style={{ display:'grid', gridTemplateColumns:'140px 1fr', gap:12 }}>
+                      <div>
+                        <label style={{ display:'block', fontSize:13, fontWeight:700, marginBottom:6 }}>Reg.nr.</label>
+                        <input value={form.bank_reg_nr} onChange={e=>setForm(f=>({...f,bank_reg_nr:e.target.value.replace(/\D/g,'').slice(0,4)}))} placeholder="1234" maxLength={4} style={INP} />
+                      </div>
+                      <div>
+                        <label style={{ display:'block', fontSize:13, fontWeight:700, marginBottom:6 }}>Kontonummer</label>
+                        <input value={form.bank_account_nr} onChange={e=>setForm(f=>({...f,bank_account_nr:e.target.value.replace(/\D/g,'').slice(0,10)}))} placeholder="12345678" maxLength={10} style={INP} />
+                      </div>
+                    </div>
+                  </div>
+
+                  <div style={{ borderTop:'1px solid #f0eeeb', paddingTop:20, display:'flex', justifyContent:'flex-end' }}>
+                    <Btn variant="primary" color={PRIMARY} radius={22} onClick={handleSave} disabled={saving} style={{ justifyContent:'center', padding:'13px 28px', fontSize:15 }}>
+                      {saving ? <><Spinner/>Gemmer…</> : '✓ Gem bankkonto'}
+                    </Btn>
+                  </div>
+                </div>
+              )}
+
+              {/* ── BUNDLERABATTER ── */}
+              {section === 'bundle' && (
+                <div>
+                  <SectionHead title="Bundlerabatter" desc="Giv købere en automatisk rabat når de køber flere varer fra dig på samme ordre. Rabatten beregnes af varernes samlede pris." />
+
+                  {/* Toggle */}
+                  <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', padding:'14px 16px', background:'#f8f7f5', borderRadius:14, marginBottom:16, border:'1px solid #e8e5e1' }}>
+                    <div>
+                      <div style={{ fontFamily:FONT, fontWeight:700, fontSize:14, color:INK }}>Aktivér bundlerabatter</div>
+                      <div style={{ fontSize:12, color:INK3, marginTop:2 }}>Vises automatisk i købers kurv</div>
                     </div>
                     <button
                       type="button"
-                      onClick={() => setBundleTiers(ts => ts.filter((_, i) => i !== idx))}
-                      style={{ width:32, height:32, borderRadius:'50%', background:'none', border:'1.5px solid #e5e5e5', color:INK3, fontSize:16, cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0, marginTop:18 }}
+                      onClick={() => setBundleEnabled(v => !v)}
+                      style={{ width:48, height:26, borderRadius:99, border:'none', cursor:'pointer', position:'relative', background: bundleEnabled ? PRIMARY : '#d1d5db', transition:'background 0.2s', flexShrink:0 }}
                     >
-                      ×
+                      <div style={{ position:'absolute', top:3, left: bundleEnabled ? 25 : 3, width:20, height:20, borderRadius:'50%', background:'#fff', transition:'left 0.2s', boxShadow:'0 1px 4px rgba(0,0,0,0.2)' }} />
                     </button>
                   </div>
-                ))}
-                {bundleTiers.length < 5 && (
-                  <button
-                    type="button"
-                    onClick={() => setBundleTiers(ts => [...ts, { min_items: Math.max(...ts.map(t => t.min_items), 1) + 1, percent: 5 }])}
-                    style={{ padding:'9px 16px', borderRadius:99, background:'none', border:`1.5px solid ${PRIMARY}`, color:PRIMARY, fontFamily:FONT, fontWeight:700, fontSize:13, cursor:'pointer', alignSelf:'flex-start' }}
-                  >
-                    + Tilføj trin
-                  </button>
-                )}
-              </div>
-            )}
 
-            <button
-              type="button"
-              onClick={handleBundleSave}
-              disabled={bundleSaving}
-              style={{ padding:'11px 20px', borderRadius:12, background: bundleSaving ? '#e5e5e5' : PRIMARY, color:'#fff', border:'none', fontFamily:FONT, fontWeight:700, fontSize:14, cursor: bundleSaving ? 'default' : 'pointer', opacity: bundleSaving ? 0.7 : 1 }}
-            >
-              {bundleSaving ? 'Gemmer…' : '✓ Gem bundlerabatter'}
-            </button>
-          </div>
+                  {/* Tiers */}
+                  {bundleEnabled && (
+                    <div style={{ display:'flex', flexDirection:'column', gap:10, marginBottom:16 }}>
+                      <div style={{ fontSize:13, fontWeight:700, color:INK2 }}>Konfigurer rabatter</div>
+                      {bundleTiers.map((tier, idx) => (
+                        <div key={idx} style={{ display:'flex', alignItems:'center', gap:12, padding:'12px 14px', background:'#f8f7f5', borderRadius:12, border:'1px solid #e8e5e1' }}>
+                          <div style={{ flex:1 }}>
+                            <div style={{ fontSize:12, color:INK3, marginBottom:4 }}>Antal varer</div>
+                            <select
+                              value={tier.min_items}
+                              onChange={e => setBundleTiers(ts => ts.map((t, i) => i === idx ? { ...t, min_items: Number(e.target.value) } : t))}
+                              style={{ width:'100%', padding:'8px 10px', borderRadius:8, border:'1.5px solid #e5e5e5', fontSize:14, fontFamily:FONT, background:'#fff', outline:'none' }}
+                            >
+                              {[2,3,4,5,6,7,8,9,10].map(n => <option key={n} value={n}>{n} varer</option>)}
+                            </select>
+                          </div>
+                          <div style={{ flex:1 }}>
+                            <div style={{ fontSize:12, color:INK3, marginBottom:4 }}>Rabat</div>
+                            <select
+                              value={tier.percent}
+                              onChange={e => setBundleTiers(ts => ts.map((t, i) => i === idx ? { ...t, percent: Number(e.target.value) } : t))}
+                              style={{ width:'100%', padding:'8px 10px', borderRadius:8, border:'1.5px solid #e5e5e5', fontSize:14, fontFamily:FONT, background:'#fff', outline:'none' }}
+                            >
+                              {[5,10,15,20,25,30].map(p => <option key={p} value={p}>{p}%</option>)}
+                            </select>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => setBundleTiers(ts => ts.filter((_, i) => i !== idx))}
+                            style={{ width:32, height:32, borderRadius:'50%', background:'none', border:'1.5px solid #e5e5e5', color:INK3, fontSize:16, cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0, marginTop:18 }}
+                          >
+                            ×
+                          </button>
+                        </div>
+                      ))}
+                      {bundleTiers.length < 5 && (
+                        <button
+                          type="button"
+                          onClick={() => setBundleTiers(ts => [...ts, { min_items: Math.max(...ts.map(t => t.min_items), 1) + 1, percent: 5 }])}
+                          style={{ padding:'9px 16px', borderRadius:99, background:'none', border:`1.5px solid ${PRIMARY}`, color:PRIMARY, fontFamily:FONT, fontWeight:700, fontSize:13, cursor:'pointer', alignSelf:'flex-start' }}
+                        >
+                          + Tilføj trin
+                        </button>
+                      )}
+                    </div>
+                  )}
 
-          {/* Kontosikkerhed */}
-          <div style={{ borderTop:'1px solid #f0eeeb', paddingTop:20 }}>
-            <div style={{ fontSize:12, fontWeight:700, color:'#aaa', textTransform:'uppercase', letterSpacing:0.8, marginBottom:14 }}>Kontosikkerhed</div>
-            <div style={{ display:'flex', flexDirection:'column', gap:10 }}>
-              <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', padding:'14px 16px', background:PAPER2, borderRadius:14, border:`1px solid ${PAPER3}` }}>
-                <div>
-                  <div style={{ fontFamily:FONT, fontWeight:700, fontSize:14, color:INK }}>Login-e-mail</div>
-                  <div style={{ fontSize:13, color:INK3, marginTop:2 }}>{institution?.email}</div>
+                  <div style={{ borderTop:'1px solid #f0eeeb', paddingTop:20, display:'flex', justifyContent:'flex-end' }}>
+                    <button
+                      type="button"
+                      onClick={handleBundleSave}
+                      disabled={bundleSaving}
+                      style={{ padding:'13px 28px', borderRadius:22, background: bundleSaving ? '#e5e5e5' : PRIMARY, color:'#fff', border:'none', fontFamily:FONT, fontWeight:700, fontSize:15, cursor: bundleSaving ? 'default' : 'pointer', opacity: bundleSaving ? 0.7 : 1 }}
+                    >
+                      {bundleSaving ? 'Gemmer…' : '✓ Gem bundlerabatter'}
+                    </button>
+                  </div>
                 </div>
-                <button onClick={()=>{ setEmailMsg(null); setNewEmail(''); setShowEmailModal(true); }} style={{ padding:'8px 16px', borderRadius:99, background:'#fff', border:`1.5px solid ${PRIMARY}`, color:PRIMARY, fontFamily:FONT, fontWeight:700, fontSize:13, cursor:'pointer' }}>
-                  Skift e-mail
-                </button>
-              </div>
-              <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', padding:'14px 16px', background:PAPER2, borderRadius:14, border:`1px solid ${PAPER3}` }}>
+              )}
+
+              {/* ── NOTIFIKATIONER ── */}
+              {section === 'notifikationer' && (
                 <div>
-                  <div style={{ fontFamily:FONT, fontWeight:700, fontSize:14, color:INK }}>Adgangskode</div>
-                  <div style={{ fontSize:13, color:INK3, marginTop:2 }}>••••••••••••</div>
+                  <SectionHead title="Notifikationer" desc="Få besked direkte på din enhed når der sker noget vigtigt — fx nye beskeder, salg og matchende opslag." />
+                  {typeof Notification !== 'undefined' ? (
+                    <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', padding:'16px 18px', background:PAPER2, borderRadius:14, border:`1px solid ${PAPER3}` }}>
+                      <div>
+                        <div style={{ fontFamily:FONT, fontWeight:700, fontSize:14, color:INK }}>Push-notifikationer</div>
+                        <div style={{ fontSize:12, color:INK3, marginTop:2 }}>
+                          {notifPermission === 'granted' ? 'Aktiveret på denne enhed' : notifPermission === 'denied' ? 'Blokeret i din browser' : 'Slået fra'}
+                        </div>
+                      </div>
+                      <button onClick={notifLoading ? undefined : handleNotifToggle} disabled={notifLoading}
+                        style={{ padding:'9px 18px', borderRadius:99, background: notifPermission === 'granted' ? '#fff' : PRIMARY, border:`1.5px solid ${PRIMARY}`, color: notifPermission === 'granted' ? PRIMARY : '#fff', fontFamily:FONT, fontWeight:700, fontSize:13, cursor: notifLoading ? 'default' : 'pointer', opacity: notifLoading ? 0.6 : 1, flexShrink:0 }}>
+                        {notifLoading ? 'Vent…' : notifPermission === 'granted' ? 'Slå fra' : 'Aktivér'}
+                      </button>
+                    </div>
+                  ) : (
+                    <div style={{ padding:'16px 18px', background:PAPER2, borderRadius:14, border:`1px solid ${PAPER3}`, fontSize:13, color:INK3, lineHeight:1.5 }}>
+                      Din browser understøtter ikke push-notifikationer. Prøv at åbne byt&amp;leg i Chrome eller Safari på en nyere enhed.
+                    </div>
+                  )}
                 </div>
-                <button onClick={()=>{ setPwMsg(null); setPwForm({current:'',next:'',confirm:''}); setShowPwModal(true); }} style={{ padding:'8px 16px', borderRadius:99, background:'#fff', border:`1.5px solid ${PRIMARY}`, color:PRIMARY, fontFamily:FONT, fontWeight:700, fontSize:13, cursor:'pointer' }}>
-                  Skift kodeord
-                </button>
-              </div>
+              )}
+
+              {/* ── SIKKERHED ── */}
+              {section === 'sikkerhed' && (
+                <div>
+                  <SectionHead title="Sikkerhed" desc="Administrer din login-e-mail og adgangskode." />
+                  <div style={{ display:'flex', flexDirection:'column', gap:10 }}>
+                    <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', padding:'14px 16px', background:PAPER2, borderRadius:14, border:`1px solid ${PAPER3}` }}>
+                      <div>
+                        <div style={{ fontFamily:FONT, fontWeight:700, fontSize:14, color:INK }}>Login-e-mail</div>
+                        <div style={{ fontSize:13, color:INK3, marginTop:2 }}>{institution?.email}</div>
+                      </div>
+                      <button onClick={()=>{ setEmailMsg(null); setNewEmail(''); setShowEmailModal(true); }} style={{ padding:'8px 16px', borderRadius:99, background:'#fff', border:`1.5px solid ${PRIMARY}`, color:PRIMARY, fontFamily:FONT, fontWeight:700, fontSize:13, cursor:'pointer', flexShrink:0 }}>
+                        Skift e-mail
+                      </button>
+                    </div>
+                    <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', padding:'14px 16px', background:PAPER2, borderRadius:14, border:`1px solid ${PAPER3}` }}>
+                      <div>
+                        <div style={{ fontFamily:FONT, fontWeight:700, fontSize:14, color:INK }}>Adgangskode</div>
+                        <div style={{ fontSize:13, color:INK3, marginTop:2 }}>••••••••••••</div>
+                      </div>
+                      <button onClick={()=>{ setPwMsg(null); setPwForm({current:'',next:'',confirm:''}); setShowPwModal(true); }} style={{ padding:'8px 16px', borderRadius:99, background:'#fff', border:`1.5px solid ${PRIMARY}`, color:PRIMARY, fontFamily:FONT, fontWeight:700, fontSize:13, cursor:'pointer', flexShrink:0 }}>
+                        Skift kodeord
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              )}
+
             </div>
-          </div>
-
-          {/* Bottom actions */}
-          <div style={{ borderTop:'1px solid #f0eeeb', paddingTop:20, display:'flex', gap:12 }}>
-            <button onClick={()=>router.push('/profil')} style={{ flex:1, padding:'13px', borderRadius:14, background:'#f5f4f2', border:'none', fontWeight:700, cursor:'pointer', fontSize:14 }}>Annuller</button>
-            <Btn variant="primary" color={PRIMARY} radius={22} onClick={handleSave} disabled={saving} style={{ flex:2, justifyContent:'center', padding:'13px', fontSize:15 }}>
-              {saving ? <><Spinner/>Gemmer…</> : '✓ Gem oplysninger'}
-            </Btn>
           </div>
         </div>
       </div>

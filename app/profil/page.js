@@ -293,7 +293,7 @@ export default function ProfilPage() {
               <MenuItem icon="👥" label="Medarbejdere" onClick={() => router.push('/medarbejdere')} />
             </MenuSection>
             <MenuSection>
-              <MenuItem icon="✏️" label="Rediger profil" onClick={() => router.push('/profil/rediger')} />
+              <MenuItem icon="⚙️" label="Indstillinger" onClick={() => router.push('/profil/rediger')} />
               <MenuItem icon="🌱" label="Bæredygtighed" value={co2Total !== null ? `${co2Total.toFixed(1)} kg CO₂` : undefined} onClick={() => router.push('/baeredygtighed/metode')} />
               {typeof Notification !== 'undefined' && (
                 <button onClick={notifLoading ? undefined : handleNotifToggle} style={{
@@ -394,7 +394,7 @@ export default function ProfilPage() {
               width:'100%', background:PRIMARY, color:'#fff', border:'none', borderRadius:99,
               fontFamily:FONT, fontWeight:700, fontSize:14, padding:'11px 0', cursor:'pointer', marginBottom:8,
             }}>
-              ✏️ Rediger profil
+              ⚙️ Indstillinger
             </button>
             {institution?.name && (
               <button onClick={() => router.push('/institution/' + encodeURIComponent(institution.name))} style={{
