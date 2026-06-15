@@ -247,8 +247,24 @@ export default function MessagesClient() {
   const [shipmentLoading, setShipmentLoading] = useState(false);
   const [invoiceConfirmed, setInvoiceConfirmed] = useState(false);
   const [generatingLabel, setGeneratingLabel] = useState(false);
+  const [convMenuOpen, setConvMenuOpen] = useState(false);
+  const [reportTarget, setReportTarget] = useState(null);
+  const [reportReason, setReportReason] = useState('');
+  const [reportNote,   setReportNote]   = useState('');
+  const [reportSending,setReportSending]= useState(false);
+  const [reportDone,   setReportDone]   = useState(false);
+  const [deleteTarget, setDeleteTarget] = useState(null); // { conv } | { all: true }
+  const [deleting,     setDeleting]     = useState(false);
   const ww = useWindowWidth();
   const isMobile = ww < 768;
+
+  const REPORT_REASONS = [
+    'Upassende eller stødende sprog',
+    'Spam eller reklame',
+    'Svindel eller mistænkelig adfærd',
+    'Vildledende opslag',
+    'Andet',
+  ];
 
   const EMOJI_LIST = ['😊','😄','😂','🥰','😍','👍','👏','🙌','❤️','🎉','✅','🤔','😅','🙏','🚀','💪','🌟','😮','🤝','📦','♻️','👶','🏫','🧸','🎠','⚽'];
   const bottomRef = useRef(null);
@@ -577,27 +593,54 @@ export default function MessagesClient() {
     if (active?.id === conv.id) setActive(null);
   }
 
-  async function deleteAllArchived(e) {
-    e.stopPropagation();
-    const archived = convs.filter(c => isArchived(c));
-    if (!archived.length) return;
-    if (!window.confirm(`Slet ${archived.length} arkiverede samtaler permanent?`)) return;
-    if (!window.confirm('Er du helt sikker? Dette kan ikke fortrydes.')) return;
-    for (const c of archived) {
-      await db.from('chat_messages').delete().eq('conversation_id', c.id);
-      await db.from('conversations').delete().eq('id', c.id);
+  // Server-side sletning via service role — pålidelig uanset RLS.
+  async function performDelete() {
+    if (!deleteTarget) return;
+    setDeleting(true);
+    const isAll = !!deleteTarget.all;
+    const targets = isAll ? convs.filter(c => isArchived(c)) : [deleteTarget.conv];
+    const ids = targets.map(c => c.id);
+    if (!ids.length) { setDeleting(false); setDeleteTarget(null); return; }
+    try {
+      const res = await authedFetch('/api/delete-conversation', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ conversation_ids: ids }),
+      });
+      const result = await res.json().catch(() => ({}));
+      if (!res.ok || !result.ok) throw new Error(result.error || 'Sletning fejlede');
+      const idSet = new Set(ids);
+      setConvs(cs => cs.filter(c => !idSet.has(c.id)));
+      if (active && idSet.has(active.id)) { setActive(null); setMessages([]); }
+    } catch (err) {
+      setUploadError(err.message || 'Samtalen kunne ikke slettes. Prøv igen.');
     }
-    setConvs(cs => cs.filter(c => !isArchived(c)));
-    if (active && isArchived(active)) { setActive(null); setMessages([]); }
+    setDeleting(false);
+    setDeleteTarget(null);
+    setConvMenuOpen(false);
   }
 
-  async function deleteConv(conv, e) {
-    e.stopPropagation();
-    if (!window.confirm('Slet denne samtale permanent?')) return;
-    await db.from('chat_messages').delete().eq('conversation_id', conv.id);
-    await db.from('conversations').delete().eq('id', conv.id);
-    setConvs(cs => cs.filter(c => c.id !== conv.id));
-    if (active?.id === conv.id) { setActive(null); setMessages([]); }
+  async function submitReport() {
+    if (!reportTarget || !reportReason) return;
+    setReportSending(true);
+    try {
+      await authedFetch('/api/report-conversation', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          conversationId: reportTarget.id,
+          otherParty: otherName(reportTarget),
+          listingTitle: reportTarget.listing_title,
+          reason: reportReason,
+          note: reportNote,
+          reporterName: ctxIsAdmin && adminInstName ? adminInstName : (ctxInstitution?.name || userEmail),
+        }),
+      });
+      setReportDone(true);
+    } catch {
+      setReportDone(true); // vis altid kvittering — e-mail er fire-and-forget
+    }
+    setReportSending(false);
   }
 
   function effectiveSenderName() {
@@ -866,6 +909,12 @@ export default function MessagesClient() {
 
   function onKey(e) { if (e.key==='Enter' && !e.shiftKey) { e.preventDefault(); send(); } }
 
+  async function openActiveListing() {
+    if (!active?.listing_id) return;
+    const { data } = await db.from('listings').select('*').eq('id', active.listing_id).maybeSingle();
+    if (data && setActiveListing) { setActiveListing(data); router.push('/opslag/detail'); }
+  }
+
   function amInitiator(c) {
     const instId = ctxInstId || ctxInstitution?.id;
     const uid    = realUserId || userId;
@@ -962,7 +1011,7 @@ export default function MessagesClient() {
                 <button onClick={()=>setShowArchived(false)} style={{ flex:1, padding:'6px 0', borderRadius:99, border:'none', background:!showArchived?PRIMARY:PAPER3, color:!showArchived?'#fff':INK3, fontSize:12, fontWeight:700, cursor:'pointer', fontFamily:FONT }}>Aktive</button>
                 <button onClick={()=>setShowArchived(true)} style={{ flex:1, padding:'6px 0', borderRadius:99, border:'none', background:showArchived?PRIMARY:PAPER3, color:showArchived?'#fff':INK3, fontSize:12, fontWeight:700, cursor:'pointer', fontFamily:FONT }}>Arkiveret</button>
                 {showArchived && convs.filter(c=>isArchived(c)).length > 0 && (
-                  <button onClick={deleteAllArchived} title="Slet alle arkiverede" style={{ padding:'6px 10px', borderRadius:99, border:'none', background:'#FEF2F2', color:'#e11d48', fontSize:12, fontWeight:700, cursor:'pointer', flexShrink:0, fontFamily:FONT }}>Slet alle</button>
+                  <button onClick={(e)=>{ e.stopPropagation(); setDeleteTarget({ all:true }); }} title="Slet alle arkiverede" style={{ padding:'6px 10px', borderRadius:99, border:'none', background:'#FEF2F2', color:'#e11d48', fontSize:12, fontWeight:700, cursor:'pointer', flexShrink:0, fontFamily:FONT }}>Slet alle</button>
                 )}
               </div>
             )}
@@ -974,7 +1023,7 @@ export default function MessagesClient() {
               <input value={search} onChange={e=>setSearch(e.target.value)} placeholder="Søg samtaler…" style={{ width:'100%', padding:'10px 12px 10px 32px', borderRadius:12, border:`1.5px solid ${PAPER3}`, fontSize:14, outline:'none', background:isMobile?PAPER2:PAPER2, fontFamily:FONT }} />
             </div>
             {isMobile && showArchived && convs.filter(c=>isArchived(c)).length > 0 && (
-              <button onClick={deleteAllArchived} style={{ marginTop:8, width:'100%', padding:'7px', borderRadius:10, border:'none', background:'#FEF2F2', color:'#e11d48', fontSize:12, fontWeight:700, cursor:'pointer', fontFamily:FONT }}>Slet alle arkiverede</button>
+              <button onClick={(e)=>{ e.stopPropagation(); setDeleteTarget({ all:true }); }} style={{ marginTop:8, width:'100%', padding:'7px', borderRadius:10, border:'none', background:'#FEF2F2', color:'#e11d48', fontSize:12, fontWeight:700, cursor:'pointer', fontFamily:FONT }}>Slet alle arkiverede</button>
             )}
           </div>
 
@@ -1049,7 +1098,7 @@ export default function MessagesClient() {
                     {!isMobile && (archived ? (
                       <div style={{ display:'flex', gap:2, flexShrink:0, alignSelf:'center' }}>
                         <button onClick={e=>unarchiveConv(c,e)} title="Flyt til indbakke" style={{ background:'none', border:'none', fontSize:13, cursor:'pointer', padding:'4px', color:INK3, fontFamily:FONT }}>↑</button>
-                        <button onClick={e=>deleteConv(c,e)} title="Slet permanent" style={{ background:'none', border:'none', fontSize:13, cursor:'pointer', padding:'4px', color:INK3 }}>
+                        <button onClick={e=>{ e.stopPropagation(); setDeleteTarget({ conv:c }); }} title="Slet permanent" style={{ background:'none', border:'none', fontSize:13, cursor:'pointer', padding:'4px', color:INK3 }}>
                           <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6M14 11v6"/></svg>
                         </button>
                       </div>
@@ -1069,7 +1118,7 @@ export default function MessagesClient() {
                     {isMobile && archived && (
                       <div style={{ display:'flex', gap:2, flexShrink:0, alignSelf:'center' }}>
                         <button onClick={e=>unarchiveConv(c,e)} title="Flyt til indbakke" style={{ background:'none', border:'none', fontSize:13, cursor:'pointer', padding:'4px', color:INK3, fontFamily:FONT }}>↑</button>
-                        <button onClick={e=>deleteConv(c,e)} title="Slet permanent" style={{ background:'none', border:'none', fontSize:13, cursor:'pointer', padding:'4px', color:INK3 }}>
+                        <button onClick={e=>{ e.stopPropagation(); setDeleteTarget({ conv:c }); }} title="Slet permanent" style={{ background:'none', border:'none', fontSize:13, cursor:'pointer', padding:'4px', color:INK3 }}>
                           <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6M14 11v6"/></svg>
                         </button>
                       </div>
@@ -1199,12 +1248,12 @@ export default function MessagesClient() {
                   <div style={{ fontFamily:FONT, fontWeight:800, fontSize: isMobile?16:15, whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis', color:INK }}>{isMobile ? otherName(active) : active.listing_title}</div>
                   <div style={{ fontSize:12, color:INK3, marginTop:1, fontFamily:FONT }}>{isMobile ? active.listing_title : <>med <strong style={{ color:INK }}>{otherName(active)}</strong></>}</div>
                 </div>
-                <button onClick={async () => {
-                  if (!active.listing_id) return;
-                  const { data } = await db.from('listings').select('*').eq('id', active.listing_id).maybeSingle();
-                  if (data && setActiveListing) setActiveListing(data);
-                  router.push('/opslag/detail');
-                }} style={{ fontSize:12, fontWeight:700, color:PRIMARY, background:GREEN_TINT, border:'none', borderRadius:99, padding:'6px 14px', cursor: active.listing_id ? 'pointer' : 'not-allowed', whiteSpace:'nowrap', fontFamily:FONT, opacity: active.listing_id ? 1 : 0.4 }}>Se opslag →</button>
+                {!isMobile && active.listing_id && (
+                  <button onClick={openActiveListing} style={{ fontSize:12, fontWeight:700, color:PRIMARY, background:GREEN_TINT, border:'none', borderRadius:99, padding:'6px 14px', cursor:'pointer', whiteSpace:'nowrap', fontFamily:FONT }}>Se opslag →</button>
+                )}
+                <button onClick={()=>setConvMenuOpen(true)} title="Indstillinger" style={{ background:'transparent', border:`1.5px solid ${PAPER3}`, color:INK3, borderRadius:99, width:34, height:34, cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0 }}>
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="5" r="1.8"/><circle cx="12" cy="12" r="1.8"/><circle cx="12" cy="19" r="1.8"/></svg>
+                </button>
               </div>
 
               {/* Messages */}
@@ -1953,6 +2002,131 @@ export default function MessagesClient() {
         <div onClick={()=>setFullsizeImage(null)} style={{ position:'fixed', inset:0, background:'rgba(22,34,28,0.88)', zIndex:3000, display:'flex', alignItems:'center', justifyContent:'center', padding:16 }}>
           <button onClick={()=>setFullsizeImage(null)} style={{ position:'absolute', top:16, right:16, background:'rgba(255,255,255,0.15)', border:'none', borderRadius:99, width:36, height:36, fontSize:18, cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center', color:'#fff' }}>✕</button>
           <img src={fullsizeImage} onClick={e=>e.stopPropagation()} style={{ maxWidth:'100%', maxHeight:'90vh', borderRadius:12, objectFit:'contain', boxShadow:'0 8px 40px rgba(0,0,0,0.5)' }} alt="" />
+        </div>
+      )}
+
+      {/* Conversation options sheet (Detaljer) */}
+      {convMenuOpen && active && (
+        <div onClick={()=>setConvMenuOpen(false)} style={{ position:'fixed', inset:0, background:'rgba(22,34,28,0.5)', zIndex:2500, display:'flex', alignItems: isMobile?'flex-end':'center', justifyContent:'center', padding: isMobile?0:24, animation:'fadeIn 0.18s ease' }}>
+          <div onClick={e=>e.stopPropagation()} style={{ background:PAPER2, borderRadius: isMobile?'20px 20px 0 0':20, width:'100%', maxWidth: isMobile?'100%':380, boxShadow:'0 16px 48px rgba(22,34,28,0.2)', overflow:'hidden', paddingBottom: isMobile?'env(safe-area-inset-bottom, 0px)':0 }}>
+            <div style={{ padding:'18px 20px 12px', borderBottom:`1px solid rgba(22,34,28,0.08)`, display:'flex', alignItems:'center', gap:12 }}>
+              <div style={{ width:42, height:42, borderRadius:12, background:active.listing_image?PAPER3:active.listing_color||'#FFD166', display:'flex', alignItems:'center', justifyContent:'center', fontSize:20, flexShrink:0, overflow:'hidden' }}>
+                {active.listing_image ? <img src={active.listing_image} style={{ width:'100%', height:'100%', objectFit:'cover' }} alt="" /> : active.listing_emoji||'🧸'}
+              </div>
+              <div style={{ flex:1, minWidth:0 }}>
+                <div style={{ fontFamily:FONT, fontWeight:800, fontSize:15, color:INK, whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis' }}>{active.listing_title}</div>
+                <div style={{ fontSize:12, color:INK3, fontFamily:FONT }}>med {otherName(active)}</div>
+              </div>
+              <button onClick={()=>setConvMenuOpen(false)} style={{ background:PAPER3, border:'none', borderRadius:99, width:30, height:30, fontSize:14, cursor:'pointer', color:INK3, flexShrink:0 }}>✕</button>
+            </div>
+            <div style={{ padding:'8px 0 12px' }}>
+              {(() => {
+                const itemStyle = { display:'flex', alignItems:'center', gap:14, width:'100%', padding:'13px 20px', background:'none', border:'none', cursor:'pointer', fontFamily:FONT, fontSize:15, fontWeight:600, color:INK, textAlign:'left' };
+                const archived = isArchived(active);
+                const unread = myUnread(active);
+                const Item = ({ icon, label, color, onClick }) => (
+                  <button onClick={onClick} style={{ ...itemStyle, color: color||INK }}
+                    onMouseEnter={e=>e.currentTarget.style.background=PAPER3}
+                    onMouseLeave={e=>e.currentTarget.style.background='none'}>
+                    <span style={{ width:22, display:'flex', justifyContent:'center', flexShrink:0 }}>{icon}</span>{label}
+                  </button>
+                );
+                return (
+                  <>
+                    {active.listing_id && (
+                      <Item icon={<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke={INK2} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>}
+                        label="Se opslag" onClick={()=>{ setConvMenuOpen(false); openActiveListing(); }} />
+                    )}
+                    <Item icon={unread>0
+                        ? <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke={INK2} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M22 6l-10 7L2 6"/><rect x="2" y="4" width="20" height="16" rx="2"/></svg>
+                        : <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke={INK2} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="3" fill={INK2}/></svg>}
+                      label={unread>0 ? 'Markér som læst' : 'Markér som ulæst'}
+                      onClick={()=>{ toggleReadUnread(active, { stopPropagation:()=>{} }); setConvMenuOpen(false); }} />
+                    <Item icon={<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke={INK2} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="21 8 21 21 3 21 3 8"/><rect x="1" y="3" width="22" height="5"/><line x1="10" y1="12" x2="14" y2="12"/></svg>}
+                      label={archived ? 'Flyt til indbakke' : 'Arkivér samtale'}
+                      onClick={()=>{ (archived?unarchiveConv:archiveConv)(active, { stopPropagation:()=>{} }); setConvMenuOpen(false); }} />
+                    <div style={{ height:1, background:'rgba(22,34,28,0.08)', margin:'6px 20px' }} />
+                    <Item icon={<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#B45309" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1z"/><line x1="4" y1="22" x2="4" y2="15"/></svg>}
+                      label="Rapportér samtale" color="#B45309"
+                      onClick={()=>{ setReportTarget(active); setReportReason(''); setReportNote(''); setReportDone(false); setConvMenuOpen(false); }} />
+                    <Item icon={<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#e11d48" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6M14 11v6"/></svg>}
+                      label="Slet samtale" color="#e11d48"
+                      onClick={()=>{ setConvMenuOpen(false); setDeleteTarget({ conv: active }); }} />
+                  </>
+                );
+              })()}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Report conversation modal */}
+      {reportTarget && (
+        <div onClick={()=>setReportTarget(null)} style={{ position:'fixed', inset:0, background:'rgba(22,34,28,0.55)', zIndex:2600, display:'flex', alignItems:'center', justifyContent:'center', padding:24, animation:'fadeIn 0.18s ease' }}>
+          <div onClick={e=>e.stopPropagation()} style={{ background:PAPER2, borderRadius:22, padding:24, maxWidth:420, width:'100%', boxShadow:'0 16px 48px rgba(22,34,28,0.2)', maxHeight:'85vh', overflowY:'auto' }}>
+            {reportDone ? (
+              <div style={{ textAlign:'center', padding:'12px 0' }}>
+                <div style={{ width:56, height:56, borderRadius:'50%', background:GREEN_TINT, display:'flex', alignItems:'center', justifyContent:'center', margin:'0 auto 14px' }}>
+                  <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke={PRIMARY} strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+                </div>
+                <h3 style={{ fontFamily:FONT, fontWeight:800, fontSize:18, color:INK, marginBottom:6 }}>Tak for din rapport</h3>
+                <p style={{ fontFamily:FONT, fontSize:14, color:INK3, lineHeight:1.5, marginBottom:18 }}>byt&leg gennemgår samtalen hurtigst muligt. Vi kontakter dig hvis vi har brug for mere information.</p>
+                <button onClick={()=>setReportTarget(null)} style={{ width:'100%', padding:'13px', borderRadius:99, background:PRIMARY, color:'#fff', border:'none', fontFamily:FONT, fontWeight:700, fontSize:15, cursor:'pointer' }}>Luk</button>
+              </div>
+            ) : (
+              <>
+                <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:6 }}>
+                  <h3 style={{ fontFamily:FONT, fontWeight:800, fontSize:18, color:INK }}>Rapportér samtale</h3>
+                  <button onClick={()=>setReportTarget(null)} style={{ background:PAPER3, border:'none', borderRadius:99, width:30, height:30, fontSize:14, cursor:'pointer', color:INK3 }}>✕</button>
+                </div>
+                <p style={{ fontFamily:FONT, fontSize:13, color:INK3, marginBottom:16 }}>Hjælp os med at holde byt&leg trygt. Hvad er der galt med samtalen med <strong style={{ color:INK }}>{otherName(reportTarget)}</strong>?</p>
+                <div style={{ display:'flex', flexDirection:'column', gap:8, marginBottom:16 }}>
+                  {REPORT_REASONS.map(r => (
+                    <button key={r} onClick={()=>setReportReason(r)}
+                      style={{ display:'flex', alignItems:'center', gap:10, padding:'12px 14px', borderRadius:12, border:`1.5px solid ${reportReason===r?PRIMARY:PAPER3}`, background:reportReason===r?GREEN_TINT:PAPER, cursor:'pointer', textAlign:'left', fontFamily:FONT, fontSize:14, fontWeight:600, color:INK }}>
+                      <span style={{ width:18, height:18, borderRadius:'50%', border:`2px solid ${reportReason===r?PRIMARY:PAPER3}`, display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0 }}>
+                        {reportReason===r && <span style={{ width:9, height:9, borderRadius:'50%', background:PRIMARY }} />}
+                      </span>
+                      {r}
+                    </button>
+                  ))}
+                </div>
+                <textarea value={reportNote} onChange={e=>setReportNote(e.target.value)} placeholder="Uddyb gerne (valgfri)…" rows={3}
+                  style={{ width:'100%', padding:'11px 14px', borderRadius:12, border:`1.5px solid ${PAPER3}`, fontSize:14, resize:'none', fontFamily:FONT, outline:'none', background:PAPER, marginBottom:16, boxSizing:'border-box' }} />
+                <div style={{ display:'flex', gap:10 }}>
+                  <button onClick={()=>setReportTarget(null)} style={{ flex:1, padding:'13px', borderRadius:99, background:PAPER3, border:'none', fontFamily:FONT, fontWeight:700, fontSize:14, cursor:'pointer', color:INK }}>Annuller</button>
+                  <button onClick={submitReport} disabled={!reportReason||reportSending} style={{ flex:2, padding:'13px', borderRadius:99, background:reportReason?'#B45309':PAPER3, border:'none', color:reportReason?'#fff':INK3, fontFamily:FONT, fontWeight:700, fontSize:14, cursor:reportReason&&!reportSending?'pointer':'default', display:'flex', alignItems:'center', justifyContent:'center', gap:8 }}>
+                    {reportSending ? <><Spinner />Sender…</> : 'Send rapport'}
+                  </button>
+                </div>
+              </>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Delete confirmation modal */}
+      {deleteTarget && (
+        <div onClick={()=>!deleting&&setDeleteTarget(null)} style={{ position:'fixed', inset:0, background:'rgba(22,34,28,0.55)', zIndex:2600, display:'flex', alignItems:'center', justifyContent:'center', padding:24, animation:'fadeIn 0.18s ease' }}>
+          <div onClick={e=>e.stopPropagation()} style={{ background:PAPER2, borderRadius:22, padding:24, maxWidth:380, width:'100%', boxShadow:'0 16px 48px rgba(22,34,28,0.2)' }}>
+            <div style={{ width:52, height:52, borderRadius:'50%', background:'#FEF2F2', display:'flex', alignItems:'center', justifyContent:'center', marginBottom:16 }}>
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#e11d48" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6M14 11v6"/></svg>
+            </div>
+            <h3 style={{ fontFamily:FONT, fontWeight:800, fontSize:18, color:INK, marginBottom:8 }}>
+              {deleteTarget.all ? `Slet ${convs.filter(c=>isArchived(c)).length} arkiverede samtaler?` : 'Slet denne samtale?'}
+            </h3>
+            <p style={{ fontFamily:FONT, fontSize:14, color:INK3, lineHeight:1.5, marginBottom:20 }}>
+              {deleteTarget.all
+                ? 'Alle arkiverede samtaler og deres beskeder slettes permanent. Dette kan ikke fortrydes.'
+                : <>Samtalen med <strong style={{ color:INK }}>{otherName(deleteTarget.conv)}</strong> og alle beskeder slettes permanent. Dette kan ikke fortrydes.</>}
+            </p>
+            <div style={{ display:'flex', gap:10 }}>
+              <button onClick={()=>setDeleteTarget(null)} disabled={deleting} style={{ flex:1, padding:'13px', borderRadius:99, background:PAPER3, border:'none', fontFamily:FONT, fontWeight:700, fontSize:14, cursor:deleting?'default':'pointer', color:INK }}>Annuller</button>
+              <button onClick={performDelete} disabled={deleting} style={{ flex:1, padding:'13px', borderRadius:99, background:'#e11d48', border:'none', color:'#fff', fontFamily:FONT, fontWeight:700, fontSize:14, cursor:deleting?'default':'pointer', display:'flex', alignItems:'center', justifyContent:'center', gap:8 }}>
+                {deleting ? <><Spinner />Sletter…</> : 'Slet'}
+              </button>
+            </div>
+          </div>
         </div>
       )}
     </div>
