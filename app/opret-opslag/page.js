@@ -726,11 +726,11 @@ export default function OpretOpslagPage() {
                               <label style={{ ...labelStyle, fontSize:12, marginBottom:6 }}>Hvad vejer pakken ca.?</label>
                               <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:6 }}>
                                 {[
-                                  { weight_g: 1000,  label: '0–1 kg',   examples: 'Lille bog, puslespil, lille bamse' },
-                                  { weight_g: 5000,  label: '1–5 kg',   examples: 'Brætspil, LEGO-sæt, mellemstor bamse' },
-                                  { weight_g: 10000, label: '5–10 kg',  examples: 'Kasse med LEGO, større boldspil' },
-                                  { weight_g: 15000, label: '10–15 kg', examples: 'Stor legetøjskasse, trampolin-dele' },
-                                  { weight_g: 20000, label: '15–20 kg', examples: 'Større legesæt, løbecykel' },
+                                  { weight_g: 1000,  label: '0–1 kg',   examples: 'Lille bamse, børnebog, lille puslespil' },
+                                  { weight_g: 5000,  label: '1–5 kg',   examples: 'Monopoly, LEGO Classic-sæt, løbecykel' },
+                                  { weight_g: 10000, label: '5–10 kg',  examples: 'Stort DUPLO-sæt, legetøjskøkken (lille)' },
+                                  { weight_g: 15000, label: '10–15 kg', examples: 'Træ-køkken, aktivitetsbord, stor DUPLO-kasse' },
+                                  { weight_g: 20000, label: '15–20 kg', examples: 'Elektrisk elbil, mindre trampolin' },
                                 ].map(band => {
                                   const sel = delivery.weight_g === band.weight_g;
                                   const hovered = hoveredBand === band.weight_g;
