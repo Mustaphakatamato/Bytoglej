@@ -94,9 +94,9 @@ export default function OpretOpslagPage() {
   // Afhentning er altid muligt (håndteres i kurven). Her vælger sælger kun om
   // der også tilbydes forsendelse, og i så fald størrelse + porto-håndtering.
   const [delivery, setDelivery] = useState({
-    shipping: false, size_category: '',
+    shipping: false, size_category: '', weight_kg: '',
   });
-  const [priceEstimates, setPriceEstimates] = useState(null); // { min, max } DKK
+  const [shippingQuote, setShippingQuote] = useState(null); // { carriers, cheapest_key, cheapest_price }
   const [deliveryDefaultApplied, setDeliveryDefaultApplied] = useState(false);
 
   useEffect(() => {
@@ -111,28 +111,28 @@ export default function OpretOpslagPage() {
     });
   }, []);
 
-  // Smart defaults for delivery based on category
+  // Smart defaults for delivery based on category (weight_kg hint for auto-suggestion)
   const CATEGORY_DELIVERY = {
-    'books':               { pickup:true, shipping:true,  size:'small'  },
-    'puzzles':             { pickup:true, shipping:true,  size:'small'  },
-    'board-games':         { pickup:true, shipping:true,  size:'medium' },
-    'plush-small':         { pickup:true, shipping:true,  size:'small'  },
-    'plush-large':         { pickup:true, shipping:true,  size:'medium' },
-    'wooden-toys':         { pickup:true, shipping:true,  size:'medium' },
-    'plastic-toys-small':  { pickup:true, shipping:true,  size:'small'  },
-    'plastic-toys-medium': { pickup:true, shipping:true,  size:'medium' },
-    'plastic-toys-large':  { pickup:true, shipping:false, size:'large'  },
-    'construction-toys':   { pickup:true, shipping:true,  size:'large'  },
-    'outdoor-toys':        { pickup:true, shipping:false, custom:true   },
-    'ride-on-toys':        { pickup:true, shipping:false, custom:true   },
-    'electronic-toys':     { pickup:true, shipping:true,  size:'medium' },
-    'children-furniture':  { pickup:true, shipping:false, custom:true   },
-    'baby-equipment':      { pickup:true, shipping:true,  size:'medium' },
-    'musical-instruments': { pickup:true, shipping:true,  size:'medium' },
-    'sports-equipment':    { pickup:true, shipping:false, custom:true   },
-    'costumes-roleplay':   { pickup:true, shipping:true,  size:'medium' },
-    'art-craft-supplies':  { pickup:true, shipping:true,  size:'small'  },
-    'other':               { pickup:true, shipping:false               },
+    'books':               { pickup:true, shipping:true,  weight_kg: 0.8  },
+    'puzzles':             { pickup:true, shipping:true,  weight_kg: 0.8  },
+    'board-games':         { pickup:true, shipping:true,  weight_kg: 1.5  },
+    'plush-small':         { pickup:true, shipping:true,  weight_kg: 0.5  },
+    'plush-large':         { pickup:true, shipping:true,  weight_kg: 1.5  },
+    'wooden-toys':         { pickup:true, shipping:true,  weight_kg: 2.0  },
+    'plastic-toys-small':  { pickup:true, shipping:true,  weight_kg: 0.8  },
+    'plastic-toys-medium': { pickup:true, shipping:true,  weight_kg: 2.0  },
+    'plastic-toys-large':  { pickup:true, shipping:false, weight_kg: 6.0  },
+    'construction-toys':   { pickup:true, shipping:true,  weight_kg: 3.0  },
+    'outdoor-toys':        { pickup:true, shipping:false                   },
+    'ride-on-toys':        { pickup:true, shipping:false                   },
+    'electronic-toys':     { pickup:true, shipping:true,  weight_kg: 2.0  },
+    'children-furniture':  { pickup:true, shipping:false                   },
+    'baby-equipment':      { pickup:true, shipping:true,  weight_kg: 3.0  },
+    'musical-instruments': { pickup:true, shipping:true,  weight_kg: 2.0  },
+    'sports-equipment':    { pickup:true, shipping:false                   },
+    'costumes-roleplay':   { pickup:true, shipping:true,  weight_kg: 1.0  },
+    'art-craft-supplies':  { pickup:true, shipping:true,  weight_kg: 0.8  },
+    'other':               { pickup:true, shipping:false                   },
   };
 
   useEffect(() => {
@@ -142,18 +142,27 @@ export default function OpretOpslagPage() {
     setDelivery(prev => ({
       ...prev,
       shipping: d.shipping ?? prev.shipping,
-      size_category: d.size || prev.size_category,
+      weight_kg: d.weight_kg != null ? String(d.weight_kg) : prev.weight_kg,
     }));
     setDeliveryDefaultApplied(true);
   }, [form.category]);
 
   useEffect(() => {
-    if (!delivery.shipping || !delivery.size_category) { setPriceEstimates(null); return; }
-    authedFetch(`/api/shipping/quote?size=${delivery.size_category}`)
+    if (!delivery.shipping) { setShippingQuote(null); return; }
+    const weight_g = delivery.weight_kg ? Math.round(parseFloat(delivery.weight_kg) * 1000) : 0;
+    authedFetch(`/api/shipping/quote?weight_g=${weight_g}`)
       .then(r => r.ok ? r.json() : null)
-      .then(json => { if (json?.min) setPriceEstimates({ min: json.min, max: json.max }); })
+      .then(json => {
+        if (json?.carriers) {
+          setShippingQuote(json);
+          // Auto-select cheapest band if none selected yet
+          if (!delivery.size_category && json.cheapest_key) {
+            setDelivery(prev => prev.size_category ? prev : { ...prev, size_category: json.cheapest_key });
+          }
+        }
+      })
       .catch(() => {});
-  }, [delivery.shipping, delivery.size_category]);
+  }, [delivery.shipping, delivery.weight_kg]);
 
   useEffect(() => {
     const fromId = new URLSearchParams(window.location.search).get('from');
@@ -729,29 +738,50 @@ export default function OpretOpslagPage() {
                         </button>
                         {delivery.shipping && (
                           <div style={{ padding:'0 16px 16px', display:'flex', flexDirection:'column', gap:12 }}>
+                            {/* Weight input */}
                             <div>
-                              <label style={{ ...labelStyle, fontSize:12, marginBottom:6 }}>Pakkestørrelse</label>
-                              <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:8 }}>
-                                {[
-                                  { key:'small',  label:'Lille',       sub:'op til 2 kg · 35×25×20 cm', ex:'Bøger, puslespil' },
-                                  { key:'medium', label:'Mellem',      sub:'2–5 kg · 50×35×25 cm',      ex:'Bamser, brætspil' },
-                                  { key:'large',  label:'Stor',        sub:'5–15 kg · 60×40×40 cm',     ex:'Kasser med legetøj' },
-                                  { key:'xlarge', label:'Meget stor',  sub:'15–30 kg · 100×60×60 cm',   ex:'Større ting' },
-                                ].map(sz => (
-                                  <button key={sz.key} type="button" onClick={()=>setDelivery(d=>({...d,size_category:sz.key}))}
-                                    style={{ padding:'10px 12px', borderRadius:10, border:`1.5px solid ${delivery.size_category===sz.key?'#2563EB':PAPER3}`, background:delivery.size_category===sz.key?'#EFF6FF':'#fff', cursor:'pointer', textAlign:'left', transition:'all 0.12s' }}>
-                                    <div style={{ fontFamily:FONT, fontWeight:700, fontSize:13, color:delivery.size_category===sz.key?'#2563EB':INK }}>{sz.label}</div>
-                                    <div style={{ fontSize:11, color:INK3, marginTop:2, lineHeight:1.4 }}>{sz.sub}</div>
-                                    <div style={{ fontSize:11, color:INK3, marginTop:1, fontStyle:'italic' }}>{sz.ex}</div>
-                                  </button>
-                                ))}
+                              <label style={{ ...labelStyle, fontSize:12, marginBottom:6 }}>Hvad vejer pakken ca.?</label>
+                              <div style={{ display:'flex', alignItems:'center', gap:8 }}>
+                                <input
+                                  type="number" min="0.1" max="20" step="0.1"
+                                  value={delivery.weight_kg}
+                                  onChange={e => setDelivery(d => ({ ...d, weight_kg: e.target.value, size_category: '' }))}
+                                  placeholder="fx 1.5"
+                                  style={{ width:90, padding:'8px 10px', borderRadius:8, border:`1.5px solid ${PAPER3}`, fontFamily:FONT, fontSize:14, outline:'none' }}
+                                />
+                                <span style={{ fontFamily:FONT, fontSize:13, color:INK3 }}>kg</span>
                               </div>
                             </div>
-                            {priceEstimates && (
-                              <div style={{ background:'#DBEAFE', borderRadius:10, padding:'10px 14px', fontSize:13, color:'#1D4ED8', fontFamily:FONT, fontWeight:600 }}>
-                                💡 Estimeret porto: ca. {fmtKr(priceEstimates.min)}–{fmtKr(priceEstimates.max)} afhængig af transportør
+
+                            {/* Carrier + weight bands */}
+                            {shippingQuote?.carriers?.map(carrier => (
+                              <div key={carrier.carrier}>
+                                <div style={{ fontFamily:FONT, fontWeight:700, fontSize:12, color:INK3, marginBottom:6 }}>{carrier.label}</div>
+                                <div style={{ display:'flex', flexDirection:'column', gap:6 }}>
+                                  {carrier.bands.map(band => {
+                                    const sel = delivery.size_category === band.key;
+                                    const suggested = band.key === carrier.suggested_key;
+                                    return (
+                                      <button key={band.key} type="button"
+                                        onClick={() => setDelivery(d => ({ ...d, size_category: band.key }))}
+                                        style={{ display:'flex', alignItems:'center', justifyContent:'space-between', padding:'10px 12px', borderRadius:10, border:`1.5px solid ${sel ? '#2563EB' : PAPER3}`, background: sel ? '#EFF6FF' : '#fff', cursor:'pointer', textAlign:'left', transition:'all 0.12s' }}>
+                                        <div style={{ display:'flex', alignItems:'center', gap:8 }}>
+                                          <div style={{ width:16, height:16, borderRadius:'50%', border:`2px solid ${sel ? '#2563EB' : PAPER3}`, background: sel ? '#2563EB' : 'transparent', flexShrink:0 }} />
+                                          <span style={{ fontFamily:FONT, fontWeight:600, fontSize:13, color: sel ? '#2563EB' : INK }}>{band.label}</span>
+                                          {suggested && <span style={{ fontSize:10, fontWeight:700, color:'#059669', background:'#D1FAE5', borderRadius:99, padding:'1px 6px' }}>anbefalet</span>}
+                                        </div>
+                                        <span style={{ fontFamily:FONT, fontWeight:700, fontSize:13, color: sel ? '#2563EB' : INK3 }}>ca. {band.price.toFixed(2).replace('.',',')} kr.</span>
+                                      </button>
+                                    );
+                                  })}
+                                </div>
                               </div>
+                            ))}
+
+                            {!shippingQuote && (
+                              <div style={{ color:INK3, fontFamily:FONT, fontSize:12 }}>Angiv vægt for at se priser per transportør.</div>
                             )}
+
                             <div style={{ background:'#EFF6FF', borderRadius:10, padding:'10px 14px', fontSize:13, color:'#1D4ED8', fontFamily:FONT, fontWeight:600 }}>
                               ℹ️ Prisen du har sat er ekskl. porto — køber betaler porto oveni ved checkout.
                             </div>

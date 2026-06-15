@@ -1,35 +1,33 @@
 import { NextResponse } from 'next/server';
 import { requireAuth, UNAUTHORIZED } from '@/lib/api-auth';
-import { RATES } from '@/lib/shipping-rates';
+import { WEIGHT_BANDS, CARRIER_LABELS, suggestBand } from '@/lib/shipping-rates';
 
-// Estimerede leveringspriser til visning i kurv + opret-opslag.
-// Bevidst tabel-baseret: en præcis live quote kræver fuld afsender/modtager +
-// valgt pakkeshop, hvilket først findes ved checkout (se create-intent, der
-// opkræver den autoritative live-pris via /shipments/quote).
+// Estimerede leveringspriser til visning i opret-opslag.
+// Tabel-baseret da live quote kræver fuld afsender/modtager (kun tilgængeligt ved checkout).
 export async function GET(req) {
   if (!await requireAuth(req)) return UNAUTHORIZED();
 
   const { searchParams } = new URL(req.url);
-  const rawSize = searchParams.get('size') || 'medium';
-  const size = ['small', 'medium', 'large', 'xlarge'].includes(rawSize) ? rawSize : 'medium';
+  const weight_g = Math.max(0, parseInt(searchParams.get('weight_g') || '0', 10));
 
-  const options = Object.values(RATES).map(r => ({
-    carrier_code: r.carrier_code,
-    product_code: r.product_code,
-    label:        r.label,
-    type:         r.type,
-    price_dkk:    r.prices[size] ?? r.prices.medium,
+  const carriers = Object.entries(WEIGHT_BANDS).map(([carrier, bands]) => ({
+    carrier,
+    label: CARRIER_LABELS[carrier],
+    bands,
+    suggested_key: weight_g > 0 ? suggestBand(carrier, weight_g)?.key : null,
   }));
 
-  const parcelOpts = options.filter(o => o.type === 'parcel_shop').sort((a, b) => a.price_dkk - b.price_dkk);
-  const homeOpts   = options.filter(o => o.type === 'home_delivery').sort((a, b) => a.price_dkk - b.price_dkk);
+  // Cheapest option overall for the given weight
+  const cheapest = carriers
+    .flatMap(c => c.bands.map(b => ({ ...b, carrier: c.carrier })))
+    .filter(b => weight_g === 0 || weight_g <= b.max_g)
+    .sort((a, b) => a.price - b.price)[0] ?? null;
 
   return NextResponse.json({
     estimate: true,
-    size_category: size,
-    parcel_shop:   parcelOpts.length ? { min_price: parcelOpts[0].price_dkk, options: parcelOpts } : null,
-    home_delivery: homeOpts.length   ? { min_price: homeOpts[0].price_dkk,   options: homeOpts   } : null,
-    min: parcelOpts[0]?.price_dkk,
-    max: homeOpts.at(-1)?.price_dkk,
+    weight_g,
+    carriers,
+    cheapest_key: cheapest?.key ?? null,
+    cheapest_price: cheapest?.price ?? null,
   });
 }
