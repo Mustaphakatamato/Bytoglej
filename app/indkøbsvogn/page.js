@@ -84,6 +84,7 @@ export default function CartPage() {
   // Per-group delivery state
   // { [sellerName]: { method: 'parcel_shop'|'home_delivery'|'pickup'|'custom', pickupPoint: obj|null, price: number|null } }
   const [deliveryState, setDeliveryState] = useState({});
+  const [sellerDiscounts, setSellerDiscounts] = useState({});
 
   // Quote data: sizeCategory → { parcel_shop: { min_price }, home_delivery: { min_price } }
   const [quotes, setQuotes] = useState({});
@@ -163,15 +164,22 @@ export default function CartPage() {
     });
   }, [groups, quotes, quotesLoading, shippingOptions, institutionId]);
 
-  // Hent sælgeres adresser så afhentnings-muligheden kan vise "hos [navn], [adresse]"
+  // Hent sælgeres adresser og bundle-rabat-indstillinger
   useEffect(() => {
     const names = [...new Set(groups.map(g => g.ownerInstitutionName).filter(Boolean))];
     if (!names.length) return;
-    db.from('institutions').select('name, address, zipcode, city').in('name', names)
+    db.from('institutions')
+      .select('name, address, zipcode, city, bundle_discount_enabled, bundle_discount_tiers')
+      .in('name', names)
       .then(({ data }) => {
-        const m = {};
-        for (const i of (data || [])) m[i.name] = i;
-        setSellerInfo(m);
+        const addrMap = {};
+        const discMap = {};
+        for (const i of (data || [])) {
+          addrMap[i.name] = i;
+          discMap[i.name] = { enabled: i.bundle_discount_enabled, tiers: i.bundle_discount_tiers };
+        }
+        setSellerInfo(addrMap);
+        setSellerDiscounts(discMap);
       });
   }, [groups]);
 
@@ -251,12 +259,28 @@ export default function CartPage() {
     return Math.round(Math.max(5, Math.min(50, itemTotal * 0.05)) * 100) / 100;
   }
 
+  function calcBundleDiscount(itemTotal, itemCount, discSettings) {
+    if (!discSettings?.enabled || !discSettings?.tiers?.length) return 0;
+    const sorted = [...discSettings.tiers].sort((a, b) => b.min_items - a.min_items);
+    const tier = sorted.find(t => itemCount >= t.min_items);
+    if (!tier) return 0;
+    return Math.round(itemTotal * (tier.percent / 100) * 100) / 100;
+  }
+
+  function getGroupDiscount(g) {
+    const groupItemTotal = g.items.reduce((x, i) => x + (i.price || 0), 0);
+    return calcBundleDiscount(groupItemTotal, g.items.length, sellerDiscounts[g.ownerInstitutionName]);
+  }
+
+  const discountTotal = selectedGroups.reduce((s, g) => s + getGroupDiscount(g), 0);
+
   const serviceFeeTotal = selectedGroups.reduce((s, g) => {
     const groupItemTotal = g.items.reduce((x, i) => x + (i.price || 0), 0);
-    return s + calcServiceFee(groupItemTotal);
+    const discount = getGroupDiscount(g);
+    return s + calcServiceFee(groupItemTotal - discount);
   }, 0);
 
-  const grandTotal = itemsTotal + shippingTotal + serviceFeeTotal;
+  const grandTotal = itemsTotal - discountTotal + shippingTotal + serviceFeeTotal;
 
   async function handleCheckout() {
     if (!userId) { router.push('/login'); return; }
@@ -382,6 +406,8 @@ export default function CartPage() {
             const ds = deliveryState[name] || {};
             const ps = pickupState[name] || {};
             const groupItemTotal = group.items.reduce((s, i) => s + (i.price || 0), 0);
+            const groupDiscount = getGroupDiscount(group);
+            const discSettings = sellerDiscounts[name];
 
             return (
               <div key={name} style={{ background: '#fff', borderRadius: 20, border: `1.5px solid ${PAPER3}`, marginBottom: 24, overflow: 'hidden' }}>
@@ -394,7 +420,15 @@ export default function CartPage() {
                     </div>
                   )}
                   <div style={{ fontFamily: FONT, fontWeight: 700, fontSize: 14, color: INK, flex: 1 }}>{name}</div>
-                  <span style={{ fontFamily: FONT, fontWeight: 700, fontSize: 14, color: PRIMARY }}>{groupItemTotal > 0 ? `${groupItemTotal} kr.` : '—'}</span>
+                  {groupDiscount > 0 && (
+                    <span style={{ fontFamily: FONT, fontWeight: 700, fontSize: 11, color: '#16a34a', background: '#dcfce7', borderRadius: 99, padding: '2px 8px', flexShrink: 0 }}>
+                      -{discSettings?.tiers ? [...discSettings.tiers].sort((a,b)=>b.min_items-a.min_items).find(t=>group.items.length>=t.min_items)?.percent : 0}% rabat
+                    </span>
+                  )}
+                  <span style={{ fontFamily: FONT, fontWeight: 700, fontSize: 14, color: groupDiscount > 0 ? '#16a34a' : PRIMARY }}>
+                    {groupItemTotal > 0 ? `${(groupItemTotal - groupDiscount).toFixed(0)} kr.` : '—'}
+                    {groupDiscount > 0 && <span style={{ textDecoration: 'line-through', color: INK3, fontSize: 12, marginLeft: 4 }}>{groupItemTotal} kr.</span>}
+                  </span>
                 </div>
 
                 {/* Items */}
@@ -418,6 +452,31 @@ export default function CartPage() {
                     );
                   })}
                 </div>
+
+                {/* Bundle discount hint */}
+                {discSettings?.enabled && discSettings?.tiers?.length > 0 && groupDiscount === 0 && (() => {
+                  const sorted = [...discSettings.tiers].sort((a, b) => a.min_items - b.min_items);
+                  const nextTier = sorted.find(t => t.min_items > group.items.length);
+                  if (!nextTier) return null;
+                  const needed = nextTier.min_items - group.items.length;
+                  return (
+                    <div style={{ padding: '10px 20px', background: '#f0fdf4', borderBottom: `1px solid ${PAPER2}`, display: 'flex', alignItems: 'center', gap: 8 }}>
+                      <span style={{ fontSize: 14 }}>🎉</span>
+                      <span style={{ fontFamily: FONT, fontSize: 12, color: '#15803d' }}>
+                        Tilføj {needed} vare{needed !== 1 ? 'r' : ''} mere fra {name} og få {nextTier.percent}% bundlerabat!
+                      </span>
+                    </div>
+                  );
+                })()}
+
+                {discSettings?.enabled && groupDiscount > 0 && (
+                  <div style={{ padding: '10px 20px', background: '#f0fdf4', borderBottom: `1px solid ${PAPER2}`, display: 'flex', alignItems: 'center', gap: 8 }}>
+                    <span style={{ fontSize: 14 }}>✅</span>
+                    <span style={{ fontFamily: FONT, fontSize: 12, color: '#15803d', fontWeight: 700 }}>
+                      Bundlerabat på {[...discSettings.tiers].sort((a,b)=>b.min_items-a.min_items).find(t=>group.items.length>=t.min_items)?.percent}% anvendt — du sparer {groupDiscount.toFixed(2).replace('.', ',')} kr.!
+                    </span>
+                  </div>
+                )}
 
                 {/* Address */}
                 {institution && (
@@ -567,6 +626,17 @@ export default function CartPage() {
                 <span style={{ fontFamily: FONT, fontSize: 14, color: INK2 }}>Ordre</span>
                 <span style={{ fontFamily: FONT, fontWeight: 600, fontSize: 14, color: INK }}>{itemsTotal.toFixed(2).replace('.', ',')} kr.</span>
               </div>
+
+              {discountTotal > 0 && (
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <span style={{ fontFamily: FONT, fontSize: 14, color: '#16a34a', display: 'flex', alignItems: 'center', gap: 5 }}>
+                    🎉 Bundlerabat
+                  </span>
+                  <span style={{ fontFamily: FONT, fontWeight: 700, fontSize: 14, color: '#16a34a' }}>
+                    -{discountTotal.toFixed(2).replace('.', ',')} kr.
+                  </span>
+                </div>
+              )}
 
               {selectedGroups.map(g => {
                 const ds = deliveryState[g.ownerInstitutionName] || {};

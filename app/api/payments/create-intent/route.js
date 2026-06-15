@@ -15,6 +15,17 @@ function calcServiceFee(itemTotal) {
   return Math.round(Math.max(5, Math.min(50, itemTotal * 0.05)) * 100) / 100;
 }
 
+// Bundle discount: find highest applicable tier by item count
+function calcBundleDiscount(itemTotal, itemCount, seller) {
+  if (!seller?.bundle_discount_enabled) return 0;
+  const tiers = seller.bundle_discount_tiers;
+  if (!Array.isArray(tiers) || !tiers.length) return 0;
+  const sorted = [...tiers].sort((a, b) => b.min_items - a.min_items);
+  const tier = sorted.find(t => itemCount >= t.min_items);
+  if (!tier) return 0;
+  return Math.round(itemTotal * (tier.percent / 100) * 100) / 100;
+}
+
 export async function POST(req) {
   const user = await requireAuth(req);
   if (!user) return UNAUTHORIZED();
@@ -134,7 +145,7 @@ export async function POST(req) {
     if (sellerName) {
       const { data } = await supa
         .from('institutions')
-        .select('id, name, email, phone, address, zipcode, city, bank_reg_nr, bank_account_nr')
+        .select('id, name, email, phone, address, zipcode, city, bank_reg_nr, bank_account_nr, bundle_discount_enabled, bundle_discount_tiers')
         .ilike('name', sellerName)
         .maybeSingle();
       seller = data;
@@ -163,8 +174,12 @@ export async function POST(req) {
       }
     }
 
-    const serviceFee = calcServiceFee(itemTotal);
-    const groupTotal = Math.round((itemTotal + shippingTotal + serviceFee) * 100) / 100;
+    // Bundle discount (applied before service fee)
+    const bundleDiscount = calcBundleDiscount(itemTotal, items.length, seller);
+    const discountedItemTotal = Math.round((itemTotal - bundleDiscount) * 100) / 100;
+
+    const serviceFee = calcServiceFee(discountedItemTotal);
+    const groupTotal = Math.round((discountedItemTotal + shippingTotal + serviceFee) * 100) / 100;
     grandTotal += groupTotal;
 
     orderGroups.push({
@@ -180,6 +195,8 @@ export async function POST(req) {
       sellerBankAccountNr: seller?.bank_account_nr || null,
       items,
       itemTotal,
+      bundleDiscount,
+      discountedItemTotal,
       shippingTotal,
       serviceFee,
       groupTotal,

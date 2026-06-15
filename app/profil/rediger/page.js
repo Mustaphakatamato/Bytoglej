@@ -67,6 +67,15 @@ export default function ProfilPage() {
   });
   const [saving, setSaving] = useState(false);
 
+  const DEFAULT_TIERS = [
+    { min_items: 2, percent: 5 },
+    { min_items: 3, percent: 10 },
+    { min_items: 5, percent: 20 },
+  ];
+  const [bundleEnabled, setBundleEnabled] = useState(institution?.bundle_discount_enabled ?? false);
+  const [bundleTiers, setBundleTiers] = useState(institution?.bundle_discount_tiers ?? DEFAULT_TIERS);
+  const [bundleSaving, setBundleSaving] = useState(false);
+
   useEffect(() => {
     if (!institution) return;
     setForm({
@@ -85,6 +94,8 @@ export default function ProfilPage() {
       bank_reg_nr:           institution.bank_reg_nr           || '',
       bank_account_nr:       institution.bank_account_nr       || '',
     });
+    setBundleEnabled(institution.bundle_discount_enabled ?? false);
+    setBundleTiers(institution.bundle_discount_tiers ?? DEFAULT_TIERS);
   }, [institution?.id]);
 
   // Modals
@@ -136,6 +147,19 @@ export default function ProfilPage() {
     onInstChange({ ...institution, ...form, children_count: Number(form.children_count) || null });
     showToast('Profil opdateret ✓');
     router.push('/profil');
+  }
+
+  async function handleBundleSave() {
+    if (!institution) return;
+    setBundleSaving(true);
+    const { error } = await db.from('institutions').update({
+      bundle_discount_enabled: bundleEnabled,
+      bundle_discount_tiers: bundleTiers,
+    }).eq('email', institution.email);
+    setBundleSaving(false);
+    if (error) { showToast('Noget gik galt', 'error'); return; }
+    onInstChange({ ...institution, bundle_discount_enabled: bundleEnabled, bundle_discount_tiers: bundleTiers });
+    showToast('Bundlerabatter gemt ✓');
   }
 
   async function handleEmailChange() {
@@ -269,6 +293,85 @@ export default function ProfilPage() {
                 <input value={form.bank_account_nr} onChange={e=>setForm(f=>({...f,bank_account_nr:e.target.value.replace(/\D/g,'').slice(0,10)}))} placeholder="12345678" maxLength={10} style={INP} />
               </div>
             </div>
+          </div>
+
+          {/* Bundlerabatter */}
+          <div style={{ borderTop:'1px solid #f0eeeb', paddingTop:20 }}>
+            <div style={{ fontSize:12, fontWeight:700, color:'#aaa', textTransform:'uppercase', letterSpacing:0.8, marginBottom:6 }}>Bundlerabatter</div>
+            <div style={{ fontSize:13, color:INK3, marginBottom:16, lineHeight:1.5 }}>
+              Giv købere en automatisk rabat når de køber flere varer fra dig på samme ordre. Rabatten beregnes af varernes samlede pris.
+            </div>
+
+            {/* Toggle */}
+            <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', padding:'14px 16px', background:'#f8f7f5', borderRadius:14, marginBottom:16, border:'1px solid #e8e5e1' }}>
+              <div>
+                <div style={{ fontFamily:FONT, fontWeight:700, fontSize:14, color:INK }}>Aktivér bundlerabatter</div>
+                <div style={{ fontSize:12, color:INK3, marginTop:2 }}>Vises automatisk i købers kurv</div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setBundleEnabled(v => !v)}
+                style={{ width:48, height:26, borderRadius:99, border:'none', cursor:'pointer', position:'relative', background: bundleEnabled ? PRIMARY : '#d1d5db', transition:'background 0.2s', flexShrink:0 }}
+              >
+                <div style={{ position:'absolute', top:3, left: bundleEnabled ? 25 : 3, width:20, height:20, borderRadius:'50%', background:'#fff', transition:'left 0.2s', boxShadow:'0 1px 4px rgba(0,0,0,0.2)' }} />
+              </button>
+            </div>
+
+            {/* Tiers */}
+            {bundleEnabled && (
+              <div style={{ display:'flex', flexDirection:'column', gap:10, marginBottom:16 }}>
+                <div style={{ fontSize:13, fontWeight:700, color:INK2 }}>Konfigurer rabatter</div>
+                {bundleTiers.map((tier, idx) => (
+                  <div key={idx} style={{ display:'flex', alignItems:'center', gap:12, padding:'12px 14px', background:'#f8f7f5', borderRadius:12, border:'1px solid #e8e5e1' }}>
+                    <div style={{ flex:1 }}>
+                      <div style={{ fontSize:12, color:INK3, marginBottom:4 }}>Artikler</div>
+                      <select
+                        value={tier.min_items}
+                        onChange={e => setBundleTiers(ts => ts.map((t, i) => i === idx ? { ...t, min_items: Number(e.target.value) } : t))}
+                        style={{ width:'100%', padding:'8px 10px', borderRadius:8, border:'1.5px solid #e5e5e5', fontSize:14, fontFamily:FONT, background:'#fff', outline:'none' }}
+                      >
+                        {[2,3,4,5,6,7,8,9,10].map(n => <option key={n} value={n}>{n} artikler</option>)}
+                      </select>
+                    </div>
+                    <div style={{ flex:1 }}>
+                      <div style={{ fontSize:12, color:INK3, marginBottom:4 }}>Rabat</div>
+                      <select
+                        value={tier.percent}
+                        onChange={e => setBundleTiers(ts => ts.map((t, i) => i === idx ? { ...t, percent: Number(e.target.value) } : t))}
+                        style={{ width:'100%', padding:'8px 10px', borderRadius:8, border:'1.5px solid #e5e5e5', fontSize:14, fontFamily:FONT, background:'#fff', outline:'none' }}
+                      >
+                        {[5,10,15,20,25,30].map(p => <option key={p} value={p}>{p}%</option>)}
+                      </select>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setBundleTiers(ts => ts.filter((_, i) => i !== idx))}
+                      style={{ width:32, height:32, borderRadius:'50%', background:'none', border:'1.5px solid #e5e5e5', color:INK3, fontSize:16, cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0, marginTop:18 }}
+                    >
+                      ×
+                    </button>
+                  </div>
+                ))}
+                {bundleTiers.length < 5 && (
+                  <button
+                    type="button"
+                    onClick={() => setBundleTiers(ts => [...ts, { min_items: Math.max(...ts.map(t => t.min_items), 1) + 1, percent: 5 }])}
+                    style={{ padding:'9px 16px', borderRadius:99, background:'none', border:`1.5px solid ${PRIMARY}`, color:PRIMARY, fontFamily:FONT, fontWeight:700, fontSize:13, cursor:'pointer', alignSelf:'flex-start' }}
+                  >
+                    + Tilføj trin
+                  </button>
+                )}
+              </div>
+            )}
+
+            <button
+              type="button"
+              onClick={handleBundleSave}
+              disabled={bundleSaving}
+              style={{ padding:'11px 20px', borderRadius:12, background: bundleSaving ? '#e5e5e5' : PRIMARY, color:'#fff', border:'none', fontFamily:FONT, fontWeight:700, fontSize:14, cursor: bundleSaving ? 'default' : 'pointer', opacity: bundleSaving ? 0.7 : 1 }}
+            >
+              {bundleSaving ? 'Gemmer…' : '✓ Gem bundlerabatter'}
+            </button>
           </div>
 
           {/* Kontosikkerhed */}
