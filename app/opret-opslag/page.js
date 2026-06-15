@@ -753,33 +753,28 @@ export default function OpretOpslagPage() {
                               </div>
                             </div>
 
-                            {/* Carrier + weight bands */}
-                            {shippingQuote?.carriers?.map(carrier => (
-                              <div key={carrier.carrier}>
-                                <div style={{ fontFamily:FONT, fontWeight:700, fontSize:12, color:INK3, marginBottom:6 }}>{carrier.label}</div>
-                                <div style={{ display:'flex', flexDirection:'column', gap:6 }}>
-                                  {carrier.bands.map(band => {
+                            {/* GLS-bånd som fælles reference — køber vælger transportør ved checkout */}
+                            {shippingQuote?.carriers?.[0]?.bands?.length > 0 && (
+                              <div>
+                                <label style={{ ...labelStyle, fontSize:12, marginBottom:6 }}>Pakkevægt</label>
+                                <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:6 }}>
+                                  {shippingQuote.carriers[0].bands.map(band => {
                                     const sel = delivery.size_category === band.key;
-                                    const suggested = band.key === carrier.suggested_key;
+                                    const suggested = band.key === shippingQuote.carriers[0].suggested_key;
                                     return (
                                       <button key={band.key} type="button"
                                         onClick={() => setDelivery(d => ({ ...d, size_category: band.key }))}
-                                        style={{ display:'flex', alignItems:'center', justifyContent:'space-between', padding:'10px 12px', borderRadius:10, border:`1.5px solid ${sel ? '#2563EB' : PAPER3}`, background: sel ? '#EFF6FF' : '#fff', cursor:'pointer', textAlign:'left', transition:'all 0.12s' }}>
-                                        <div style={{ display:'flex', alignItems:'center', gap:8 }}>
-                                          <div style={{ width:16, height:16, borderRadius:'50%', border:`2px solid ${sel ? '#2563EB' : PAPER3}`, background: sel ? '#2563EB' : 'transparent', flexShrink:0 }} />
-                                          <span style={{ fontFamily:FONT, fontWeight:600, fontSize:13, color: sel ? '#2563EB' : INK }}>{band.label}</span>
-                                          {suggested && <span style={{ fontSize:10, fontWeight:700, color:'#059669', background:'#D1FAE5', borderRadius:99, padding:'1px 6px' }}>anbefalet</span>}
+                                        style={{ display:'flex', alignItems:'center', gap:8, padding:'10px 12px', borderRadius:10, border:`1.5px solid ${sel ? '#2563EB' : PAPER3}`, background: sel ? '#EFF6FF' : '#fff', cursor:'pointer', textAlign:'left', transition:'all 0.12s' }}>
+                                        <div style={{ width:14, height:14, borderRadius:'50%', border:`2px solid ${sel ? '#2563EB' : PAPER3}`, background: sel ? '#2563EB' : 'transparent', flexShrink:0 }} />
+                                        <div>
+                                          <div style={{ fontFamily:FONT, fontWeight:600, fontSize:13, color: sel ? '#2563EB' : INK }}>{band.label}</div>
+                                          {suggested && <div style={{ fontSize:10, fontWeight:700, color:'#059669' }}>anbefalet</div>}
                                         </div>
-                                        <span style={{ fontFamily:FONT, fontWeight:700, fontSize:13, color: sel ? '#2563EB' : INK3 }}>ca. {band.price.toFixed(2).replace('.',',')} kr.</span>
                                       </button>
                                     );
                                   })}
                                 </div>
                               </div>
-                            ))}
-
-                            {!shippingQuote && (
-                              <div style={{ color:INK3, fontFamily:FONT, fontSize:12 }}>Angiv vægt for at se priser per transportør.</div>
                             )}
 
                             <div style={{ background:'#EFF6FF', borderRadius:10, padding:'10px 14px', fontSize:13, color:'#1D4ED8', fontFamily:FONT, fontWeight:600 }}>
