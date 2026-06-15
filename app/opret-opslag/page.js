@@ -94,9 +94,8 @@ export default function OpretOpslagPage() {
   // Afhentning er altid muligt (håndteres i kurven). Her vælger sælger kun om
   // der også tilbydes forsendelse, og i så fald størrelse + porto-håndtering.
   const [delivery, setDelivery] = useState({
-    shipping: false, size_category: '', weight_kg: '',
+    shipping: false, weight_kg: '',
   });
-  const [shippingQuote, setShippingQuote] = useState(null); // { carriers, cheapest_key, cheapest_price }
   const [deliveryDefaultApplied, setDeliveryDefaultApplied] = useState(false);
 
   useEffect(() => {
@@ -144,25 +143,10 @@ export default function OpretOpslagPage() {
       shipping: d.shipping ?? prev.shipping,
       weight_kg: d.weight_kg != null ? String(d.weight_kg) : prev.weight_kg,
     }));
+
     setDeliveryDefaultApplied(true);
   }, [form.category]);
 
-  useEffect(() => {
-    if (!delivery.shipping) { setShippingQuote(null); return; }
-    const weight_g = delivery.weight_kg ? Math.round(parseFloat(delivery.weight_kg) * 1000) : 0;
-    authedFetch(`/api/shipping/quote?weight_g=${weight_g}`)
-      .then(r => r.ok ? r.json() : null)
-      .then(json => {
-        if (json?.carriers) {
-          setShippingQuote(json);
-          // Auto-select cheapest band if none selected yet
-          if (!delivery.size_category && json.cheapest_key) {
-            setDelivery(prev => prev.size_category ? prev : { ...prev, size_category: json.cheapest_key });
-          }
-        }
-      })
-      .catch(() => {});
-  }, [delivery.shipping, delivery.weight_kg]);
 
   useEffect(() => {
     const fromId = new URLSearchParams(window.location.search).get('from');
@@ -421,7 +405,7 @@ export default function OpretOpslagPage() {
     if (!form.title.trim()) return;
     if (form.type === 'køb' && !String(form.price).trim()) { showToast('Angiv en pris for køb-opslag', 'error'); return; }
     if (!form.description.trim()) { showToast('Tilføj en beskrivelse', 'error'); return; }
-    if (delivery.shipping && !delivery.size_category) { showToast('Vælg pakkestørrelse for forsendelse', 'error'); return; }
+    if (delivery.shipping && !delivery.weight_kg) { showToast('Angiv pakkens vægt for forsendelse', 'error'); return; }
     setSaving(true);
     try {
     const { data:{ user } } = await db.auth.getUser();
@@ -458,7 +442,7 @@ export default function OpretOpslagPage() {
         allow_pickup: true,      // afhentning er altid muligt — køber aftaler direkte
         allow_shipping: delivery.shipping,
         allow_custom: false,
-        shipping_size_category: delivery.shipping ? (delivery.size_category || null) : null,
+        shipping_size_category: delivery.shipping && delivery.weight_kg ? String(Math.round(parseFloat(delivery.weight_kg) * 1000)) : null,
         shipping_included_in_price: false,
       });
     }
@@ -738,47 +722,21 @@ export default function OpretOpslagPage() {
                         </button>
                         {delivery.shipping && (
                           <div style={{ padding:'0 16px 16px', display:'flex', flexDirection:'column', gap:12 }}>
-                            {/* Weight input */}
                             <div>
                               <label style={{ ...labelStyle, fontSize:12, marginBottom:6 }}>Hvad vejer pakken ca.?</label>
                               <div style={{ display:'flex', alignItems:'center', gap:8 }}>
                                 <input
                                   type="number" min="0.1" max="20" step="0.1"
                                   value={delivery.weight_kg}
-                                  onChange={e => setDelivery(d => ({ ...d, weight_kg: e.target.value, size_category: '' }))}
+                                  onChange={e => setDelivery(d => ({ ...d, weight_kg: e.target.value }))}
                                   placeholder="fx 1.5"
                                   style={{ width:90, padding:'8px 10px', borderRadius:8, border:`1.5px solid ${PAPER3}`, fontFamily:FONT, fontSize:14, outline:'none' }}
                                 />
                                 <span style={{ fontFamily:FONT, fontSize:13, color:INK3 }}>kg</span>
                               </div>
                             </div>
-
-                            {/* GLS-bånd som fælles reference — køber vælger transportør ved checkout */}
-                            {shippingQuote?.carriers?.[0]?.bands?.length > 0 && (
-                              <div>
-                                <label style={{ ...labelStyle, fontSize:12, marginBottom:6 }}>Pakkevægt</label>
-                                <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:6 }}>
-                                  {shippingQuote.carriers[0].bands.map(band => {
-                                    const sel = delivery.size_category === band.key;
-                                    const suggested = band.key === shippingQuote.carriers[0].suggested_key;
-                                    return (
-                                      <button key={band.key} type="button"
-                                        onClick={() => setDelivery(d => ({ ...d, size_category: band.key }))}
-                                        style={{ display:'flex', alignItems:'center', gap:8, padding:'10px 12px', borderRadius:10, border:`1.5px solid ${sel ? '#2563EB' : PAPER3}`, background: sel ? '#EFF6FF' : '#fff', cursor:'pointer', textAlign:'left', transition:'all 0.12s' }}>
-                                        <div style={{ width:14, height:14, borderRadius:'50%', border:`2px solid ${sel ? '#2563EB' : PAPER3}`, background: sel ? '#2563EB' : 'transparent', flexShrink:0 }} />
-                                        <div>
-                                          <div style={{ fontFamily:FONT, fontWeight:600, fontSize:13, color: sel ? '#2563EB' : INK }}>{band.label}</div>
-                                          {suggested && <div style={{ fontSize:10, fontWeight:700, color:'#059669' }}>anbefalet</div>}
-                                        </div>
-                                      </button>
-                                    );
-                                  })}
-                                </div>
-                              </div>
-                            )}
-
                             <div style={{ background:'#EFF6FF', borderRadius:10, padding:'10px 14px', fontSize:13, color:'#1D4ED8', fontFamily:FONT, fontWeight:600 }}>
-                              ℹ️ Prisen du har sat er ekskl. porto — køber betaler porto oveni ved checkout.
+                              ℹ️ Prisen du har sat er ekskl. porto — køber betaler den billigste porto oveni ved checkout.
                             </div>
                           </div>
                         )}
