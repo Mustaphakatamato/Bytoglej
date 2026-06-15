@@ -8,11 +8,17 @@ const CARRIER_COLOR = { pdk: '#005CB9', gls: '#06038D', dao: '#E2001A' };
 
 function fmtKr(n) { return `${Number(n || 0).toFixed(2).replace('.', ',')} kr.`; }
 
+const DAYS_DA = { Monday: 'Mandag', Tuesday: 'Tirsdag', Wednesday: 'Onsdag', Thursday: 'Torsdag', Friday: 'Fredag', Saturday: 'Lørdag', Sunday: 'Søndag' };
+function translateDay(h) {
+  return String(h).replace(/^(\w+):/, (_, d) => `${DAYS_DA[d] || d}:`);
+}
+
 // Vinted-lignende kort-vælger: viser udleveringssteder fra alle carriers på et kort
 // + en liste. Køber vælger ét sted (og dermed carrier). Billigste fremhæves.
 export default function PickupPointPicker({ points, cheapestCarrier, onConfirm, onClose, addressLabel }) {
   const [mounted, setMounted] = useState(false);
   const [selectedId, setSelectedId] = useState(null);
+  const [expanded, setExpanded] = useState(false);
   const mapRef = useRef(null);
   const mapInstanceRef = useRef(null);
   const markersRef = useRef(null);
@@ -132,7 +138,6 @@ export default function PickupPointPicker({ points, cheapestCarrier, onConfirm, 
                   </div>
                   <div style={{ fontFamily: FONT, fontWeight: 700, fontSize: 13, color: isSel ? PRIMARY : INK }}>{p.name}</div>
                   <div style={{ fontFamily: FONT, fontSize: 12, color: INK3 }}>{p.address}</div>
-                  {p.opening_hours?.[0] && <div style={{ fontFamily: FONT, fontSize: 11, color: INK3 }}>🕒 {String(p.opening_hours[0]).replace(/^[A-Za-zæøåÆØÅ]+day: ?/, '')}</div>}
                 </button>
               );
             })}
@@ -144,21 +149,56 @@ export default function PickupPointPicker({ points, cheapestCarrier, onConfirm, 
           </div>
         </div>
 
-        {/* Footer: bekræft */}
-        <div style={{ padding: '14px 20px', borderTop: `1px solid ${PAPER2}`, display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
-          <div style={{ minWidth: 0 }}>
-            {selected
-              ? <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                  <CarrierLogo carrier={selected.carrier_code} />
-                  <span style={{ fontFamily: FONT, fontSize: 13, color: INK, fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{selected.name} · {fmtKr(selected.price)}</span>
+        {/* Detaljeboks for valgt sted (Vinted-stil) */}
+        <div style={{ borderTop: `1px solid ${PAPER2}` }}>
+          {selected ? (
+            <>
+              <div style={{ padding: '16px 20px 12px', display: 'flex', alignItems: 'flex-start', gap: 14 }}>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6 }}>
+                    <CarrierLogo carrier={selected.carrier_code} />
+                  </div>
+                  <div style={{ fontFamily: FONT, fontWeight: 800, fontSize: 16, color: INK }}>{fmtKr(selected.price)}</div>
+                  <div style={{ fontFamily: FONT, fontSize: 13, color: INK2, marginTop: 6, display: 'flex', alignItems: 'center', gap: 6 }}>
+                    <span>📍</span><span style={{ fontWeight: 700 }}>{selected.name}</span>
+                  </div>
+                  <div style={{ fontFamily: FONT, fontSize: 12, color: INK3, marginTop: 2, marginLeft: 22 }}>{selected.address}</div>
+                  <div style={{ fontFamily: FONT, fontSize: 12, color: INK3, marginTop: 4, display: 'flex', alignItems: 'center', gap: 6 }}>
+                    <span>🕒</span><span>Klar til afhentning inden for 1–3 hverdage</span>
+                  </div>
                 </div>
-              : <span style={{ fontFamily: FONT, fontSize: 13, color: INK3 }}>Vælg et sted på kortet eller i listen</span>}
-          </div>
-          <button type="button" disabled={!selected}
-            onClick={() => selected && onConfirm(selected)}
-            style={{ flexShrink: 0, padding: '11px 26px', borderRadius: 99, border: 'none', background: selected ? PRIMARY : PAPER3, color: selected ? '#fff' : INK3, fontFamily: FONT, fontWeight: 700, fontSize: 14, cursor: selected ? 'pointer' : 'not-allowed' }}>
-            Bekræft
-          </button>
+                <button type="button" onClick={() => onConfirm(selected)}
+                  style={{ flexShrink: 0, padding: '11px 26px', borderRadius: 99, border: 'none', background: PRIMARY, color: '#fff', fontFamily: FONT, fontWeight: 700, fontSize: 14, cursor: 'pointer' }}>
+                  Bekræft
+                </button>
+              </div>
+
+              {/* Yderligere oplysninger — udfold åbningstider */}
+              {selected.opening_hours?.length > 0 && (
+                <div style={{ borderTop: `1px solid ${PAPER2}` }}>
+                  <button type="button" onClick={() => setExpanded(e => !e)}
+                    style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 20px', background: 'none', border: 'none', cursor: 'pointer', fontFamily: FONT, fontWeight: 700, fontSize: 13, color: INK }}>
+                    Yderligere oplysninger
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke={INK3} strokeWidth="2" strokeLinecap="round" style={{ transform: expanded ? 'rotate(180deg)' : 'none', transition: 'transform .2s' }}><polyline points="6 9 12 15 18 9" /></svg>
+                  </button>
+                  {expanded && (
+                    <div style={{ padding: '0 20px 16px' }}>
+                      <div style={{ fontFamily: FONT, fontSize: 12, fontWeight: 700, color: INK2, marginBottom: 6 }}>Åbningstider</div>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
+                        {selected.opening_hours.map((h, i) => (
+                          <div key={i} style={{ fontFamily: FONT, fontSize: 12, color: INK3 }}>{translateDay(h)}</div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+            </>
+          ) : (
+            <div style={{ padding: '18px 20px', fontFamily: FONT, fontSize: 13, color: INK3, textAlign: 'center' }}>
+              Vælg et sted på kortet eller i listen
+            </div>
+          )}
         </div>
       </div>
     </div>,
