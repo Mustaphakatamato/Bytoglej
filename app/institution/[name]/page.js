@@ -47,6 +47,7 @@ export default function InstitutionPage() {
   const [followCount, setFollowCount] = useState(0);
   const [followLoading, setFollowLoading] = useState(false);
   const [currentUserId, setCurrentUserId] = useState(null);
+  const [currentUserEmail, setCurrentUserEmail] = useState(null);
   const ww = useWindowWidth();
   const isMobile = ww < 768;
 
@@ -70,6 +71,7 @@ export default function InstitutionPage() {
     db.auth.getUser().then(({ data: { user } }) => {
       if (!user) return;
       setCurrentUserId(user.id);
+      setCurrentUserEmail(user.email || null);
       db.from('institution_follows').select('id').eq('follower_user_id', user.id).eq('institution_name', institutionName).maybeSingle()
         .then(({ data }) => setIsFollowing(!!data));
     });
@@ -216,6 +218,26 @@ export default function InstitutionPage() {
       router.push('/beskeder');
     } catch {}
     setContacting(false);
+  }
+
+  // Fortrolighed: skjult profil er kun synlig for institutionen selv.
+  const isOwner = inst && currentUserEmail && inst.email &&
+    inst.email.toLowerCase() === currentUserEmail.toLowerCase();
+  if (!loading && inst && inst.profile_public === false && !isOwner) {
+    return (
+      <div style={{ minHeight:'100vh', paddingTop:80, background:'#f8f5f0' }} className="page-enter">
+        <div style={{ maxWidth:560, margin:'0 auto', padding:isMobile?'48px 16px':'80px 24px', textAlign:'center' }}>
+          <div style={{ fontSize:48, marginBottom:16 }}>🔒</div>
+          <h1 style={{ fontFamily:"'Nunito',sans-serif", fontWeight:900, fontSize:isMobile?22:26, marginBottom:10 }}>Profilen er ikke offentlig</h1>
+          <p style={{ fontSize:15, color:INK3, lineHeight:1.6, marginBottom:28 }}>
+            {institutionName} har valgt at skjule sin profilside. Du kan stadig se og købe deres aktive opslag via søgningen.
+          </p>
+          <button onClick={()=>router.push('/opslag')} style={{ padding:'12px 28px', borderRadius:99, background:PRIMARY, color:'#fff', border:'none', fontFamily:FONT, fontWeight:700, fontSize:15, cursor:'pointer' }}>
+            Gå til opslag
+          </button>
+        </div>
+      </div>
+    );
   }
 
   return (

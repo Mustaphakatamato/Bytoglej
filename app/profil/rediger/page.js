@@ -5,6 +5,7 @@ import { db } from '@/lib/supabase';
 import { PRIMARY, GREEN_DEEP, GREEN_TINT, INK, INK2, INK3, PAPER, PAPER2, PAPER3, FONT } from '@/lib/constants';
 import { useWindowWidth, geocodeAddress } from '@/lib/hooks';
 import { useApp } from '@/providers/AppProvider';
+import { authedFetch } from '@/lib/authed-fetch';
 import { Btn, Spinner } from '@/components/ui';
 const INP = { width:'100%', padding:'11px 14px', borderRadius:12, border:'1.5px solid #e5e5e5', fontSize:14, fontFamily:"'Nunito Sans',sans-serif", outline:'none', boxSizing:'border-box' };
 
@@ -22,6 +23,7 @@ const SECTIONS = [
   { key:'betaling',       label:'Betaling',            icon:'💳' },
   { key:'bundle',         label:'Bundlerabatter',      icon:'📦' },
   { key:'notifikationer', label:'Notifikationer',      icon:'🔔' },
+  { key:'fortrolighed',   label:'Fortrolighed',        icon:'🛡️' },
   { key:'sikkerhed',      label:'Sikkerhed',           icon:'🔒' },
 ];
 
@@ -116,6 +118,12 @@ export default function IndstillingerPage() {
     if (typeof Notification !== 'undefined') setNotifPermission(Notification.permission);
   }, []);
 
+  // Fortrolighed
+  const [marketingConsent, setMarketingConsent] = useState(institution?.marketing_consent ?? false);
+  const [profilePublic, setProfilePublic]       = useState(institution?.profile_public ?? true);
+  const [consentSaving, setConsentSaving]       = useState(null); // hvilken toggle der gemmer
+  const [exporting, setExporting]               = useState(false);
+
   useEffect(() => {
     if (!institution) return;
     setForm({
@@ -136,6 +144,8 @@ export default function IndstillingerPage() {
     });
     setBundleEnabled(institution.bundle_discount_enabled ?? false);
     setBundleTiers(institution.bundle_discount_tiers ?? DEFAULT_TIERS);
+    setMarketingConsent(institution.marketing_consent ?? false);
+    setProfilePublic(institution.profile_public ?? true);
   }, [institution?.id]);
 
   // Modals
@@ -251,6 +261,53 @@ export default function IndstillingerPage() {
       showToast('Notifikationer aktiveret ✓');
     } catch {}
     setNotifLoading(false);
+  }
+
+  // Samtykke/præference-skift — gemmes server-side med audit-log.
+  // Optimistisk UI, ruller tilbage hvis kaldet fejler.
+  async function handleConsentToggle(type, next) {
+    if (!institution) return;
+    const setter = type === 'marketing' ? setMarketingConsent : setProfilePublic;
+    const column = type === 'marketing' ? 'marketing_consent' : 'profile_public';
+    const prev = type === 'marketing' ? marketingConsent : profilePublic;
+    setter(next);
+    setConsentSaving(type);
+    try {
+      const res = await authedFetch('/api/gdpr/consent', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ type, granted: next }),
+      });
+      if (!res.ok) throw new Error('failed');
+      onInstChange({ ...institution, [column]: next });
+      showToast('Indstilling gemt ✓');
+    } catch {
+      setter(prev);
+      showToast('Kunne ikke gemme — prøv igen', 'error');
+    }
+    setConsentSaving(null);
+  }
+
+  async function handleDataExport() {
+    setExporting(true);
+    try {
+      const res = await authedFetch('/api/gdpr/export');
+      if (!res.ok) throw new Error('failed');
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      const cd = res.headers.get('Content-Disposition') || '';
+      a.download = cd.match(/filename="([^"]+)"/)?.[1] || 'bytogleg-data.json';
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+      showToast('Dine data er downloadet ✓');
+    } catch {
+      showToast('Kunne ikke hente data — prøv igen', 'error');
+    }
+    setExporting(false);
   }
 
   async function handleEmailChange() {
@@ -556,6 +613,70 @@ export default function IndstillingerPage() {
                       Din browser understøtter ikke push-notifikationer. Prøv at åbne byt&amp;leg i Chrome eller Safari på en nyere enhed.
                     </div>
                   )}
+                </div>
+              )}
+
+              {/* ── FORTROLIGHED ── */}
+              {section === 'fortrolighed' && (
+                <div>
+                  <SectionHead title="Fortrolighed" desc="Styr hvordan dine data bruges, og hent en kopi af alt vi har registreret om din institution." />
+
+                  {/* Markedsføringssamtykke */}
+                  <div style={{ display:'flex', alignItems:'flex-start', justifyContent:'space-between', gap:16, padding:'16px 18px', background:PAPER2, borderRadius:14, border:`1px solid ${PAPER3}`, marginBottom:12 }}>
+                    <div>
+                      <div style={{ fontFamily:FONT, fontWeight:700, fontSize:14, color:INK }}>Markedsføring og nyheder</div>
+                      <div style={{ fontSize:12, color:INK3, marginTop:4, lineHeight:1.5 }}>
+                        Tillad at byt&amp;leg sender dig nyheder, tips og kampagner på e-mail. Du modtager altid driftsbeskeder om dine handler uanset dette valg.
+                      </div>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => consentSaving ? null : handleConsentToggle('marketing', !marketingConsent)}
+                      disabled={consentSaving === 'marketing'}
+                      style={{ width:48, height:26, borderRadius:99, border:'none', cursor: consentSaving==='marketing'?'default':'pointer', position:'relative', background: marketingConsent ? PRIMARY : '#d1d5db', transition:'background 0.2s', flexShrink:0, marginTop:2, opacity: consentSaving==='marketing'?0.6:1 }}
+                    >
+                      <div style={{ position:'absolute', top:3, left: marketingConsent ? 25 : 3, width:20, height:20, borderRadius:'50%', background:'#fff', transition:'left 0.2s', boxShadow:'0 1px 4px rgba(0,0,0,0.2)' }} />
+                    </button>
+                  </div>
+
+                  {/* Profil-synlighed */}
+                  <div style={{ display:'flex', alignItems:'flex-start', justifyContent:'space-between', gap:16, padding:'16px 18px', background:PAPER2, borderRadius:14, border:`1px solid ${PAPER3}`, marginBottom:12 }}>
+                    <div>
+                      <div style={{ fontFamily:FONT, fontWeight:700, fontSize:14, color:INK }}>Offentlig profil</div>
+                      <div style={{ fontSize:12, color:INK3, marginTop:4, lineHeight:1.5 }}>
+                        Når den er slået til, kan alle se din institutions profilside og finde den i søgning. Slå fra for at skjule profilen — dine aktive opslag kan stadig købes.
+                      </div>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => consentSaving ? null : handleConsentToggle('profile_public', !profilePublic)}
+                      disabled={consentSaving === 'profile_public'}
+                      style={{ width:48, height:26, borderRadius:99, border:'none', cursor: consentSaving==='profile_public'?'default':'pointer', position:'relative', background: profilePublic ? PRIMARY : '#d1d5db', transition:'background 0.2s', flexShrink:0, marginTop:2, opacity: consentSaving==='profile_public'?0.6:1 }}
+                    >
+                      <div style={{ position:'absolute', top:3, left: profilePublic ? 25 : 3, width:20, height:20, borderRadius:'50%', background:'#fff', transition:'left 0.2s', boxShadow:'0 1px 4px rgba(0,0,0,0.2)' }} />
+                    </button>
+                  </div>
+
+                  <div style={{ fontSize:12, color:INK3, lineHeight:1.5, marginBottom:24 }}>
+                    Alle ændringer registreres med tidspunkt, så vi kan dokumentere dit samtykke jf. GDPR. Du kan til enhver tid ændre dine valg her.
+                  </div>
+
+                  {/* Data-eksport */}
+                  <div style={{ borderTop:'1px solid #f0eeeb', paddingTop:20 }}>
+                    <div style={{ fontSize:12, fontWeight:700, color:'#aaa', textTransform:'uppercase', letterSpacing:0.8, marginBottom:6 }}>Dine data</div>
+                    <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', gap:16, padding:'16px 18px', background:PAPER2, borderRadius:14, border:`1px solid ${PAPER3}` }}>
+                      <div>
+                        <div style={{ fontFamily:FONT, fontWeight:700, fontSize:14, color:INK }}>Download mine data</div>
+                        <div style={{ fontSize:12, color:INK3, marginTop:4, lineHeight:1.5 }}>
+                          Hent en kopi af alle oplysninger vi har om din institution — profil, opslag, ordrer og samtaler (GDPR art. 15 &amp; 20).
+                        </div>
+                      </div>
+                      <button onClick={exporting ? undefined : handleDataExport} disabled={exporting}
+                        style={{ padding:'9px 18px', borderRadius:99, background:'#fff', border:`1.5px solid ${PRIMARY}`, color:PRIMARY, fontFamily:FONT, fontWeight:700, fontSize:13, cursor: exporting?'default':'pointer', opacity: exporting?0.6:1, flexShrink:0, whiteSpace:'nowrap' }}>
+                        {exporting ? 'Henter…' : 'Download'}
+                      </button>
+                    </div>
+                  </div>
                 </div>
               )}
 
