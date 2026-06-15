@@ -157,7 +157,7 @@ export default function PickupPointPicker({ points, cheapestCarrier, buyerCoords
         .leaflet-tooltip.ltb-pp-tip { background:#fff; border:none; border-radius:10px; box-shadow:0 4px 16px rgba(0,0,0,0.22); padding:8px 11px; }
         .leaflet-tooltip.ltb-pp-tip:before { border-top-color:#fff; }
       `}</style>
-      <div onClick={e => e.stopPropagation()} style={{ background: '#fff', borderRadius: 20, width: '100%', maxWidth: 920, maxHeight: '90vh', overflow: 'hidden', display: 'flex', flexDirection: 'column', boxShadow: '0 20px 60px rgba(0,0,0,0.3)' }}>
+      <div onClick={e => e.stopPropagation()} style={{ background: '#fff', borderRadius: 20, width: '100%', maxWidth: 1240, maxHeight: '92vh', overflow: 'hidden', display: 'flex', flexDirection: 'column', boxShadow: '0 20px 60px rgba(0,0,0,0.3)' }}>
         {/* Header */}
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '16px 20px', borderBottom: `1px solid ${PAPER2}` }}>
           <div>
@@ -168,9 +168,9 @@ export default function PickupPointPicker({ points, cheapestCarrier, buyerCoords
         </div>
 
         {/* Body: liste + kort */}
-        <div style={{ display: 'flex', flex: 1, minHeight: 0, height: 'min(60vh, 540px)' }}>
+        <div style={{ display: 'flex', flex: 1, minHeight: 0, height: 'min(68vh, 640px)' }}>
           {/* Liste */}
-          <div style={{ width: 340, maxWidth: '45%', overflowY: 'auto', borderRight: `1px solid ${PAPER2}`, flexShrink: 0 }}>
+          <div style={{ width: 360, maxWidth: '38%', overflowY: 'auto', borderRight: `1px solid ${PAPER2}`, flexShrink: 0 }}>
             {sorted.length === 0 && (
               <div style={{ padding: 24, fontFamily: FONT, fontSize: 13, color: INK3, textAlign: 'center' }}>Ingen udleveringssteder fundet i området.</div>
             )}
