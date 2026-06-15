@@ -94,7 +94,7 @@ export default function OpretOpslagPage() {
   // Afhentning er altid muligt (håndteres i kurven). Her vælger sælger kun om
   // der også tilbydes forsendelse, og i så fald størrelse + porto-håndtering.
   const [delivery, setDelivery] = useState({
-    shipping: false, weight_g: null,
+    shipping: false, weight_g: 1000,
   });
   const [deliveryDefaultApplied, setDeliveryDefaultApplied] = useState(false);
 
