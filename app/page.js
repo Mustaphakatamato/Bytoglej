@@ -11,6 +11,7 @@ import { useApp } from '@/providers/AppProvider';
 import { db } from '@/lib/supabase';
 import { getCO2Comparison } from '@/lib/co2/calculator';
 import { LogoLockup } from '@/components/Logo';
+import { STATS_CONFIG } from '@/lib/stats-config';
 
 /* ── Compact mobile listing card (Vinted-style) ───────────── */
 function MobileCard({ listing, onClick, favs, toggleFav }) {
@@ -191,26 +192,39 @@ function HeroSection({ stats }) {
     </div>
   );
 
-  const statsRow = stats && (stats.institutions > 0 || stats.deals > 0) ? (
+  const showStat = (key, count) =>
+    STATS_CONFIG.showStats && count >= (STATS_CONFIG.thresholds[key] ?? 0);
+
+  const anyStatVisible = stats && (
+    showStat('institutions', stats.institutions) ||
+    showStat('listings', stats.listings) ||
+    showStat('trades', stats.deals)
+  );
+
+  const statsRow = anyStatVisible ? (
     <div style={{ display: 'flex', gap: isMobile ? 24 : 36, flexWrap: 'wrap', justifyContent: isMobile ? 'center' : 'flex-start' }}>
-      {stats.institutions > 0 && (
+      {showStat('institutions', stats.institutions) && (
         <div style={{ textAlign: isMobile ? 'center' : 'left' }}>
           <div style={{ fontFamily: FONT, fontWeight: 800, fontSize: isMobile ? 22 : 28, color: hasImage ? INK : '#fff', letterSpacing: '-0.04em', lineHeight: 1 }}>{stats.institutions}</div>
           <div style={{ fontSize: 11, color: hasImage ? INK3 : 'rgba(255,255,255,0.5)', marginTop: 3, fontFamily: FONT, letterSpacing: '0.02em' }}>institutioner tilmeldt</div>
         </div>
       )}
-      {stats.listings > 0 && (
+      {showStat('listings', stats.listings) && (
         <div style={{ textAlign: isMobile ? 'center' : 'left' }}>
           <div style={{ fontFamily: FONT, fontWeight: 800, fontSize: isMobile ? 22 : 28, color: hasImage ? INK : '#fff', letterSpacing: '-0.04em', lineHeight: 1 }}>{stats.listings}</div>
           <div style={{ fontSize: 11, color: hasImage ? INK3 : 'rgba(255,255,255,0.5)', marginTop: 3, fontFamily: FONT, letterSpacing: '0.02em' }}>aktive opslag</div>
         </div>
       )}
-      {stats.deals > 0 && (
+      {showStat('trades', stats.deals) && (
         <div style={{ textAlign: isMobile ? 'center' : 'left' }}>
           <div style={{ fontFamily: FONT, fontWeight: 800, fontSize: isMobile ? 22 : 28, color: hasImage ? INK : '#fff', letterSpacing: '-0.04em', lineHeight: 1 }}>{stats.deals}</div>
           <div style={{ fontSize: 11, color: hasImage ? INK3 : 'rgba(255,255,255,0.5)', marginTop: 3, fontFamily: FONT, letterSpacing: '0.02em' }}>handler gennemført</div>
         </div>
       )}
+    </div>
+  ) : STATS_CONFIG.startupMessage ? (
+    <div style={{ fontSize: 12, color: hasImage ? INK3 : 'rgba(255,255,255,0.5)', fontFamily: FONT, fontStyle: 'italic' }}>
+      {STATS_CONFIG.startupMessage}
     </div>
   ) : null;
 
@@ -250,28 +264,32 @@ function HeroSection({ stats }) {
               Se markedspladsen →
             </button>
           </div>
-          {stats && (stats.institutions > 0 || stats.deals > 0) && (
+          {anyStatVisible ? (
             <div style={{ display: 'flex', justifyContent: 'center', gap: isMobile ? 28 : 56, flexWrap: 'wrap' }}>
-              {stats.institutions > 0 && (
+              {showStat('institutions', stats.institutions) && (
                 <div style={{ textAlign: 'center' }}>
                   <div style={{ fontFamily: FONT, fontWeight: 800, fontSize: isMobile ? 26 : 34, color: '#fff', letterSpacing: '-0.04em', lineHeight: 1 }}>{stats.institutions}</div>
                   <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.5)', marginTop: 4, fontFamily: FONT, letterSpacing: '0.02em' }}>institutioner tilmeldt</div>
                 </div>
               )}
-              {stats.listings > 0 && (
+              {showStat('listings', stats.listings) && (
                 <div style={{ textAlign: 'center' }}>
                   <div style={{ fontFamily: FONT, fontWeight: 800, fontSize: isMobile ? 26 : 34, color: '#fff', letterSpacing: '-0.04em', lineHeight: 1 }}>{stats.listings}</div>
                   <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.5)', marginTop: 4, fontFamily: FONT, letterSpacing: '0.02em' }}>aktive opslag</div>
                 </div>
               )}
-              {stats.deals > 0 && (
+              {showStat('trades', stats.deals) && (
                 <div style={{ textAlign: 'center' }}>
                   <div style={{ fontFamily: FONT, fontWeight: 800, fontSize: isMobile ? 26 : 34, color: '#fff', letterSpacing: '-0.04em', lineHeight: 1 }}>{stats.deals}</div>
                   <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.5)', marginTop: 4, fontFamily: FONT, letterSpacing: '0.02em' }}>handler gennemført</div>
                 </div>
               )}
             </div>
-          )}
+          ) : STATS_CONFIG.startupMessage ? (
+            <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.5)', fontFamily: FONT, fontStyle: 'italic' }}>
+              {STATS_CONFIG.startupMessage}
+            </div>
+          ) : null}
         </div>
 
         {/* Wave */}
@@ -368,28 +386,32 @@ function HeroSection({ stats }) {
               Se markedspladsen →
             </button>
           </div>
-          {stats && (stats.institutions > 0 || stats.deals > 0) && (
+          {anyStatVisible ? (
             <div style={{ display: 'flex', gap: 32, flexWrap: 'wrap' }}>
-              {stats.institutions > 0 && (
+              {showStat('institutions', stats.institutions) && (
                 <div>
                   <div style={{ fontFamily: FONT, fontWeight: 800, fontSize: 28, color: INK, letterSpacing: '-0.04em', lineHeight: 1 }}>{stats.institutions}</div>
                   <div style={{ fontSize: 11, color: INK3, marginTop: 3, fontFamily: FONT, letterSpacing: '0.02em' }}>institutioner tilmeldt</div>
                 </div>
               )}
-              {stats.listings > 0 && (
+              {showStat('listings', stats.listings) && (
                 <div>
                   <div style={{ fontFamily: FONT, fontWeight: 800, fontSize: 28, color: INK, letterSpacing: '-0.04em', lineHeight: 1 }}>{stats.listings}</div>
                   <div style={{ fontSize: 11, color: INK3, marginTop: 3, fontFamily: FONT, letterSpacing: '0.02em' }}>aktive opslag</div>
                 </div>
               )}
-              {stats.deals > 0 && (
+              {showStat('trades', stats.deals) && (
                 <div>
                   <div style={{ fontFamily: FONT, fontWeight: 800, fontSize: 28, color: INK, letterSpacing: '-0.04em', lineHeight: 1 }}>{stats.deals}</div>
                   <div style={{ fontSize: 11, color: INK3, marginTop: 3, fontFamily: FONT, letterSpacing: '0.02em' }}>handler gennemført</div>
                 </div>
               )}
             </div>
-          )}
+          ) : STATS_CONFIG.startupMessage ? (
+            <div style={{ fontSize: 12, color: INK3, fontFamily: FONT, fontStyle: 'italic' }}>
+              {STATS_CONFIG.startupMessage}
+            </div>
+          ) : null}
         </div>
       </div>
 
