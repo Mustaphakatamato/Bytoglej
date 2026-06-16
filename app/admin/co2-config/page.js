@@ -5,7 +5,6 @@ import { db } from '@/lib/supabase';
 import { PRIMARY, GREEN_SOFT, GREEN_TINT, PAPER, PAPER2, PAPER3, INK, INK2, INK3, FONT } from '@/lib/constants';
 import { EMISSION_FACTORS, METHODOLOGY_VERSION } from '@/lib/co2/emission-factors';
 import { Spinner } from '@/components/ui';
-import { checkIsAdmin } from '@/lib/admin';
 import { useApp } from '@/providers/AppProvider';
 
 export default function Co2ConfigPage() {
@@ -27,8 +26,8 @@ export default function Co2ConfigPage() {
   useEffect(() => {
     db.auth.getUser().then(async ({ data: { user } }) => {
       if (!user) { router.push('/dashboard'); return; }
-      const admin = await checkIsAdmin(user.id);
-      if (!admin) { router.push('/dashboard'); return; }
+      const { data: adminRow } = await db.from('admins').select('id').eq('user_id', user.id).maybeSingle();
+      if (!adminRow) { router.push('/dashboard'); return; }
       setAuthed(true);
       fetchAll();
     });
