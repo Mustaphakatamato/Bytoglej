@@ -317,7 +317,7 @@ export default function AdminPage() {
           <p style={{ fontFamily: FONT, fontSize: 12, color: INK3, margin: '4px 0 0' }}>byt&amp;leg intern administration</p>
         </div>
 
-        <div style={{ display: 'flex', gap: 2, borderBottom: `1px solid ${PAPER3}`, marginBottom: 24, overflowX: 'auto', scrollbarWidth: 'none' }}>
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 2, rowGap: 2, borderBottom: `1px solid ${PAPER3}`, marginBottom: 24 }}>
           {TABS.map(({ id, label, emoji }) => (
             <button key={id} onClick={() => setTab(id)} style={{ background: 'none', border: 'none', borderBottom: tab === id ? `2.5px solid ${PRIMARY}` : '2.5px solid transparent', padding: isMobile ? '10px 12px' : '10px 16px', fontFamily: FONT, fontWeight: tab === id ? 700 : 600, fontSize: 13, color: tab === id ? PRIMARY : INK3, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6, borderRadius: '8px 8px 0 0', transition: 'color 0.15s', marginBottom: -1, whiteSpace: 'nowrap', flexShrink: 0 }}>
               <span style={{ fontSize: 15 }}>{emoji}</span> {label}
