@@ -1,0 +1,7 @@
+-- Admin architecture rebuild migration
+-- See admin_architecture_rebuild_2026_06_16 in Supabase dashboard
+-- This migration was applied directly. File saved for reference.
+-- Creates: admin_audit_log, listing_reports tables
+-- Adds: admin_notes to feedback
+-- Updates: RLS policies to use admins table instead of hardcoded emails
+-- Removes: mustaphakatamato@live.dk from admins table
