@@ -133,6 +133,7 @@ const TABS = [
   { id: 'users',        label: 'Brugere',       emoji: '👥' },
   { id: 'economy',      label: 'Økonomi',       emoji: '💰' },
   { id: 'log',          label: 'Log',           emoji: '📝' },
+  { id: 'ai-bot',       label: 'AI Bot',        emoji: '🤖' },
 ];
 
 // ── Login form ──────────────────────────────────────────────────────────────────
@@ -342,6 +343,7 @@ export default function AdminPage() {
         {tab === 'users'        && <UsersTab isMobile={isMobile} />}
         {tab === 'economy'      && <EconomyTab isMobile={isMobile} />}
         {tab === 'log'          && <LogTab isMobile={isMobile} />}
+        {tab === 'ai-bot'       && <AiBotTab isMobile={isMobile} />}
       </div>
     </div>
   );
@@ -1452,6 +1454,145 @@ function LogTab({ isMobile }) {
             </div>
           ))}
         </div>
+      )}
+    </div>
+  );
+}
+
+// ── SECTION: AI Bot ─────────────────────────────────────────────────────────────
+
+function AiBotTab({ isMobile }) {
+  const [logs, setLogs] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [stats, setStats] = useState(null);
+  const [scanTypeFilter, setScanTypeFilter] = useState('');
+
+  useEffect(() => {
+    async function load() {
+      const since = new Date();
+      since.setDate(since.getDate() - 30);
+      const { data } = await db
+        .from('ai_scan_logs')
+        .select('*')
+        .gte('created_at', since.toISOString())
+        .order('created_at', { ascending: false })
+        .limit(300);
+      if (!data) { setLoading(false); return; }
+      setLogs(data);
+
+      const submitted = data.filter(r => r.submitted);
+      const withPrice = submitted.filter(r => r.ai_price_suggested != null && r.final_price != null);
+      const totalDeltas = withPrice.reduce((s, r) => s + Math.abs(r.price_delta || 0), 0);
+
+      setStats({
+        total: data.length,
+        submitted: submitted.length,
+        submitRate: data.length ? Math.round(submitted.length / data.length * 100) : 0,
+        usedTitle: submitted.filter(r => r.used_title).length,
+        usedDescription: submitted.filter(r => r.used_description).length,
+        usedPrice: withPrice.filter(r => r.used_price).length,
+        withPrice: withPrice.length,
+        avgPriceDelta: withPrice.length ? Math.round(totalDeltas / withPrice.length) : null,
+        byScanType: {
+          'scan-toy': data.filter(r => r.scan_type === 'scan-toy').length,
+          'fill-soges': data.filter(r => r.scan_type === 'fill-soges').length,
+          'improve-listing': data.filter(r => r.scan_type === 'improve-listing').length,
+        },
+      });
+      setLoading(false);
+    }
+    load();
+  }, []);
+
+  const filtered = scanTypeFilter ? logs.filter(l => l.scan_type === scanTypeFilter) : logs;
+  const pct = (n, total) => total > 0 ? Math.round(n / total * 100) + '%' : '—';
+
+  return (
+    <div style={{ padding: isMobile ? '20px 0' : '24px 0', maxWidth: 1100 }}>
+      <SectionHead title="AI Bot — seneste 30 dage" />
+
+      {loading ? <Spinner /> : !stats ? <Empty text="Ingen data endnu" /> : (
+        <>
+          <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr 1fr' : 'repeat(5,1fr)', gap: 12, marginBottom: 28 }}>
+            {[
+              { label: 'Scans i alt', value: stats.total },
+              { label: 'Submittet', value: `${stats.submitted} (${pct(stats.submitted, stats.total)})` },
+              { label: 'Titel accepteret', value: pct(stats.usedTitle, stats.submitted) },
+              { label: 'Beskrivelse accepteret', value: pct(stats.usedDescription, stats.submitted) },
+              { label: 'Pris accepteret ±15%', value: pct(stats.usedPrice, stats.withPrice) },
+            ].map((c, i) => (
+              <div key={i} style={{ background: PAPER2, border: `1px solid rgba(22,34,28,0.08)`, borderRadius: 12, padding: '14px 16px' }}>
+                <div style={{ fontFamily: FONT, fontWeight: 800, fontSize: 22, color: PRIMARY, letterSpacing: '-0.03em' }}>{c.value}</div>
+                <div style={{ fontFamily: FONT, fontSize: 11, color: INK3, marginTop: 4, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.04em' }}>{c.label}</div>
+              </div>
+            ))}
+          </div>
+
+          <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr', gap: 12, marginBottom: 28 }}>
+            <div style={{ background: PAPER2, border: `1px solid rgba(22,34,28,0.08)`, borderRadius: 12, padding: '16px 20px' }}>
+              <div style={{ fontFamily: FONT, fontSize: 11, fontWeight: 700, color: INK3, textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 12 }}>Fordeling pr. scan-type</div>
+              {Object.entries(stats.byScanType).map(([type, count]) => (
+                <div key={type} style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8 }}>
+                  <span style={{ fontFamily: FONT, fontSize: 13, color: INK }}>{type}</span>
+                  <span style={{ fontFamily: FONT, fontSize: 13, fontWeight: 700, color: PRIMARY }}>{count}</span>
+                </div>
+              ))}
+            </div>
+            <div style={{ background: PAPER2, border: `1px solid rgba(22,34,28,0.08)`, borderRadius: 12, padding: '16px 20px' }}>
+              <div style={{ fontFamily: FONT, fontSize: 11, fontWeight: 700, color: INK3, textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 12 }}>Pris-præcision</div>
+              <div style={{ fontFamily: FONT, fontSize: 13, color: INK, marginBottom: 6 }}>
+                Gennemsnitlig afvigelse: <strong>{stats.avgPriceDelta != null ? `±${stats.avgPriceDelta} kr.` : '—'}</strong>
+              </div>
+              <div style={{ fontFamily: FONT, fontSize: 13, color: INK, marginBottom: 6 }}>
+                Rækker med prisdata: <strong>{stats.withPrice}</strong>
+              </div>
+              <div style={{ fontFamily: FONT, fontSize: 12, color: INK3, fontStyle: 'italic' }}>
+                Rækker hvor used_price = false er fine-tuning-kandidater
+              </div>
+            </div>
+          </div>
+
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12, flexWrap: 'wrap', gap: 8 }}>
+            <div style={{ fontFamily: FONT, fontSize: 12, color: INK3 }}>{filtered.length} rækker</div>
+            <select value={scanTypeFilter} onChange={e => setScanTypeFilter(e.target.value)} style={{ padding: '8px 12px', border: `1.5px solid ${PAPER3}`, borderRadius: 10, fontFamily: FONT, fontSize: 13, background: PAPER2, color: INK, cursor: 'pointer' }}>
+              <option value="">Alle scan-typer</option>
+              <option value="scan-toy">scan-toy</option>
+              <option value="fill-soges">fill-soges</option>
+              <option value="improve-listing">improve-listing</option>
+            </select>
+          </div>
+
+          <div style={{ overflowX: 'auto' }}>
+            <table style={{ width: '100%', borderCollapse: 'collapse', fontFamily: FONT, fontSize: 12 }}>
+              <thead>
+                <tr style={{ background: PAPER2, borderBottom: `2px solid ${PAPER3}` }}>
+                  {['Tidspunkt','Type','Institution','AI pris','Final pris','Δ','Titel','Beskr.','Pris OK','Submit'].map(h => (
+                    <th key={h} style={{ padding: '8px 10px', textAlign: 'left', color: INK3, fontWeight: 700, fontSize: 11, textTransform: 'uppercase', letterSpacing: '0.04em', whiteSpace: 'nowrap' }}>{h}</th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {filtered.map((l, i) => (
+                  <tr key={l.id} style={{ borderBottom: `1px solid ${PAPER3}`, background: i % 2 === 0 ? '#fff' : PAPER2 }}>
+                    <td style={{ padding: '8px 10px', color: INK3, whiteSpace: 'nowrap' }}>{fmtDate(l.created_at, true)}</td>
+                    <td style={{ padding: '8px 10px' }}><Badge bg={GREEN_TINT} color={PRIMARY}>{l.scan_type}</Badge></td>
+                    <td style={{ padding: '8px 10px', color: INK, maxWidth: 140, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{l.institution_name || '—'}</td>
+                    <td style={{ padding: '8px 10px', color: INK, whiteSpace: 'nowrap' }}>{l.ai_price_suggested != null ? `${l.ai_price_suggested} kr.` : '—'}</td>
+                    <td style={{ padding: '8px 10px', color: INK, whiteSpace: 'nowrap' }}>{l.final_price != null ? `${l.final_price} kr.` : '—'}</td>
+                    <td style={{ padding: '8px 10px', color: l.price_delta != null ? (Math.abs(l.price_delta) > 50 ? '#DC2626' : PRIMARY) : INK3, whiteSpace: 'nowrap', fontWeight: 700 }}>
+                      {l.price_delta != null ? `${l.price_delta > 0 ? '+' : ''}${l.price_delta}` : '—'}
+                    </td>
+                    <td style={{ padding: '8px 10px', textAlign: 'center' }}>{l.used_title == null ? '—' : l.used_title ? '✅' : '✏️'}</td>
+                    <td style={{ padding: '8px 10px', textAlign: 'center' }}>{l.used_description == null ? '—' : l.used_description ? '✅' : '✏️'}</td>
+                    <td style={{ padding: '8px 10px', textAlign: 'center' }}>{l.used_price == null ? '—' : l.used_price ? '✅' : '❌'}</td>
+                    <td style={{ padding: '8px 10px', textAlign: 'center' }}>{l.submitted ? '✅' : '⏳'}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+            {filtered.length === 0 && <Empty text="Ingen AI-scans i perioden" />}
+          </div>
+        </>
       )}
     </div>
   );

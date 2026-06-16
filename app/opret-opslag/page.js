@@ -77,6 +77,7 @@ export default function OpretOpslagPage() {
   const [aiSuggestion, setAiSuggestion] = useState(null);
   const [aiFilledFields, setAiFilledFields] = useState({ title: false, description: false });
   const [priceSuggestion, setPriceSuggestion] = useState(null); // { basis, comparable_count, suggested_min, suggested_max, suggested_price }
+  const [scanLogId, setScanLogId] = useState(null);
   const [aiApply, setAiApply] = useState({ title: true, description: true });
   const [aiRegenerating, setAiRegenerating] = useState({ title: false, description: false });
   const [institution, setInstitution] = useState(ctxInstitution || null);
@@ -360,6 +361,7 @@ export default function OpretOpslagPage() {
       }));
       setAiFilledFields({ title: !!json.title, description: !!json.description });
       setPriceSuggestion(json.price || null);
+      if (json.log_id) setScanLogId(json.log_id);
       const preview = URL.createObjectURL(file);
       setImgFiles(prev => prev.length < 6 ? [file, ...prev] : prev);
       setImgPreviews(prev => prev.length < 6 ? [preview, ...prev] : prev);
@@ -390,6 +392,7 @@ export default function OpretOpslagPage() {
           condition: json.condition || f.condition,
         }));
         setAiFilledFields({ title: !!json.title, description: !!json.description });
+        if (json.log_id) setScanLogId(json.log_id);
         setSøgesFilled(true);
       }
     } catch { showToast('AI kunne ikke udfylde — prøv igen', 'error'); }
@@ -461,6 +464,21 @@ export default function OpretOpslagPage() {
         if (up) { const { data:{publicUrl} } = db.storage.from('listing-images').getPublicUrl(up.path); urls.push(publicUrl); }
       }
       if (urls.length) await db.from('listings').update({ images: urls }).eq('id', listing.id);
+    }
+    // Fire-and-forget: opdater AI-scan log med brugerens endelige valg
+    if (scanLogId) {
+      authedFetch(`/api/ai-scan-logs/${scanLogId}`, {
+        method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          listing_id: listing.id,
+          final_title: form.title,
+          final_description: form.description,
+          final_category: form.category,
+          final_condition: form.condition,
+          final_age_group: form.age_group,
+          final_price: form.price ? Number(form.price) : null,
+        }),
+      }).catch(() => {});
     }
     // Fire-and-forget: saved-search email notifications
     authedFetch('/api/match-searches', {
