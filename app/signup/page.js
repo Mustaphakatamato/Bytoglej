@@ -227,8 +227,8 @@ export default function SignupPage() {
       try {
         const isNum = /^\d+$/.test(debouncedQuery);
         const url = (isNum && debouncedQuery.length === 10)
-          ? `https://cvrapi.dk/api?produ=${debouncedQuery}&country=dk`
-          : `https://cvrapi.dk/api?search=${encodeURIComponent(debouncedQuery)}&country=dk`;
+          ? `/api/cvr-lookup?produ=${debouncedQuery}`
+          : `/api/cvr-lookup?search=${encodeURIComponent(debouncedQuery)}`;
         const res = await fetch(url);
         const data = await res.json();
         if (cancelled) return;
@@ -292,8 +292,8 @@ export default function SignupPage() {
     setCvrStatus('checking');
     try {
       const url = cvr.length === 10
-        ? `https://cvrapi.dk/api?produ=${cvr}&country=dk`
-        : `https://cvrapi.dk/api?search=${cvr}&country=dk`;
+        ? `/api/cvr-lookup?produ=${cvr}`
+        : `/api/cvr-lookup?search=${cvr}`;
       const res = await fetch(url);
       const data = await res.json();
       if (!data || data.error) throw new Error('ikke fundet');
@@ -301,7 +301,7 @@ export default function SignupPage() {
       let kommune = '';
       if (cvr.length === 10 && data.cvr) {
         try {
-          const parentRes = await fetch(`https://cvrapi.dk/api?search=${data.cvr}&country=dk`);
+          const parentRes = await fetch(`/api/cvr-lookup?search=${data.cvr}`);
           const parentData = await parentRes.json();
           if (parentData && !parentData.error) kommune = parentData.name;
         } catch {}
