@@ -739,6 +739,10 @@ function ListingsTab({ allInstitutions = [], isMobile }) {
 
   async function handleReviewAction(listingId, action, reason = '') {
     setReviewActing(listingId + action);
+    // Optimistic: remove from UI immediately so it doesn't wait for the API
+    setPendingReviews(prev => prev.filter(l => l.id !== listingId));
+    setRejectTarget(null);
+    setRejectReason('');
     const { data: { session } } = await db.auth.getSession();
     const res = await fetch('/api/admin/review-listing', {
       method: 'POST',
@@ -746,7 +750,6 @@ function ListingsTab({ allInstitutions = [], isMobile }) {
       body: JSON.stringify({ listing_id: listingId, action, reason }),
     });
     if (res.ok) {
-      setPendingReviews(prev => prev.filter(l => l.id !== listingId));
       if (action === 'approve') {
         setListings(prev => prev.map(l => l.id === listingId ? { ...l, review_status: 'approved', is_active: true } : l));
       } else {
@@ -754,8 +757,6 @@ function ListingsTab({ allInstitutions = [], isMobile }) {
       }
     }
     setReviewActing(null);
-    setRejectTarget(null);
-    setRejectReason('');
   }
 
   async function toggleActive(l) {
