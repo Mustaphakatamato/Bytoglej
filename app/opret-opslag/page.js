@@ -77,7 +77,7 @@ export default function OpretOpslagPage() {
   const [aiSuggestion, setAiSuggestion] = useState(null);
   const [aiFilledFields, setAiFilledFields] = useState({ title: false, description: false });
   const [priceSuggestion, setPriceSuggestion] = useState(null); // { basis, comparable_count, suggested_min, suggested_max, suggested_price }
-  const [scanLogId, setScanLogId] = useState(null);
+  const [aiScanData, setAiScanData] = useState(null); // AI-forslag gemt til log ved submit
   const [aiApply, setAiApply] = useState({ title: true, description: true });
   const [aiRegenerating, setAiRegenerating] = useState({ title: false, description: false });
   const [institution, setInstitution] = useState(ctxInstitution || null);
@@ -361,7 +361,21 @@ export default function OpretOpslagPage() {
       }));
       setAiFilledFields({ title: !!json.title, description: !!json.description });
       setPriceSuggestion(json.price || null);
-      if (json.log_id) setScanLogId(json.log_id);
+      setAiScanData({
+        scan_type: 'scan-toy',
+        model_used: 'meta-llama/llama-4-scout-17b-16e-instruct',
+        ai_raw_response: json,
+        ai_title: json.title || null,
+        ai_description: json.description || null,
+        ai_category: json.category || null,
+        ai_condition: json.condition || null,
+        ai_age_group: json.age_group || null,
+        ai_price_min: json.price?.suggested_min || null,
+        ai_price_max: json.price?.suggested_max || null,
+        ai_price_suggested: json.price?.suggested_price || null,
+        ai_price_basis: json.price?.basis || null,
+        ai_price_comparable_count: json.price?.comparable_count ?? null,
+      });
       const preview = URL.createObjectURL(file);
       setImgFiles(prev => prev.length < 6 ? [file, ...prev] : prev);
       setImgPreviews(prev => prev.length < 6 ? [preview, ...prev] : prev);
@@ -392,7 +406,17 @@ export default function OpretOpslagPage() {
           condition: json.condition || f.condition,
         }));
         setAiFilledFields({ title: !!json.title, description: !!json.description });
-        if (json.log_id) setScanLogId(json.log_id);
+        setAiScanData({
+          scan_type: 'fill-soges',
+          model_used: 'llama-3.1-8b-instant',
+          input_query: søgesQuery,
+          ai_raw_response: json,
+          ai_title: json.title || null,
+          ai_description: json.description || null,
+          ai_category: json.category || null,
+          ai_condition: json.condition || null,
+          ai_age_group: json.age_group || null,
+        });
         setSøgesFilled(true);
       }
     } catch { showToast('AI kunne ikke udfylde — prøv igen', 'error'); }
@@ -465,20 +489,35 @@ export default function OpretOpslagPage() {
       }
       if (urls.length) await db.from('listings').update({ images: urls }).eq('id', listing.id);
     }
-    // Fire-and-forget: opdater AI-scan log med brugerens endelige valg
-    if (scanLogId) {
-      authedFetch(`/api/ai-scan-logs/${scanLogId}`, {
-        method: 'PATCH', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          listing_id: listing.id,
-          final_title: form.title,
-          final_description: form.description,
-          final_category: form.category,
-          final_condition: form.condition,
-          final_age_group: form.age_group,
-          final_price: form.price ? Number(form.price) : null,
-        }),
-      }).catch(() => {});
+    // Fire-and-forget: log AI-scan kun ved faktisk submit
+    if (aiScanData) {
+      const finalPrice = form.price ? Number(form.price) : null;
+      const aiPrice = aiScanData.ai_price_suggested;
+      const priceDelta = aiPrice && finalPrice ? finalPrice - aiPrice : null;
+      const priceDeltaPct = aiPrice && priceDelta != null ? Math.round(priceDelta / aiPrice * 10000) / 100 : null;
+      const normalize = s => (s || '').toLowerCase().replace(/[^\w\s]/g, '').split(/\s+/).filter(Boolean);
+      const aiWords = new Set(normalize(aiScanData.ai_description));
+      const finalWords = new Set(normalize(form.description));
+      const overlap = aiWords.size ? [...aiWords].filter(w => finalWords.has(w)).length / aiWords.size : 0;
+      db.from('ai_scan_logs').insert({
+        ...aiScanData,
+        user_id: user?.id,
+        institution_name: inst?.name || null,
+        listing_id: listing.id,
+        final_title: form.title,
+        final_description: form.description,
+        final_category: form.category || null,
+        final_condition: form.condition || null,
+        final_age_group: form.age_group || null,
+        final_price: finalPrice,
+        used_title: (form.title.trim().toLowerCase() === (aiScanData.ai_title || '').trim().toLowerCase()),
+        used_description: overlap >= 0.7,
+        used_price: aiPrice && finalPrice ? Math.abs(priceDeltaPct) <= 15 : null,
+        price_delta: priceDelta,
+        price_delta_pct: priceDeltaPct,
+        submitted: true,
+        submitted_at: new Date().toISOString(),
+      }).then(() => {}).catch(() => {});
     }
     // Fire-and-forget: saved-search email notifications
     authedFetch('/api/match-searches', {

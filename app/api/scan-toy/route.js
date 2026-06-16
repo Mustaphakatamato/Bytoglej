@@ -1,7 +1,7 @@
 import Groq from 'groq-sdk';
 import { NextResponse } from 'next/server';
 import { requireAuth, UNAUTHORIZED } from '@/lib/api-auth';
-import { createServerClient } from '@/lib/supabase-server';
+import { createServerClient } from '@/lib/supabase-server'; // bruges til prissammenligning
 
 // Antal sammenlignelige opslag der kræves før vi bruger platform-median frem for AI-estimat.
 const MIN_COMPARABLES = 5;
@@ -24,8 +24,7 @@ const CATEGORY_KEYS = [
 ];
 
 export async function POST(req) {
-  const user = await requireAuth(req);
-  if (!user) return UNAUTHORIZED();
+  if (!await requireAuth(req)) return UNAUTHORIZED();
   if (!process.env.GROQ_API_KEY) {
     return NextResponse.json({ error: 'AI-scanning er ikke konfigureret' }, { status: 500 });
   }
@@ -132,32 +131,7 @@ Ingen markdown, ingen forklaring — kun JSON.`;
     // Fjern de rå AI-prisfelter fra svaret; returnér det strukturerede price-objekt.
     delete parsed.price_min; delete parsed.price_max;
 
-    // Log til fine-tuning — fire-and-forget
-    let logId = null;
-    try {
-      const supa = createServerClient();
-      const { data: logRow } = await supa.from('ai_scan_logs').insert({
-        user_id: user.id,
-        scan_type: 'scan-toy',
-        model_used: 'meta-llama/llama-4-scout-17b-16e-instruct',
-        ai_raw_response: parsed,
-        ai_title: parsed.title || null,
-        ai_description: parsed.description || null,
-        ai_category: parsed.category || null,
-        ai_condition: parsed.condition || null,
-        ai_age_group: parsed.age_group || null,
-        ai_price_min: price?.suggested_min || null,
-        ai_price_max: price?.suggested_max || null,
-        ai_price_suggested: price?.suggested_price || null,
-        ai_price_basis: price?.basis || null,
-        ai_price_comparable_count: price?.comparable_count ?? null,
-      }).select('id').single();
-      logId = logRow?.id || null;
-    } catch (e) {
-      console.error('ai_scan_logs insert fejl:', e.message);
-    }
-
-    return NextResponse.json({ ...parsed, price, log_id: logId });
+    return NextResponse.json({ ...parsed, price });
   } catch (e) {
     console.error('scan-toy error:', e.message);
     return NextResponse.json({ error: 'Noget gik galt — prøv igen' }, { status: 500 });
