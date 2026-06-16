@@ -18,20 +18,23 @@ export async function POST(req) {
 
     const completion = await groq.chat.completions.create({
       model: 'meta-llama/llama-4-scout-17b-16e-instruct',
-      max_tokens: 3,
+      max_tokens: 30,
       temperature: 0,
       messages: [{
         role: 'user',
         content: [
           { type: 'image_url', image_url: { url: `data:${mimeType};base64,${base64}`, detail: 'low' } },
-          { type: 'text', text: 'Is there a real, living human person visible in this photo? Reply YES or NO only. IMPORTANT: Reply NO for ALL of the following — cartoon characters, animated characters, Disney characters, illustrated characters, drawings, paintings, printed characters on toys/puzzles/books/packaging, dolls, action figures, stuffed animals, partial body parts (hands/fingers/arms/legs/feet), blurry background people, shadows, reflections, silhouettes, clothing without a person, furniture, equipment, food, animals, buildings, nature, or any non-human object. Reply YES ONLY if there is an actual real photograph of a real living human being\'s face or body that could identify them.' },
+          { type: 'text', text: 'Is there a real, living human person with a visible face or clearly identifiable body visible in this photo? Reply "YES: [brief reason]" or "NO". IMPORTANT: Reply NO for ALL of the following — cartoon characters, animated characters, illustrated characters, drawings, paintings, printed characters on toys/puzzles/books/packaging, dolls, action figures, stuffed animals, hands, fingers, arms, legs, feet (without face), blurry background people, shadows, reflections, silhouettes, clothing without a person, furniture, equipment, food, animals, buildings, nature, or any non-human object. Reply YES ONLY if there is a clearly visible real human face or body that could identify a person.' },
         ],
       }],
     });
 
-    const text = completion.choices[0].message.content.toLowerCase().trim();
-    const hasPeople = text.startsWith('yes');
-    return NextResponse.json({ safe: !hasPeople });
+    const text = completion.choices[0].message.content.trim();
+    const hasPeople = text.toLowerCase().startsWith('yes');
+    const reason = hasPeople
+      ? text.replace(/^yes[:\s]*/i, '').trim() || 'Ansigt eller person synlig i billedet'
+      : null;
+    return NextResponse.json({ safe: !hasPeople, reason });
   } catch (e) {
     console.error('scan-image error:', e.message);
     return NextResponse.json({ safe: true });
