@@ -18,7 +18,6 @@ function fmtDist(m) {
   return m < 1000 ? `${m} m` : `${(m / 1000).toFixed(1).replace('.', ',')} km`;
 }
 
-// Kompakt brandfarvet mærke (Vinted-stil). active = valgt eller hover.
 const MARK = { pdk: { bg: '#005CB9', txt: 'pn' }, gls: { bg: '#06038D', txt: 'GLS' }, dao: { bg: '#E2001A', txt: 'dao' } };
 function makeMarkerIcon(L, p, active) {
   const m = MARK[p.carrier_code] || { bg: PRIMARY, txt: p.carrier_name };
@@ -35,20 +34,26 @@ function makeMarkerIcon(L, p, active) {
   return L.divIcon({ className: '', html, iconAnchor: [size / 2, size / 2] });
 }
 
-// Vinted-lignende kort-vælger: viser udleveringssteder fra alle carriers på et kort
-// + en liste sorteret efter afstand. Køber vælger ét sted (og dermed carrier).
 export default function PickupPointPicker({ points, cheapestCarrier, buyerCoords, onConfirm, onClose, addressLabel }) {
   const [mounted, setMounted] = useState(false);
   const [selectedId, setSelectedId] = useState(null);
   const [hoveredId, setHoveredId] = useState(null);
   const [expanded, setExpanded] = useState(false);
+  const [mobileTab, setMobileTab] = useState('kort');
+  const [isMobile, setIsMobile] = useState(false);
   const markerByIdRef = useRef({});
   const mapRef = useRef(null);
   const mapInstanceRef = useRef(null);
   const markersRef = useRef(null);
   const selectedRef = useRef(null);
 
-  useEffect(() => { setMounted(true); }, []);
+  useEffect(() => {
+    setMounted(true);
+    const check = () => setIsMobile(window.innerWidth < 768);
+    check();
+    window.addEventListener('resize', check);
+    return () => window.removeEventListener('resize', check);
+  }, []);
 
   const selected = points.find(p => p.id === selectedId) || null;
   selectedRef.current = selectedId;
@@ -72,14 +77,10 @@ export default function PickupPointPicker({ points, cheapestCarrier, buyerCoords
       mapInstanceRef.current = L.map(mapRef.current, { center, zoom: 12, zoomControl: true, scrollWheelZoom: true });
       L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', { attribution: '© OpenStreetMap © CARTO', maxZoom: 19 }).addTo(mapInstanceRef.current);
       markersRef.current = L.layerGroup().addTo(mapInstanceRef.current);
-      // Fit til alle punkter
       if (valid.length > 1) {
         const b = L.latLngBounds(valid.map(p => [p.lat, p.lng]));
         mapInstanceRef.current.fitBounds(b, { padding: [40, 40] });
       }
-      // Kortet initialiseres inde i et modal hvor containeren endnu ikke har sin endelige
-      // størrelse → tiles placeres forkert (hvide felter). invalidateSize retter layoutet,
-      // når modalen er malet. Kør et par gange for at fange animation/forsinket layout.
       const fixSize = () => mapInstanceRef.current?.invalidateSize();
       requestAnimationFrame(fixSize);
       setTimeout(fixSize, 150);
@@ -90,13 +91,20 @@ export default function PickupPointPicker({ points, cheapestCarrier, buyerCoords
     };
   }, [mounted]); // eslint-disable-line
 
-  // Tegn markers når kortet er klar / valg ændres. Gemmer refs til hurtig hover-opdatering.
+  // Invalidate map when mobile tab switches to kort
+  useEffect(() => {
+    if (mobileTab === 'kort' && mapInstanceRef.current) {
+      setTimeout(() => mapInstanceRef.current?.invalidateSize(), 50);
+      setTimeout(() => mapInstanceRef.current?.invalidateSize(), 200);
+    }
+  }, [mobileTab]);
+
+  // Tegn markers
   useEffect(() => {
     if (!mapInstanceRef.current || !markersRef.current) return;
     const L = require('leaflet');
     markersRef.current.clearLayers();
     markerByIdRef.current = {};
-    // Køber-markør (blå prik)
     if (buyerCoords?.lat != null) {
       const userHtml = `<div style="width:14px;height:14px;border-radius:50%;background:#3B82F6;border:3px solid #fff;box-shadow:0 0 0 3px rgba(59,130,246,0.35),0 2px 6px rgba(0,0,0,0.25)"></div>`;
       L.marker([buyerCoords.lat, buyerCoords.lng], { icon: L.divIcon({ className: '', html: userHtml, iconAnchor: [7, 7] }), zIndexOffset: 500 })
@@ -110,7 +118,6 @@ export default function PickupPointPicker({ points, cheapestCarrier, buyerCoords
         .on('click', (e) => { L.DomEvent.stopPropagation(e); setSelectedId(p.id); })
         .on('mouseover', () => setHoveredId(p.id))
         .on('mouseout', () => setHoveredId(h => h === p.id ? null : h));
-      // Lille info-boks ved hover (Vinted-stil): navn + adresse + pris.
       const tip = `<div style="font-family:${FONT};min-width:140px">
         <div style="font-weight:800;font-size:12px;color:${INK}">${p.name}</div>
         <div style="font-size:11px;color:${INK3};margin-top:2px">${p.address}</div>
@@ -121,7 +128,7 @@ export default function PickupPointPicker({ points, cheapestCarrier, buyerCoords
     });
   }, [points, selectedId, mounted, buyerCoords]);
 
-  // Hover: fremhæv kun den berørte markør (uden at gentegne alle).
+  // Hover highlight (desktop)
   useEffect(() => {
     if (!mapInstanceRef.current) return;
     const L = require('leaflet');
@@ -143,7 +150,6 @@ export default function PickupPointPicker({ points, cheapestCarrier, buyerCoords
 
   if (!mounted) return null;
 
-  // Sortér efter afstand fra køberens adresse (nærmeste først). Fald tilbage til pris.
   const sorted = [...points].sort((a, b) => {
     if (a.distance_m != null && b.distance_m != null) return a.distance_m - b.distance_m;
     if (a.distance_m != null) return -1;
@@ -151,6 +157,160 @@ export default function PickupPointPicker({ points, cheapestCarrier, buyerCoords
     return (a.price ?? 9e9) - (b.price ?? 9e9);
   });
 
+  // ── Delt: detalje-panel for valgt sted ──────────────────────────────────────
+  function DetailPanel({ fullWidthBtn }) {
+    if (!selected) {
+      return (
+        <div style={{ padding: '16px 20px', fontFamily: FONT, fontSize: 13, color: INK3, textAlign: 'center' }}>
+          Vælg et sted på {isMobile ? 'kortet eller i listen' : 'kortet eller i listen'}
+        </div>
+      );
+    }
+    return (
+      <>
+        <div style={{ padding: '16px 20px 12px' }}>
+          <div style={{ display: 'flex', alignItems: 'flex-start', gap: 14 }}>
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
+                <CarrierLogo carrier={selected.carrier_code} />
+              </div>
+              <div style={{ fontFamily: FONT, fontWeight: 800, fontSize: 18, color: INK, marginBottom: 8 }}>{fmtKr(selected.price)}</div>
+              <div style={{ display: 'flex', alignItems: 'flex-start', gap: 8, marginBottom: 4 }}>
+                <span style={{ fontSize: 15, marginTop: 1 }}>📍</span>
+                <div>
+                  <div style={{ fontFamily: FONT, fontWeight: 700, fontSize: 14, color: INK }}>{selected.name}</div>
+                  <div style={{ fontFamily: FONT, fontSize: 13, color: INK3 }}>{selected.address}</div>
+                </div>
+              </div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <span style={{ fontSize: 15 }}>🕒</span>
+                <div style={{ fontFamily: FONT, fontSize: 13, color: INK3 }}>Klar til afhentning inden for 1–3 hverdage</div>
+              </div>
+            </div>
+            {!fullWidthBtn && (
+              <button type="button" onClick={() => onConfirm(selected)}
+                style={{ flexShrink: 0, padding: '11px 26px', borderRadius: 99, border: 'none', background: PRIMARY, color: '#fff', fontFamily: FONT, fontWeight: 700, fontSize: 14, cursor: 'pointer' }}>
+                Bekræft
+              </button>
+            )}
+          </div>
+          {fullWidthBtn && (
+            <button type="button" onClick={() => onConfirm(selected)}
+              style={{ marginTop: 14, width: '100%', padding: '15px', borderRadius: 12, border: 'none', background: PRIMARY, color: '#fff', fontFamily: FONT, fontWeight: 700, fontSize: 15, cursor: 'pointer', boxSizing: 'border-box' }}>
+              Vælg dette afhentningssted
+            </button>
+          )}
+        </div>
+        {selected.opening_hours?.length > 0 && (
+          <div style={{ borderTop: `1px solid ${PAPER2}` }}>
+            <button type="button" onClick={() => setExpanded(e => !e)}
+              style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 20px', background: 'none', border: 'none', cursor: 'pointer', fontFamily: FONT, fontWeight: 700, fontSize: 13, color: INK }}>
+              Yderligere oplysninger
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke={INK3} strokeWidth="2" strokeLinecap="round" style={{ transform: expanded ? 'rotate(180deg)' : 'none', transition: 'transform .2s' }}><polyline points="6 9 12 15 18 9" /></svg>
+            </button>
+            {expanded && (
+              <div style={{ padding: '0 20px 16px' }}>
+                <div style={{ fontFamily: FONT, fontSize: 12, fontWeight: 700, color: INK2, marginBottom: 6 }}>Åbningstider</div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
+                  {selected.opening_hours.map((h, i) => (
+                    <div key={i} style={{ fontFamily: FONT, fontSize: 12, color: INK3 }}>{translateDay(h)}</div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+      </>
+    );
+  }
+
+  // ── Liste over afhentningssteder ─────────────────────────────────────────────
+  function PointList({ style }) {
+    return (
+      <div style={style}>
+        {sorted.length === 0 && (
+          <div style={{ padding: 24, fontFamily: FONT, fontSize: 13, color: INK3, textAlign: 'center' }}>Ingen udleveringssteder fundet i området.</div>
+        )}
+        {sorted.map(p => {
+          const isSel = p.id === selectedId;
+          const isCheapest = p.carrier_code === cheapestCarrier && p.price != null;
+          return (
+            <button key={p.id} type="button"
+              onClick={() => { setSelectedId(p.id); if (isMobile) setMobileTab('kort'); }}
+              onMouseEnter={() => setHoveredId(p.id)}
+              onMouseLeave={() => setHoveredId(h => h === p.id ? null : h)}
+              style={{ width: '100%', textAlign: 'left', padding: '12px 16px', border: 'none', borderBottom: `1px solid ${PAPER3}`, borderLeft: `3px solid ${isSel ? PRIMARY : 'transparent'}`, background: isSel ? GREEN_TINT : (hoveredId === p.id ? '#FAFAF7' : '#fff'), cursor: 'pointer', display: 'flex', flexDirection: 'column', gap: 4 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <CarrierLogo carrier={p.carrier_code} />
+                {isCheapest && <span style={{ fontSize: 10, fontWeight: 800, color: '#059669', background: '#D1FAE5', borderRadius: 99, padding: '1px 7px' }}>BILLIGST</span>}
+                <span style={{ marginLeft: 'auto', fontFamily: FONT, fontWeight: 800, fontSize: 14, color: INK }}>{p.price != null ? fmtKr(p.price) : '—'}</span>
+              </div>
+              <div style={{ fontFamily: FONT, fontWeight: 700, fontSize: 13, color: isSel ? PRIMARY : INK }}>{p.name}</div>
+              <div style={{ fontFamily: FONT, fontSize: 12, color: INK3, display: 'flex', justifyContent: 'space-between', gap: 8 }}>
+                <span style={{ minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{p.address}</span>
+                {fmtDist(p.distance_m) && <span style={{ flexShrink: 0, fontWeight: 600 }}>{fmtDist(p.distance_m)}</span>}
+              </div>
+            </button>
+          );
+        })}
+      </div>
+    );
+  }
+
+  // ── Kort-element (deles mellem mobil og desktop) ─────────────────────────────
+  function MapEl({ style }) {
+    return <div ref={mapRef} style={{ width: '100%', height: '100%', minHeight: 200, ...style }} />;
+  }
+
+  // ── MOBIL LAYOUT (Vinted-stil) ───────────────────────────────────────────────
+  if (isMobile) {
+    return createPortal(
+      <div style={{ position: 'fixed', inset: 0, zIndex: 10000, background: '#fff', display: 'flex', flexDirection: 'column' }}>
+        <style>{`
+          .leaflet-tooltip.ltb-pp-tip { background:#fff; border:none; border-radius:10px; box-shadow:0 4px 16px rgba(0,0,0,0.22); padding:8px 11px; }
+          .leaflet-tooltip.ltb-pp-tip:before { border-top-color:#fff; }
+        `}</style>
+
+        {/* Top-bar: tilbage + adresse */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '14px 16px 10px', borderBottom: `1px solid ${PAPER2}`, flexShrink: 0 }}>
+          <button onClick={onClose} style={{ width: 36, height: 36, borderRadius: '50%', border: 'none', background: PAPER2, color: INK, fontSize: 18, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>←</button>
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div style={{ fontFamily: FONT, fontWeight: 700, fontSize: 15, color: INK }}>Vælg et afhentningssted</div>
+            {addressLabel && <div style={{ fontFamily: FONT, fontSize: 12, color: INK3, marginTop: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>📍 {addressLabel}</div>}
+          </div>
+        </div>
+
+        {/* Kort / Liste tabs */}
+        <div style={{ display: 'flex', borderBottom: `1px solid ${PAPER2}`, flexShrink: 0 }}>
+          {[['kort', 'Kort'], ['liste', 'Liste']].map(([k, l]) => (
+            <button key={k} onClick={() => setMobileTab(k)}
+              style={{ flex: 1, padding: '12px', border: 'none', borderBottom: `2px solid ${mobileTab === k ? PRIMARY : 'transparent'}`, background: 'none', fontFamily: FONT, fontWeight: 700, fontSize: 14, color: mobileTab === k ? PRIMARY : INK3, cursor: 'pointer' }}>
+              {l}
+            </button>
+          ))}
+        </div>
+
+        {/* Indhold: Kort eller Liste */}
+        <div style={{ flex: 1, minHeight: 0, position: 'relative', overflow: mobileTab === 'liste' ? 'auto' : 'hidden' }}>
+          {/* Kortet holdes altid i DOM for at undgå re-init, men skjules ved liste-tab */}
+          <div style={{ position: 'absolute', inset: 0, display: mobileTab === 'kort' ? 'block' : 'none' }}>
+            <MapEl />
+          </div>
+          {mobileTab === 'liste' && (
+            <PointList style={{ overflowY: 'auto', height: '100%' }} />
+          )}
+        </div>
+
+        {/* Bund: valgt sted + CTA */}
+        <div style={{ borderTop: `1px solid ${PAPER2}`, flexShrink: 0, background: '#fff' }}>
+          <DetailPanel fullWidthBtn />
+        </div>
+      </div>,
+      document.body
+    );
+  }
+
+  // ── DESKTOP LAYOUT ───────────────────────────────────────────────────────────
   return createPortal(
     <div onClick={onClose} style={{ position: 'fixed', inset: 0, background: 'rgba(22,34,28,0.55)', zIndex: 10000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
       <style>{`
@@ -169,91 +329,15 @@ export default function PickupPointPicker({ points, cheapestCarrier, buyerCoords
 
         {/* Body: liste + kort */}
         <div style={{ display: 'flex', flex: 1, minHeight: 0, height: 'min(68vh, 640px)' }}>
-          {/* Liste */}
-          <div style={{ width: 360, maxWidth: '38%', overflowY: 'auto', borderRight: `1px solid ${PAPER2}`, flexShrink: 0 }}>
-            {sorted.length === 0 && (
-              <div style={{ padding: 24, fontFamily: FONT, fontSize: 13, color: INK3, textAlign: 'center' }}>Ingen udleveringssteder fundet i området.</div>
-            )}
-            {sorted.map(p => {
-              const isSel = p.id === selectedId;
-              const isCheapest = p.carrier_code === cheapestCarrier && p.price != null;
-              return (
-                <button key={p.id} type="button"
-                  onClick={() => setSelectedId(p.id)}
-                  onMouseEnter={() => setHoveredId(p.id)}
-                  onMouseLeave={() => setHoveredId(h => h === p.id ? null : h)}
-                  style={{ width: '100%', textAlign: 'left', padding: '12px 16px', border: 'none', borderBottom: `1px solid ${PAPER3}`, borderLeft: `3px solid ${isSel ? PRIMARY : 'transparent'}`, background: isSel ? GREEN_TINT : (hoveredId === p.id ? '#FAFAF7' : '#fff'), cursor: 'pointer', display: 'flex', flexDirection: 'column', gap: 4 }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                    <CarrierLogo carrier={p.carrier_code} />
-                    {isCheapest && <span style={{ fontSize: 10, fontWeight: 800, color: '#059669', background: '#D1FAE5', borderRadius: 99, padding: '1px 7px' }}>BILLIGST</span>}
-                    <span style={{ marginLeft: 'auto', fontFamily: FONT, fontWeight: 800, fontSize: 14, color: INK }}>{p.price != null ? fmtKr(p.price) : '—'}</span>
-                  </div>
-                  <div style={{ fontFamily: FONT, fontWeight: 700, fontSize: 13, color: isSel ? PRIMARY : INK }}>{p.name}</div>
-                  <div style={{ fontFamily: FONT, fontSize: 12, color: INK3, display: 'flex', justifyContent: 'space-between', gap: 8 }}>
-                    <span style={{ minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{p.address}</span>
-                    {fmtDist(p.distance_m) && <span style={{ flexShrink: 0, fontWeight: 600 }}>{fmtDist(p.distance_m)}</span>}
-                  </div>
-                </button>
-              );
-            })}
-          </div>
-
-          {/* Kort */}
+          <PointList style={{ width: 360, maxWidth: '38%', overflowY: 'auto', borderRight: `1px solid ${PAPER2}`, flexShrink: 0 }} />
           <div style={{ flex: 1, position: 'relative', minWidth: 0 }}>
-            <div ref={mapRef} style={{ width: '100%', height: '100%', minHeight: 360 }} />
+            <MapEl style={{ minHeight: 360 }} />
           </div>
         </div>
 
-        {/* Detaljeboks for valgt sted (Vinted-stil) */}
+        {/* Detalje-panel */}
         <div style={{ borderTop: `1px solid ${PAPER2}` }}>
-          {selected ? (
-            <>
-              <div style={{ padding: '16px 20px 12px', display: 'flex', alignItems: 'flex-start', gap: 14 }}>
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6 }}>
-                    <CarrierLogo carrier={selected.carrier_code} />
-                  </div>
-                  <div style={{ fontFamily: FONT, fontWeight: 800, fontSize: 16, color: INK }}>{fmtKr(selected.price)}</div>
-                  <div style={{ fontFamily: FONT, fontSize: 13, color: INK2, marginTop: 6, display: 'flex', alignItems: 'center', gap: 6 }}>
-                    <span>📍</span><span style={{ fontWeight: 700 }}>{selected.name}</span>
-                  </div>
-                  <div style={{ fontFamily: FONT, fontSize: 12, color: INK3, marginTop: 2, marginLeft: 22 }}>{selected.address}</div>
-                  <div style={{ fontFamily: FONT, fontSize: 12, color: INK3, marginTop: 4, display: 'flex', alignItems: 'center', gap: 6 }}>
-                    <span>🕒</span><span>Klar til afhentning inden for 1–3 hverdage</span>
-                  </div>
-                </div>
-                <button type="button" onClick={() => onConfirm(selected)}
-                  style={{ flexShrink: 0, padding: '11px 26px', borderRadius: 99, border: 'none', background: PRIMARY, color: '#fff', fontFamily: FONT, fontWeight: 700, fontSize: 14, cursor: 'pointer' }}>
-                  Bekræft
-                </button>
-              </div>
-
-              {/* Yderligere oplysninger — udfold åbningstider */}
-              {selected.opening_hours?.length > 0 && (
-                <div style={{ borderTop: `1px solid ${PAPER2}` }}>
-                  <button type="button" onClick={() => setExpanded(e => !e)}
-                    style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 20px', background: 'none', border: 'none', cursor: 'pointer', fontFamily: FONT, fontWeight: 700, fontSize: 13, color: INK }}>
-                    Yderligere oplysninger
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke={INK3} strokeWidth="2" strokeLinecap="round" style={{ transform: expanded ? 'rotate(180deg)' : 'none', transition: 'transform .2s' }}><polyline points="6 9 12 15 18 9" /></svg>
-                  </button>
-                  {expanded && (
-                    <div style={{ padding: '0 20px 16px' }}>
-                      <div style={{ fontFamily: FONT, fontSize: 12, fontWeight: 700, color: INK2, marginBottom: 6 }}>Åbningstider</div>
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
-                        {selected.opening_hours.map((h, i) => (
-                          <div key={i} style={{ fontFamily: FONT, fontSize: 12, color: INK3 }}>{translateDay(h)}</div>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-                </div>
-              )}
-            </>
-          ) : (
-            <div style={{ padding: '18px 20px', fontFamily: FONT, fontSize: 13, color: INK3, textAlign: 'center' }}>
-              Vælg et sted på kortet eller i listen
-            </div>
-          )}
+          <DetailPanel fullWidthBtn={false} />
         </div>
       </div>
     </div>,
