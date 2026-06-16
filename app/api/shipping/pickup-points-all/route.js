@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { requireAuth, UNAUTHORIZED } from '@/lib/api-auth';
 import { createServerClient } from '@/lib/supabase-server';
 import { getPriceQuote } from '@/lib/shipmondo/client';
+import { RATES, sizeToLegacy } from '@/lib/shipping-rates';
 
 // Henter udleveringssteder fra ALLE tre carriers (PostNord, GLS, DAO) på én gang,
 // med koordinater + pris pr. carrier, til den Vinted-lignende kort-vælger i kurven.
@@ -111,7 +112,11 @@ export async function POST(req) {
         sender, receiver, service_point_id: firstId,
       });
       price = q?.price_dkk > 0 ? Math.round(q.price_dkk * 100) / 100 : null;
-    } catch { /* carrier utilgængelig — udelad pris */ }
+    } catch {
+      // Shipmondo-quote fejlede — fald tilbage til statisk pristabel
+      const legacySize = sizeToLegacy(sizeCategory);
+      price = RATES[`${c.code}_parcel_shop`]?.prices?.[legacySize] ?? null;
+    }
 
     return raw.map(p => ({
       id:            String(p.id ?? p.number),

@@ -4,15 +4,12 @@ import { createPortal } from 'react-dom';
 import { PRIMARY, INK, INK2, INK3, PAPER2, PAPER3, GREEN_TINT, FONT } from '@/lib/constants';
 import CarrierLogo from '@/components/CarrierLogo';
 
-const CARRIER_COLOR = { pdk: '#005CB9', gls: '#06038D', dao: '#E2001A' };
-
 function fmtKr(n) { return `${Number(n || 0).toFixed(2).replace('.', ',')} kr.`; }
 
 const DAYS_DA = { Monday: 'Mandag', Tuesday: 'Tirsdag', Wednesday: 'Onsdag', Thursday: 'Torsdag', Friday: 'Fredag', Saturday: 'Lørdag', Sunday: 'Søndag' };
 function translateDay(h) {
   return String(h).replace(/^(\w+):/, (_, d) => `${DAYS_DA[d] || d}:`);
 }
-
 function fmtDist(m) {
   if (m == null) return null;
   return m < 1000 ? `${m} m` : `${(m / 1000).toFixed(1).replace('.', ',')} km`;
@@ -41,11 +38,12 @@ export default function PickupPointPicker({ points, cheapestCarrier, buyerCoords
   const [expanded, setExpanded] = useState(false);
   const [mobileTab, setMobileTab] = useState('kort');
   const [isMobile, setIsMobile] = useState(false);
+
   const markerByIdRef = useRef({});
+  // mapRef peger altid på det SAMME div-element — aldrig erstattet via sub-komponent
   const mapRef = useRef(null);
   const mapInstanceRef = useRef(null);
   const markersRef = useRef(null);
-  const selectedRef = useRef(null);
 
   useEffect(() => {
     setMounted(true);
@@ -56,9 +54,8 @@ export default function PickupPointPicker({ points, cheapestCarrier, buyerCoords
   }, []);
 
   const selected = points.find(p => p.id === selectedId) || null;
-  selectedRef.current = selectedId;
 
-  // Init kort + markers
+  // Init Leaflet-kort
   useEffect(() => {
     if (!mounted || typeof window === 'undefined' || !mapRef.current) return;
     if (!document.getElementById('leaflet-css')) {
@@ -75,39 +72,35 @@ export default function PickupPointPicker({ points, cheapestCarrier, buyerCoords
 
     if (!mapInstanceRef.current) {
       mapInstanceRef.current = L.map(mapRef.current, { center, zoom: 12, zoomControl: true, scrollWheelZoom: true });
-      L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', { attribution: '© OpenStreetMap © CARTO', maxZoom: 19 }).addTo(mapInstanceRef.current);
+      L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
+        attribution: '© OpenStreetMap © CARTO', maxZoom: 19,
+      }).addTo(mapInstanceRef.current);
       markersRef.current = L.layerGroup().addTo(mapInstanceRef.current);
       if (valid.length > 1) {
         const b = L.latLngBounds(valid.map(p => [p.lat, p.lng]));
         mapInstanceRef.current.fitBounds(b, { padding: [40, 40] });
       }
-      const fixSize = () => mapInstanceRef.current?.invalidateSize();
-      requestAnimationFrame(fixSize);
-      setTimeout(fixSize, 150);
-      setTimeout(fixSize, 400);
+      // Tiles placeres forkert hvis containeren endnu ikke har sin endelige størrelse.
+      // Kald invalidateSize gentagne gange så animerede layouts nås.
+      const fix = () => mapInstanceRef.current?.invalidateSize();
+      requestAnimationFrame(fix);
+      setTimeout(fix, 150);
+      setTimeout(fix, 400);
     }
     return () => {
       if (mapInstanceRef.current) { mapInstanceRef.current.remove(); mapInstanceRef.current = null; }
     };
   }, [mounted]); // eslint-disable-line
 
-  // Invalidate map when mobile tab switches to kort
-  useEffect(() => {
-    if (mobileTab === 'kort' && mapInstanceRef.current) {
-      setTimeout(() => mapInstanceRef.current?.invalidateSize(), 50);
-      setTimeout(() => mapInstanceRef.current?.invalidateSize(), 200);
-    }
-  }, [mobileTab]);
-
-  // Tegn markers
+  // Tegn/opdater markers
   useEffect(() => {
     if (!mapInstanceRef.current || !markersRef.current) return;
     const L = require('leaflet');
     markersRef.current.clearLayers();
     markerByIdRef.current = {};
     if (buyerCoords?.lat != null) {
-      const userHtml = `<div style="width:14px;height:14px;border-radius:50%;background:#3B82F6;border:3px solid #fff;box-shadow:0 0 0 3px rgba(59,130,246,0.35),0 2px 6px rgba(0,0,0,0.25)"></div>`;
-      L.marker([buyerCoords.lat, buyerCoords.lng], { icon: L.divIcon({ className: '', html: userHtml, iconAnchor: [7, 7] }), zIndexOffset: 500 })
+      const html = `<div style="width:14px;height:14px;border-radius:50%;background:#3B82F6;border:3px solid #fff;box-shadow:0 0 0 3px rgba(59,130,246,0.35),0 2px 6px rgba(0,0,0,0.25)"></div>`;
+      L.marker([buyerCoords.lat, buyerCoords.lng], { icon: L.divIcon({ className: '', html, iconAnchor: [7, 7] }), zIndexOffset: 500 })
         .addTo(markersRef.current).bindTooltip('Din adresse', { direction: 'top' });
     }
     points.forEach(p => {
@@ -115,7 +108,7 @@ export default function PickupPointPicker({ points, cheapestCarrier, buyerCoords
       const isSel = p.id === selectedId;
       const marker = L.marker([p.lat, p.lng], { icon: makeMarkerIcon(L, p, isSel), zIndexOffset: isSel ? 1000 : 0 })
         .addTo(markersRef.current)
-        .on('click', (e) => { L.DomEvent.stopPropagation(e); setSelectedId(p.id); })
+        .on('click', e => { L.DomEvent.stopPropagation(e); setSelectedId(p.id); })
         .on('mouseover', () => setHoveredId(p.id))
         .on('mouseout', () => setHoveredId(h => h === p.id ? null : h));
       const tip = `<div style="font-family:${FONT};min-width:140px">
@@ -128,7 +121,7 @@ export default function PickupPointPicker({ points, cheapestCarrier, buyerCoords
     });
   }, [points, selectedId, mounted, buyerCoords]);
 
-  // Hover highlight (desktop)
+  // Hover-fremhævning (desktop)
   useEffect(() => {
     if (!mapInstanceRef.current) return;
     const L = require('leaflet');
@@ -148,6 +141,16 @@ export default function PickupPointPicker({ points, cheapestCarrier, buyerCoords
     mapInstanceRef.current.panTo([selected.lat, selected.lng]);
   }, [selectedId]); // eslint-disable-line
 
+  // Når mobil-tab skifter til "kort": invalidate så tiles vises korrekt
+  useEffect(() => {
+    if (mobileTab === 'kort' && mapInstanceRef.current) {
+      const fix = () => mapInstanceRef.current?.invalidateSize();
+      requestAnimationFrame(fix);
+      setTimeout(fix, 100);
+      setTimeout(fix, 300);
+    }
+  }, [mobileTab]);
+
   if (!mounted) return null;
 
   const sorted = [...points].sort((a, b) => {
@@ -157,14 +160,36 @@ export default function PickupPointPicker({ points, cheapestCarrier, buyerCoords
     return (a.price ?? 9e9) - (b.price ?? 9e9);
   });
 
-  // ── Delt: detalje-panel for valgt sted ──────────────────────────────────────
+  // Liste-rækker (deles)
+  const listRows = sorted.length === 0 ? (
+    <div style={{ padding: 24, fontFamily: FONT, fontSize: 13, color: INK3, textAlign: 'center' }}>Ingen udleveringssteder fundet.</div>
+  ) : sorted.map(p => {
+    const isSel = p.id === selectedId;
+    const isCheapest = p.carrier_code === cheapestCarrier && p.price != null;
+    return (
+      <button key={p.id} type="button"
+        onClick={() => { setSelectedId(p.id); if (isMobile) setMobileTab('kort'); }}
+        onMouseEnter={() => setHoveredId(p.id)}
+        onMouseLeave={() => setHoveredId(h => h === p.id ? null : h)}
+        style={{ width: '100%', textAlign: 'left', padding: '12px 16px', border: 'none', borderBottom: `1px solid ${PAPER3}`, borderLeft: `3px solid ${isSel ? PRIMARY : 'transparent'}`, background: isSel ? GREEN_TINT : (hoveredId === p.id ? '#FAFAF7' : '#fff'), cursor: 'pointer', display: 'flex', flexDirection: 'column', gap: 4 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          <CarrierLogo carrier={p.carrier_code} />
+          {isCheapest && <span style={{ fontSize: 10, fontWeight: 800, color: '#059669', background: '#D1FAE5', borderRadius: 99, padding: '1px 7px' }}>BILLIGST</span>}
+          <span style={{ marginLeft: 'auto', fontFamily: FONT, fontWeight: 800, fontSize: 14, color: INK }}>{p.price != null ? fmtKr(p.price) : '—'}</span>
+        </div>
+        <div style={{ fontFamily: FONT, fontWeight: 700, fontSize: 13, color: isSel ? PRIMARY : INK }}>{p.name}</div>
+        <div style={{ fontFamily: FONT, fontSize: 12, color: INK3, display: 'flex', justifyContent: 'space-between', gap: 8 }}>
+          <span style={{ minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{p.address}</span>
+          {fmtDist(p.distance_m) && <span style={{ flexShrink: 0, fontWeight: 600 }}>{fmtDist(p.distance_m)}</span>}
+        </div>
+      </button>
+    );
+  });
+
+  // Detalje-panel for valgt sted
   function DetailPanel({ fullWidthBtn }) {
     if (!selected) {
-      return (
-        <div style={{ padding: '16px 20px', fontFamily: FONT, fontSize: 13, color: INK3, textAlign: 'center' }}>
-          Vælg et sted på {isMobile ? 'kortet eller i listen' : 'kortet eller i listen'}
-        </div>
-      );
+      return <div style={{ padding: '16px 20px', fontFamily: FONT, fontSize: 13, color: INK3, textAlign: 'center' }}>Vælg et sted på kortet eller i listen</div>;
     }
     return (
       <>
@@ -211,11 +236,9 @@ export default function PickupPointPicker({ points, cheapestCarrier, buyerCoords
             {expanded && (
               <div style={{ padding: '0 20px 16px' }}>
                 <div style={{ fontFamily: FONT, fontSize: 12, fontWeight: 700, color: INK2, marginBottom: 6 }}>Åbningstider</div>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
-                  {selected.opening_hours.map((h, i) => (
-                    <div key={i} style={{ fontFamily: FONT, fontSize: 12, color: INK3 }}>{translateDay(h)}</div>
-                  ))}
-                </div>
+                {selected.opening_hours.map((h, i) => (
+                  <div key={i} style={{ fontFamily: FONT, fontSize: 12, color: INK3 }}>{translateDay(h)}</div>
+                ))}
               </div>
             )}
           </div>
@@ -224,54 +247,28 @@ export default function PickupPointPicker({ points, cheapestCarrier, buyerCoords
     );
   }
 
-  // ── Liste over afhentningssteder ─────────────────────────────────────────────
-  function PointList({ style }) {
-    return (
-      <div style={style}>
-        {sorted.length === 0 && (
-          <div style={{ padding: 24, fontFamily: FONT, fontSize: 13, color: INK3, textAlign: 'center' }}>Ingen udleveringssteder fundet i området.</div>
-        )}
-        {sorted.map(p => {
-          const isSel = p.id === selectedId;
-          const isCheapest = p.carrier_code === cheapestCarrier && p.price != null;
-          return (
-            <button key={p.id} type="button"
-              onClick={() => { setSelectedId(p.id); if (isMobile) setMobileTab('kort'); }}
-              onMouseEnter={() => setHoveredId(p.id)}
-              onMouseLeave={() => setHoveredId(h => h === p.id ? null : h)}
-              style={{ width: '100%', textAlign: 'left', padding: '12px 16px', border: 'none', borderBottom: `1px solid ${PAPER3}`, borderLeft: `3px solid ${isSel ? PRIMARY : 'transparent'}`, background: isSel ? GREEN_TINT : (hoveredId === p.id ? '#FAFAF7' : '#fff'), cursor: 'pointer', display: 'flex', flexDirection: 'column', gap: 4 }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                <CarrierLogo carrier={p.carrier_code} />
-                {isCheapest && <span style={{ fontSize: 10, fontWeight: 800, color: '#059669', background: '#D1FAE5', borderRadius: 99, padding: '1px 7px' }}>BILLIGST</span>}
-                <span style={{ marginLeft: 'auto', fontFamily: FONT, fontWeight: 800, fontSize: 14, color: INK }}>{p.price != null ? fmtKr(p.price) : '—'}</span>
-              </div>
-              <div style={{ fontFamily: FONT, fontWeight: 700, fontSize: 13, color: isSel ? PRIMARY : INK }}>{p.name}</div>
-              <div style={{ fontFamily: FONT, fontSize: 12, color: INK3, display: 'flex', justifyContent: 'space-between', gap: 8 }}>
-                <span style={{ minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{p.address}</span>
-                {fmtDist(p.distance_m) && <span style={{ flexShrink: 0, fontWeight: 600 }}>{fmtDist(p.distance_m)}</span>}
-              </div>
-            </button>
-          );
-        })}
-      </div>
-    );
-  }
+  // ── FÆLLES map-div — holdes altid i DOM, flyttes aldrig ─────────────────────
+  // Synlighed styres via opacity/pointerEvents, ikke display:none,
+  // så Leaflet aldrig mister kortets layout-dimensioner.
+  const mapDiv = (
+    <div
+      ref={mapRef}
+      style={{
+        position: 'absolute', inset: 0,
+        opacity: (!isMobile || mobileTab === 'kort') ? 1 : 0,
+        pointerEvents: (!isMobile || mobileTab === 'kort') ? 'auto' : 'none',
+        transition: 'opacity 0.15s',
+      }}
+    />
+  );
 
-  // ── Kort-element (deles mellem mobil og desktop) ─────────────────────────────
-  function MapEl({ style }) {
-    return <div ref={mapRef} style={{ width: '100%', height: '100%', minHeight: 200, ...style }} />;
-  }
-
-  // ── MOBIL LAYOUT (Vinted-stil) ───────────────────────────────────────────────
+  // ── MOBIL LAYOUT ─────────────────────────────────────────────────────────────
   if (isMobile) {
     return createPortal(
       <div style={{ position: 'fixed', inset: 0, zIndex: 10000, background: '#fff', display: 'flex', flexDirection: 'column' }}>
-        <style>{`
-          .leaflet-tooltip.ltb-pp-tip { background:#fff; border:none; border-radius:10px; box-shadow:0 4px 16px rgba(0,0,0,0.22); padding:8px 11px; }
-          .leaflet-tooltip.ltb-pp-tip:before { border-top-color:#fff; }
-        `}</style>
+        <style>{`.leaflet-tooltip.ltb-pp-tip{background:#fff;border:none;border-radius:10px;box-shadow:0 4px 16px rgba(0,0,0,0.22);padding:8px 11px}.leaflet-tooltip.ltb-pp-tip:before{border-top-color:#fff}`}</style>
 
-        {/* Top-bar: tilbage + adresse */}
+        {/* Top-bar */}
         <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '14px 16px 10px', borderBottom: `1px solid ${PAPER2}`, flexShrink: 0 }}>
           <button onClick={onClose} style={{ width: 36, height: 36, borderRadius: '50%', border: 'none', background: PAPER2, color: INK, fontSize: 18, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>←</button>
           <div style={{ flex: 1, minWidth: 0 }}>
@@ -290,18 +287,18 @@ export default function PickupPointPicker({ points, cheapestCarrier, buyerCoords
           ))}
         </div>
 
-        {/* Indhold: Kort eller Liste */}
-        <div style={{ flex: 1, minHeight: 0, position: 'relative', overflow: mobileTab === 'liste' ? 'auto' : 'hidden' }}>
-          {/* Kortet holdes altid i DOM for at undgå re-init, men skjules ved liste-tab */}
-          <div style={{ position: 'absolute', inset: 0, display: mobileTab === 'kort' ? 'block' : 'none' }}>
-            <MapEl />
-          </div>
+        {/* Indhold — kort og liste deler samme beholder.
+            Kortet er altid i DOM (opacity 0/1), listen vises ovenpå ved liste-tab. */}
+        <div style={{ flex: 1, minHeight: 0, position: 'relative' }}>
+          {mapDiv}
           {mobileTab === 'liste' && (
-            <PointList style={{ overflowY: 'auto', height: '100%' }} />
+            <div style={{ position: 'absolute', inset: 0, overflowY: 'auto', background: '#fff' }}>
+              {listRows}
+            </div>
           )}
         </div>
 
-        {/* Bund: valgt sted + CTA */}
+        {/* Bund: detalje + CTA */}
         <div style={{ borderTop: `1px solid ${PAPER2}`, flexShrink: 0, background: '#fff' }}>
           <DetailPanel fullWidthBtn />
         </div>
@@ -313,13 +310,11 @@ export default function PickupPointPicker({ points, cheapestCarrier, buyerCoords
   // ── DESKTOP LAYOUT ───────────────────────────────────────────────────────────
   return createPortal(
     <div onClick={onClose} style={{ position: 'fixed', inset: 0, background: 'rgba(22,34,28,0.55)', zIndex: 10000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
-      <style>{`
-        .leaflet-tooltip.ltb-pp-tip { background:#fff; border:none; border-radius:10px; box-shadow:0 4px 16px rgba(0,0,0,0.22); padding:8px 11px; }
-        .leaflet-tooltip.ltb-pp-tip:before { border-top-color:#fff; }
-      `}</style>
+      <style>{`.leaflet-tooltip.ltb-pp-tip{background:#fff;border:none;border-radius:10px;box-shadow:0 4px 16px rgba(0,0,0,0.22);padding:8px 11px}.leaflet-tooltip.ltb-pp-tip:before{border-top-color:#fff}`}</style>
       <div onClick={e => e.stopPropagation()} style={{ background: '#fff', borderRadius: 20, width: '100%', maxWidth: 1240, maxHeight: '92vh', overflow: 'hidden', display: 'flex', flexDirection: 'column', boxShadow: '0 20px 60px rgba(0,0,0,0.3)' }}>
+
         {/* Header */}
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '16px 20px', borderBottom: `1px solid ${PAPER2}` }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '16px 20px', borderBottom: `1px solid ${PAPER2}`, flexShrink: 0 }}>
           <div>
             <div style={{ fontFamily: FONT, fontWeight: 800, fontSize: 17, color: INK }}>Vælg et afhentningssted</div>
             {addressLabel && <div style={{ fontFamily: FONT, fontSize: 12, color: INK3, marginTop: 2, display: 'flex', alignItems: 'center', gap: 5 }}><span>📍</span>{addressLabel} · sorteret efter afstand</div>}
@@ -329,14 +324,18 @@ export default function PickupPointPicker({ points, cheapestCarrier, buyerCoords
 
         {/* Body: liste + kort */}
         <div style={{ display: 'flex', flex: 1, minHeight: 0, height: 'min(68vh, 640px)' }}>
-          <PointList style={{ width: 360, maxWidth: '38%', overflowY: 'auto', borderRight: `1px solid ${PAPER2}`, flexShrink: 0 }} />
+          {/* Liste */}
+          <div style={{ width: 360, maxWidth: '38%', overflowY: 'auto', borderRight: `1px solid ${PAPER2}`, flexShrink: 0 }}>
+            {listRows}
+          </div>
+          {/* Kort — position:relative wrapper giver mapDiv en målbar størrelse */}
           <div style={{ flex: 1, position: 'relative', minWidth: 0 }}>
-            <MapEl style={{ minHeight: 360 }} />
+            {mapDiv}
           </div>
         </div>
 
         {/* Detalje-panel */}
-        <div style={{ borderTop: `1px solid ${PAPER2}` }}>
+        <div style={{ borderTop: `1px solid ${PAPER2}`, flexShrink: 0 }}>
           <DetailPanel fullWidthBtn={false} />
         </div>
       </div>
