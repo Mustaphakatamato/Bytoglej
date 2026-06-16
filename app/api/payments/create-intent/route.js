@@ -10,9 +10,9 @@ function getStripe() {
   return new Stripe(process.env.STRIPE_SECRET_KEY);
 }
 
-// Service fee: 5% of item total, min 5 kr, max 50 kr
+// Service fee: 5% of item total + 5 kr flat (Vinted-model)
 function calcServiceFee(itemTotal) {
-  return Math.round(Math.max(5, Math.min(50, itemTotal * 0.05)) * 100) / 100;
+  return Math.round((itemTotal * 0.05 + 5) * 100) / 100;
 }
 
 // Bundle discount: find highest applicable tier by item count
