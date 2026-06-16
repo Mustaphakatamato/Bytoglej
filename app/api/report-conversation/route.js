@@ -3,7 +3,7 @@ import { Resend } from 'resend';
 import { requireAuth, UNAUTHORIZED } from '@/lib/api-auth';
 import { escapeHtml } from '@/lib/escape-html';
 
-const ADMIN_NOTIFICATION_EMAIL = process.env.ADMIN_NOTIFICATION_EMAIL || 'mustaphakatamato@live.dk';
+const ADMIN_NOTIFICATION_EMAIL = process.env.ADMIN_NOTIFICATION_EMAIL || 'admin@bytogleg.dk';
 
 // Rapporterer en samtale til byt&leg admin via e-mail.
 export async function POST(req) {

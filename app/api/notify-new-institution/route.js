@@ -14,7 +14,7 @@ export async function POST(req) {
     const city = escapeHtml(String(body.city || '').slice(0, 100));
     if (!institutionName) return NextResponse.json({ ok: true });
 
-    const to = process.env.ADMIN_NOTIFICATION_EMAIL || 'mustaphakatamato@gmail.com';
+    const to = process.env.ADMIN_NOTIFICATION_EMAIL || 'admin@bytogleg.dk';
     if (!process.env.RESEND_API_KEY) return NextResponse.json({ ok: true });
 
     const base = process.env.NEXT_PUBLIC_BASE_URL || 'https://bytogleg.dk';

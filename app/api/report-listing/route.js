@@ -3,7 +3,7 @@ import { Resend } from 'resend';
 import { requireAuth, UNAUTHORIZED } from '@/lib/api-auth';
 import { escapeHtml } from '@/lib/escape-html';
 
-const ADMIN_NOTIFICATION_EMAIL = process.env.ADMIN_NOTIFICATION_EMAIL || 'mustaphakatamato@live.dk';
+const ADMIN_NOTIFICATION_EMAIL = process.env.ADMIN_NOTIFICATION_EMAIL || 'admin@bytogleg.dk';
 
 export async function POST(req) {
   const user = await requireAuth(req);
