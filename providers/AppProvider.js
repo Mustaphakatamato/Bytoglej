@@ -1,5 +1,6 @@
 'use client';
 import React, { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react';
+import { usePathname } from 'next/navigation';
 import { db } from '@/lib/supabase';
 import { checkIsAdmin } from '@/lib/admin';
 import ChatBubble from '@/components/ChatBubble';
@@ -352,16 +353,19 @@ export function AppProvider({ children }) {
     effectiveInstitution,
   };
 
+  const pathname = usePathname();
+  const isAdmin = pathname?.startsWith('/admin');
+
   return (
     <ActiveUserContext.Provider value={activeUserValue}>
       <AppContext.Provider value={appValue}>
         {children}
-        <ChatBubble />
-        <FeedbackWidget
+        {!isAdmin && <ChatBubble />}
+        {!isAdmin && <FeedbackWidget
           loggedIn={loggedIn}
           institutionName={effectiveInstitution?.name || null}
           userEmail={realEmail}
-        />
+        />}
       </AppContext.Provider>
     </ActiveUserContext.Provider>
   );
