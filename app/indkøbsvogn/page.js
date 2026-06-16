@@ -314,7 +314,7 @@ export default function CartPage() {
   }, 0);
 
   function calcServiceFee(itemTotal) {
-    return Math.round(Math.max(5, Math.min(50, itemTotal * 0.05)) * 100) / 100;
+    return Math.round((itemTotal * 0.05 + 5) * 100) / 100;
   }
 
   function calcBundleDiscount(itemTotal, itemCount, discSettings) {
