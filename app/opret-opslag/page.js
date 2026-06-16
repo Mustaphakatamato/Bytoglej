@@ -80,6 +80,7 @@ export default function OpretOpslagPage() {
   const [aiScanData, setAiScanData] = useState(null); // AI-forslag gemt til log ved submit
   const [scanRejected, setScanRejected] = useState(false); // AI afviste billede → vis "send til gennemgang"
   const [rejectionLogId, setRejectionLogId] = useState(null); // person detection → "AI tog fejl" knap
+  const [step1Attempted, setStep1Attempted] = useState(false);
   const [aiApply, setAiApply] = useState({ title: true, description: true });
   const [aiRegenerating, setAiRegenerating] = useState({ title: false, description: false });
   const [institution, setInstitution] = useState(ctxInstitution || null);
@@ -604,7 +605,8 @@ export default function OpretOpslagPage() {
   const labelStyle = { display:'block', fontSize:13, fontWeight:700, marginBottom:7, fontFamily:FONT, color:INK2 };
 
   const deliveryValid = true;   // afhentning er altid muligt → levering er altid gyldig
-  const step1Valid = form.title.trim() && (form.type !== 'køb' || form.price) && deliveryValid;
+  const _step1CatObj = CATEGORIES.find(c => c.key === form.category);
+  const step1Valid = !!(form.title.trim() && (form.type !== 'køb' || form.price) && deliveryValid && form.category && (!_step1CatObj?.sub?.length || form.subcategory) && form.brand !== null && form.brand !== undefined);
   const needsImage = form.type !== 'søges';
   const step2Valid = form.description.trim() && (!needsImage || imgFiles.length > 0);
 
@@ -911,7 +913,7 @@ export default function OpretOpslagPage() {
                 <div style={{ display:'flex', flexDirection:'column', gap:12 }}>
                   <div>
                     <label style={labelStyle}>Kategori <span style={{ color:'#e53e3e' }}>*</span></label>
-                    <select value={form.category} onChange={e => setForm(f => ({ ...f, category: e.target.value, subcategory: '' }))} style={{ ...inputStyle, cursor:'pointer' }}>
+                    <select value={form.category} onChange={e => setForm(f => ({ ...f, category: e.target.value, subcategory: '' }))} style={{ ...inputStyle, cursor:'pointer', border:`1.5px solid ${step1Attempted && !form.category ? '#FCA5A5' : PAPER3}` }}>
                       <option value=''>Vælg kategori…</option>
                       {CATEGORIES.map(cat => <option key={cat.key} value={cat.key}>{cat.emoji} {cat.label}</option>)}
                     </select>
@@ -922,7 +924,7 @@ export default function OpretOpslagPage() {
                     return (
                       <div>
                         <label style={labelStyle}>Underkategori <span style={{ color:'#e53e3e' }}>*</span></label>
-                        <select value={form.subcategory} onChange={e => setForm(f => ({ ...f, subcategory: e.target.value }))} style={{ ...inputStyle, cursor:'pointer' }}>
+                        <select value={form.subcategory} onChange={e => setForm(f => ({ ...f, subcategory: e.target.value }))} style={{ ...inputStyle, cursor:'pointer', border:`1.5px solid ${step1Attempted && !form.subcategory ? '#FCA5A5' : PAPER3}` }}>
                           <option value=''>Vælg underkategori…</option>
                           {catObj.sub.map(sub => <option key={sub} value={sub}>{sub}</option>)}
                         </select>
@@ -931,11 +933,16 @@ export default function OpretOpslagPage() {
                   })()}
                   <div>
                     <label style={labelStyle}>Varemærke <span style={{ color:'#e53e3e' }}>*</span></label>
-                    <BrandPicker value={form.brand} onChange={v => setForm(f => ({ ...f, brand: v }))} />
+                    <BrandPicker value={form.brand} onChange={v => setForm(f => ({ ...f, brand: v }))} error={step1Attempted && (form.brand === null || form.brand === undefined)} />
                   </div>
                 </div>
 
-                <button onClick={()=>{ if(step1Valid) { setStep(2); scrollTop(); } }} disabled={!step1Valid} style={{ width:'100%', padding:'14px', borderRadius:99, background:step1Valid?PRIMARY:PAPER3, color:step1Valid?'#fff':INK3, border:'none', fontFamily:FONT, fontWeight:700, fontSize:15, cursor:step1Valid?'pointer':'not-allowed', marginTop:4, transition:'all 0.2s' }}>
+                {step1Attempted && !step1Valid && (
+                  <div style={{ background:'#FEF2F2', border:'1px solid #FECACA', borderRadius:10, padding:'10px 14px', fontFamily:FONT, fontSize:13, color:'#B91C1C', fontWeight:600 }}>
+                    Udfyld alle obligatoriske felter markeret med * for at fortsætte
+                  </div>
+                )}
+                <button onClick={()=>{ setStep1Attempted(true); if(step1Valid) { setStep(2); scrollTop(); } }} style={{ width:'100%', padding:'14px', borderRadius:99, background:step1Valid?PRIMARY:PAPER3, color:step1Valid?'#fff':INK3, border:'none', fontFamily:FONT, fontWeight:700, fontSize:15, cursor:'pointer', marginTop:4, transition:'all 0.2s' }}>
                   Næste: Detaljer & billeder →
                 </button>
               </div>

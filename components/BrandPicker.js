@@ -3,7 +3,7 @@ import { useState, useRef, useEffect } from 'react';
 import { BRAND_OPTIONS } from '@/lib/toy-brands';
 import { PRIMARY, GREEN_TINT, PAPER, PAPER2, PAPER3, INK, INK2, INK3, FONT } from '@/lib/constants';
 
-export default function BrandPicker({ value, onChange, style }) {
+export default function BrandPicker({ value, onChange, style, error }) {
   const [open, setOpen] = useState(false);
   const [search, setSearch] = useState('');
   const ref = useRef(null);
@@ -34,7 +34,7 @@ export default function BrandPicker({ value, onChange, style }) {
       <button
         type="button"
         onClick={() => setOpen(o => !o)}
-        style={{ width:'100%', padding:'12px 14px', borderRadius:12, border:`1.5px solid ${PAPER3}`, fontSize:14, outline:'none', fontFamily:FONT, background:'#fff', color: isUnselected ? INK3 : INK, boxSizing:'border-box', cursor:'pointer', textAlign:'left', display:'flex', alignItems:'center', justifyContent:'space-between' }}
+        style={{ width:'100%', padding:'12px 14px', borderRadius:12, border:`1.5px solid ${error ? '#FCA5A5' : PAPER3}`, fontSize:14, outline:'none', fontFamily:FONT, background:'#fff', color: isUnselected ? INK3 : INK, boxSizing:'border-box', cursor:'pointer', textAlign:'left', display:'flex', alignItems:'center', justifyContent:'space-between' }}
       >
         <span>{selectedLabel}</span>
         <span style={{ fontSize:10, color:INK3 }}>▾</span>
