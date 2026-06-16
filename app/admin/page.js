@@ -1550,6 +1550,78 @@ function LogTab({ isMobile }) {
   );
 }
 
+// ── SECTION: Scan rejection logs ────────────────────────────────────────────────
+
+function ScanRejectionLogsSection({ isMobile }) {
+  const [logs, setLogs] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [deleting, setDeleting] = useState({});
+
+  useEffect(() => {
+    db.from('scan_rejection_logs')
+      .select('*')
+      .order('created_at', { ascending: false })
+      .limit(200)
+      .then(({ data }) => { setLogs(data || []); setLoading(false); });
+  }, []);
+
+  async function deleteImage(log_id) {
+    setDeleting(d => ({ ...d, [log_id]: true }));
+    const headers = await authHeaders();
+    await fetch('/api/admin/scan-rejection', {
+      method: 'POST',
+      headers,
+      body: JSON.stringify({ action: 'delete_image', log_id }),
+    });
+    setLogs(prev => prev.map(l => l.id === log_id ? { ...l, image_path: null, deleted_at: new Date().toISOString() } : l));
+    setDeleting(d => ({ ...d, [log_id]: false }));
+  }
+
+  if (loading) return <Spinner />;
+  if (!logs.length) return <Empty text="Ingen afviste billeder endnu" />;
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+      {logs.map(l => {
+        const imgUrl = l.image_path && !l.deleted_at
+          ? `${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public/listing-images/${l.image_path}`
+          : null;
+        return (
+          <div key={l.id} style={{ background: PAPER2, border: `1px solid rgba(22,34,28,0.08)`, borderRadius: 14, padding: '14px 16px', display: 'flex', gap: 14, alignItems: 'flex-start', flexWrap: isMobile ? 'wrap' : 'nowrap' }}>
+            {imgUrl ? (
+              <img src={imgUrl} alt="" style={{ width: 72, height: 72, objectFit: 'cover', borderRadius: 10, flexShrink: 0, border: `1px solid ${PAPER3}` }} />
+            ) : (
+              <div style={{ width: 72, height: 72, borderRadius: 10, background: PAPER3, flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 20 }}>
+                {l.deleted_at ? '🗑️' : '📷'}
+              </div>
+            )}
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 6, alignItems: 'center' }}>
+                <span style={{ fontFamily: FONT, fontSize: 11, fontWeight: 700, color: INK3 }}>{fmtDate(l.created_at, true)}</span>
+                {l.institution_name && <Badge bg={GREEN_TINT} color={PRIMARY}>{l.institution_name}</Badge>}
+                {l.user_disputed && <Badge bg='#FEF3C7' color='#92400E'>AI tog fejl (bruger)</Badge>}
+                {l.deleted_at && <Badge bg={PAPER3} color={INK3}>Billede slettet</Badge>}
+              </div>
+              <div style={{ fontFamily: FONT, fontSize: 13, color: INK, marginBottom: 8, lineHeight: 1.5 }}>
+                <strong>AI begrundelse:</strong> {l.ai_reason || '—'}
+              </div>
+              {!l.deleted_at && l.image_path && (
+                <button
+                  onClick={() => deleteImage(l.id)}
+                  disabled={!!deleting[l.id]}
+                  style={{ background: '#FEE2E2', color: '#991B1B', border: 'none', borderRadius: 8, padding: '5px 12px', fontSize: 12, fontWeight: 700, fontFamily: FONT, cursor: deleting[l.id] ? 'not-allowed' : 'pointer', opacity: deleting[l.id] ? 0.6 : 1 }}
+                >
+                  {deleting[l.id] ? 'Sletter…' : 'Slet billede permanent'}
+                </button>
+              )}
+            </div>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
 // ── SECTION: AI Bot ─────────────────────────────────────────────────────────────
 
 function AiBotTab({ isMobile }) {
@@ -1557,6 +1629,7 @@ function AiBotTab({ isMobile }) {
   const [loading, setLoading] = useState(true);
   const [stats, setStats] = useState(null);
   const [scanTypeFilter, setScanTypeFilter] = useState('');
+  const [showRejections, setShowRejections] = useState(false);
 
   useEffect(() => {
     async function load() {
@@ -1600,6 +1673,22 @@ function AiBotTab({ isMobile }) {
 
   return (
     <div style={{ padding: isMobile ? '20px 0' : '24px 0', maxWidth: 1100 }}>
+      <div style={{ display: 'flex', gap: 10, marginBottom: 24, flexWrap: 'wrap' }}>
+        <button onClick={() => setShowRejections(false)} style={{ padding: '8px 18px', borderRadius: 10, border: 'none', background: !showRejections ? PRIMARY : PAPER2, color: !showRejections ? '#fff' : INK, fontFamily: FONT, fontWeight: 700, fontSize: 13, cursor: 'pointer' }}>
+          AI-scans
+        </button>
+        <button onClick={() => setShowRejections(true)} style={{ padding: '8px 18px', borderRadius: 10, border: 'none', background: showRejections ? PRIMARY : PAPER2, color: showRejections ? '#fff' : INK, fontFamily: FONT, fontWeight: 700, fontSize: 13, cursor: 'pointer' }}>
+          Afviste billeder
+        </button>
+      </div>
+
+      {showRejections ? (
+        <>
+          <SectionHead title="Afviste billeder — persondetektering" />
+          <ScanRejectionLogsSection isMobile={isMobile} />
+        </>
+      ) : (
+      <>
       <SectionHead title="AI Bot — seneste 30 dage" />
 
       {loading ? <Spinner /> : !stats ? <Empty text="Ingen data endnu" /> : (
@@ -1684,6 +1773,8 @@ function AiBotTab({ isMobile }) {
             {filtered.length === 0 && <Empty text="Ingen AI-scans i perioden" />}
           </div>
         </>
+      )}
+      </>
       )}
     </div>
   );

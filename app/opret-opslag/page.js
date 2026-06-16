@@ -79,6 +79,7 @@ export default function OpretOpslagPage() {
   const [priceSuggestion, setPriceSuggestion] = useState(null); // { basis, comparable_count, suggested_min, suggested_max, suggested_price }
   const [aiScanData, setAiScanData] = useState(null); // AI-forslag gemt til log ved submit
   const [scanRejected, setScanRejected] = useState(false); // AI afviste billede → vis "send til gennemgang"
+  const [rejectionLogId, setRejectionLogId] = useState(null); // person detection → "AI tog fejl" knap
   const [aiApply, setAiApply] = useState({ title: true, description: true });
   const [aiRegenerating, setAiRegenerating] = useState({ title: false, description: false });
   const [institution, setInstitution] = useState(ctxInstitution || null);
@@ -336,22 +337,46 @@ export default function OpretOpslagPage() {
     if (!file) return;
     e.target.value = '';
     setScanError(null);
+    setRejectionLogId(null);
     setScanning(true);
     try {
       const compressed = await compressImage(file);
-      const safe = await checkImageSafe(compressed);
-      if (!safe) { setScanError('Billedet afvist — indeholder personer. Upload et billede uden personer.'); setScanRejected(true); setScanning(false); return; }
+
+      // Person detection — inline to capture reason
+      let personDetected = false;
+      let personReason = null;
+      try {
+        const safeForm = new FormData(); safeForm.append('image', compressed);
+        const safeRes = await authedFetch('/api/scan-image', { method: 'POST', body: safeForm });
+        const safeJson = await safeRes.json();
+        if (safeJson.safe === false) { personDetected = true; personReason = safeJson.reason || null; }
+      } catch {}
+
+      if (personDetected) {
+        // Log rejection server-side (fire-and-forget result; save log_id for dispute button)
+        try {
+          const logForm = new FormData();
+          logForm.append('image', compressed);
+          logForm.append('ai_reason', personReason || 'Person detekteret');
+          logForm.append('institution_name', institution?.name || '');
+          const logRes = await authedFetch('/api/log-scan-rejection', { method: 'POST', body: logForm });
+          const logJson = await logRes.json();
+          if (logJson.log_id) setRejectionLogId(logJson.log_id);
+        } catch {}
+        setScanError('AI har registreret en person på billedet. Upload et billede uden personer.');
+        setScanning(false);
+        return;
+      }
+
       const fd = new FormData();
       fd.append('image', compressed);
       const res = await authedFetch('/api/scan-toy', { method: 'POST', body: fd });
       const json = await res.json();
       if (json.error) {
-        setScanError(res.status === 422 ? json.error : 'Scan mislykkedes — prøv igen');
-        if (res.status === 422) setScanRejected(true);
+        setScanError('Scan mislykkedes — prøv igen');
         setScanning(false);
         return;
       }
-      setScanRejected(false);
       setForm(f => ({
         ...f,
         title: json.title || f.title,
@@ -362,6 +387,7 @@ export default function OpretOpslagPage() {
         // Forudfyld pris med forslaget (kun for køb, og kun hvis feltet er tomt)
         price: (f.type === 'køb' && !f.price && json.price?.suggested_price) ? String(json.price.suggested_price) : f.price,
       }));
+      setScanRejected(!!json.needs_review);
       setAiFilledFields({ title: !!json.title, description: !!json.description });
       setPriceSuggestion(json.price || null);
       setAiScanData({
@@ -383,7 +409,7 @@ export default function OpretOpslagPage() {
       setImgFiles(prev => prev.length < 6 ? [file, ...prev] : prev);
       setImgPreviews(prev => prev.length < 6 ? [preview, ...prev] : prev);
       setImgError(false);
-      showToast('AI har udfyldt felterne — tjek og juster 🎉');
+      showToast(json.needs_review ? 'AI har udfyldt felterne — opslaget sendes til gennemgang 🔍' : 'AI har udfyldt felterne — tjek og juster 🎉');
     } catch { setScanError('Scan mislykkedes — prøv igen'); }
     setScanning(false);
   }
@@ -720,9 +746,30 @@ export default function OpretOpslagPage() {
                         <div style={{ flex:1 }}>
                           <div style={{ fontFamily:FONT, fontWeight:700, fontSize:13, color:'#B91C1C', marginBottom:4 }}>Billedet kunne ikke bruges</div>
                           <div style={{ fontFamily:FONT, fontSize:12, color:'#DC2626', lineHeight:1.5 }}>{scanError}</div>
-                          <button onClick={() => { setScanError(null); scanRef.current?.click(); }} style={{ marginTop:8, background:'#B91C1C', color:'#fff', border:'none', borderRadius:8, padding:'6px 14px', fontSize:12, fontWeight:700, fontFamily:FONT, cursor:'pointer' }}>
-                            Prøv et andet billede
-                          </button>
+                          <div style={{ display:'flex', gap:8, marginTop:8, flexWrap:'wrap' }}>
+                            <button onClick={() => { setScanError(null); setRejectionLogId(null); scanRef.current?.click(); }} style={{ background:'#B91C1C', color:'#fff', border:'none', borderRadius:8, padding:'6px 14px', fontSize:12, fontWeight:700, fontFamily:FONT, cursor:'pointer' }}>
+                              Prøv et andet billede
+                            </button>
+                            {rejectionLogId && (
+                              <button
+                                onClick={async () => {
+                                  try {
+                                    await authedFetch('/api/admin/scan-rejection', {
+                                      method: 'POST',
+                                      headers: { 'Content-Type': 'application/json' },
+                                      body: JSON.stringify({ action: 'dispute', log_id: rejectionLogId }),
+                                    });
+                                  } catch {}
+                                  setRejectionLogId(null);
+                                  setScanError(null);
+                                  showToast('Feedback sendt — tak! Du kan prøve med et nyt billede.');
+                                }}
+                                style={{ background:'transparent', color:'#B91C1C', border:'1.5px solid #B91C1C', borderRadius:8, padding:'6px 14px', fontSize:12, fontWeight:700, fontFamily:FONT, cursor:'pointer' }}
+                              >
+                                AI tog fejl
+                              </button>
+                            )}
+                          </div>
                         </div>
                       </div>
                     )}

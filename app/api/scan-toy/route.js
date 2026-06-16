@@ -42,19 +42,19 @@ export async function POST(req) {
 
     const prompt = `Du er en assistent der hjælper med at oprette annoncer for danske institutioner (vuggestuer, børnehaver, skoler).
 
-Tjek FØRST: Er billedet relevant for en institutions-annonce? Relevante ting er: legetøj, spil, puslespil, bøger, børnemøbler, sportsudstyr, musikinstrumenter, kreativt materiale, udendørs legeredskaber, babyudstyr, kostumer — altså ting en institution ville sælge eller bytte.
-
-Hvis billedet IKKE er relevant (fx kropsdele, mad, landskaber, dyr, mennesker, tekst, tilfældige genstande der ikke er legetøj/udstyr) — returner KUN: {"rejected":true,"reason":"Billedet ser ikke ud til at indeholde legetøj eller institutions-udstyr"}
-
-Hvis billedet ER relevant — returner KUN et JSON-objekt med:
-- title: kort dansk titel (maks 60 tegn)
+Returner KUN et JSON-objekt med følgende felter:
+- needs_review: true hvis billedet IKKE tydeligt viser legetøj eller institutions-udstyr (fx mad, landskaber, dyr, mennesker, tilfældige genstande) — false ellers
+- reject_reason: kort dansk forklaring på max 80 tegn (kun hvis needs_review er true, ellers udelad feltet)
+- title: kort dansk titel på max 60 tegn (bedste gæt selv ved usikre billeder)
 - category: vælg ÉN nøgle fra: ${CATEGORY_KEYS.join(', ')}
 - condition: vælg ÉN: "Ny", "God stand", "Brugt", "Slidte"
 - age_group: vælg ÉN: "0-2 år", "3-6 år", "6-10 år", "10+ år", "Alle aldre"
-- description: 2-3 sætninger på dansk om genstanden (stand, indhold, egnethed)
-- price_min: laveste rimelige BRUGTPRIS i danske kroner (heltal) — vurder ud fra typisk nypris, type og stand
+- description: 2-3 sætninger på dansk om genstanden (stand, indhold, egnethed — bedste gæt ved usikre billeder)
+- price_min: laveste rimelige BRUGTPRIS i danske kroner (heltal)
 - price_max: højeste rimelige brugtpris i danske kroner (heltal), skal være ≥ price_min
 
+Relevante ting: legetøj, spil, puslespil, bøger, børnemøbler, sportsudstyr, musikinstrumenter, kreativt materiale, legeredskaber, babyudstyr, kostumer.
+Sæt needs_review: true for alt andet og giv et bedste gæt på felterne.
 Ingen markdown, ingen forklaring — kun JSON.`;
 
     const completion = await groq.chat.completions.create({
@@ -74,10 +74,6 @@ Ingen markdown, ingen forklaring — kun JSON.`;
     if (!jsonMatch) return NextResponse.json({ error: 'Ugyldigt AI-svar — prøv igen' }, { status: 500 });
 
     const parsed = JSON.parse(jsonMatch[0]);
-
-    if (parsed.rejected) {
-      return NextResponse.json({ error: parsed.reason || 'Ikke relevant for en institutions-annonce' }, { status: 422 });
-    }
 
     if (!CATEGORY_KEYS.includes(parsed.category)) parsed.category = 'other';
 
@@ -129,9 +125,12 @@ Ingen markdown, ingen forklaring — kun JSON.`;
     }
 
     // Fjern de rå AI-prisfelter fra svaret; returnér det strukturerede price-objekt.
+    const needsReview = !!parsed.needs_review;
+    const rejectReason = parsed.reject_reason || null;
     delete parsed.price_min; delete parsed.price_max;
+    delete parsed.needs_review; delete parsed.reject_reason;
 
-    return NextResponse.json({ ...parsed, price });
+    return NextResponse.json({ ...parsed, price, needs_review: needsReview, reject_reason: rejectReason });
   } catch (e) {
     console.error('scan-toy error:', e.message);
     return NextResponse.json({ error: 'Noget gik galt — prøv igen' }, { status: 500 });
