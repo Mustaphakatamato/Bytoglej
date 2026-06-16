@@ -354,14 +354,14 @@ export function AppProvider({ children }) {
   };
 
   const pathname = usePathname();
-  const isAdmin = pathname?.startsWith('/admin');
+  const isAdminPage = pathname?.startsWith('/admin');
 
   return (
     <ActiveUserContext.Provider value={activeUserValue}>
       <AppContext.Provider value={appValue}>
         {children}
-        {!isAdmin && <ChatBubble />}
-        {!isAdmin && <FeedbackWidget
+        {!isAdminPage && <ChatBubble />}
+        {!isAdminPage && <FeedbackWidget
           loggedIn={loggedIn}
           institutionName={effectiveInstitution?.name || null}
           userEmail={realEmail}
