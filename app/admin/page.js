@@ -749,6 +749,8 @@ function ListingsTab({ allInstitutions = [], isMobile }) {
       setPendingReviews(prev => prev.filter(l => l.id !== listingId));
       if (action === 'approve') {
         setListings(prev => prev.map(l => l.id === listingId ? { ...l, review_status: 'approved', is_active: true } : l));
+      } else {
+        setListings(prev => prev.filter(l => l.id !== listingId));
       }
     }
     setReviewActing(null);

@@ -47,11 +47,7 @@ export async function POST(req) {
       data: { listing_id: listing.id, listing_title: listing.title },
     }).catch(() => {});
   } else {
-    await supa.from('listings').update({
-      review_status: 'rejected',
-      is_active: false,
-      review_reason: reason.trim(),
-    }).eq('id', listing_id);
+    await supa.from('listings').delete().eq('id', listing_id);
 
     await supa.from('notifications').insert({
       institution_name: listing.institution_name,
