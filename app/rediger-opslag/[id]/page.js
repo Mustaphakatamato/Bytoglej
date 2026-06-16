@@ -4,7 +4,7 @@ import { useRouter, useParams } from 'next/navigation';
 import { db } from '@/lib/supabase';
 import { PRIMARY, GREEN_DEEP, GREEN_SOFT, GREEN_TINT, PAPER, PAPER2, PAPER3, INK, INK2, INK3, CORAL, TYPE_CFG, CONDITIONS, AGE_GROUPS, FONT } from '@/lib/constants';
 import { CATEGORIES } from '@/lib/categories';
-import { BRAND_OPTIONS } from '@/lib/toy-brands';
+import BrandPicker from '@/components/BrandPicker';
 import { useWindowWidth } from '@/lib/hooks';
 import { useApp } from '@/providers/AppProvider';
 import { Spinner } from '@/components/ui';
@@ -379,9 +379,7 @@ export default function RedigerOpslagPage() {
                 })()}
                 <div>
                   <label style={labelStyle}>Varemærke <span style={{ fontWeight: 400, color: INK3 }}>(valgfri)</span></label>
-                  <select value={form.brand} onChange={e => setForm(f => ({ ...f, brand: e.target.value }))} style={{ ...inputStyle, cursor: 'pointer' }}>
-                    {BRAND_OPTIONS.map(b => <option key={b.value} value={b.value}>{b.label}</option>)}
-                  </select>
+                  <BrandPicker value={form.brand} onChange={v => setForm(f => ({ ...f, brand: v }))} />
                 </div>
               </div>
 
