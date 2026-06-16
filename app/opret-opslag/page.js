@@ -340,7 +340,7 @@ export default function OpretOpslagPage() {
     try {
       const compressed = await compressImage(file);
       const safe = await checkImageSafe(compressed);
-      if (!safe) { setScanError('Billedet afvist — indeholder personer. Upload et billede uden personer.'); setScanning(false); return; }
+      if (!safe) { setScanError('Billedet afvist — indeholder personer. Upload et billede uden personer.'); setScanRejected(true); setScanning(false); return; }
       const fd = new FormData();
       fd.append('image', compressed);
       const res = await authedFetch('/api/scan-toy', { method: 'POST', body: fd });
