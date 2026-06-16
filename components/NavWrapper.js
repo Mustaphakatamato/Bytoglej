@@ -7,6 +7,7 @@ import { PRIMARY, GREEN_TINT, INK, INK2, INK3, PAPER, PAPER2, PAPER3, FONT } fro
 import { CATEGORIES } from '@/lib/categories';
 import { useWindowWidth } from '@/lib/hooks';
 import { useState, useEffect, useRef, useMemo, Suspense } from 'react';
+import { createPortal } from 'react-dom';
 
 function Mark09({ size = 36, bg = PRIMARY }) {
   const r = Math.round(size * 0.18);
@@ -670,25 +671,22 @@ function NotificationBell({ institution, transparent, isMobile }) {
   );
 
   if (isMobile) {
-    return (
+    const sheet = open ? createPortal(
       <>
-        {bellBtn}
-        {open && (
-          <>
-            <div onClick={() => setOpen(false)} style={{ position:'fixed', inset:0, background:'rgba(22,34,28,0.4)', zIndex:1200, backdropFilter:'blur(2px)' }} />
-            <div style={{ position:'fixed', bottom:0, left:0, right:0, zIndex:1201, background:'#fff', borderRadius:'20px 20px 0 0', boxShadow:'0 -8px 40px rgba(22,34,28,0.18)', maxHeight:'70vh', display:'flex', flexDirection:'column', animation:'slideUp 0.25s ease' }}>
-              <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', padding:'16px 20px 12px', borderBottom:`1px solid ${PAPER2}`, flexShrink:0 }}>
-                <span style={{ fontFamily:FONT, fontWeight:800, fontSize:16, color:INK }}>Notifikationer</span>
-                <button onClick={() => setOpen(false)} style={{ background:'none', border:'none', fontSize:20, cursor:'pointer', color:INK3, lineHeight:1, padding:'2px 6px' }}>✕</button>
-              </div>
-              <div style={{ overflowY:'auto', flex:1, paddingBottom:'calc(env(safe-area-inset-bottom, 0px) + 16px)' }}>
-                {noteList}
-              </div>
-            </div>
-          </>
-        )}
-      </>
-    );
+        <div onClick={() => setOpen(false)} style={{ position:'fixed', inset:0, background:'rgba(22,34,28,0.4)', zIndex:1200 }} />
+        <div style={{ position:'fixed', bottom:0, left:0, right:0, zIndex:1201, background:'#fff', borderRadius:'20px 20px 0 0', boxShadow:'0 -8px 40px rgba(22,34,28,0.18)', maxHeight:'70vh', display:'flex', flexDirection:'column', animation:'slideUp 0.25s ease' }}>
+          <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', padding:'16px 20px 12px', borderBottom:`1px solid ${PAPER2}`, flexShrink:0 }}>
+            <span style={{ fontFamily:FONT, fontWeight:800, fontSize:16, color:INK }}>Notifikationer</span>
+            <button onClick={() => setOpen(false)} style={{ background:'none', border:'none', fontSize:20, cursor:'pointer', color:INK3, lineHeight:1, padding:'2px 6px' }}>✕</button>
+          </div>
+          <div style={{ overflowY:'auto', flex:1, paddingBottom:'calc(env(safe-area-inset-bottom, 0px) + 16px)' }}>
+            {noteList}
+          </div>
+        </div>
+      </>,
+      document.body
+    ) : null;
+    return <>{bellBtn}{sheet}</>;
   }
 
   return (
