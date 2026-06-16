@@ -613,7 +613,7 @@ export default function SignupPage() {
               )}
               <div style={{ display: 'flex', gap: 10, marginTop: 4 }}>
                 <Btn variant="outline" radius={22} onClick={() => setStep(2)} style={{ padding: '12px 20px', fontSize: 14 }}>← Tilbage</Btn>
-                <Btn variant="primary" color={PRIMARY} radius={22} onClick={() => { const e = validateStep3(); if (e) { setAuthError(e); } else { setAuthError(null); setStep(4); } }} style={{ flex: 1, justifyContent: 'center', padding: '13px', fontSize: 15 }}>Fortsæt →</Btn>
+                <Btn variant="primary" color={PRIMARY} radius={22} onClick={() => { const e = validateStep3(); if (e) { setAuthError(e); } else { setAuthError(null); setForm(f => ({ ...f, contact_name: f.contact_name || f.leader_name, email: f.email || f.leader_email })); setStep(4); } }} style={{ flex: 1, justifyContent: 'center', padding: '13px', fontSize: 15 }}>Fortsæt →</Btn>
               </div>
             </div>
           )}
