@@ -1559,6 +1559,7 @@ function ScanRejectionLogsSection({ isMobile }) {
   const [logs, setLogs] = useState([]);
   const [loading, setLoading] = useState(true);
   const [deleting, setDeleting] = useState({});
+  const [lightbox, setLightbox] = useState(null);
 
   useEffect(() => {
     db.from('scan_rejection_logs')
@@ -1584,6 +1585,13 @@ function ScanRejectionLogsSection({ isMobile }) {
   if (!logs.length) return <Empty text="Ingen afviste billeder endnu" />;
 
   return (
+    <>
+      {lightbox && (
+        <div onClick={() => setLightbox(null)} style={{ position: 'fixed', inset: 0, zIndex: 9999, background: 'rgba(0,0,0,0.85)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20, cursor: 'zoom-out' }}>
+          <img src={lightbox} alt="" style={{ maxWidth: '100%', maxHeight: '90vh', borderRadius: 12, boxShadow: '0 8px 48px rgba(0,0,0,0.6)', objectFit: 'contain' }} onClick={e => e.stopPropagation()} />
+          <button onClick={() => setLightbox(null)} style={{ position: 'absolute', top: 16, right: 16, background: 'rgba(255,255,255,0.15)', border: 'none', borderRadius: '50%', width: 40, height: 40, color: '#fff', fontSize: 20, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>✕</button>
+        </div>
+      )}
     <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
       {logs.map(l => {
         const imgUrl = l.image_path && !l.deleted_at
@@ -1592,7 +1600,7 @@ function ScanRejectionLogsSection({ isMobile }) {
         return (
           <div key={l.id} style={{ background: PAPER2, border: `1px solid rgba(22,34,28,0.08)`, borderRadius: 14, padding: '14px 16px', display: 'flex', gap: 14, alignItems: 'flex-start', flexWrap: isMobile ? 'wrap' : 'nowrap' }}>
             {imgUrl ? (
-              <img src={imgUrl} alt="" style={{ width: 72, height: 72, objectFit: 'cover', borderRadius: 10, flexShrink: 0, border: `1px solid ${PAPER3}` }} />
+              <img src={imgUrl} alt="" onClick={() => setLightbox(imgUrl)} style={{ width: 72, height: 72, objectFit: 'cover', borderRadius: 10, flexShrink: 0, border: `1px solid ${PAPER3}`, cursor: 'zoom-in' }} />
             ) : (
               <div style={{ width: 72, height: 72, borderRadius: 10, background: PAPER3, flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 20 }}>
                 {l.deleted_at ? '🗑️' : '📷'}
@@ -1622,6 +1630,7 @@ function ScanRejectionLogsSection({ isMobile }) {
         );
       })}
     </div>
+    </>
   );
 }
 
