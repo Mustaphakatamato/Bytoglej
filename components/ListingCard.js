@@ -7,7 +7,7 @@ import { CATEGORIES } from '@/lib/categories';
 import { db } from '@/lib/supabase';
 
 export function calcServiceFee(price) {
-  return Math.round(Math.max(5, Math.min(50, price * 0.05)) * 100) / 100;
+  return Math.round((price * 0.05 + 5) * 100) / 100;
 }
 
 import { useApp } from '@/providers/AppProvider';
