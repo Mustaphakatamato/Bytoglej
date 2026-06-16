@@ -24,6 +24,7 @@ export default function FeedbackWidget({ loggedIn, institutionName, userEmail })
   const [screenshot, setScreenshot]       = useState(null);   // Blob/File
   const [screenshotPreview, setScreenshotPreview] = useState(null); // object URL
   const [capturing, setCapturing]         = useState(false);
+  const [hideForCapture, setHideForCapture] = useState(false);
   const fileInputRef                      = useRef(null);
 
   useEffect(() => {
@@ -63,13 +64,15 @@ export default function FeedbackWidget({ loggedIn, institutionName, userEmail })
       return;
     }
     setCapturing(true);
+    // Hide modal + backdrop so the screenshot shows the clean page
+    setHideForCapture(true);
+    await new Promise(r => setTimeout(r, 150));
     try {
       const stream = await navigator.mediaDevices.getDisplayMedia({ video: true, preferCurrentTab: true });
       const video = document.createElement('video');
       video.srcObject = stream;
       await new Promise(r => { video.onloadedmetadata = r; });
       video.play();
-      // Wait two animation frames so the frame is fully painted
       await new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)));
       const canvas = document.createElement('canvas');
       canvas.width = video.videoWidth;
@@ -78,10 +81,15 @@ export default function FeedbackWidget({ loggedIn, institutionName, userEmail })
       stream.getTracks().forEach(t => t.stop());
       canvas.toBlob(blob => { if (blob) attachBlob(blob); }, 'image/jpeg', 0.85);
     } catch {
-      // User cancelled — fall back to file picker
-      fileInputRef.current?.click();
+      // User cancelled — do nothing, separate upload button handles file picker
+    } finally {
+      setHideForCapture(false);
+      setCapturing(false);
     }
-    setCapturing(false);
+  }
+
+  function openFilePicker() {
+    fileInputRef.current?.click();
   }
 
   function handleFileSelect(e) {
@@ -177,7 +185,7 @@ export default function FeedbackWidget({ loggedIn, institutionName, userEmail })
         🚀
       </button>
 
-      {open && (
+      {open && !hideForCapture && (
         <>
           <div onClick={handleClose} style={{ position: 'fixed', inset: 0, background: 'rgba(22,34,28,0.35)', zIndex: 9991, backdropFilter: 'blur(2px)' }} />
 
@@ -271,16 +279,28 @@ export default function FeedbackWidget({ loggedIn, institutionName, userEmail })
                       </div>
                     </div>
                   ) : (
-                    <button onClick={captureScreen} disabled={capturing} style={{
-                      width: '100%', padding: '8px 12px', borderRadius: 10,
-                      border: `1.5px dashed ${PAPER3}`, background: PAPER2,
-                      fontFamily: FONT, fontSize: 12, fontWeight: 600, color: INK3,
-                      cursor: capturing ? 'default' : 'pointer',
-                      display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
-                    }}>
-                      <span style={{ fontSize: 15 }}>📸</span>
-                      {capturing ? 'Vælg hvad der skal deles…' : 'Tag screenshot / vedhæft billede'}
-                    </button>
+                    <div style={{ display: 'flex', gap: 6 }}>
+                      <button onClick={captureScreen} disabled={capturing} style={{
+                        flex: 1, padding: '8px 6px', borderRadius: 10,
+                        border: `1.5px dashed ${PAPER3}`, background: PAPER2,
+                        fontFamily: FONT, fontSize: 11, fontWeight: 600, color: INK3,
+                        cursor: capturing ? 'default' : 'pointer',
+                        display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 5,
+                      }}>
+                        <span style={{ fontSize: 14 }}>📸</span>
+                        {capturing ? 'Vælg skærm…' : 'Tag screenshot'}
+                      </button>
+                      <button onClick={openFilePicker} disabled={capturing} style={{
+                        flex: 1, padding: '8px 6px', borderRadius: 10,
+                        border: `1.5px dashed ${PAPER3}`, background: PAPER2,
+                        fontFamily: FONT, fontSize: 11, fontWeight: 600, color: INK3,
+                        cursor: capturing ? 'default' : 'pointer',
+                        display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 5,
+                      }}>
+                        <span style={{ fontSize: 14 }}>📁</span>
+                        Upload billede
+                      </button>
+                    </div>
                   )}
                 </div>
 
