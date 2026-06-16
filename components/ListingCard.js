@@ -177,7 +177,8 @@ export default function ListingCard({ listing, onClick, favs, toggleFav, onInsti
           })()}
         </div>
 
-        <div style={{ fontFamily: FONT, fontWeight: 700, fontSize: 15, color: INK, marginBottom: 4, lineHeight: 1.3 }}>{listing.title}</div>
+        <div style={{ fontFamily: FONT, fontWeight: 700, fontSize: 15, color: INK, marginBottom: 2, lineHeight: 1.3 }}>{listing.title}</div>
+        {listing.brand && <div style={{ fontSize: 11, color: INK3, fontFamily: FONT, fontWeight: 600, marginBottom: 4 }}>{listing.brand}</div>}
         {listing.description && (
           <div style={{ fontSize: 12, color: INK3, lineHeight: 1.5, marginBottom: 8, display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>
             {listing.description}
