@@ -12,7 +12,6 @@ import { useApp } from '@/providers/AppProvider';
 import { db } from '@/lib/supabase';
 import { authedFetch } from '@/lib/authed-fetch';
 
-const MapContainer = nextDynamic(() => import('@/components/MapView'), { ssr: false });
 
 function MobileListingCard({ l, isFav, onToggleFav, onOpen }) {
   const [imgIdx, setImgIdx] = useState(0);
@@ -229,8 +228,7 @@ function OpslagInner() {
   const [subcategory, setSubcategory] = useState('');
   const [pendingCategory, setPendingCategory] = useState('');
   const [browserDismissed, setBrowserDismissed] = useState(false);
-  const [viewMode, setViewMode] = useState('list');
-  const [saveSearchModal, setSaveSearchModal] = useState(false);
+const [saveSearchModal, setSaveSearchModal] = useState(false);
   const [saveSearchName, setSaveSearchName] = useState('');
   const [savingSearch, setSavingSearch] = useState(false);
   const [aiMode, setAiMode] = useState(false);
@@ -411,13 +409,6 @@ function OpslagInner() {
               <input value={search} readOnly placeholder="Brug søgefeltet ovenfor..."
                 style={{ border: 'none', background: 'transparent', outline: 'none', fontSize: 13, fontFamily: FONT, flex: 1, minWidth: 0, color: INK }} />
               {search && <span style={{ fontSize: 13, color: INK2, fontFamily: FONT, fontWeight: 600 }}>"{search}"</span>}
-            </div>
-            <div style={{ display: 'flex', borderRadius: 99, overflow: 'hidden', border: `1.5px solid ${PAPER3}`, flexShrink: 0 }}>
-              {[['list', 'Liste'], ['map', 'Kort']].map(([mode, label]) => (
-                <button key={mode} onClick={() => setViewMode(mode)} style={{ padding: '8px 18px', border: 'none', background: viewMode === mode ? PRIMARY : PAPER2, color: viewMode === mode ? '#fff' : INK3, fontWeight: 700, fontSize: 13, fontFamily: FONT, cursor: 'pointer', transition: 'all 0.15s', whiteSpace: 'nowrap' }}>
-                  {label}
-                </button>
-              ))}
             </div>
           </div>
           {category && (
@@ -652,15 +643,7 @@ function OpslagInner() {
         </div>
         )}
 
-        {viewMode === 'map' && !isMobile ? (
-          <MapContainer
-            listings={filtered}
-            listingCoords={{}}
-            userCoords={null}
-            onListingClick={handleListingClick}
-            isMobile={isMobile}
-          />
-        ) : loading ? (
+        {loading ? (
           <div style={{ display: 'grid', gridTemplateColumns: isMobile ? 'repeat(2,minmax(0,1fr))' : 'repeat(auto-fill,minmax(240px,1fr))', gap: isMobile ? 8 : 18 }}>
             {[1,2,3,4,5,6].map(i => isMobile
               ? <SkeletonMobileCard key={i} />
