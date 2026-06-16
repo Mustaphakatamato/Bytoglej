@@ -599,7 +599,7 @@ function CategoryStrip({ router }) {
 }
 
 // ── Notification bell ─────────────────────────────────────────────────────────
-function NotificationBell({ institution, transparent, isMobile }) {
+function NotificationBell({ institution, transparent, isMobile, onMobileClick }) {
   const [open, setOpen] = useState(false);
   const [notes, setNotes] = useState([]);
   const [unread, setUnread] = useState(0);
@@ -629,6 +629,7 @@ function NotificationBell({ institution, transparent, isMobile }) {
   }, [isMobile]);
 
   async function handleOpen() {
+    if (isMobile && onMobileClick) { onMobileClick(); return; }
     const wasOpen = open;
     setOpen(o => !o);
     if (!wasOpen && unread > 0) {
@@ -751,7 +752,7 @@ function Nav({ pathname, navigate, loggedIn, setLoggedIn, unreadTotal, instituti
                 <SearchBar transparent={transparent} router={router} />
               </Suspense>
             </div>
-            {loggedIn && <NotificationBell institution={institution} transparent={transparent} isMobile={true} />}
+            {loggedIn && <NotificationBell institution={institution} transparent={transparent} isMobile={true} onMobileClick={() => navigate('/notifikationer')} />}
             <button onClick={()=>navigate('/indkøbsvogn')} style={{ flexShrink:0, position:'relative', width:36, height:36, borderRadius:10, background:GREEN_TINT, border:'none', display:'flex', alignItems:'center', justifyContent:'center', cursor:'pointer', padding:0 }}>
               <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke={PRIMARY} strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><circle cx="9" cy="21" r="1"/><circle cx="20" cy="21" r="1"/><path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"/></svg>
               {cartCount > 0 && <span style={{ position:'absolute', top:-4, right:-4, background:'#EF476F', color:'#fff', borderRadius:99, fontSize:9, fontWeight:800, minWidth:15, height:15, display:'flex', alignItems:'center', justifyContent:'center', padding:'0 3px', lineHeight:1 }}>{cartCount > 9 ? '9+' : cartCount}</span>}
