@@ -23,8 +23,8 @@ export async function POST(req) {
       messages: [{
         role: 'user',
         content: [
-          { type: 'image_url', image_url: { url: `data:${mimeType};base64,${base64}`, detail: 'low' } },
-          { type: 'text', text: 'Is there a real, living human person with a visible face or clearly identifiable body visible in this photo? Reply "YES: [brief reason]" or "NO". IMPORTANT: Reply NO for ALL of the following — cartoon characters, animated characters, illustrated characters, drawings, paintings, printed characters on toys/puzzles/books/packaging, dolls, action figures, stuffed animals, hands, fingers, arms, legs, feet (without face), blurry background people, shadows, reflections, silhouettes, clothing without a person, furniture, equipment, food, animals, buildings, nature, or any non-human object. Reply YES ONLY if there is a clearly visible real human face or body that could identify a person.' },
+          { type: 'image_url', image_url: { url: `data:${mimeType};base64,${base64}`, detail: 'auto' } },
+          { type: 'text', text: 'Is there a real, living human person with a visible face or clearly identifiable body in this photo? The person may appear at any orientation (upside-down, sideways, rotated). Look carefully at all parts of the image. Reply "YES: [brief reason]" or "NO". Reply NO for: cartoon/animated/illustrated characters, drawings, paintings, printed characters on toys/books/packaging, dolls, action figures, stuffed animals, isolated hands/fingers/arms/legs/feet with NO face visible, blurry background people, shadows, reflections, silhouettes, clothing, furniture, food, animals, buildings. Reply YES if any real human face or identifiable body is visible anywhere in the image, regardless of orientation.' },
         ],
       }],
     });
