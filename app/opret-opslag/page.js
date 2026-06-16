@@ -78,6 +78,7 @@ export default function OpretOpslagPage() {
   const [aiFilledFields, setAiFilledFields] = useState({ title: false, description: false });
   const [priceSuggestion, setPriceSuggestion] = useState(null); // { basis, comparable_count, suggested_min, suggested_max, suggested_price }
   const [aiScanData, setAiScanData] = useState(null); // AI-forslag gemt til log ved submit
+  const [scanRejected, setScanRejected] = useState(false); // AI afviste billede → vis "send til gennemgang"
   const [aiApply, setAiApply] = useState({ title: true, description: true });
   const [aiRegenerating, setAiRegenerating] = useState({ title: false, description: false });
   const [institution, setInstitution] = useState(ctxInstitution || null);
@@ -346,9 +347,11 @@ export default function OpretOpslagPage() {
       const json = await res.json();
       if (json.error) {
         setScanError(res.status === 422 ? json.error : 'Scan mislykkedes — prøv igen');
+        if (res.status === 422) setScanRejected(true);
         setScanning(false);
         return;
       }
+      setScanRejected(false);
       setForm(f => ({
         ...f,
         title: json.title || f.title,
@@ -449,6 +452,18 @@ export default function OpretOpslagPage() {
       const { data } = await db.from('institutions').select('*').ilike('email', user.email).maybeSingle();
       if (data) inst = data;
     }
+    if (scanRejected) {
+      const instName = inst?.name || 'Min institution';
+      const { count: pendingCount } = await db.from('listings')
+        .select('id', { count: 'exact', head: true })
+        .eq('institution_name', instName)
+        .eq('review_status', 'pending');
+      if ((pendingCount || 0) >= 10) {
+        showToast('I har allerede 10 opslag til manuel gennemgang — vent på svar inden du sender flere', 'error');
+        setSaving(false);
+        return;
+      }
+    }
     const isSøges = form.type === 'søges';
     const insertData = {
       title: form.title, type: form.type,
@@ -459,7 +474,9 @@ export default function OpretOpslagPage() {
       user_id: user?.id || null,
       emoji: isSøges ? '🔍' : form.emoji,
       color: isSøges ? '#F5F0FF' : form.color,
-      tags: form.tags || [], images: [], bid_count: 0, is_active: true,
+      tags: form.tags || [], images: [], bid_count: 0, is_active: scanRejected ? false : true,
+      review_status: scanRejected ? 'pending' : null,
+      review_requested_at: scanRejected ? new Date().toISOString() : null,
       category: form.category || null, subcategory: form.subcategory || null, brand: form.brand || null,
       can_ship: delivery.shipping || false,
     };
@@ -523,23 +540,25 @@ export default function OpretOpslagPage() {
         submitted_at: new Date().toISOString(),
       }).then(() => {}).catch(() => {});
     }
-    // Fire-and-forget: saved-search email notifications
-    authedFetch('/api/match-searches', {
-      method:'POST', headers:{'Content-Type':'application/json'},
-      body: JSON.stringify({ listingId:listing.id, title:listing.title, type:listing.type, tags:listing.tags||[], city:listing.city, age_group:listing.age_group }),
-    }).catch(()=>{});
-    // Fire-and-forget: in-app auto-match notifications (both directions)
-    authedFetch('/api/auto-match-soges', {
-      method:'POST', headers:{'Content-Type':'application/json'},
-      body: JSON.stringify({
-        mode: isSøges ? 'new-søges' : 'new-listing',
-        listingId: listing.id, category: listing.category,
-        age_group: listing.age_group, condition: listing.condition,
-        title: listing.title, institutionName: inst?.name, institutionId: inst?.id,
-      }),
-    }).catch(()=>{});
+    if (!scanRejected) {
+      // Fire-and-forget: saved-search email notifications
+      authedFetch('/api/match-searches', {
+        method:'POST', headers:{'Content-Type':'application/json'},
+        body: JSON.stringify({ listingId:listing.id, title:listing.title, type:listing.type, tags:listing.tags||[], city:listing.city, age_group:listing.age_group }),
+      }).catch(()=>{});
+      // Fire-and-forget: in-app auto-match notifications (both directions)
+      authedFetch('/api/auto-match-soges', {
+        method:'POST', headers:{'Content-Type':'application/json'},
+        body: JSON.stringify({
+          mode: isSøges ? 'new-søges' : 'new-listing',
+          listingId: listing.id, category: listing.category,
+          age_group: listing.age_group, condition: listing.condition,
+          title: listing.title, institutionName: inst?.name, institutionId: inst?.id,
+        }),
+      }).catch(()=>{});
+    }
     fetchListings?.();
-    showToast(isSøges ? 'Søges-opslag publiceret! Tjek mulige matches på dit dashboard 🔍' : 'Opslag publiceret! 🎉');
+    showToast(scanRejected ? 'Opslag sendt til gennemgang! Vi vender tilbage inden for 1–2 hverdage 🔍' : (isSøges ? 'Søges-opslag publiceret! Tjek mulige matches på dit dashboard 🔍' : 'Opslag publiceret! 🎉'));
     router.push('/profil');
     } catch (e) {
       console.error('handleCreate error:', e);
@@ -707,6 +726,15 @@ export default function OpretOpslagPage() {
                         </div>
                       </div>
                     )}
+                    {scanRejected && !scanning && (
+                      <div style={{ background:'#FEF3C7', border:'1px solid #FCD34D', borderRadius:12, padding:'14px 16px', display:'flex', gap:10, alignItems:'flex-start' }}>
+                        <span style={{ fontSize:20, flexShrink:0 }}>🔍</span>
+                        <div>
+                          <div style={{ fontFamily:FONT, fontWeight:700, fontSize:13, color:'#92400E', marginBottom:4 }}>Send til manuel gennemgang</div>
+                          <div style={{ fontFamily:FONT, fontSize:12, color:'#78350F', lineHeight:1.5 }}>AI kan ikke bekræfte billedet. Udfyld opslaget og send det til godkendelse — vi vender tilbage inden for 1–2 hverdage.</div>
+                        </div>
+                      </div>
+                    )}
                   </>
                 )}
                 <div style={{ display:'flex', alignItems:'center', gap:10 }}>
@@ -868,6 +896,14 @@ export default function OpretOpslagPage() {
 
             {step === 2 && (
               <div style={{ display:'flex', flexDirection:'column', gap:20 }}>
+                {scanRejected && (
+                  <div style={{ background:'#FEF3C7', border:'1px solid #FCD34D', borderRadius:12, padding:'12px 16px', display:'flex', gap:10, alignItems:'center' }}>
+                    <span style={{ fontSize:18, flexShrink:0 }}>🔍</span>
+                    <div style={{ fontFamily:FONT, fontSize:13, color:'#92400E', fontWeight:600, lineHeight:1.5 }}>
+                      Dette opslag sendes til manuel gennemgang og er ikke synligt på markedspladsen, før vi godkender det.
+                    </div>
+                  </div>
+                )}
                 <div>
                   <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:7 }}>
                     <label style={{ ...labelStyle, marginBottom:0 }}>Beskrivelse <span style={{ color:'#e53e3e' }}>*</span></label>
@@ -979,7 +1015,7 @@ export default function OpretOpslagPage() {
                     }}
                     disabled={saving || !form.description.trim()}
                     style={{ flex:2, padding:'13px', borderRadius:99, background: saving || !form.description.trim() ? PAPER3 : PRIMARY, color: saving || !form.description.trim() ? INK3 : '#fff', border:'none', fontFamily:FONT, fontWeight:700, fontSize:15, cursor: saving || !form.description.trim() ? 'not-allowed' : 'pointer', display:'flex', alignItems:'center', justifyContent:'center', gap:8, transition:'all 0.2s' }}>
-                    {saving ? <><Spinner /> Publicerer…</> : '✓ Publicer opslag'}
+                    {saving ? <><Spinner /> {scanRejected ? 'Sender til gennemgang…' : 'Publicerer…'}</> : (scanRejected ? '🔍 Send til gennemgang' : '✓ Publicer opslag')}
                   </button>
                 </div>
               </div>
