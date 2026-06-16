@@ -158,7 +158,7 @@ export default function FeedbackWidget({ loggedIn, institutionName, userEmail })
     removeScreenshot();
   }
 
-  if (!loggedIn) return null;
+  if (!loggedIn || pathname?.startsWith('/admin')) return null;
 
   return (
     <>

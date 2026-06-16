@@ -34,7 +34,7 @@ export default function ChatBubble() {
   useEffect(() => { const t = setTimeout(() => setSplashDone(true), 1400); return () => clearTimeout(t); }, []);
 
   const userId = realUserId || ctxUserId;
-  const hidden = !splashDone || !userId || !!pathname?.startsWith('/beskeder');
+  const hidden = !splashDone || !userId || !!pathname?.startsWith('/beskeder') || !!pathname?.startsWith('/admin');
 
   // ── helpers ─────────────────────────────────────────────────────────────────
   const amInit = useCallback((conv) => {
