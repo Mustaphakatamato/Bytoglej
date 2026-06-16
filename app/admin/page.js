@@ -736,6 +736,37 @@ function ListingsTab({ allInstitutions = [], isMobile }) {
     setListings(prev => prev.filter(l => l.id !== id));
     setConfirm(null);
   }
+  function startEdit(l) {
+    setEditing(l.id);
+    setEditForm({
+      title: l.title || '',
+      description: l.description || '',
+      price: l.price ?? '',
+      condition: l.condition || '',
+      age_group: l.age_group || '',
+      city: l.city || '',
+      category: l.category || '',
+      type: l.type || '',
+    });
+  }
+  async function saveEdit(l) {
+    setSavingEdit(true);
+    const patch = {
+      title: (editForm.title || '').trim(),
+      description: editForm.description || null,
+      price: editForm.price === '' || editForm.price == null ? null : Number(editForm.price),
+      condition: editForm.condition || null,
+      age_group: editForm.age_group || null,
+      city: editForm.city || null,
+      category: editForm.category || null,
+      type: editForm.type || null,
+    };
+    const { error } = await db.from('listings').update(patch).eq('id', l.id);
+    setSavingEdit(false);
+    if (error) { alert('Kunne ikke gemme ændringer: ' + error.message); return; }
+    setListings(prev => prev.map(x => x.id === l.id ? { ...x, ...patch } : x));
+    setEditing(null);
+  }
   async function setReportStatus(id, status) {
     const { data: { session } } = await db.auth.getSession();
     await db.from('listing_reports').update({ status, reviewed_by: session?.user?.email, reviewed_at: new Date().toISOString() }).eq('id', id);
