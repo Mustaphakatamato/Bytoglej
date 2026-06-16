@@ -557,9 +557,93 @@ export default function ListingDetailClient() {
     showToast('Bytteforslag sendt!');
   }
 
+  // Relaterede opslag: sælgers andre opslag, ellers lignende fra samme kategori.
+  // På desktop placeres sektionen i venstre kolonne under billedet (fylder tomrummet
+  // ved siden af den høje info-kolonne); på mobil i bunden i fuld bredde.
+  const relatedSection = (instListings.length > 0 || similarListings.length > 0) && (() => {
+    const isSeller = instListings.length > 0;
+    const displayListings = isSeller ? instListings : similarListings;
+    const cols = isMobile ? 'repeat(2, 1fr)' : 'repeat(3, 1fr)';
+    const limit = 6;
+    const wrapperStyle = isMobile
+      ? { maxWidth:1140, margin:'0 auto', padding:'24px 16px 40px' }
+      : { padding:'32px 0 8px' };
+    return (
+      <div style={wrapperStyle}>
+        {/* Bundlerabat-banner — kun ved sælgers egne opslag */}
+        {isSeller && sellerBundle && !isOwn && (() => {
+          const maxPct = Math.max(...sellerBundle.map(t => t.percent || 0));
+          return (
+            <div style={{ background:'#fff', border:`1px solid ${PAPER3}`, borderRadius:16, padding:isMobile?'14px 16px':'16px 20px', marginBottom:20, display:'flex', alignItems:'center', gap:14 }}>
+              <div style={{ width:44, height:44, borderRadius:12, background:GREEN_TINT, display:'flex', alignItems:'center', justifyContent:'center', fontSize:22, flexShrink:0 }}>📦</div>
+              <div style={{ flex:1, minWidth:0 }}>
+                <div style={{ fontFamily:FONT, fontWeight:800, fontSize:isMobile?15:16, color:INK, letterSpacing:'-0.02em' }}>Køb bundle</div>
+                <div style={{ fontFamily:FONT, fontSize:13, color:INK3, marginTop:1 }}>Op til {maxPct}% rabat når du køber flere varer fra {listing.institution_name}</div>
+              </div>
+              <button onClick={()=>goToInstitution(listing.institution_name)} style={{ background:PRIMARY, border:'none', borderRadius:99, padding:isMobile?'10px 16px':'11px 22px', fontFamily:FONT, fontWeight:700, fontSize:isMobile?13:14, color:'#fff', cursor:'pointer', whiteSpace:'nowrap', flexShrink:0 }}>
+                Lav et bundle
+              </button>
+            </div>
+          );
+        })()}
+        <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:16, gap:12 }}>
+          <div>
+            <h2 style={{ fontFamily:FONT, fontWeight:800, fontSize:isMobile?18:20, color:INK, marginBottom:3 }}>
+              {isSeller ? `Flere fra ${listing.institution_name}` : 'Lignende opslag'}
+            </h2>
+            <p style={{ fontSize:13, color:INK3, fontFamily:FONT }}>
+              {isSeller ? `${instListings.length} ${instListings.length === 1 ? 'opslag' : 'andre opslag'}` : 'Måske du også finder det her'}
+            </p>
+          </div>
+          {isSeller && (
+            <button onClick={()=>goToInstitution(listing.institution_name)}
+              style={{ background:'none', border:`1.5px solid ${PAPER3}`, borderRadius:99, padding:'7px 16px', fontSize:13, fontWeight:700, color:PRIMARY, cursor:'pointer', fontFamily:FONT, whiteSpace:'nowrap', flexShrink:0 }}>
+              Se alle →
+            </button>
+          )}
+        </div>
+        <div style={{ display:'grid', gridTemplateColumns: cols, gap: isMobile ? 10 : 14 }}>
+          {displayListings.slice(0, limit).map(l => {
+            const typeColors = { køb: { bg:'#EEF4FF', text:'#2563EB' }, byt: { bg:'#FFF3E8', text:'#C2551E' }, byd: { bg:'#F5F0FF', text:'#7C3AED' }, gratis: { bg:'#F0FFF4', text:'#15803D' } };
+            const tc = typeColors[l.type] || { bg:PAPER3, text:INK3 };
+            return (
+              <div key={l.id} onClick={()=>{ setActiveListing(l); router.push('/opslag/detail'); }} style={{ cursor:'pointer', background:PAPER2, borderRadius:16, overflow:'hidden', border:`1px solid ${PAPER3}`, transition:'transform 0.15s, box-shadow 0.15s' }}
+                onMouseEnter={e=>{ e.currentTarget.style.transform='translateY(-2px)'; e.currentTarget.style.boxShadow='0 6px 20px rgba(22,34,28,0.1)'; }}
+                onMouseLeave={e=>{ e.currentTarget.style.transform=''; e.currentTarget.style.boxShadow=''; }}>
+                <div style={{ height: isMobile ? 120 : 140, background: l.images?.[0] ? '#e8e6e3' : (l.color||'#FFD166'), display:'flex', alignItems:'center', justifyContent:'center', fontSize:isMobile?40:48, overflow:'hidden', position:'relative' }}>
+                  {l.images?.[0]
+                    ? <img src={l.images[0]} alt="" style={{ width:'100%', height:'100%', objectFit:'cover' }} />
+                    : (l.emoji || '🧸')}
+                  <div style={{ position:'absolute', top:8, left:8, background:tc.bg, color:tc.text, borderRadius:99, padding:'3px 9px', fontSize:10, fontWeight:700, fontFamily:FONT }}>
+                    {l.type}
+                  </div>
+                </div>
+                <div style={{ padding: isMobile ? '10px 10px 12px' : '11px 12px 14px' }}>
+                  <div style={{ fontFamily:FONT, fontWeight:700, fontSize:isMobile?12:13, color:INK, marginBottom:4, whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis' }}>{l.title}</div>
+                  <div style={{ fontSize:11, color:INK3, fontFamily:FONT, marginBottom:4 }}>{l.condition} · {l.age_group}</div>
+                  {l.price
+                    ? <div style={{ fontFamily:FONT, fontWeight:800, fontSize:isMobile?14:15, color:PRIMARY }}>{l.price} kr.</div>
+                    : <div style={{ fontFamily:FONT, fontWeight:700, fontSize:12, color:GREEN_DEEP }}>Gratis</div>}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+        {isSeller && instListings.length > limit && (
+          <div style={{ textAlign:'center', marginTop:20 }}>
+            <button onClick={()=>goToInstitution(listing.institution_name)}
+              style={{ background:GREEN_TINT, border:`1.5px solid ${GREEN_SOFT}`, borderRadius:99, padding:'11px 28px', fontSize:14, fontWeight:700, color:PRIMARY, cursor:'pointer', fontFamily:FONT }}>
+              Se alle {instListings.length} opslag fra {listing.institution_name} →
+            </button>
+          </div>
+        )}
+      </div>
+    );
+  })();
+
   return (
     <>
-    <div style={{ minHeight:'100vh', paddingTop:80, background:PAPER }} className="page-enter">
+    <div style={{ minHeight:'100vh', paddingTop: isMobile ? 80 : 124, background:PAPER }} className="page-enter">
       <div style={{ maxWidth:1140, margin:'0 auto', padding:'16px 16px 0' }}>
         <button onClick={()=>router.push('/opslag')} style={{ background:'none', border:'none', fontSize:13, fontWeight:600, color:INK3, cursor:'pointer', display:'flex', alignItems:'center', gap:6, padding:'8px 0', fontFamily:FONT }}>← Markedsplads</button>
       </div>
@@ -615,6 +699,8 @@ export default function ListingDetailClient() {
                 </button>
               </div>
             )}
+            {/* På desktop: relaterede opslag under billedet (fylder tomrummet) */}
+            {!isMobile && relatedSection}
           </div>
 
           {/* RIGHT: Info + Actions */}
@@ -953,82 +1039,8 @@ export default function ListingDetailClient() {
         </div>
       </Modal>
 
-      {/* Other listings from same institution, or similar listings fallback */}
-      {(instListings.length > 0 || similarListings.length > 0) && (() => {
-        const isSeller = instListings.length > 0;
-        const displayListings = isSeller ? instListings : similarListings;
-        return (
-          <div style={{ maxWidth:1140, margin:'0 auto', padding:isMobile?'24px 16px 40px':'32px 24px 56px' }}>
-            {/* Bundlerabat-banner — kun ved sælgers egne opslag */}
-            {isSeller && sellerBundle && !isOwn && (() => {
-              const maxPct = Math.max(...sellerBundle.map(t => t.percent || 0));
-              return (
-                <div style={{ background:'#fff', border:`1px solid ${PAPER3}`, borderRadius:16, padding:isMobile?'14px 16px':'16px 20px', marginBottom:20, display:'flex', alignItems:'center', gap:14 }}>
-                  <div style={{ width:44, height:44, borderRadius:12, background:GREEN_TINT, display:'flex', alignItems:'center', justifyContent:'center', fontSize:22, flexShrink:0 }}>📦</div>
-                  <div style={{ flex:1, minWidth:0 }}>
-                    <div style={{ fontFamily:FONT, fontWeight:800, fontSize:isMobile?15:16, color:INK, letterSpacing:'-0.02em' }}>Køb bundle</div>
-                    <div style={{ fontFamily:FONT, fontSize:13, color:INK3, marginTop:1 }}>Op til {maxPct}% rabat når du køber flere varer fra {listing.institution_name}</div>
-                  </div>
-                  <button onClick={()=>goToInstitution(listing.institution_name)} style={{ background:PRIMARY, border:'none', borderRadius:99, padding:isMobile?'10px 16px':'11px 22px', fontFamily:FONT, fontWeight:700, fontSize:isMobile?13:14, color:'#fff', cursor:'pointer', whiteSpace:'nowrap', flexShrink:0 }}>
-                    Lav et bundle
-                  </button>
-                </div>
-              );
-            })()}
-            <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:20 }}>
-              <div>
-                <h2 style={{ fontFamily:FONT, fontWeight:800, fontSize:isMobile?18:22, color:INK, marginBottom:4 }}>
-                  {isSeller ? `Flere fra ${listing.institution_name}` : 'Lignende opslag'}
-                </h2>
-                <p style={{ fontSize:13, color:INK3, fontFamily:FONT }}>
-                  {isSeller ? `${instListings.length} ${instListings.length === 1 ? 'opslag' : 'andre opslag'}` : 'Måske du også finder det her'}
-                </p>
-              </div>
-              {isSeller && (
-                <button onClick={()=>goToInstitution(listing.institution_name)}
-                  style={{ background:'none', border:`1.5px solid ${PAPER3}`, borderRadius:99, padding:'7px 16px', fontSize:13, fontWeight:700, color:PRIMARY, cursor:'pointer', fontFamily:FONT, whiteSpace:'nowrap' }}>
-                  Se alle →
-                </button>
-              )}
-            </div>
-            <div style={{ display:'grid', gridTemplateColumns: isMobile ? 'repeat(2, 1fr)' : 'repeat(4, 1fr)', gap: isMobile ? 10 : 16 }}>
-              {displayListings.slice(0, isMobile ? 6 : 8).map(l => {
-                const typeColors = { køb: { bg:'#EEF4FF', text:'#2563EB' }, byt: { bg:'#FFF3E8', text:'#C2551E' }, byd: { bg:'#F5F0FF', text:'#7C3AED' }, gratis: { bg:'#F0FFF4', text:'#15803D' } };
-                const tc = typeColors[l.type] || { bg:PAPER3, text:INK3 };
-                return (
-                  <div key={l.id} onClick={()=>{ setActiveListing(l); router.push('/opslag/detail'); }} style={{ cursor:'pointer', background:PAPER2, borderRadius:16, overflow:'hidden', border:`1px solid ${PAPER3}`, transition:'transform 0.15s, box-shadow 0.15s' }}
-                    onMouseEnter={e=>{ e.currentTarget.style.transform='translateY(-2px)'; e.currentTarget.style.boxShadow='0 6px 20px rgba(22,34,28,0.1)'; }}
-                    onMouseLeave={e=>{ e.currentTarget.style.transform=''; e.currentTarget.style.boxShadow=''; }}>
-                    <div style={{ height: isMobile ? 120 : 160, background: l.images?.[0] ? '#e8e6e3' : (l.color||'#FFD166'), display:'flex', alignItems:'center', justifyContent:'center', fontSize:isMobile?40:56, overflow:'hidden', position:'relative' }}>
-                      {l.images?.[0]
-                        ? <img src={l.images[0]} alt="" style={{ width:'100%', height:'100%', objectFit:'cover' }} />
-                        : (l.emoji || '🧸')}
-                      <div style={{ position:'absolute', top:8, left:8, background:tc.bg, color:tc.text, borderRadius:99, padding:'3px 9px', fontSize:10, fontWeight:700, fontFamily:FONT }}>
-                        {l.type}
-                      </div>
-                    </div>
-                    <div style={{ padding: isMobile ? '10px 10px 12px' : '12px 14px 16px' }}>
-                      <div style={{ fontFamily:FONT, fontWeight:700, fontSize:isMobile?12:13, color:INK, marginBottom:4, whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis' }}>{l.title}</div>
-                      <div style={{ fontSize:11, color:INK3, fontFamily:FONT, marginBottom:4 }}>{l.condition} · {l.age_group}</div>
-                      {l.price
-                        ? <div style={{ fontFamily:FONT, fontWeight:800, fontSize:isMobile?14:16, color:PRIMARY }}>{l.price} kr.</div>
-                        : <div style={{ fontFamily:FONT, fontWeight:700, fontSize:12, color:GREEN_DEEP }}>Gratis</div>}
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-            {isSeller && instListings.length > (isMobile ? 6 : 8) && (
-              <div style={{ textAlign:'center', marginTop:20 }}>
-                <button onClick={()=>goToInstitution(listing.institution_name)}
-                  style={{ background:GREEN_TINT, border:`1.5px solid ${GREEN_SOFT}`, borderRadius:99, padding:'11px 28px', fontSize:14, fontWeight:700, color:PRIMARY, cursor:'pointer', fontFamily:FONT }}>
-                  Se alle {instListings.length} opslag fra {listing.institution_name} →
-                </button>
-              </div>
-            )}
-          </div>
-        );
-      })()}
+      {/* På mobil: relaterede opslag i bunden (fuld bredde) */}
+      {isMobile && relatedSection}
 
       <Modal open={shareModal} onClose={()=>{ setShareModal(false); setSelectedEmails([]); setShareNote(''); }} title="Del med medarbejder">
         <div style={{ display:'flex', flexDirection:'column', gap:14 }}>
