@@ -1,6 +1,7 @@
 import Groq from 'groq-sdk';
 import { NextResponse } from 'next/server';
 import { requireAuth, UNAUTHORIZED } from '@/lib/api-auth';
+import { createServerClient } from '@/lib/supabase-server';
 
 export const maxDuration = 30;
 
@@ -15,7 +16,8 @@ const URGENCY_KEYS = ['haster','måneden','ingen'];
 const CONDITIONS = ['Ny','Meget god','God','Acceptabel'];
 
 export async function POST(req) {
-  if (!await requireAuth(req)) return UNAUTHORIZED();
+  const user = await requireAuth(req);
+  if (!user) return UNAUTHORIZED();
   if (!process.env.GROQ_API_KEY) {
     return NextResponse.json({ error: 'GROQ_API_KEY ikke konfigureret' }, { status: 500 });
   }
@@ -77,7 +79,28 @@ Institutionens tekst: "${query}"`;
     if (!URGENCY_KEYS.includes(result.urgency)) result.urgency = 'ingen';
     if (!CONDITIONS.includes(result.condition)) result.condition = 'God';
 
-    return NextResponse.json(result);
+    // Log til fine-tuning — fire-and-forget
+    let logId = null;
+    try {
+      const supa = createServerClient();
+      const { data: logRow } = await supa.from('ai_scan_logs').insert({
+        user_id: user.id,
+        scan_type: 'fill-soges',
+        model_used: 'llama-3.1-8b-instant',
+        input_query: query,
+        ai_raw_response: result,
+        ai_title: result.title || null,
+        ai_description: result.description || null,
+        ai_category: result.category || null,
+        ai_condition: result.condition || null,
+        ai_age_group: result.age_group || null,
+      }).select('id').single();
+      logId = logRow?.id || null;
+    } catch (e) {
+      console.error('ai_scan_logs insert fejl:', e.message);
+    }
+
+    return NextResponse.json({ ...result, log_id: logId });
 
   } catch (e) {
     console.error('fill-soges error:', e.message);
