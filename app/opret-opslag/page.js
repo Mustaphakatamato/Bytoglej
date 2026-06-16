@@ -90,7 +90,7 @@ export default function OpretOpslagPage() {
   const [form, setForm] = useState({
     title:'', type:'køb', price:'', age_group:'3-6 år',
     description:'', condition:'God', emoji:'🧸', color:'#FFD166',
-    tags:[], min_bid:'', category:'', subcategory:'', brand:'', urgency:'ingen', can_ship: false,
+    tags:[], min_bid:'', category:'', subcategory:'', brand: null, urgency:'ingen', can_ship: false,
   });
 
   // Leveringsvalg
@@ -436,6 +436,10 @@ export default function OpretOpslagPage() {
     if (!form.title.trim()) return;
     if (form.type === 'køb' && !String(form.price).trim()) { showToast('Angiv en pris for køb-opslag', 'error'); return; }
     if (!form.description.trim()) { showToast('Tilføj en beskrivelse', 'error'); return; }
+    if (!form.category) { showToast('Vælg en kategori', 'error'); return; }
+    const selectedCat = CATEGORIES.find(c => c.key === form.category);
+    if (selectedCat?.sub?.length > 0 && !form.subcategory) { showToast('Vælg en underkategori', 'error'); return; }
+    if (form.brand === null || form.brand === undefined) { showToast('Vælg et varemærke (eller "Intet varemærke")', 'error'); return; }
     if (delivery.shipping && !delivery.weight_g) { showToast('Vælg pakkevægt for forsendelse', 'error'); return; }
     setSaving(true);
     try {
@@ -831,7 +835,7 @@ export default function OpretOpslagPage() {
                 {/* Category picker */}
                 <div style={{ display:'flex', flexDirection:'column', gap:12 }}>
                   <div>
-                    <label style={labelStyle}>Kategori <span style={{ fontWeight:400, color:INK3 }}>(valgfri)</span></label>
+                    <label style={labelStyle}>Kategori <span style={{ color:'#e53e3e' }}>*</span></label>
                     <select value={form.category} onChange={e => setForm(f => ({ ...f, category: e.target.value, subcategory: '' }))} style={{ ...inputStyle, cursor:'pointer' }}>
                       <option value=''>Vælg kategori…</option>
                       {CATEGORIES.map(cat => <option key={cat.key} value={cat.key}>{cat.emoji} {cat.label}</option>)}
@@ -842,7 +846,7 @@ export default function OpretOpslagPage() {
                     if (!catObj?.sub?.length) return null;
                     return (
                       <div>
-                        <label style={labelStyle}>Underkategori <span style={{ fontWeight:400, color:INK3 }}>(valgfri)</span></label>
+                        <label style={labelStyle}>Underkategori <span style={{ color:'#e53e3e' }}>*</span></label>
                         <select value={form.subcategory} onChange={e => setForm(f => ({ ...f, subcategory: e.target.value }))} style={{ ...inputStyle, cursor:'pointer' }}>
                           <option value=''>Vælg underkategori…</option>
                           {catObj.sub.map(sub => <option key={sub} value={sub}>{sub}</option>)}
@@ -851,7 +855,7 @@ export default function OpretOpslagPage() {
                     );
                   })()}
                   <div>
-                    <label style={labelStyle}>Varemærke <span style={{ fontWeight:400, color:INK3 }}>(valgfri)</span></label>
+                    <label style={labelStyle}>Varemærke <span style={{ color:'#e53e3e' }}>*</span></label>
                     <BrandPicker value={form.brand} onChange={v => setForm(f => ({ ...f, brand: v }))} />
                   </div>
                 </div>

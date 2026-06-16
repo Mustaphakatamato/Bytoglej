@@ -24,14 +24,17 @@ export default function BrandPicker({ value, onChange, style }) {
     !search || b.label.toLowerCase().includes(search.toLowerCase())
   );
 
-  const selectedLabel = BRAND_OPTIONS.find(b => b.value === value)?.label || 'Intet varemærke';
+  const isUnselected = value === null || value === undefined;
+  const selectedLabel = isUnselected
+    ? 'Vælg varemærke…'
+    : (BRAND_OPTIONS.find(b => b.value === value)?.label || 'Intet varemærke');
 
   return (
     <div ref={ref} style={{ position:'relative', ...style }}>
       <button
         type="button"
         onClick={() => setOpen(o => !o)}
-        style={{ width:'100%', padding:'12px 14px', borderRadius:12, border:`1.5px solid ${PAPER3}`, fontSize:14, outline:'none', fontFamily:FONT, background:'#fff', color: value ? INK : INK3, boxSizing:'border-box', cursor:'pointer', textAlign:'left', display:'flex', alignItems:'center', justifyContent:'space-between' }}
+        style={{ width:'100%', padding:'12px 14px', borderRadius:12, border:`1.5px solid ${PAPER3}`, fontSize:14, outline:'none', fontFamily:FONT, background:'#fff', color: isUnselected ? INK3 : INK, boxSizing:'border-box', cursor:'pointer', textAlign:'left', display:'flex', alignItems:'center', justifyContent:'space-between' }}
       >
         <span>{selectedLabel}</span>
         <span style={{ fontSize:10, color:INK3 }}>▾</span>
