@@ -86,7 +86,6 @@ export default function ProfilPage() {
   const [sentCount, setSentCount] = useState(null);
   const [notifPermission, setNotifPermission] = useState('default');
   const [notifLoading, setNotifLoading] = useState(false);
-  const [inboxNotifs, setInboxNotifs] = useState([]);
 
   useEffect(() => {
     if (typeof Notification !== 'undefined') setNotifPermission(Notification.permission);
@@ -173,15 +172,6 @@ export default function ProfilPage() {
       if (!inst?.id) return;
       const instId = inst.id;
       const instName = inst.name;
-
-      if (instName) {
-        db.from('notifications')
-          .select('*')
-          .eq('institution_name', instName)
-          .order('created_at', { ascending: false })
-          .limit(20)
-          .then(({ data }) => { if (!cancelled && data) setInboxNotifs(data); });
-      }
 
       db.from('transaction_co2_savings')
         .select('net_saved_kg')
@@ -286,31 +276,6 @@ export default function ProfilPage() {
             </div>
 
           <div style={{ display:'flex', flexDirection:'column', gap:10, padding:'0 0 12px' }}>
-            {inboxNotifs.length > 0 && (
-              <div style={{ display:'flex', flexDirection:'column', gap:0 }}>
-                <div style={{ fontFamily:FONT, fontWeight:700, fontSize:11, color:INK3, textTransform:'uppercase', letterSpacing:'0.08em', padding:'4px 20px 0 20px', marginBottom:6 }}>
-                  Beskeder fra byt&amp;leg {inboxNotifs.filter(n=>!n.read).length > 0 && <span style={{ background:'#EF476F', color:'#fff', borderRadius:99, fontSize:10, fontWeight:800, padding:'1px 7px', marginLeft:6 }}>{inboxNotifs.filter(n=>!n.read).length}</span>}
-                </div>
-                <div style={{ background:'#fff', borderRadius:16, overflow:'hidden', boxShadow:'0 1px 3px rgba(22,34,28,0.06)' }}>
-                  {inboxNotifs.map((n, i) => (
-                    <button key={n.id} onClick={async () => {
-                      if (!n.read) {
-                        await db.from('notifications').update({ read: true }).eq('id', n.id);
-                        setInboxNotifs(prev => prev.map(x => x.id === n.id ? { ...x, read: true } : x));
-                      }
-                    }} style={{ width:'100%', display:'flex', alignItems:'flex-start', gap:12, padding:'14px 20px', background: n.read ? 'transparent' : '#FFF7ED', border:'none', borderBottom: i < inboxNotifs.length-1 ? `1px solid ${PAPER3}` : 'none', cursor:'pointer', textAlign:'left' }}>
-                      <span style={{ fontSize:20, flexShrink:0, marginTop:1 }}>{n.type === 'listing_review_approved' ? '✅' : n.type === 'listing_review_rejected' ? '❌' : '📬'}</span>
-                      <div style={{ flex:1, minWidth:0 }}>
-                        <div style={{ fontFamily:FONT, fontWeight: n.read ? 600 : 800, fontSize:14, color:INK, marginBottom:3 }}>{n.title}</div>
-                        <div style={{ fontFamily:FONT, fontSize:12, color:INK3, lineHeight:1.5 }}>{n.body}</div>
-                        <div style={{ fontFamily:FONT, fontSize:11, color:INK3, marginTop:4 }}>{new Date(n.created_at).toLocaleDateString('da-DK', { day:'numeric', month:'short', hour:'2-digit', minute:'2-digit' })}</div>
-                      </div>
-                      {!n.read && <div style={{ width:8, height:8, borderRadius:'50%', background:'#EF476F', flexShrink:0, marginTop:6 }} />}
-                    </button>
-                  ))}
-                </div>
-              </div>
-            )}
             <div style={{ fontFamily:FONT, fontWeight:700, fontSize:11, color:INK3, textTransform:'uppercase', letterSpacing:'0.08em', padding:'4px 20px 0' }}>Jeg sælger</div>
             <MenuSection>
               <MenuItem icon="🏷️" label="Mine opslag" value={activeListingCount !== null ? `${activeListingCount} aktive` : undefined} onClick={() => router.push('/mine-opslag')} />
@@ -495,34 +460,6 @@ export default function ProfilPage() {
 
         {/* ── Main content ── */}
         <div style={{ flex:1, minWidth:0 }}>
-
-          {/* In-app notification inbox */}
-          {inboxNotifs.length > 0 && (
-            <div style={{ marginBottom:28 }}>
-              <div style={{ display:'flex', alignItems:'center', gap:8, fontFamily:FONT, fontWeight:700, fontSize:12, color:INK3, textTransform:'uppercase', letterSpacing:'0.08em', marginBottom:10 }}>
-                Beskeder fra byt&amp;leg
-                {inboxNotifs.filter(n=>!n.read).length > 0 && <span style={{ background:'#EF476F', color:'#fff', borderRadius:99, fontSize:10, fontWeight:800, padding:'1px 7px' }}>{inboxNotifs.filter(n=>!n.read).length}</span>}
-              </div>
-              <div style={{ background:'#fff', borderRadius:16, overflow:'hidden', boxShadow:'0 1px 6px rgba(22,34,28,0.08)' }}>
-                {inboxNotifs.map((n, i) => (
-                  <button key={n.id} onClick={async () => {
-                    if (!n.read) {
-                      await db.from('notifications').update({ read: true }).eq('id', n.id);
-                      setInboxNotifs(prev => prev.map(x => x.id === n.id ? { ...x, read: true } : x));
-                    }
-                  }} style={{ width:'100%', display:'flex', alignItems:'flex-start', gap:14, padding:'16px 20px', background: n.read ? 'transparent' : '#FFF7ED', border:'none', borderBottom: i < inboxNotifs.length-1 ? `1px solid ${PAPER3}` : 'none', cursor:'pointer', textAlign:'left' }}>
-                    <span style={{ fontSize:22, flexShrink:0, marginTop:1 }}>{n.type === 'listing_review_approved' ? '✅' : n.type === 'listing_review_rejected' ? '❌' : '📬'}</span>
-                    <div style={{ flex:1, minWidth:0 }}>
-                      <div style={{ fontFamily:FONT, fontWeight: n.read ? 600 : 800, fontSize:15, color:INK, marginBottom:4 }}>{n.title}</div>
-                      <div style={{ fontFamily:FONT, fontSize:13, color:INK3, lineHeight:1.5 }}>{n.body}</div>
-                      <div style={{ fontFamily:FONT, fontSize:11, color:INK3, marginTop:6 }}>{new Date(n.created_at).toLocaleDateString('da-DK', { day:'numeric', month:'short', hour:'2-digit', minute:'2-digit' })}</div>
-                    </div>
-                    {!n.read && <div style={{ width:9, height:9, borderRadius:'50%', background:'#EF476F', flexShrink:0, marginTop:6 }} />}
-                  </button>
-                ))}
-              </div>
-            </div>
-          )}
 
           {/* Jeg sælger */}
           <div style={{ fontFamily:FONT, fontWeight:700, fontSize:12, color:INK3, textTransform:'uppercase', letterSpacing:'0.08em', marginBottom:10 }}>Jeg sælger</div>
