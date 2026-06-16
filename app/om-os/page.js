@@ -1,7 +1,10 @@
 'use client';
+import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { PRIMARY, GREEN_DEEP, GREEN_SOFT, GREEN_TINT, INK, INK2, INK3, PAPER, PAPER2 } from '@/lib/constants';
 import { useWindowWidth } from '@/lib/hooks';
+import { db } from '@/lib/supabase';
+import { STATS_CONFIG } from '@/lib/stats-config';
 
 const values = [
   { title: 'Tillid',            desc: 'Kun verificerede institutioner med CVR-nummer får adgang. Hvert opslag er knyttet til en reel institution.' },
@@ -14,16 +17,30 @@ const institutionTypes = [
   'Vuggestuer', 'Børnehaver', 'Folkeskoler', "SFO'er", 'Fritidsklubber', 'Private institutioner',
 ];
 
-const stats = [
-  { n: '2.847',  label: 'Handler gennemført' },
-  { n: '156',    label: 'Institutioner tilmeldt' },
-  { n: '12,5 ton', label: 'CO₂ sparet' },
-];
-
 export default function OmOsPage() {
   const router = useRouter();
   const w = useWindowWidth();
   const isMobile = w < 768;
+  const [liveStats, setLiveStats] = useState(null);
+
+  useEffect(() => {
+    if (!STATS_CONFIG.showStats) return;
+    Promise.all([
+      db.from('institutions').select('id', { count: 'exact', head: true }),
+      db.from('conversations').select('id', { count: 'exact', head: true }).eq('deal_completed', true),
+      db.from('transaction_co2_savings').select('net_saved_kg'),
+    ]).then(([{ count: instCount }, { count: dealCount }, { data: co2Data }]) => {
+      const totalKg = (co2Data || []).reduce((s, r) => s + (r.net_saved_kg || 0), 0);
+      const co2Tons = totalKg >= 1000
+        ? (totalKg / 1000).toFixed(1) + ' ton'
+        : Math.round(totalKg) + ' kg';
+      setLiveStats({
+        institutions: instCount || 0,
+        deals: dealCount || 0,
+        co2: co2Tons,
+      });
+    });
+  }, []);
 
   return (
     <div style={{ background: PAPER, minHeight: '100vh', overflowX: 'hidden' }} className="page-enter">
@@ -194,13 +211,16 @@ export default function OmOsPage() {
         </div>
       </div>
 
-      {/* ── Impact stats ── */}
+      {/* ── Impact stats — kun når STATS_CONFIG.showStats er true og tærskler er nået ── */}
+      {STATS_CONFIG.showStats && liveStats && (
+        STATS_CONFIG.thresholds.institutions <= liveStats.institutions ||
+        STATS_CONFIG.thresholds.trades <= liveStats.deals
+      ) && (
       <div style={{
         background: GREEN_DEEP,
         padding: isMobile ? '72px 20px' : '112px 40px',
         position: 'relative', overflow: 'hidden',
       }}>
-        {/* subtle radial glow */}
         <div style={{
           position: 'absolute', inset: 0,
           backgroundImage: `radial-gradient(circle at 20% 50%, rgba(42,125,79,0.35) 0%, transparent 55%), radial-gradient(circle at 80% 30%, rgba(207,227,216,0.06) 0%, transparent 50%)`,
@@ -214,9 +234,13 @@ export default function OmOsPage() {
           gap: isMobile ? 48 : 0,
           textAlign: 'center',
         }}>
-          {stats.map((s, i) => (
+          {[
+            { n: liveStats.deals.toLocaleString('da-DK'), label: 'Handler gennemført' },
+            { n: liveStats.institutions.toLocaleString('da-DK'), label: 'Institutioner tilmeldt' },
+            { n: liveStats.co2, label: 'CO₂ sparet' },
+          ].map((s, i, arr) => (
             <div key={i} style={{
-              borderRight: (!isMobile && i < stats.length - 1) ? '1px solid rgba(255,255,255,0.08)' : 'none',
+              borderRight: (!isMobile && i < arr.length - 1) ? '1px solid rgba(255,255,255,0.08)' : 'none',
               padding: isMobile ? 0 : '0 48px',
             }}>
               <div style={{
@@ -242,6 +266,7 @@ export default function OmOsPage() {
           ))}
         </div>
       </div>
+      )}
 
       {/* ── Manifesto / Vision ── */}
       <div style={{ background: PAPER, padding: isMobile ? '80px 20px' : '120px 40px' }}>
