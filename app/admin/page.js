@@ -9,6 +9,7 @@ import {
   FONT,
 } from '@/lib/constants';
 import { useWindowWidth } from '@/lib/hooks';
+import AdminListingEditModal from '@/components/AdminListingEditModal';
 
 // ── Shared small components ────────────────────────────────────────────────────
 
@@ -707,9 +708,7 @@ function ListingsTab({ allInstitutions = [], isMobile }) {
   const [filterStatus, setFilterStatus] = useState('');
   const [expanded, setExpanded] = useState(null);
   const [confirm, setConfirm] = useState(null);
-  const [editing, setEditing] = useState(null);
-  const [editForm, setEditForm] = useState({});
-  const [savingEdit, setSavingEdit] = useState(false);
+  const [editModalListing, setEditModalListing] = useState(null);
 
   const fetchAll = useCallback(async () => {
     setLoading(true);
@@ -736,37 +735,6 @@ function ListingsTab({ allInstitutions = [], isMobile }) {
     await db.from('listings').delete().eq('id', id);
     setListings(prev => prev.filter(l => l.id !== id));
     setConfirm(null);
-  }
-  function startEdit(l) {
-    setEditing(l.id);
-    setEditForm({
-      title: l.title || '',
-      description: l.description || '',
-      price: l.price ?? '',
-      condition: l.condition || '',
-      age_group: l.age_group || '',
-      city: l.city || '',
-      category: l.category || '',
-      type: l.type || '',
-    });
-  }
-  async function saveEdit(l) {
-    setSavingEdit(true);
-    const patch = {
-      title: (editForm.title || '').trim(),
-      description: editForm.description || null,
-      price: editForm.price === '' || editForm.price == null ? null : Number(editForm.price),
-      condition: editForm.condition || null,
-      age_group: editForm.age_group || null,
-      city: editForm.city || null,
-      category: editForm.category || null,
-      type: editForm.type || null,
-    };
-    const { error } = await db.from('listings').update(patch).eq('id', l.id);
-    setSavingEdit(false);
-    if (error) { alert('Kunne ikke gemme ændringer: ' + error.message); return; }
-    setListings(prev => prev.map(x => x.id === l.id ? { ...x, ...patch } : x));
-    setEditing(null);
   }
   async function setReportStatus(id, status) {
     const { data: { session } } = await db.auth.getSession();
@@ -822,9 +790,9 @@ function ListingsTab({ allInstitutions = [], isMobile }) {
             <input value={query} onChange={e => setQuery(e.target.value)} placeholder="Søg…" style={{ flex: '1 1 200px', minWidth: 160, padding: '10px 14px', border: `1.5px solid ${PAPER3}`, borderRadius: 10, fontFamily: FONT, fontSize: 14, background: PAPER2, color: INK, outline: 'none', boxSizing: 'border-box' }} />
             <select value={filterType} onChange={e => setFilterType(e.target.value)} style={{ padding: '10px 12px', border: `1.5px solid ${PAPER3}`, borderRadius: 10, fontFamily: FONT, fontSize: 13, background: PAPER2, color: INK, cursor: 'pointer' }}>
               <option value="">Alle typer</option>
-              <option value="sælges">Sælges</option>
-              <option value="søges">Søges</option>
-              <option value="byttes">Byttes</option>
+              <option value="køb">Sælges</option>
+              <option value="byd">Søges</option>
+              <option value="byt">Byttes</option>
             </select>
             <select value={filterStatus} onChange={e => setFilterStatus(e.target.value)} style={{ padding: '10px 12px', border: `1.5px solid ${PAPER3}`, borderRadius: 10, fontFamily: FONT, fontSize: 13, background: PAPER2, color: INK, cursor: 'pointer' }}>
               <option value="">Alle statusser</option>
@@ -852,60 +820,7 @@ function ListingsTab({ allInstitutions = [], isMobile }) {
                       </div>
                       {isOpen && (
                         <div style={{ borderTop: `1px solid ${PAPER3}`, padding: 16 }}>
-                          {editing === l.id ? (
-                            (() => {
-                              const inputStyle = { width: '100%', padding: '9px 12px', border: `1.5px solid ${PAPER3}`, borderRadius: 10, fontFamily: FONT, fontSize: 13, background: '#fff', color: INK, outline: 'none', boxSizing: 'border-box' };
-                              const set = (k, v) => setEditForm(f => ({ ...f, [k]: v }));
-                              const lbl = { fontFamily: FONT, fontSize: 11, fontWeight: 700, color: INK3, textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 4 };
-                              return (
-                                <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-                                  <div>
-                                    <div style={lbl}>Titel</div>
-                                    <input value={editForm.title} onChange={e => set('title', e.target.value)} style={inputStyle} />
-                                  </div>
-                                  <div>
-                                    <div style={lbl}>Beskrivelse</div>
-                                    <textarea value={editForm.description} onChange={e => set('description', e.target.value)} rows={4} style={{ ...inputStyle, resize: 'vertical', lineHeight: 1.5 }} />
-                                  </div>
-                                  <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr 1fr' : 'repeat(auto-fill, minmax(150px, 1fr))', gap: 10 }}>
-                                    <div>
-                                      <div style={lbl}>Pris (kr.)</div>
-                                      <input type="number" value={editForm.price} onChange={e => set('price', e.target.value)} style={inputStyle} />
-                                    </div>
-                                    <div>
-                                      <div style={lbl}>Type</div>
-                                      <select value={editForm.type} onChange={e => set('type', e.target.value)} style={{ ...inputStyle, cursor: 'pointer' }}>
-                                        <option value="sælges">Sælges</option>
-                                        <option value="søges">Søges</option>
-                                        <option value="byttes">Byttes</option>
-                                      </select>
-                                    </div>
-                                    <div>
-                                      <div style={lbl}>Stand</div>
-                                      <input value={editForm.condition} onChange={e => set('condition', e.target.value)} style={inputStyle} />
-                                    </div>
-                                    <div>
-                                      <div style={lbl}>Aldersgruppe</div>
-                                      <input value={editForm.age_group} onChange={e => set('age_group', e.target.value)} style={inputStyle} />
-                                    </div>
-                                    <div>
-                                      <div style={lbl}>By</div>
-                                      <input value={editForm.city} onChange={e => set('city', e.target.value)} style={inputStyle} />
-                                    </div>
-                                    <div>
-                                      <div style={lbl}>Kategori</div>
-                                      <input value={editForm.category} onChange={e => set('category', e.target.value)} style={inputStyle} />
-                                    </div>
-                                  </div>
-                                  <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-                                    <button onClick={() => saveEdit(l)} disabled={savingEdit} style={{ padding: '8px 18px', borderRadius: 10, border: 'none', background: PRIMARY, color: '#fff', fontFamily: FONT, fontWeight: 700, fontSize: 13, cursor: savingEdit ? 'default' : 'pointer', opacity: savingEdit ? 0.6 : 1 }}>{savingEdit ? 'Gemmer…' : 'Gem ændringer'}</button>
-                                    <button onClick={() => setEditing(null)} style={{ padding: '8px 18px', borderRadius: 10, border: `1.5px solid ${PAPER3}`, background: '#fff', color: INK3, fontFamily: FONT, fontWeight: 700, fontSize: 13, cursor: 'pointer' }}>Annuller</button>
-                                  </div>
-                                </div>
-                              );
-                            })()
-                          ) : (
-                            <>
+                          <>
                           {l.description && <div style={{ fontFamily: FONT, fontSize: 13, color: INK2, lineHeight: 1.6, marginBottom: 12, whiteSpace: 'pre-wrap' }}>{l.description}</div>}
                           {Array.isArray(l.images) && l.images.length > 0 && (
                             <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 12 }}>
@@ -924,13 +839,12 @@ function ListingsTab({ allInstitutions = [], isMobile }) {
                             <InfoItem label="Oprettet" value={fmtDate(l.created_at)} />
                           </div>
                           <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-                            <button onClick={() => startEdit(l)} style={{ padding: '7px 14px', borderRadius: 10, border: 'none', background: PRIMARY, color: '#fff', fontFamily: FONT, fontWeight: 700, fontSize: 12, cursor: 'pointer' }}>Rediger</button>
+                            <button onClick={() => setEditModalListing(l)} style={{ padding: '7px 14px', borderRadius: 10, border: 'none', background: PRIMARY, color: '#fff', fontFamily: FONT, fontWeight: 700, fontSize: 12, cursor: 'pointer' }}>Rediger</button>
                             <button onClick={() => toggleActive(l)} style={{ padding: '7px 14px', borderRadius: 10, border: `1.5px solid ${PAPER3}`, background: '#fff', color: INK, fontFamily: FONT, fontWeight: 700, fontSize: 12, cursor: 'pointer' }}>{l.is_active ? 'Deaktiver' : 'Aktiver'}</button>
                             {!l.is_sold && <button onClick={() => markSold(l)} style={{ padding: '7px 14px', borderRadius: 10, border: `1.5px solid ${PAPER3}`, background: '#fff', color: INK, fontFamily: FONT, fontWeight: 700, fontSize: 12, cursor: 'pointer' }}>Marker solgt</button>}
                             <button onClick={() => setConfirm(l.id)} style={{ padding: '7px 14px', borderRadius: 10, border: 'none', background: '#FEF2F2', color: '#DC2626', fontFamily: FONT, fontWeight: 700, fontSize: 12, cursor: 'pointer' }}>Slet</button>
                           </div>
-                            </>
-                          )}
+                          </>
                         </div>
                       )}
                     </div>
@@ -953,6 +867,17 @@ function ListingsTab({ allInstitutions = [], isMobile }) {
             </div>
           </div>
         </div>
+      )}
+
+      {editModalListing && (
+        <AdminListingEditModal
+          listing={editModalListing}
+          onClose={() => setEditModalListing(null)}
+          onSaved={(updated) => {
+            setListings(prev => prev.map(x => x.id === updated.id ? updated : x));
+            setEditModalListing(null);
+          }}
+        />
       )}
     </div>
   );
