@@ -598,7 +598,7 @@ function CategoryStrip({ router }) {
 }
 
 // ── Notification bell ─────────────────────────────────────────────────────────
-function NotificationBell({ institution, transparent }) {
+function NotificationBell({ institution, transparent, isMobile }) {
   const [open, setOpen] = useState(false);
   const [notes, setNotes] = useState([]);
   const [unread, setUnread] = useState(0);
@@ -621,14 +621,16 @@ function NotificationBell({ institution, transparent }) {
   }, [institution?.name]);
 
   useEffect(() => {
+    if (isMobile) return;
     function handle(e) { if (ref.current && !ref.current.contains(e.target)) setOpen(false); }
     document.addEventListener('mousedown', handle);
     return () => document.removeEventListener('mousedown', handle);
-  }, []);
+  }, [isMobile]);
 
   async function handleOpen() {
+    const wasOpen = open;
     setOpen(o => !o);
-    if (!open && unread > 0) {
+    if (!wasOpen && unread > 0) {
       setUnread(0);
       setNotes(n => n.map(x => ({ ...x, read: true })));
       await db.from('notifications')
@@ -640,26 +642,62 @@ function NotificationBell({ institution, transparent }) {
 
   if (!institution?.name) return null;
 
+  const bellBtn = (
+    <button onClick={handleOpen} style={{ position:'relative', width:36, height:36, borderRadius: isMobile ? 10 : '50%', background: open ? PRIMARY : (transparent ? 'rgba(255,255,255,0.15)' : GREEN_TINT), border:'none', display:'flex', alignItems:'center', justifyContent:'center', cursor:'pointer', transition:'background 0.15s', flexShrink:0 }}>
+      <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke={open || transparent ? '#fff' : PRIMARY} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/>
+      </svg>
+      {unread > 0 && <span style={{ position:'absolute', top:-2, right:-2, background:'#EF476F', color:'#fff', borderRadius:99, fontSize:9, fontWeight:800, minWidth:15, height:15, display:'flex', alignItems:'center', justifyContent:'center', padding:'0 3px', lineHeight:1 }}>{unread > 9 ? '9+' : unread}</span>}
+    </button>
+  );
+
+  const noteList = (
+    <>
+      {notes.length === 0 ? (
+        <div style={{ padding:'32px 16px', textAlign:'center', color:INK3, fontFamily:FONT, fontSize:13 }}>Ingen notifikationer endnu</div>
+      ) : notes.map((n, i) => (
+        <div key={n.id} style={{ display:'flex', alignItems:'flex-start', gap:12, padding:'14px 16px', borderBottom: i < notes.length - 1 ? `1px solid ${PAPER2}` : 'none', background: n.read ? '#fff' : '#FFF7ED' }}>
+          <span style={{ fontSize:20, flexShrink:0, marginTop:1 }}>{n.type === 'listing_review_approved' ? '✅' : n.type === 'listing_review_rejected' ? '❌' : '📬'}</span>
+          <div style={{ flex:1, minWidth:0 }}>
+            <div style={{ fontFamily:FONT, fontWeight: n.read ? 600 : 800, fontSize:14, color:INK, marginBottom:3 }}>{n.title}</div>
+            <div style={{ fontFamily:FONT, fontSize:12, color:INK3, lineHeight:1.5 }}>{n.body}</div>
+            <div style={{ fontFamily:FONT, fontSize:11, color:INK3, marginTop:4 }}>{new Date(n.created_at).toLocaleDateString('da-DK', { day:'numeric', month:'short', hour:'2-digit', minute:'2-digit' })}</div>
+          </div>
+          {!n.read && <div style={{ width:8, height:8, borderRadius:'50%', background:'#EF476F', flexShrink:0, marginTop:6 }} />}
+        </div>
+      ))}
+    </>
+  );
+
+  if (isMobile) {
+    return (
+      <>
+        {bellBtn}
+        {open && (
+          <>
+            <div onClick={() => setOpen(false)} style={{ position:'fixed', inset:0, background:'rgba(22,34,28,0.4)', zIndex:1200, backdropFilter:'blur(2px)' }} />
+            <div style={{ position:'fixed', bottom:0, left:0, right:0, zIndex:1201, background:'#fff', borderRadius:'20px 20px 0 0', boxShadow:'0 -8px 40px rgba(22,34,28,0.18)', maxHeight:'70vh', display:'flex', flexDirection:'column', animation:'slideUp 0.25s ease' }}>
+              <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', padding:'16px 20px 12px', borderBottom:`1px solid ${PAPER2}`, flexShrink:0 }}>
+                <span style={{ fontFamily:FONT, fontWeight:800, fontSize:16, color:INK }}>Notifikationer</span>
+                <button onClick={() => setOpen(false)} style={{ background:'none', border:'none', fontSize:20, cursor:'pointer', color:INK3, lineHeight:1, padding:'2px 6px' }}>✕</button>
+              </div>
+              <div style={{ overflowY:'auto', flex:1, paddingBottom:'calc(env(safe-area-inset-bottom, 0px) + 16px)' }}>
+                {noteList}
+              </div>
+            </div>
+          </>
+        )}
+      </>
+    );
+  }
+
   return (
     <div ref={ref} style={{ position:'relative', flexShrink:0 }}>
-      <button onClick={handleOpen} style={{ position:'relative', width:36, height:36, borderRadius:'50%', background: open ? PRIMARY : (transparent ? 'rgba(255,255,255,0.15)' : GREEN_TINT), border:'none', display:'flex', alignItems:'center', justifyContent:'center', cursor:'pointer', transition:'background 0.15s' }}>
-        <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke={open || transparent ? '#fff' : PRIMARY} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-          <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/>
-        </svg>
-        {unread > 0 && <span style={{ position:'absolute', top:-2, right:-2, background:'#EF476F', color:'#fff', borderRadius:99, fontSize:9, fontWeight:800, minWidth:15, height:15, display:'flex', alignItems:'center', justifyContent:'center', padding:'0 3px', lineHeight:1 }}>{unread > 9 ? '9+' : unread}</span>}
-      </button>
-
+      {bellBtn}
       {open && (
         <div style={{ position:'absolute', top:'calc(100% + 8px)', right:0, zIndex:700, background:'#fff', borderRadius:16, boxShadow:'0 8px 32px rgba(22,34,28,0.15)', border:`1px solid ${PAPER2}`, minWidth:300, maxWidth:360, maxHeight:400, overflowY:'auto' }}>
           <div style={{ padding:'12px 16px', borderBottom:`1px solid ${PAPER2}`, fontFamily:FONT, fontWeight:800, fontSize:14, color:INK }}>Notifikationer</div>
-          {notes.length === 0 ? (
-            <div style={{ padding:'24px 16px', textAlign:'center', color:INK3, fontFamily:FONT, fontSize:13 }}>Ingen notifikationer endnu</div>
-          ) : notes.map(n => (
-            <div key={n.id} style={{ padding:'12px 16px', borderBottom:`1px solid ${PAPER2}`, background: n.read ? '#fff' : '#F5F0FF' }}>
-              <div style={{ fontFamily:FONT, fontWeight:700, fontSize:13, color:INK, marginBottom:2 }}>{n.title}</div>
-              <div style={{ fontFamily:FONT, fontSize:12, color:INK3, lineHeight:1.4 }}>{n.body}</div>
-            </div>
-          ))}
+          {noteList}
         </div>
       )}
     </div>
@@ -715,6 +753,7 @@ function Nav({ pathname, navigate, loggedIn, setLoggedIn, unreadTotal, instituti
                 <SearchBar transparent={transparent} router={router} />
               </Suspense>
             </div>
+            {loggedIn && <NotificationBell institution={institution} transparent={transparent} isMobile={true} />}
             <button onClick={()=>navigate('/indkøbsvogn')} style={{ flexShrink:0, position:'relative', width:36, height:36, borderRadius:10, background:GREEN_TINT, border:'none', display:'flex', alignItems:'center', justifyContent:'center', cursor:'pointer', padding:0 }}>
               <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke={PRIMARY} strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><circle cx="9" cy="21" r="1"/><circle cx="20" cy="21" r="1"/><path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"/></svg>
               {cartCount > 0 && <span style={{ position:'absolute', top:-4, right:-4, background:'#EF476F', color:'#fff', borderRadius:99, fontSize:9, fontWeight:800, minWidth:15, height:15, display:'flex', alignItems:'center', justifyContent:'center', padding:'0 3px', lineHeight:1 }}>{cartCount > 9 ? '9+' : cartCount}</span>}
@@ -758,7 +797,7 @@ function Nav({ pathname, navigate, loggedIn, setLoggedIn, unreadTotal, instituti
                 <Link href="/opret-opslag" style={{ background:PRIMARY, color:'#fff', fontWeight:700, fontSize:13, padding:'8px 18px', borderRadius:22, textDecoration:'none', display:'inline-flex', alignItems:'center' }}>
                   + Opret opslag
                 </Link>
-                <NotificationBell institution={institution} transparent={transparent} />
+                <NotificationBell institution={institution} transparent={transparent} isMobile={false} />
                 <div style={{ position:'relative', flexShrink:0 }} onMouseEnter={()=>setProfileOpen(true)} onMouseLeave={()=>setProfileOpen(false)}>
                   <button style={{ width:36, height:36, borderRadius:'50%', background:PRIMARY, display:'flex', alignItems:'center', justifyContent:'center', color:'#fff', fontWeight:800, fontSize:13, cursor:'pointer', overflow:'hidden', border:`2px solid ${profileOpen?'#fff':PRIMARY}`, outline:'none', transition:'border-color 0.15s', boxShadow: profileOpen?`0 0 0 3px ${PRIMARY}40`:'none' }}>
                     {institution?.logo_url
