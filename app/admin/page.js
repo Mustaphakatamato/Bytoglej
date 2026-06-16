@@ -2,7 +2,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { db } from '@/lib/supabase';
-import { checkIsAdmin } from '@/lib/admin';
 import {
   PRIMARY, GREEN_SOFT, GREEN_TINT,
   PAPER, PAPER2, PAPER3,
@@ -167,8 +166,8 @@ export default function AdminPage() {
   async function checkAuth() {
     const { data: { session } } = await db.auth.getSession();
     if (!session?.user) { setAuthState('login'); return; }
-    const isAdm = await checkIsAdmin(session.user.id);
-    if (isAdm) {
+    const { data: adminRow } = await db.from('admins').select('id').eq('user_id', session.user.id).maybeSingle();
+    if (adminRow) {
       setAdminUser(session.user);
       setAuthState('authenticated');
       fetchInstitutions();
@@ -192,8 +191,8 @@ export default function AdminPage() {
       setLoginLoading(false);
       return;
     }
-    const isAdm = await checkIsAdmin(data.user.id);
-    if (!isAdm) {
+    const { data: adminRow } = await db.from('admins').select('id').eq('user_id', data.user.id).maybeSingle();
+    if (!adminRow) {
       await db.auth.signOut();
       setLoginError('Denne konto har ikke admin-adgang');
       setLoginLoading(false);
