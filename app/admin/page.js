@@ -195,6 +195,7 @@ export default function AdminPage() {
   const [allInstitutions, setAllInstitutions] = useState([]);
   const [pendingApprovalCount, setPendingApprovalCount] = useState(0);
   const [feedbackNewCount, setFeedbackNewCount] = useState(0);
+  const [pendingReviewCount, setPendingReviewCount] = useState(0);
   const w = useWindowWidth();
   const isMobile = w < 768;
 
@@ -203,12 +204,14 @@ export default function AdminPage() {
   useEffect(() => {
     if (authState !== 'authenticated') return;
     async function fetchCounts() {
-      const [{ count: approvals }, { count: newFb }] = await Promise.all([
+      const [{ count: approvals }, { count: newFb }, { count: pendingReviews }] = await Promise.all([
         db.from('institutions').select('id', { count: 'exact', head: true }).eq('is_approved', false),
         db.from('feedback').select('id', { count: 'exact', head: true }).eq('status', 'new'),
+        db.from('listings').select('id', { count: 'exact', head: true }).eq('review_status', 'pending'),
       ]);
       setPendingApprovalCount(approvals || 0);
       setFeedbackNewCount(newFb || 0);
+      setPendingReviewCount(pendingReviews || 0);
     }
     fetchCounts();
   }, [authState]);
@@ -328,6 +331,9 @@ export default function AdminPage() {
               )}
               {id === 'feedback' && feedbackNewCount > 0 && (
                 <span style={{ background: '#EF476F', color: '#fff', borderRadius: 99, fontSize: 10, fontWeight: 800, minWidth: 18, height: 18, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', padding: '0 5px' }}>{feedbackNewCount}</span>
+              )}
+              {id === 'listings' && pendingReviewCount > 0 && (
+                <span style={{ background: '#F59E0B', color: '#fff', borderRadius: 99, fontSize: 10, fontWeight: 800, minWidth: 18, height: 18, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', padding: '0 5px' }}>{pendingReviewCount}</span>
               )}
             </button>
           ))}
@@ -701,9 +707,13 @@ function InstitutionsTab({ institutions, refresh, isMobile }) {
 // ── SECTION 4: Listings ─────────────────────────────────────────────────────────
 
 function ListingsTab({ allInstitutions = [], isMobile }) {
-  const [subTab, setSubTab] = useState('listings'); // listings | reports
+  const [subTab, setSubTab] = useState('listings'); // listings | reports | review
   const [listings, setListings] = useState([]);
   const [reports, setReports] = useState([]);
+  const [pendingReviews, setPendingReviews] = useState([]);
+  const [reviewActing, setReviewActing] = useState(null);
+  const [rejectTarget, setRejectTarget] = useState(null);
+  const [rejectReason, setRejectReason] = useState('');
   const [loading, setLoading] = useState(true);
   const [query, setQuery] = useState('');
   const [filterType, setFilterType] = useState('');
@@ -714,16 +724,37 @@ function ListingsTab({ allInstitutions = [], isMobile }) {
 
   const fetchAll = useCallback(async () => {
     setLoading(true);
-    const [{ data: l }, { data: r }] = await Promise.all([
+    const [{ data: l }, { data: r }, { data: pr }] = await Promise.all([
       db.from('listings').select('*').order('created_at', { ascending: false }).limit(300),
       db.from('listing_reports').select('*, listings(title, institution_name)').eq('status', 'pending').order('created_at', { ascending: false }),
+      db.from('listings').select('*').eq('review_status', 'pending').order('review_requested_at', { ascending: true }),
     ]);
     setListings(l || []);
     setReports(r || []);
+    setPendingReviews(pr || []);
     setLoading(false);
   }, []);
 
   useEffect(() => { fetchAll(); }, [fetchAll]);
+
+  async function handleReviewAction(listingId, action, reason = '') {
+    setReviewActing(listingId + action);
+    const { data: { session } } = await db.auth.getSession();
+    const res = await fetch('/api/admin/review-listing', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session?.access_token || ''}` },
+      body: JSON.stringify({ listing_id: listingId, action, reason }),
+    });
+    if (res.ok) {
+      setPendingReviews(prev => prev.filter(l => l.id !== listingId));
+      if (action === 'approve') {
+        setListings(prev => prev.map(l => l.id === listingId ? { ...l, review_status: 'approved', is_active: true } : l));
+      }
+    }
+    setReviewActing(null);
+    setRejectTarget(null);
+    setRejectReason('');
+  }
 
   async function toggleActive(l) {
     await db.from('listings').update({ is_active: !l.is_active }).eq('id', l.id);
@@ -789,8 +820,8 @@ function ListingsTab({ allInstitutions = [], isMobile }) {
   return (
     <div>
       <div style={{ display: 'flex', gap: 8, marginBottom: 16, flexWrap: 'wrap' }}>
-        {[['listings', `Alle opslag (${listings.length})`], ['reports', `Rapporterede (${reports.length})`]].map(([k, l]) => (
-          <button key={k} onClick={() => setSubTab(k)} style={{ padding: '7px 16px', borderRadius: 99, border: `1.5px solid ${subTab === k ? PRIMARY : PAPER3}`, background: subTab === k ? GREEN_TINT : PAPER2, color: subTab === k ? PRIMARY : INK3, fontFamily: FONT, fontWeight: 700, fontSize: 13, cursor: 'pointer' }}>{l}</button>
+        {[['listings', `Alle opslag (${listings.length})`], ['reports', `Rapporterede (${reports.length})`], ['review', `Til gennemgang${pendingReviews.length > 0 ? ` (${pendingReviews.length})` : ''}`]].map(([k, l]) => (
+          <button key={k} onClick={() => setSubTab(k)} style={{ padding: '7px 16px', borderRadius: 99, border: `1.5px solid ${subTab === k ? (k === 'review' ? '#F59E0B' : PRIMARY) : PAPER3}`, background: subTab === k ? (k === 'review' ? '#FEF3C7' : GREEN_TINT) : PAPER2, color: subTab === k ? (k === 'review' ? '#92400E' : PRIMARY) : INK3, fontFamily: FONT, fontWeight: 700, fontSize: 13, cursor: 'pointer' }}>{l}</button>
         ))}
       </div>
 
@@ -815,6 +846,66 @@ function ListingsTab({ allInstitutions = [], isMobile }) {
                 </div>
               </div>
             ))}
+          </div>
+        )
+      ) : subTab === 'review' ? (
+        loading ? <Spinner /> : pendingReviews.length === 0 ? (
+          <div style={{ padding: '60px 20px', textAlign: 'center' }}>
+            <div style={{ fontSize: 48, marginBottom: 12 }}>✅</div>
+            <div style={{ fontFamily: FONT, fontWeight: 700, fontSize: 18, color: INK }}>Ingen opslag til gennemgang</div>
+            <div style={{ fontSize: 14, color: INK3, marginTop: 8 }}>Alle indsendte opslag er behandlet.</div>
+          </div>
+        ) : (
+          <div>
+            <div style={{ fontFamily: FONT, fontSize: 12, color: INK3, marginBottom: 12 }}>{pendingReviews.length} opslag afventer gennemgang</div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+              {pendingReviews.map(l => (
+                <div key={l.id} style={{ background: '#fff', border: '1.5px solid #FDE68A', borderRadius: 16, overflow: 'hidden' }}>
+                  <div style={{ display: 'flex', gap: 14, padding: '16px 18px', flexWrap: isMobile ? 'wrap' : 'nowrap' }}>
+                    {Array.isArray(l.images) && l.images[0] && (
+                      <img src={l.images[0]} alt="" style={{ width: 80, height: 80, objectFit: 'cover', borderRadius: 10, flexShrink: 0 }} />
+                    )}
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ fontFamily: FONT, fontWeight: 800, fontSize: 15, color: INK, marginBottom: 4 }}>{l.title}</div>
+                      <div style={{ fontFamily: FONT, fontSize: 12, color: INK3, marginBottom: 6 }}>{l.institution_name} · Indsendt {fmtDate(l.review_requested_at || l.created_at)}</div>
+                      {l.description && <div style={{ fontFamily: FONT, fontSize: 13, color: INK2, lineHeight: 1.5, marginBottom: 8, display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>{l.description}</div>}
+                      <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
+                        <TypeBadge type={l.type} />
+                        {l.price != null && <span style={{ fontFamily: FONT, fontSize: 12, color: INK2, fontWeight: 700 }}>{fmtKr(l.price)}</span>}
+                        {l.category && <span style={{ fontFamily: FONT, fontSize: 12, color: INK3 }}>{l.category}</span>}
+                      </div>
+                    </div>
+                  </div>
+                  <div style={{ padding: '0 18px 16px', display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                    <button onClick={() => handleReviewAction(l.id, 'approve')} disabled={!!reviewActing || rejectTarget === l.id}
+                      style={{ padding: '9px 18px', borderRadius: 10, border: 'none', background: PRIMARY, color: '#fff', fontFamily: FONT, fontWeight: 700, fontSize: 13, cursor: !!reviewActing ? 'default' : 'pointer', opacity: !!reviewActing ? 0.7 : 1 }}>
+                      {reviewActing === l.id + 'approve' ? '…' : '✓ Godkend'}
+                    </button>
+                    <button onClick={() => { setRejectTarget(l.id); setRejectReason(''); }} disabled={!!reviewActing}
+                      style={{ padding: '9px 18px', borderRadius: 10, border: '1.5px solid #FCA5A5', background: '#FEF2F2', color: '#DC2626', fontFamily: FONT, fontWeight: 700, fontSize: 13, cursor: !!reviewActing ? 'default' : 'pointer' }}>
+                      ✕ Afvis
+                    </button>
+                  </div>
+                  {rejectTarget === l.id && (
+                    <div style={{ padding: '0 18px 18px' }}>
+                      <div style={{ background: '#FEF2F2', borderRadius: 12, padding: '14px 16px' }}>
+                        <div style={{ fontFamily: FONT, fontWeight: 600, fontSize: 13, color: '#DC2626', marginBottom: 8 }}>Begrundelse (sendes til sælger)</div>
+                        <textarea value={rejectReason} onChange={e => setRejectReason(e.target.value)} rows={3} placeholder="Beskriv hvorfor opslaget ikke kan godkendes…"
+                          style={{ width: '100%', padding: '8px 12px', borderRadius: 8, border: '1.5px solid #FCA5A5', fontSize: 13, fontFamily: FONT, resize: 'none', outline: 'none', boxSizing: 'border-box', background: '#fff' }} />
+                        <div style={{ display: 'flex', gap: 8, marginTop: 10, justifyContent: 'flex-end' }}>
+                          <button onClick={() => { setRejectTarget(null); setRejectReason(''); }}
+                            style={{ padding: '8px 16px', borderRadius: 8, border: `1px solid ${PAPER3}`, background: '#fff', fontFamily: FONT, fontSize: 13, cursor: 'pointer', color: INK3 }}>Annuller</button>
+                          <button onClick={() => handleReviewAction(l.id, 'reject', rejectReason)} disabled={!rejectReason.trim() || !!reviewActing}
+                            style={{ padding: '8px 16px', borderRadius: 8, border: 'none', background: '#DC2626', color: '#fff', fontFamily: FONT, fontWeight: 700, fontSize: 13, cursor: !rejectReason.trim() ? 'not-allowed' : 'pointer', opacity: !rejectReason.trim() ? 0.6 : 1 }}>
+                            {reviewActing === l.id + 'reject' ? '…' : 'Bekræft afvisning'}
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
           </div>
         )
       ) : (
