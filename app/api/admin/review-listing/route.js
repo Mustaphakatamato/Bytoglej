@@ -20,12 +20,23 @@ export async function POST(req) {
     return NextResponse.json({ error: 'Begrundelse er påkrævet ved afvisning' }, { status: 400 });
   }
 
-  // Fetch listing for notification context
+  // Fetch listing + institution_id for notification
   const { data: listing } = await supa
     .from('listings')
     .select('id, title, institution_name, review_status')
     .eq('id', listing_id)
     .maybeSingle();
+
+  // Look up institution_id so RLS SELECT on notifications works for the seller
+  let institutionId = null;
+  if (listing?.institution_name) {
+    const { data: inst } = await supa
+      .from('institutions')
+      .select('id')
+      .eq('name', listing.institution_name)
+      .maybeSingle();
+    institutionId = inst?.id || null;
+  }
 
   if (!listing) return NextResponse.json({ error: 'Opslag ikke fundet' }, { status: 404 });
   if (listing.review_status !== 'pending') {
@@ -40,6 +51,7 @@ export async function POST(req) {
     }).eq('id', listing_id);
 
     await supa.from('notifications').insert({
+      institution_id: institutionId,
       institution_name: listing.institution_name,
       type: 'listing_review_approved',
       title: 'Dit opslag er godkendt! 🎉',
@@ -50,6 +62,7 @@ export async function POST(req) {
     await supa.from('listings').delete().eq('id', listing_id);
 
     await supa.from('notifications').insert({
+      institution_id: institutionId,
       institution_name: listing.institution_name,
       type: 'listing_review_rejected',
       title: 'Dit opslag kunne ikke godkendes',
