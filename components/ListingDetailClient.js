@@ -5,6 +5,7 @@ import { db } from '@/lib/supabase';
 import { PRIMARY, GREEN_DEEP, GREEN_SOFT, GREEN_TINT, PAPER, PAPER2, PAPER3, INK, INK2, INK3, CORAL, SKY, ACCENT, ACCENT2, FONT } from '@/lib/constants';
 import { useWindowWidth } from '@/lib/hooks';
 import { calcServiceFee, BuyerProtectionPopup } from '@/components/ListingCard';
+import { CATEGORIES } from '@/lib/categories';
 
 function timeAgo(dateStr) {
   if (!dateStr) return null;
@@ -618,6 +619,23 @@ export default function ListingDetailClient() {
                 return badges.map(b => <span key={b.label} style={{ background:b.bg, color:b.color, borderRadius:99, padding:'4px 12px', fontSize:11, fontWeight:700, fontFamily:FONT }}>{b.icon} {b.label}</span>);
               })()}
             </div>
+
+            {/* Brand + category path */}
+            {(listing.brand || listing.category) && (
+              <div style={{ display:'flex', alignItems:'center', gap:6, marginBottom:12, flexWrap:'wrap' }}>
+                {listing.category && (() => {
+                  const cat = CATEGORIES.find(c => c.key === listing.category);
+                  if (!cat) return null;
+                  return (
+                    <span style={{ fontSize:12, color:INK3, fontFamily:FONT }}>
+                      {cat.emoji} {cat.label}{listing.subcategory ? ` › ${listing.subcategory}` : ''}
+                    </span>
+                  );
+                })()}
+                {listing.brand && listing.category && <span style={{ color:PAPER3, fontSize:12 }}>·</span>}
+                {listing.brand && <span style={{ fontSize:12, color:INK3, fontFamily:FONT, fontWeight:600 }}>{listing.brand}</span>}
+              </div>
+            )}
 
             {/* Description with expand */}
             {listing.description && (

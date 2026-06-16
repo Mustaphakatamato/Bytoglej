@@ -3,6 +3,7 @@ import { useState, useEffect, useRef } from 'react';
 import { db } from '@/lib/supabase';
 import { PRIMARY, GREEN_DEEP, GREEN_TINT, PAPER, PAPER2, PAPER3, INK, INK2, INK3, TYPE_CFG, CONDITIONS, AGE_GROUPS, FONT } from '@/lib/constants';
 import { CATEGORIES } from '@/lib/categories';
+import { BRAND_OPTIONS } from '@/lib/toy-brands';
 import { Spinner } from '@/components/ui';
 
 // Fuld redigerings-modal til admin — spejler opret/rediger-flowet, så admin
@@ -29,6 +30,7 @@ export default function AdminListingEditModal({ listing, onClose, onSaved }) {
     min_bid: listing.min_bid || '',
     category: listing.category || '',
     subcategory: listing.subcategory || '',
+    brand: listing.brand || '',
   });
 
   const [delivery, setDelivery] = useState({ shipping: !!listing.can_ship, weight_g: 1000 });
@@ -149,6 +151,7 @@ export default function AdminListingEditModal({ listing, onClose, onSaved }) {
       min_bid: form.type === 'byd' && form.min_bid ? Number(form.min_bid) : null,
       category: form.category || null,
       subcategory: form.subcategory || null,
+      brand: form.brand || null,
       images: allImages,
       can_ship: delivery.shipping || false,
       original_price: originalPrice,
@@ -229,37 +232,34 @@ export default function AdminListingEditModal({ listing, onClose, onSaved }) {
             </select>
           </div>
 
-          {/* Kategori */}
-          <div>
-            <label style={labelStyle}>Kategori <span style={{ fontWeight: 400, color: INK3 }}>(valgfri)</span></label>
-            <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: form.category ? 10 : 0 }}>
-              {CATEGORIES.map(cat => {
-                const sel = form.category === cat.key;
-                return (
-                  <button key={cat.key} type="button" onClick={() => setForm(f => ({ ...f, category: sel ? '' : cat.key, subcategory: '' }))}
-                    style={{ padding: '6px 14px', borderRadius: 99, fontSize: 12, fontWeight: 700, border: sel ? `2px solid ${PRIMARY}` : '2px solid transparent', background: sel ? GREEN_TINT : PAPER2, color: sel ? PRIMARY : INK3, cursor: 'pointer', fontFamily: FONT, display: 'flex', alignItems: 'center', gap: 5 }}>
-                    <span>{cat.emoji}</span><span>{cat.label}</span>
-                  </button>
-                );
-              })}
+          {/* Kategori + Varemærke */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+            <div>
+              <label style={labelStyle}>Kategori <span style={{ fontWeight: 400, color: INK3 }}>(valgfri)</span></label>
+              <select value={form.category} onChange={e => setForm(f => ({ ...f, category: e.target.value, subcategory: '' }))} style={{ ...inputStyle, cursor: 'pointer' }}>
+                <option value=''>Vælg kategori…</option>
+                {CATEGORIES.map(cat => <option key={cat.key} value={cat.key}>{cat.emoji} {cat.label}</option>)}
+              </select>
             </div>
             {form.category && (() => {
               const catObj = CATEGORIES.find(c => c.key === form.category);
-              if (!catObj) return null;
+              if (!catObj?.sub?.length) return null;
               return (
-                <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-                  {catObj.sub.map(sub => {
-                    const selSub = form.subcategory === sub;
-                    return (
-                      <button key={sub} type="button" onClick={() => setForm(f => ({ ...f, subcategory: selSub ? '' : sub }))}
-                        style={{ padding: '5px 12px', borderRadius: 99, fontSize: 12, fontWeight: 700, border: selSub ? `2px solid ${PRIMARY}` : `1.5px solid ${PAPER3}`, background: selSub ? GREEN_TINT : PAPER2, color: selSub ? PRIMARY : INK3, cursor: 'pointer', fontFamily: FONT }}>
-                        {sub}
-                      </button>
-                    );
-                  })}
+                <div>
+                  <label style={labelStyle}>Underkategori <span style={{ fontWeight: 400, color: INK3 }}>(valgfri)</span></label>
+                  <select value={form.subcategory} onChange={e => setForm(f => ({ ...f, subcategory: e.target.value }))} style={{ ...inputStyle, cursor: 'pointer' }}>
+                    <option value=''>Vælg underkategori…</option>
+                    {catObj.sub.map(sub => <option key={sub} value={sub}>{sub}</option>)}
+                  </select>
                 </div>
               );
             })()}
+            <div>
+              <label style={labelStyle}>Varemærke <span style={{ fontWeight: 400, color: INK3 }}>(valgfri)</span></label>
+              <select value={form.brand} onChange={e => setForm(f => ({ ...f, brand: e.target.value }))} style={{ ...inputStyle, cursor: 'pointer' }}>
+                {BRAND_OPTIONS.map(b => <option key={b.value} value={b.value}>{b.label}</option>)}
+              </select>
+            </div>
           </div>
 
           {/* Beskrivelse */}
