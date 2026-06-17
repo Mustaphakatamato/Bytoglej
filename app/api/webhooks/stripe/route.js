@@ -85,6 +85,35 @@ export async function POST(req) {
   const order = claimed;
   const groups = order.order_groups || [];
 
+  // For bid-type payments: mark the bid message and conversation as completed
+  const bidMessageId = pi.metadata?.bid_message_id;
+  const bidConvId    = pi.metadata?.conversation_id;
+  const bidDelivery  = pi.metadata?.delivery_method || '';
+  if (bidMessageId || bidConvId) {
+    const now = new Date().toISOString();
+    const bidUpdates = [];
+    if (bidMessageId) {
+      bidUpdates.push(
+        supa.from('chat_messages')
+          .update({ bid_status: 'checkout_done', bid_note: bidDelivery })
+          .eq('id', bidMessageId)
+      );
+    }
+    if (bidConvId) {
+      bidUpdates.push(
+        supa.from('conversations').update({
+          deal_completed: true,
+          deal_completed_at: now,
+          deal_type: 'byd',
+          delivery_method: bidDelivery,
+          last_message: '🎉 Handel gennemført!',
+          last_message_at: now,
+        }).eq('id', bidConvId)
+      );
+    }
+    await Promise.all(bidUpdates);
+  }
+
   // Markér alle købte opslag som solgt
   const soldListingIds = groups.flatMap(g => (g.items || []).map(i => i.listingId)).filter(Boolean);
   if (soldListingIds.length) {

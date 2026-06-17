@@ -268,6 +268,7 @@ export default function MessagesClient() {
   const [uploadError,     setUploadError]     = useState(null);
   const [bundleAcceptedAt,setBundleAcceptedAt]= useState({});
   const [checkoutDeliveries, setCheckoutDeliveries] = useState({});
+  const [goingToPayment,   setGoingToPayment]   = useState(null);
   const [shipmentInfo, setShipmentInfo] = useState(null);
   const [confirmingOrder, setConfirmingOrder] = useState(false);
   const [shipmentLoading, setShipmentLoading] = useState(false);
@@ -877,6 +878,28 @@ export default function MessagesClient() {
         }
       } catch {}
     }
+  }
+
+  async function handleBidPayment(checkoutMsg, deliveryMethod) {
+    setGoingToPayment(checkoutMsg.id);
+    const checkoutData = (() => { try { return JSON.parse(checkoutMsg.content); } catch { return {}; } })();
+    // 'shipping' maps to cheapest carrier; exact carrier selection can be added later
+    const shippingMethod = deliveryMethod === 'shipping' ? 'parcel_shop_gls' : deliveryMethod;
+    try {
+      const res = await authedFetch('/api/payments/create-intent', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          buyerInstitutionId: ctxInstId || ctxInstitution?.id,
+          conversationId: active.id,
+          groups: [{ sellerName: active.owner_name, items: [{ listingId: checkoutData.listing_id, bidMessageId: checkoutMsg.id }], shippingMethod }],
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) { alert(data.error || 'Noget gik galt — prøv igen'); setGoingToPayment(null); return; }
+      const bd = encodeURIComponent(JSON.stringify(data.breakdown));
+      router.push(`/betaling/${data.orderId}?cs=${encodeURIComponent(data.clientSecret)}&total=${data.grandTotal}&bd=${bd}`);
+    } catch { alert('Noget gik galt — prøv igen'); setGoingToPayment(null); }
   }
 
   async function handleRejectBid() {
@@ -1489,7 +1512,7 @@ export default function MessagesClient() {
                                     </div>
                                   ) : isOwnerInConv ? (
                                     <div style={{ fontFamily:FONT, fontSize:13, color:'#B45309', fontWeight:600, textAlign:'center', padding:'8px 0' }}>
-                                      ⏳ Afventer købers valg af leveringsmetode…
+                                      ⏳ Afventer købers betaling…
                                     </div>
                                   ) : (
                                     (() => {
@@ -1499,16 +1522,17 @@ export default function MessagesClient() {
                                         opts.push({ key:'custom', icon:'🤝', label:'Aftalt levering', desc:'Aftales direkte med sælger' });
                                       } else {
                                         if (so.allow_pickup) opts.push({ key:'pickup', icon:'📍', label:'Afhentning', desc: so.pickup_address || 'Afhentes hos sælger' });
-                                        if (so.allow_shipping) opts.push({ key:'shipping', icon:'📦', label:'Pakke via transportør', desc: so.shipping_included_in_price ? 'Porto inkluderet i pris' : 'Porto betales separat' });
+                                        if (so.allow_shipping) opts.push({ key:'shipping', icon:'📦', label:'Pakke via transportør', desc: 'Porto beregnes ved betaling' });
                                         if (so.allow_custom) opts.push({ key:'custom', icon:'🤝', label:'Aftalt levering', desc:'Aftales direkte med sælger' });
                                         if (!opts.length) opts.push({ key:'custom', icon:'🤝', label:'Aftalt levering', desc:'Aftales direkte med sælger' });
                                       }
                                       const chosen = checkoutDeliveries[m.id];
+                                      const paying = goingToPayment === m.id;
                                       return (
                                         <div style={{ display:'flex', flexDirection:'column', gap:8 }}>
                                           {opts.map(o => (
-                                            <button key={o.key} onClick={()=>setCheckoutDeliveries(prev=>({...prev,[m.id]:o.key}))}
-                                              style={{ display:'flex', alignItems:'center', gap:12, padding:'11px 14px', borderRadius:12, border:`2px solid ${chosen===o.key?PRIMARY:'#FDE68A'}`, background:chosen===o.key?GREEN_TINT:'#FFFBEB', cursor:'pointer', textAlign:'left' }}>
+                                            <button key={o.key} onClick={()=>{ if (!paying) setCheckoutDeliveries(prev=>({...prev,[m.id]:o.key})); }}
+                                              style={{ display:'flex', alignItems:'center', gap:12, padding:'11px 14px', borderRadius:12, border:`2px solid ${chosen===o.key?PRIMARY:'#FDE68A'}`, background:chosen===o.key?GREEN_TINT:'#FFFBEB', cursor:paying?'default':'pointer', textAlign:'left', opacity:paying?0.6:1 }}>
                                               <span style={{ fontSize:18 }}>{o.icon}</span>
                                               <div style={{ flex:1 }}>
                                                 <div style={{ fontFamily:FONT, fontWeight:700, fontSize:13, color:INK }}>{o.label}</div>
@@ -1518,10 +1542,10 @@ export default function MessagesClient() {
                                             </button>
                                           ))}
                                           <button
-                                            onClick={()=>{ if(chosen) handleBuyerCheckout(m, chosen); }}
-                                            disabled={!chosen}
-                                            style={{ padding:'12px', borderRadius:99, background:chosen?PRIMARY:PAPER3, border:'none', color:chosen?'#fff':INK3, fontFamily:FONT, fontWeight:700, fontSize:14, cursor:chosen?'pointer':'default', marginTop:4 }}>
-                                            {chosen ? '✅ Bekræft og afslut handel' : 'Vælg leveringsmetode…'}
+                                            onClick={()=>{ if(chosen && !paying) handleBidPayment(m, chosen); }}
+                                            disabled={!chosen || paying}
+                                            style={{ padding:'12px', borderRadius:99, background:chosen&&!paying?PRIMARY:PAPER3, border:'none', color:chosen&&!paying?'#fff':INK3, fontFamily:FONT, fontWeight:700, fontSize:14, cursor:chosen&&!paying?'pointer':'default', marginTop:4 }}>
+                                            {paying ? 'Forbereder betaling…' : chosen ? '💳 Gå til betaling' : 'Vælg leveringsmetode…'}
                                           </button>
                                         </div>
                                       );

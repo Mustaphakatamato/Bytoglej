@@ -98,6 +98,9 @@ export async function POST(req) {
   // never from the client.
   const orderGroups = [];
   let grandTotal = 0;
+  let metaBidMsgId = '';
+  let metaConvId = body.conversationId || '';
+  let metaDelivery = '';
 
   for (const g of groups) {
     if (!Array.isArray(g.items) || !g.items.length) {
@@ -120,18 +123,40 @@ export async function POST(req) {
       if (l.user_id && l.user_id === user.id) {
         return NextResponse.json({ error: 'Du kan ikke købe dine egne opslag' }, { status: 400 });
       }
-      itemTotal += l.price || 0;
+
+      // Bid-mode: item price comes from an accepted bid message, not listing.price
+      let itemPrice = l.price || 0;
+      const bidMsgId = i.bidMessageId || null;
+      if (bidMsgId) {
+        const { data: bidMsg } = await supa
+          .from('chat_messages')
+          .select('id, bid_amount, bid_status, conversation_id')
+          .eq('id', bidMsgId)
+          .eq('bid_status', 'accepted')
+          .maybeSingle();
+        if (!bidMsg) {
+          return NextResponse.json({ error: 'Bud ikke fundet eller ikke accepteret' }, { status: 400 });
+        }
+        itemPrice = bidMsg.bid_amount || 0;
+        metaBidMsgId = metaBidMsgId || bidMsgId;
+        metaConvId = metaConvId || bidMsg.conversation_id || '';
+      }
+
+      itemTotal += itemPrice;
       sellerInstitutionName = sellerInstitutionName || l.institution_name;
       sellerUserId = sellerUserId || l.user_id;
       items.push({
         listingId: l.id,
         title: l.title,
-        price: l.price || 0,
+        price: itemPrice,
         emoji: l.emoji,
         category: l.category,
         sizeCategory: shipOptMap.get(l.id)?.shipping_size_category || 'medium',
+        ...(bidMsgId ? { bidMessageId: bidMsgId } : {}),
       });
     }
+
+    if (!metaDelivery && g.shippingMethod) metaDelivery = g.shippingMethod === 'pickup' || g.shippingMethod === 'custom' ? g.shippingMethod : 'shipping';
 
     // Validate shipping method server-side
     const sizeCategory = items[0]?.sizeCategory || 'medium';
@@ -229,6 +254,9 @@ export async function POST(req) {
         buyer_institution_id: buyer?.id || '',
         buyer_name: buyer?.name || '',
         group_count: String(groups.length),
+        bid_message_id: metaBidMsgId,
+        conversation_id: metaConvId,
+        delivery_method: metaDelivery,
       },
       description: `Bytogleg ordre — ${orderGroups.map(g => g.sellerName).join(', ')}`,
     });
