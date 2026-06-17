@@ -6,6 +6,7 @@ import { PRIMARY, GREEN_SOFT, GREEN_TINT, PAPER, PAPER2, PAPER3, INK, INK3, CORA
 import { useWindowWidth, relTime, haversine, geocodeAddress } from '@/lib/hooks';
 import { useApp, useActiveUser } from '@/providers/AppProvider';
 import { Badge, Btn, Spinner, SkeletonMessageRow } from '@/components/ui';
+import { TradeProtectionPopup } from '@/components/ListingCard';
 import { authedFetch } from '@/lib/authed-fetch';
 import PullToRefresh from '@/components/PullToRefresh';
 import { calculateCO2Savings } from '@/lib/co2/calculator';
@@ -272,6 +273,7 @@ export default function MessagesClient() {
   const [swapPaying,       setSwapPaying]       = useState(false);
   const [swapDelivery,     setSwapDelivery]     = useState('shipping');
   const [nowTs,            setNowTs]            = useState(() => Date.now());
+  const [showSwapProtection, setShowSwapProtection] = useState(false);
   const [shipmentInfo, setShipmentInfo] = useState(null);
   const [confirmingOrder, setConfirmingOrder] = useState(false);
   const [shipmentLoading, setShipmentLoading] = useState(false);
@@ -1685,6 +1687,7 @@ export default function MessagesClient() {
                                             </div>
                                             <div style={{ fontFamily:FONT, fontSize:11, color:INK3, lineHeight:1.5 }}>
                                               {swapDelivery==='shipping' ? 'Du betaler porto for din vare + 10 kr byttebeskyttelse. Porto beregnes på betalingssiden.' : 'Du betaler 10 kr byttebeskyttelse. I aftaler selv leveringen.'}
+                                              {' '}<button onClick={()=>setShowSwapProtection(true)} style={{ background:'none', border:'none', padding:0, color:PRIMARY, fontFamily:FONT, fontSize:11, fontWeight:700, textDecoration:'underline', cursor:'pointer' }}>Hvad er byttebeskyttelse?</button>
                                             </div>
                                             <button onClick={()=>{ if(!swapPaying) handleSwapPayment(swapDelivery); }} disabled={swapPaying} style={{ padding:'11px', borderRadius:99, background:swapPaying?PAPER3:PRIMARY, color:swapPaying?INK3:'#fff', border:'none', fontFamily:FONT, fontWeight:700, fontSize:13, cursor:swapPaying?'default':'pointer' }}>{swapPaying ? 'Forbereder betaling…' : '💳 Gå til betaling'}</button>
                                             <div style={{ fontFamily:FONT, fontSize:11, color:INK3 }}>{otherPaid ? 'Den anden part har betalt ✓' : 'Den anden part har endnu ikke betalt'}</div>
@@ -2137,6 +2140,9 @@ export default function MessagesClient() {
           )}
         </div>}
       </div>
+
+      {/* Byttebeskyttelse-popup */}
+      {showSwapProtection && <TradeProtectionPopup onClose={()=>setShowSwapProtection(false)} />}
 
       {/* Swap preview modal */}
       {swapPreview && (
