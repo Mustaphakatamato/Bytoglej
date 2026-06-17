@@ -5,6 +5,7 @@ import { db } from '@/lib/supabase';
 import { PRIMARY, GREEN_DEEP, GREEN_SOFT, GREEN_TINT, PAPER, PAPER2, PAPER3, INK, INK2, INK3, CORAL, SKY, ACCENT, ACCENT2, FONT } from '@/lib/constants';
 import { useWindowWidth } from '@/lib/hooks';
 import { calcServiceFee, BuyerProtectionPopup } from '@/components/ListingCard';
+import { getShippingPrice } from '@/lib/shipping-rates';
 import { CATEGORIES } from '@/lib/categories';
 
 function timeAgo(dateStr) {
@@ -502,6 +503,42 @@ export default function ListingDetailClient() {
     showToast('Bud trukket tilbage');
   }
 
+  // Live prisoversigt i bud-modalen: bud + estimeret porto + køberbeskyttelse.
+  // Porto er et "fra"-estimat (billigste pakkeshop for opslagets størrelse); den
+  // præcise pris vælges ved betaling. Køberbeskyttelse beregnes eksakt (5% + 5 kr).
+  function bidPriceSummary(amount) {
+    const bid = Number(amount);
+    if (!bid || bid <= 0) return null;
+    const so = listing.shipping_options?.[0];
+    const canShip = so?.allow_shipping || (!so && listing.can_ship);
+    const portoIncluded = so?.shipping_included_in_price;
+    const portoFrom = canShip && !portoIncluded ? getShippingPrice('parcel_shop_gls', so?.shipping_size_category) : 0;
+    const protection = calcServiceFee(bid);
+    const totalCa = bid + portoFrom + protection;
+    const kr = n => `${n.toFixed(2).replace('.', ',')} kr.`;
+    const row = (label, value, extra) => (
+      <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', fontFamily:FONT, fontSize:13 }}>
+        <span style={{ color:INK3 }}>{label}</span>
+        <span style={{ color:INK2, fontWeight:600 }}>{extra}{value}</span>
+      </div>
+    );
+    return (
+      <div style={{ background:GREEN_TINT, border:`1px solid ${GREEN_SOFT}`, borderRadius:12, padding:'12px 14px', display:'flex', flexDirection:'column', gap:7 }}>
+        {row('Dit bud', kr(bid))}
+        {canShip && !portoIncluded && row('Porto (fra)', kr(portoFrom), '~')}
+        {portoIncluded && row('Porto', 'inkluderet')}
+        {row('Køberbeskyttelse', kr(protection))}
+        <div style={{ borderTop:`1px solid ${GREEN_SOFT}`, marginTop:2, paddingTop:8, display:'flex', justifyContent:'space-between', alignItems:'center' }}>
+          <span style={{ fontFamily:FONT, fontWeight:800, fontSize:14, color:INK }}>Du betaler ca.</span>
+          <span style={{ fontFamily:FONT, fontWeight:800, fontSize:16, color:PRIMARY }}>{kr(totalCa)}</span>
+        </div>
+        {canShip && !portoIncluded && (
+          <div style={{ fontFamily:FONT, fontSize:11, color:INK3, lineHeight:1.5 }}>Porto beregnes præcist ved betaling, når du vælger leveringsmetode.</div>
+        )}
+      </div>
+    );
+  }
+
   async function handleSwap() {
     const chosen = ownListings.find(l => l.id === selectedSwapId);
     if (!chosen && !swapOffer.trim()) return;
@@ -979,6 +1016,7 @@ export default function ListingDetailClient() {
                 <input type="number" value={bidAmount} onChange={e=>setBidAmount(e.target.value)} placeholder={`Fx ${existingBid.bid_amount}`} style={{ width:'100%', padding:'12px 14px', borderRadius:12, border:'1.5px solid #e5e5e5', fontSize:16, fontFamily:"'Nunito',sans-serif", fontWeight:700, outline:'none' }} />
                 {listing.min_bid && bidAmount && Number(bidAmount) < listing.min_bid && <p style={{ fontSize:12, color:'#e11d48', marginTop:4 }}>Mindste bud er {listing.min_bid} kr.</p>}
               </div>
+              {bidPriceSummary(bidAmount)}
               <Btn variant="primary" color={ACCENT2} radius={22} onClick={async()=>{
                 if (!bidAmount || (listing.min_bid && Number(bidAmount)<listing.min_bid)) return;
                 setSaving(true);
@@ -996,6 +1034,7 @@ export default function ListingDetailClient() {
                 <input type="number" value={bidAmount} onChange={e=>setBidAmount(e.target.value)} placeholder={listing.min_bid ? `Minimum ${listing.min_bid} kr.` : 'Fx 150'} min={listing.min_bid||1} style={{ width:'100%', padding:'12px 14px', borderRadius:12, border:'1.5px solid #e5e5e5', fontSize:16, fontFamily:"'Nunito',sans-serif", fontWeight:700, outline:'none' }} />
                 {listing.min_bid && bidAmount && Number(bidAmount) < listing.min_bid && <p style={{ fontSize:12, color:'#e11d48', marginTop:4 }}>Mindste bud er {listing.min_bid} kr.</p>}
               </div>
+              {bidPriceSummary(bidAmount)}
               <Btn variant="primary" color={ACCENT2} radius={22} onClick={handleBid} disabled={saving||!bidAmount||(listing.min_bid&&Number(bidAmount)<listing.min_bid)} style={{ justifyContent:'center', padding:'14px', fontSize:15 }}>{saving?<><Spinner/>Sender…</>:'Send bud'}</Btn>
             </>
           )}
