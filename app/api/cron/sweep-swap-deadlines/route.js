@@ -2,10 +2,11 @@ import { NextResponse } from 'next/server';
 import Stripe from 'stripe';
 import { createServerClient } from '@/lib/supabase-server';
 
-// Vercel Cron: kører hver time (schedule i vercel.json: "0 * * * *").
-// Annullerer bytteforslag hvor betalingsfristen (48t) er overskredet uden
-// at begge parter har betalt, og refunderer den part der nåede at betale.
-// Beskyttet af CRON_SECRET.
+// Vercel Cron: kører dagligt kl. 03:00 UTC (schedule i vercel.json: "0 3 * * *").
+// Hobby-planen tillader kun daglige cron-jobs; en 48t-frist fanges fint
+// inden for ét døgn. Annullerer bytteforslag hvor betalingsfristen (48t) er
+// overskredet uden at begge parter har betalt, og refunderer den part der
+// nåede at betale. Beskyttet af CRON_SECRET.
 
 function getStripe() {
   if (!process.env.STRIPE_SECRET_KEY) throw new Error('STRIPE_SECRET_KEY er ikke sat');
