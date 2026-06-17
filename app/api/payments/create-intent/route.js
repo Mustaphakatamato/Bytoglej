@@ -124,22 +124,41 @@ export async function POST(req) {
         return NextResponse.json({ error: 'Du kan ikke købe dine egne opslag' }, { status: 400 });
       }
 
-      // Bid-mode: item price comes from an accepted bid message, not listing.price
+      // Bid-mode: item price comes from an accepted bid in the conversation,
+      // not listing.price. Reservationen udløber 24 timer efter accept.
       let itemPrice = l.price || 0;
-      const bidMsgId = i.bidMessageId || null;
-      if (bidMsgId) {
+      const fromBid = i.fromBid || i.bidMessageId;
+      if (fromBid && body.conversationId) {
         const { data: bidMsg } = await supa
           .from('chat_messages')
-          .select('id, bid_amount, bid_status, conversation_id')
-          .eq('id', bidMsgId)
+          .select('id, bid_amount, bid_status')
+          .eq('conversation_id', body.conversationId)
           .eq('bid_status', 'accepted')
+          .order('created_at', { ascending: false })
+          .limit(1)
           .maybeSingle();
         if (!bidMsg) {
           return NextResponse.json({ error: 'Bud ikke fundet eller ikke accepteret' }, { status: 400 });
         }
+
+        // 24-timers reservation: tjek mod checkout-beskedens oprettelsestidspunkt
+        if (body.checkoutMessageId) {
+          const { data: coMsg } = await supa
+            .from('chat_messages')
+            .select('created_at')
+            .eq('id', body.checkoutMessageId)
+            .maybeSingle();
+          if (coMsg) {
+            const deadline = new Date(coMsg.created_at).getTime() + 24 * 60 * 60 * 1000;
+            if (Date.now() > deadline) {
+              return NextResponse.json({ error: 'Tilbuddet er udløbet — buddet er ikke længere reserveret' }, { status: 409 });
+            }
+          }
+        }
+
         itemPrice = bidMsg.bid_amount || 0;
-        metaBidMsgId = metaBidMsgId || bidMsgId;
-        metaConvId = metaConvId || bidMsg.conversation_id || '';
+        metaBidMsgId = metaBidMsgId || body.checkoutMessageId || bidMsg.id;
+        metaConvId = metaConvId || body.conversationId;
       }
 
       itemTotal += itemPrice;
@@ -152,7 +171,7 @@ export async function POST(req) {
         emoji: l.emoji,
         category: l.category,
         sizeCategory: shipOptMap.get(l.id)?.shipping_size_category || 'medium',
-        ...(bidMsgId ? { bidMessageId: bidMsgId } : {}),
+        ...(fromBid ? { fromBid: true } : {}),
       });
     }
 

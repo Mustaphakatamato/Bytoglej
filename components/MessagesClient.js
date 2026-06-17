@@ -271,6 +271,7 @@ export default function MessagesClient() {
   const [goingToPayment,   setGoingToPayment]   = useState(null);
   const [swapPaying,       setSwapPaying]       = useState(false);
   const [swapDelivery,     setSwapDelivery]     = useState('shipping');
+  const [nowTs,            setNowTs]            = useState(() => Date.now());
   const [shipmentInfo, setShipmentInfo] = useState(null);
   const [confirmingOrder, setConfirmingOrder] = useState(false);
   const [shipmentLoading, setShipmentLoading] = useState(false);
@@ -299,6 +300,12 @@ export default function MessagesClient() {
   const bottomRef = useRef(null);
   const inputRef  = useRef(null);
   const fileInputRef = useRef(null);
+
+  // Tikker hvert minut så 24-timers nedtællingen på accepterede bud opdateres.
+  useEffect(() => {
+    const t = setInterval(() => setNowTs(Date.now()), 60000);
+    return () => clearInterval(t);
+  }, []);
 
   useEffect(() => {
     db.auth.getUser().then(({ data: { user } }) => {
@@ -934,11 +941,14 @@ export default function MessagesClient() {
     } catch { alert('Noget gik galt — prøv igen'); setSwapPaying(false); }
   }
 
-  async function handleBidPayment(checkoutMsg, deliveryMethod) {
+  async function handleBidPayment(checkoutMsg) {
     setGoingToPayment(checkoutMsg.id);
     const checkoutData = (() => { try { return JSON.parse(checkoutMsg.content); } catch { return {}; } })();
-    // 'shipping' maps to cheapest carrier; exact carrier selection can be added later
-    const shippingMethod = deliveryMethod === 'shipping' ? 'parcel_shop_gls' : deliveryMethod;
+    // Leveringsmetode udledes af opslagets shipping_options — vælges ikke i chatten.
+    const so = checkoutData.shipping_options;
+    let shippingMethod = 'custom';
+    if (so?.allow_shipping) shippingMethod = 'parcel_shop_gls';
+    else if (so?.allow_pickup) shippingMethod = 'pickup';
     try {
       const res = await authedFetch('/api/payments/create-intent', {
         method: 'POST',
@@ -946,7 +956,8 @@ export default function MessagesClient() {
         body: JSON.stringify({
           buyerInstitutionId: ctxInstId || ctxInstitution?.id,
           conversationId: active.id,
-          groups: [{ sellerName: active.owner_name, items: [{ listingId: checkoutData.listing_id, bidMessageId: checkoutMsg.id }], shippingMethod }],
+          checkoutMessageId: checkoutMsg.id,
+          groups: [{ sellerName: active.owner_name, items: [{ listingId: checkoutData.listing_id, fromBid: true }], shippingMethod }],
         }),
       });
       const data = await res.json();
@@ -1548,63 +1559,60 @@ export default function MessagesClient() {
                                   border: `2px solid ${m.bid_status === 'checkout_done' ? PRIMARY : '#FDE68A'}`,
                                   borderRadius:16, padding:'16px',
                                 }}>
-                                  <div style={{ display:'flex', alignItems:'center', gap:8, marginBottom:12 }}>
-                                    <span style={{ fontSize:18 }}>{m.bid_status === 'checkout_done' ? '✅' : '🛍️'}</span>
-                                    <div>
-                                      <div style={{ fontFamily:FONT, fontWeight:800, fontSize:14, color:INK }}>
-                                        {m.bid_status === 'checkout_done' ? 'Handel gennemført!' : 'Vælg leveringsmetode'}
-                                      </div>
-                                      <div style={{ fontFamily:FONT, fontSize:12, color:INK3, marginTop:1 }}>
-                                        {checkoutData.listing_title} · {checkoutData.deal_type === 'byd' ? `${checkoutData.amount} kr.` : 'Bytte'}
-                                      </div>
-                                    </div>
-                                  </div>
-
-                                  {m.bid_status === 'checkout_done' ? (
-                                    <div style={{ fontFamily:FONT, fontSize:13, color:INK2, fontWeight:600 }}>
-                                      {m.bid_note === 'pickup' ? '📍 Afhentning' : m.bid_note === 'shipping' ? '📦 Pakke via transportør' : '🤝 Aftalt levering'}
-                                    </div>
-                                  ) : isOwnerInConv ? (
-                                    <div style={{ fontFamily:FONT, fontSize:13, color:'#B45309', fontWeight:600, textAlign:'center', padding:'8px 0' }}>
-                                      ⏳ Afventer købers betaling…
-                                    </div>
-                                  ) : (
-                                    (() => {
-                                      const so = checkoutData.shipping_options;
-                                      const opts = [];
-                                      if (!so) {
-                                        opts.push({ key:'custom', icon:'🤝', label:'Aftalt levering', desc:'Aftales direkte med sælger' });
-                                      } else {
-                                        if (so.allow_pickup) opts.push({ key:'pickup', icon:'📍', label:'Afhentning', desc: so.pickup_address || 'Afhentes hos sælger' });
-                                        if (so.allow_shipping) opts.push({ key:'shipping', icon:'📦', label:'Pakke via transportør', desc: 'Porto beregnes ved betaling' });
-                                        if (so.allow_custom) opts.push({ key:'custom', icon:'🤝', label:'Aftalt levering', desc:'Aftales direkte med sælger' });
-                                        if (!opts.length) opts.push({ key:'custom', icon:'🤝', label:'Aftalt levering', desc:'Aftales direkte med sælger' });
-                                      }
-                                      const chosen = checkoutDeliveries[m.id];
-                                      const paying = goingToPayment === m.id;
-                                      return (
-                                        <div style={{ display:'flex', flexDirection:'column', gap:8 }}>
-                                          {opts.map(o => (
-                                            <button key={o.key} onClick={()=>{ if (!paying) setCheckoutDeliveries(prev=>({...prev,[m.id]:o.key})); }}
-                                              style={{ display:'flex', alignItems:'center', gap:12, padding:'11px 14px', borderRadius:12, border:`2px solid ${chosen===o.key?PRIMARY:'#FDE68A'}`, background:chosen===o.key?GREEN_TINT:'#FFFBEB', cursor:paying?'default':'pointer', textAlign:'left', opacity:paying?0.6:1 }}>
-                                              <span style={{ fontSize:18 }}>{o.icon}</span>
-                                              <div style={{ flex:1 }}>
-                                                <div style={{ fontFamily:FONT, fontWeight:700, fontSize:13, color:INK }}>{o.label}</div>
-                                                <div style={{ fontFamily:FONT, fontSize:11, color:INK3, marginTop:1 }}>{o.desc}</div>
-                                              </div>
-                                              {chosen===o.key && <span style={{ color:PRIMARY, fontWeight:800 }}>✓</span>}
-                                            </button>
-                                          ))}
-                                          <button
-                                            onClick={()=>{ if(chosen && !paying) handleBidPayment(m, chosen); }}
-                                            disabled={!chosen || paying}
-                                            style={{ padding:'12px', borderRadius:99, background:chosen&&!paying?PRIMARY:PAPER3, border:'none', color:chosen&&!paying?'#fff':INK3, fontFamily:FONT, fontWeight:700, fontSize:14, cursor:chosen&&!paying?'pointer':'default', marginTop:4 }}>
-                                            {paying ? 'Forbereder betaling…' : chosen ? '💳 Gå til betaling' : 'Vælg leveringsmetode…'}
-                                          </button>
+                                  {(() => {
+                                    const deadline = new Date(m.created_at).getTime() + 24 * 60 * 60 * 1000;
+                                    const remaining = deadline - nowTs;
+                                    const expired = remaining <= 0;
+                                    const hrs = Math.max(0, Math.floor(remaining / 3600000));
+                                    const mins = Math.max(0, Math.floor((remaining % 3600000) / 60000));
+                                    const deadlineStr = new Date(deadline).toLocaleString('da-DK', { day:'numeric', month:'long', hour:'2-digit', minute:'2-digit' });
+                                    const done = m.bid_status === 'checkout_done';
+                                    const paying = goingToPayment === m.id;
+                                    return (
+                                      <>
+                                        <div style={{ display:'flex', alignItems:'center', gap:8, marginBottom:12 }}>
+                                          <span style={{ fontSize:18 }}>{done ? '✅' : '🛍️'}</span>
+                                          <div>
+                                            <div style={{ fontFamily:FONT, fontWeight:800, fontSize:14, color:INK }}>
+                                              {done ? 'Handel gennemført!' : 'Dit bud er accepteret 🎉'}
+                                            </div>
+                                            <div style={{ fontFamily:FONT, fontSize:12, color:INK3, marginTop:1 }}>
+                                              {checkoutData.listing_title} · {checkoutData.deal_type === 'byd' ? `${checkoutData.amount} kr.` : 'Bytte'}
+                                            </div>
+                                          </div>
                                         </div>
-                                      );
-                                    })()
-                                  )}
+
+                                        {done ? (
+                                          <div style={{ fontFamily:FONT, fontSize:13, color:INK2, fontWeight:600 }}>
+                                            {m.bid_note === 'pickup' ? '📍 Afhentning' : m.bid_note === 'shipping' ? '📦 Pakke via transportør' : '🤝 Aftalt levering'}
+                                          </div>
+                                        ) : isOwnerInConv ? (
+                                          <div style={{ fontFamily:FONT, fontSize:13, color:'#B45309', fontWeight:600, textAlign:'center', padding:'8px 0' }}>
+                                            {expired ? '⏰ Tilbuddet udløb — køber betalte ikke i tide' : `⏳ Afventer købers betaling (udløber ${deadlineStr})`}
+                                          </div>
+                                        ) : expired ? (
+                                          <div style={{ fontFamily:FONT, fontSize:13, color:'#B45309', fontWeight:600, textAlign:'center', padding:'8px 0', lineHeight:1.5 }}>
+                                            ⏰ Tilbuddet er udløbet — buddet er ikke længere reserveret til denne pris.
+                                          </div>
+                                        ) : (
+                                          <div style={{ display:'flex', flexDirection:'column', gap:10 }}>
+                                            <div style={{ background:'#FEF9C3', border:'1px solid #FDE68A', borderRadius:12, padding:'10px 12px' }}>
+                                              <div style={{ fontFamily:FONT, fontWeight:700, fontSize:12, color:'#92400e' }}>⏳ Reserveret til dig i 24 timer</div>
+                                              <div style={{ fontFamily:FONT, fontSize:12, color:'#92400e', marginTop:2, lineHeight:1.5 }}>
+                                                Betal inden <strong>{deadlineStr}</strong> for at sikre prisen — {hrs}t {mins}m tilbage.
+                                              </div>
+                                            </div>
+                                            <button
+                                              onClick={()=>{ if(!paying) handleBidPayment(m); }}
+                                              disabled={paying}
+                                              style={{ padding:'13px', borderRadius:99, background:paying?PAPER3:PRIMARY, border:'none', color:paying?INK3:'#fff', fontFamily:FONT, fontWeight:700, fontSize:14, cursor:paying?'default':'pointer' }}>
+                                              {paying ? 'Forbereder betaling…' : '💳 Gå til betaling'}
+                                            </button>
+                                          </div>
+                                        )}
+                                      </>
+                                    );
+                                  })()}
                                 </div>
                               </div>
                             ) : isSwap ? (
