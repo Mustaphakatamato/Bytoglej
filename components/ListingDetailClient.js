@@ -27,6 +27,7 @@ function timeAgo(dateStr) {
 import { useApp, useActiveUser } from '@/providers/AppProvider';
 import { Badge, Btn, Spinner, Modal } from '@/components/ui';
 import OfferModal from '@/components/OfferModal';
+import SwapProposalModal from '@/components/SwapProposalModal';
 import { authedFetch } from '@/lib/authed-fetch';
 
 function ImageGallery({ images, color, emoji, title }) {
@@ -87,6 +88,7 @@ export default function ListingDetailClient() {
   const [bidModal,  setBidModal]  = useState(false);
   const [offerModal, setOfferModal] = useState(false);
   const [swapModal, setSwapModal] = useState(false);
+  const [swapProposalModal, setSwapProposalModal] = useState(false);
   const [bidAmount, setBidAmount] = useState('');
   const [swapOffer, setSwapOffer] = useState('');
   const [selectedSwapId, setSelectedSwapId] = useState(null);
@@ -846,6 +848,7 @@ export default function ListingDetailClient() {
                 {listing.type==='køb' && <Btn variant="outline" radius={22} onClick={()=>{ if(!loggedIn){ router.push('/login'); return; } setOfferModal(true); }} style={{ justifyContent:'center', padding:'13px', fontSize:15 }}>🏷️ Giv et tilbud</Btn>}
                 {listing.type==='byd' && <Btn variant="primary" color={ACCENT2} radius={22} onClick={()=>setBidModal(true)} style={{ justifyContent:'center', padding:'15px', fontSize:16 }}>📊 Afgiv bud</Btn>}
                 {listing.type==='byt' && <Btn variant="primary" color={ACCENT} radius={22} onClick={()=>setSwapModal(true)} style={{ justifyContent:'center', padding:'15px', fontSize:16 }}>🔄 Foreslå bytte</Btn>}
+                {listing.type==='byt' && <Btn variant="outline" radius={22} onClick={()=>{ if(!loggedIn){ router.push('/login'); return; } setSwapProposalModal(true); }} style={{ justifyContent:'center', padding:'13px', fontSize:15 }}>📦 Foreslå bundt-bytte</Btn>}
                 {listing.type==='søges' && <button onClick={()=>setSøgesModal(true)}
                   style={{ width:'100%', padding:'15px', borderRadius:22, border:'none', background:'#7C3AED', color:'#fff', fontSize:15, fontWeight:700, cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center', gap:8, fontFamily:FONT, transition:'all 0.2s' }}>
                   🎯 Jeg har noget der matcher
@@ -879,6 +882,15 @@ export default function ListingDetailClient() {
               open={offerModal}
               onClose={()=>setOfferModal(false)}
               listing={listing}
+              showToast={showToast}
+              onSubmitted={(data)=>{ if (data?.conversationId && setSelectedConvId) setSelectedConvId(data.conversationId); router.push('/beskeder'); }}
+            />
+
+            <SwapProposalModal
+              open={swapProposalModal}
+              onClose={()=>setSwapProposalModal(false)}
+              listing={listing}
+              ownListings={ownListings}
               showToast={showToast}
               onSubmitted={(data)=>{ if (data?.conversationId && setSelectedConvId) setSelectedConvId(data.conversationId); router.push('/beskeder'); }}
             />
