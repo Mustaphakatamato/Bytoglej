@@ -242,6 +242,7 @@ function MineOrdrerContent() {
           .from('orders')
           .select('id, created_at, grand_total, status, order_groups, tracking_number, tracking_url, paid_at')
           .eq('buyer_id', user.id)
+          .not('status', 'in', '("pending","failed","cancelled")')
           .order('created_at', { ascending: false });
         if (cancelled) return;
         if (dbErr) { setError('Kunne ikke hente ordrer.'); setLoading(false); return; }
