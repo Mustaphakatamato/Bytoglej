@@ -65,6 +65,59 @@ export function BuyerProtectionPopup({ price, fee, onClose, image, emoji }) {
   return createPortal(modal, document.body);
 }
 
+// Fast byttebeskyttelse pr. part (jf. produktbeslutning).
+export const SWAP_PROTECTION_FEE = 10;
+
+export function TradeProtectionPopup({ fee = SWAP_PROTECTION_FEE, porto, onClose }) {
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => { setMounted(true); }, []);
+  if (!mounted) return null;
+  const hasPorto = typeof porto === 'number' && porto > 0;
+  const total = fee + (hasPorto ? porto : 0);
+  const kr = n => `${n.toFixed(2).replace('.', ',')} kr.`;
+
+  const modal = (
+    <div onClick={onClose} style={{ position:'fixed', inset:0, background:'rgba(22,34,28,0.5)', zIndex:9999, display:'flex', alignItems:'center', justifyContent:'center', padding:24 }}>
+      <div onClick={e=>e.stopPropagation()} style={{ background:'#fff', borderRadius:20, width:'100%', maxWidth:420, padding:'28px 24px', boxShadow:'0 24px 64px rgba(22,34,28,0.22)' }}>
+        <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:20 }}>
+          <span style={{ fontFamily:FONT, fontWeight:800, fontSize:17, color:'#111' }}>Byttebeskyttelse</span>
+          <button onClick={onClose} style={{ background:'none', border:'none', fontSize:20, cursor:'pointer', color:'#888', lineHeight:1, padding:4 }}>✕</button>
+        </div>
+        <div style={{ display:'flex', alignItems:'center', gap:14, paddingBottom:18, borderBottom:'1px solid #eee' }}>
+          <div style={{ width:40, height:40, borderRadius:'50%', background:'#E6F4F1', display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0 }}>
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none"><path d="M12 2L4 6v6c0 5.25 3.5 10.15 8 11.35C16.5 22.15 20 17.25 20 12V6L12 2z" fill="#2D6A4F"/><path d="M9 12l2 2 4-4" stroke="#fff" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></svg>
+          </div>
+          <div style={{ flex:1 }}>
+            <div style={{ fontFamily:FONT, fontSize:14, color:'#111', fontWeight:600 }}>Gebyr for byttebeskyttelse</div>
+            <div style={{ fontFamily:FONT, fontSize:14, color:'#111' }}>{kr(fee)}</div>
+          </div>
+        </div>
+        {hasPorto && (
+          <div style={{ display:'flex', alignItems:'center', gap:14, paddingTop:18, paddingBottom:18, borderBottom:'1px solid #eee' }}>
+            <div style={{ width:40, height:40, borderRadius:'50%', background:'#EFF6FF', display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0, fontSize:20 }}>📦</div>
+            <div style={{ flex:1 }}>
+              <div style={{ fontFamily:FONT, fontSize:14, color:'#111', fontWeight:600 }}>Porto for din vare</div>
+              <div style={{ fontFamily:FONT, fontSize:14, color:'#111' }}>{kr(porto)}</div>
+            </div>
+          </div>
+        )}
+        <div style={{ marginTop:20, marginBottom:20, fontFamily:FONT, fontSize:13, color:'#666', lineHeight:1.6 }}>
+          Ved en byttehandel betaler <strong>begge parter</strong> et fast gebyr på {kr(fee)} for byttebeskyttelse. Beskyttelsen dækker jer hvis den modtagne vare ikke ankommer eller ikke matcher beskrivelsen. Begge pakkemærkater frigives først når <strong>begge parter har betalt</strong> — så ingen sender uden at modparten også har forpligtet sig.
+        </div>
+        <div style={{ background:'#f5f5f5', borderRadius:12, padding:'14px 16px', marginBottom:24, display:'flex', justifyContent:'space-between', alignItems:'center' }}>
+          <span style={{ fontFamily:FONT, fontWeight:700, fontSize:15, color:'#111' }}>{hasPorto ? 'Du betaler i alt' : 'Du betaler'}</span>
+          <span style={{ fontFamily:FONT, fontWeight:800, fontSize:16, color:'#2D6A4F' }}>{kr(total)}</span>
+        </div>
+        <button onClick={onClose} style={{ width:'100%', padding:'16px', borderRadius:99, background:'#2D6A4F', color:'#fff', border:'none', fontFamily:FONT, fontWeight:700, fontSize:15, cursor:'pointer' }}>
+          OK, luk
+        </button>
+      </div>
+    </div>
+  );
+
+  return createPortal(modal, document.body);
+}
+
 export default function ListingCard({ listing, onClick, favs, toggleFav, onInstitutionClick }) {
   const router = useRouter();
   const { realUserId, institution } = useApp();
