@@ -274,6 +274,7 @@ export default function MessagesClient() {
   const [swapDelivery,     setSwapDelivery]     = useState('shipping');
   const [nowTs,            setNowTs]            = useState(() => Date.now());
   const [showSwapProtection, setShowSwapProtection] = useState(false);
+  const [bidCarrier, setBidCarrier] = useState({});
   const [shipmentInfo, setShipmentInfo] = useState(null);
   const [confirmingOrder, setConfirmingOrder] = useState(false);
   const [shipmentLoading, setShipmentLoading] = useState(false);
@@ -943,13 +944,12 @@ export default function MessagesClient() {
     } catch { alert('Noget gik galt — prøv igen'); setSwapPaying(false); }
   }
 
-  async function handleBidPayment(checkoutMsg) {
+  async function handleBidPayment(checkoutMsg, selectedCarrier) {
     setGoingToPayment(checkoutMsg.id);
     const checkoutData = (() => { try { return JSON.parse(checkoutMsg.content); } catch { return {}; } })();
-    // Leveringsmetode udledes af opslagets shipping_options — vælges ikke i chatten.
     const so = checkoutData.shipping_options;
     let shippingMethod = 'custom';
-    if (so?.allow_shipping) shippingMethod = 'parcel_shop_gls';
+    if (so?.allow_shipping) shippingMethod = selectedCarrier || 'parcel_shop_gls';
     else if (so?.allow_pickup) shippingMethod = 'pickup';
     try {
       const res = await authedFetch('/api/payments/create-intent', {
@@ -1604,8 +1604,29 @@ export default function MessagesClient() {
                                                 Betal inden <strong>{deadlineStr}</strong> for at sikre prisen — {hrs}t {mins}m tilbage.
                                               </div>
                                             </div>
+                                            {checkoutData?.shipping_options?.allow_shipping && (() => {
+                                              const sel = bidCarrier[m.id] || 'parcel_shop_gls';
+                                              const carriers = [
+                                                { k:'parcel_shop_gls', l:'GLS pakkeshop' },
+                                                { k:'parcel_shop_pdk', l:'PostNord pakkeshop' },
+                                                { k:'parcel_shop_dao', l:'DAO pakkeshop' },
+                                              ];
+                                              return (
+                                                <div>
+                                                  <div style={{ fontFamily:FONT, fontWeight:700, fontSize:12, color:INK2, marginBottom:6 }}>Vælg transportør til pakkelevering</div>
+                                                  <div style={{ display:'flex', gap:6 }}>
+                                                    {carriers.map(o => (
+                                                      <button key={o.k} onClick={()=>setBidCarrier(prev=>({...prev,[m.id]:o.k}))}
+                                                        style={{ flex:1, padding:'8px 4px', borderRadius:10, border:`2px solid ${sel===o.k?PRIMARY:'rgba(22,34,28,0.12)'}`, background:sel===o.k?GREEN_TINT:'#fff', cursor:'pointer', fontFamily:FONT, fontSize:11, fontWeight:700, color:INK, lineHeight:1.4 }}>
+                                                        {o.l}
+                                                      </button>
+                                                    ))}
+                                                  </div>
+                                                </div>
+                                              );
+                                            })()}
                                             <button
-                                              onClick={()=>{ if(!paying) handleBidPayment(m); }}
+                                              onClick={()=>{ if(!paying) handleBidPayment(m, bidCarrier[m.id] || (checkoutData?.shipping_options?.allow_shipping ? 'parcel_shop_gls' : checkoutData?.shipping_options?.allow_pickup ? 'pickup' : 'custom')); }}
                                               disabled={paying}
                                               style={{ padding:'13px', borderRadius:99, background:paying?PAPER3:PRIMARY, border:'none', color:paying?INK3:'#fff', fontFamily:FONT, fontWeight:700, fontSize:14, cursor:paying?'default':'pointer' }}>
                                               {paying ? 'Forbereder betaling…' : '💳 Gå til betaling'}
