@@ -1005,37 +1005,47 @@ export default function ListingDetailClient() {
 
       <Modal open={swapModal} onClose={()=>{ setSwapModal(false); setSelectedSwapId(null); setSwapOffer(''); }} title="Foreslå bytte">
         <div style={{ display:'flex', flexDirection:'column', gap:16 }}>
-          <div style={{ background:'#FCEAE6', borderRadius:12, padding:16, borderLeft:`3px solid ${CORAL}` }}>
-            <div style={{ fontSize:13, color:CORAL, fontWeight:600, marginBottom:4, fontFamily:FONT }}>De tilbyder:</div>
-            <div style={{ fontFamily:FONT, fontWeight:700, fontSize:16, color:INK }}>{listing.title}</div>
-          </div>
-          <div>
-            <label style={{ display:'block', fontSize:13, fontWeight:700, marginBottom:10 }}>Vælg hvad I tilbyder i bytte:</label>
-            {ownListings.length > 0 ? (
-              <div style={{ display:'flex', flexDirection:'column', gap:8, maxHeight:220, overflowY:'auto' }}>
-                {ownListings.map(l => (
-                  <div key={l.id} onClick={()=>setSelectedSwapId(l.id===selectedSwapId?null:l.id)}
-                    style={{ display:'flex', alignItems:'center', gap:12, padding:'10px 14px', borderRadius:12, border:`2px solid ${selectedSwapId===l.id?ACCENT:'#e5e5e5'}`, background:selectedSwapId===l.id?'#FEF0E3':'#fff', cursor:'pointer', transition:'all 0.15s' }}>
-                    <div style={{ width:40, height:40, borderRadius:10, background:l.images?.[0]?'#e8e6e3':l.color||'#FFD166', display:'flex', alignItems:'center', justifyContent:'center', overflow:'hidden', flexShrink:0 }}>
-                      {l.images?.[0] ? <img src={l.images[0]} style={{ width:'100%', height:'100%', objectFit:'cover' }} alt="" /> : l.emoji||'🧸'}
-                    </div>
-                    <span style={{ fontWeight:600, fontSize:14 }}>{l.title}</span>
-                    {selectedSwapId===l.id && <span style={{ marginLeft:'auto', color:ACCENT, fontSize:18 }}>✓</span>}
-                  </div>
-                ))}
+          {ownListings.length === 0 ? (
+            <>
+              <div style={{ display:'flex', flexDirection:'column', alignItems:'center', gap:12, padding:'12px 0 8px' }}>
+                <div style={{ fontSize:44 }}>📭</div>
+                <div style={{ fontFamily:FONT, fontWeight:800, fontSize:16, color:INK, textAlign:'center' }}>Du har ingen aktive opslag</div>
+                <div style={{ fontFamily:FONT, fontSize:14, color:INK3, textAlign:'center', lineHeight:1.6 }}>
+                  Du skal have mindst ét aktivt opslag for at kunne foreslå en byttehandel.
+                </div>
               </div>
-            ) : (
-              <div style={{ background:'#f8f7f5', borderRadius:10, padding:'12px 14px', fontSize:13, color:'#999', marginBottom:4 }}>Du har ingen aktive opslag at tilbyde — skriv det manuelt nedenfor.</div>
-            )}
-          </div>
-          <div>
-            <label style={{ display:'block', fontSize:13, fontWeight:600, marginBottom:6, color:'#888' }}>
-              {ownListings.length > 0 ? 'Eller skriv en fri beskrivelse:' : 'Beskriv hvad I tilbyder:'}
-            </label>
-            <textarea value={swapOffer} onChange={e=>setSwapOffer(e.target.value)} placeholder="Fx: Vi tilbyder vores cykeltrailer i god stand…" rows={3} style={{ width:'100%', padding:'11px 14px', borderRadius:12, border:'1.5px solid #e5e5e5', fontSize:14, resize:'none', fontFamily:"'Nunito Sans',sans-serif", outline:'none' }} />
-          </div>
-          <Btn variant="primary" color={ACCENT} radius={22} onClick={handleSwap} disabled={saving||(!selectedSwapId&&!swapOffer.trim())} style={{ justifyContent:'center', padding:'14px', fontSize:15 }}>{saving?<><Spinner/>Sender…</>:'Send bytteforslag'}</Btn>
-          <Btn variant="ghost" onClick={()=>{ setSwapModal(false); setSelectedSwapId(null); setSwapOffer(''); }} style={{ justifyContent:'center' }}>Annuller</Btn>
+              <Btn variant="primary" color={ACCENT} radius={22} onClick={()=>{ setSwapModal(false); router.push('/opret'); }} style={{ justifyContent:'center', padding:'14px', fontSize:15 }}>Opret et opslag</Btn>
+              <Btn variant="ghost" onClick={()=>{ setSwapModal(false); setSelectedSwapId(null); setSwapOffer(''); }} style={{ justifyContent:'center' }}>Luk</Btn>
+            </>
+          ) : (
+            <>
+              <div style={{ background:'#FCEAE6', borderRadius:12, padding:16, borderLeft:`3px solid ${CORAL}` }}>
+                <div style={{ fontSize:13, color:CORAL, fontWeight:600, marginBottom:4, fontFamily:FONT }}>De tilbyder:</div>
+                <div style={{ fontFamily:FONT, fontWeight:700, fontSize:16, color:INK }}>{listing.title}</div>
+              </div>
+              <div>
+                <label style={{ display:'block', fontSize:13, fontWeight:700, marginBottom:10 }}>Vælg hvad I tilbyder i bytte:</label>
+                <div style={{ display:'flex', flexDirection:'column', gap:8, maxHeight:220, overflowY:'auto' }}>
+                  {ownListings.map(l => (
+                    <div key={l.id} onClick={()=>setSelectedSwapId(l.id===selectedSwapId?null:l.id)}
+                      style={{ display:'flex', alignItems:'center', gap:12, padding:'10px 14px', borderRadius:12, border:`2px solid ${selectedSwapId===l.id?ACCENT:'#e5e5e5'}`, background:selectedSwapId===l.id?'#FEF0E3':'#fff', cursor:'pointer', transition:'all 0.15s' }}>
+                      <div style={{ width:40, height:40, borderRadius:10, background:l.images?.[0]?'#e8e6e3':l.color||'#FFD166', display:'flex', alignItems:'center', justifyContent:'center', overflow:'hidden', flexShrink:0 }}>
+                        {l.images?.[0] ? <img src={l.images[0]} style={{ width:'100%', height:'100%', objectFit:'cover' }} alt="" /> : l.emoji||'🧸'}
+                      </div>
+                      <span style={{ fontWeight:600, fontSize:14 }}>{l.title}</span>
+                      {selectedSwapId===l.id && <span style={{ marginLeft:'auto', color:ACCENT, fontSize:18 }}>✓</span>}
+                    </div>
+                  ))}
+                </div>
+              </div>
+              <div>
+                <label style={{ display:'block', fontSize:13, fontWeight:600, marginBottom:6, color:'#888' }}>Eller skriv en fri beskrivelse:</label>
+                <textarea value={swapOffer} onChange={e=>setSwapOffer(e.target.value)} placeholder="Fx: Vi tilbyder vores cykeltrailer i god stand…" rows={3} style={{ width:'100%', padding:'11px 14px', borderRadius:12, border:'1.5px solid #e5e5e5', fontSize:14, resize:'none', fontFamily:"'Nunito Sans',sans-serif", outline:'none' }} />
+              </div>
+              <Btn variant="primary" color={ACCENT} radius={22} onClick={handleSwap} disabled={saving||(!selectedSwapId&&!swapOffer.trim())} style={{ justifyContent:'center', padding:'14px', fontSize:15 }}>{saving?<><Spinner/>Sender…</>:'Send bytteforslag'}</Btn>
+              <Btn variant="ghost" onClick={()=>{ setSwapModal(false); setSelectedSwapId(null); setSwapOffer(''); }} style={{ justifyContent:'center' }}>Annuller</Btn>
+            </>
+          )}
         </div>
       </Modal>
 
