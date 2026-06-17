@@ -473,10 +473,13 @@ async function handleSwapProposalPayment(pi, supa) {
   if (!claimed) return NextResponse.json({ received: true, already_processed: true });
   if (!proposalId) return NextResponse.json({ received: true, warning: 'Mangler forslag' });
 
-  // Markér denne part betalt + gem leveringsvalg.
+  // Markér denne part betalt + gem leveringsvalg + ordre-id (til evt. refusion).
   const paidField     = party === 'owner' ? 'owner_paid' : 'initiator_paid';
   const deliveryField = party === 'owner' ? 'owner_delivery' : 'initiator_delivery';
-  await supa.from('swap_proposals').update({ [paidField]: true, [deliveryField]: delivery }).eq('id', proposalId);
+  const orderField    = party === 'owner' ? 'owner_order_id' : 'initiator_order_id';
+  await supa.from('swap_proposals')
+    .update({ [paidField]: true, [deliveryField]: delivery, [orderField]: claimed.id })
+    .eq('id', proposalId);
 
   const { data: p } = await supa.from('swap_proposals').select('*').eq('id', proposalId).maybeSingle();
   if (!p) return NextResponse.json({ received: true });
