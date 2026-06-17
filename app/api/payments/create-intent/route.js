@@ -4,15 +4,11 @@ import { requireAuth, UNAUTHORIZED } from '@/lib/api-auth';
 import { createServerClient } from '@/lib/supabase-server';
 import { getShippingPrice } from '@/lib/shipping-rates';
 import { getPriceQuote } from '@/lib/shipmondo/client';
+import { calcServiceFee } from '@/lib/pricing';
 
 function getStripe() {
   if (!process.env.STRIPE_SECRET_KEY) throw new Error('STRIPE_SECRET_KEY er ikke sat');
   return new Stripe(process.env.STRIPE_SECRET_KEY);
-}
-
-// Service fee: 5% of item total + 5 kr flat (Vinted-model)
-function calcServiceFee(itemTotal) {
-  return Math.round((itemTotal * 0.05 + 5) * 100) / 100;
 }
 
 // Bundle discount: find highest applicable tier by item count

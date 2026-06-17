@@ -6,9 +6,8 @@ import { PRIMARY, GREEN_TINT, GREEN_SOFT, PAPER2, INK, INK3, CORAL, TYPE_CFG, CO
 import { CATEGORIES } from '@/lib/categories';
 import { db } from '@/lib/supabase';
 
-export function calcServiceFee(price) {
-  return Math.round((price * 0.05 + 5) * 100) / 100;
-}
+import { calcServiceFee, SWAP_PROTECTION_FEE } from '@/lib/pricing';
+export { calcServiceFee, SWAP_PROTECTION_FEE };
 
 import { useApp } from '@/providers/AppProvider';
 
@@ -64,9 +63,6 @@ export function BuyerProtectionPopup({ price, fee, onClose, image, emoji }) {
 
   return createPortal(modal, document.body);
 }
-
-// Fast byttebeskyttelse pr. part (jf. produktbeslutning).
-export const SWAP_PROTECTION_FEE = 10;
 
 export function TradeProtectionPopup({ fee = SWAP_PROTECTION_FEE, porto, onClose }) {
   const [mounted, setMounted] = useState(false);

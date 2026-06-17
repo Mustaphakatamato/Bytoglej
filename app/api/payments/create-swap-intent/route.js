@@ -4,9 +4,7 @@ import { requireAuth, UNAUTHORIZED } from '@/lib/api-auth';
 import { createServerClient } from '@/lib/supabase-server';
 import { getShippingPrice } from '@/lib/shipping-rates';
 import { getPriceQuote } from '@/lib/shipmondo/client';
-
-// Fast byttebeskyttelse pr. part (jf. produktbeslutning).
-const SWAP_PROTECTION_FEE = 10;
+import { SWAP_PROTECTION_FEE } from '@/lib/pricing';
 
 function getStripe() {
   if (!process.env.STRIPE_SECRET_KEY) throw new Error('STRIPE_SECRET_KEY er ikke sat');

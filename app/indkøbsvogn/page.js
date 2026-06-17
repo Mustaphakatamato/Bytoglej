@@ -9,6 +9,7 @@ import { CATEGORIES } from '@/lib/categories';
 import { authedFetch } from '@/lib/authed-fetch';
 import CarrierLogo from '@/components/CarrierLogo';
 import PickupPointPicker from '@/components/PickupPointPicker';
+import { calcServiceFee } from '@/lib/pricing';
 
 // ── Helpers ────────────────────────────────────────────────────
 
@@ -312,10 +313,6 @@ export default function CartPage() {
     const ds = deliveryState[g.ownerInstitutionName];
     return s + (ds?.price || 0);
   }, 0);
-
-  function calcServiceFee(itemTotal) {
-    return Math.round((itemTotal * 0.05 + 5) * 100) / 100;
-  }
 
   function calcBundleDiscount(itemTotal, itemCount, discSettings) {
     if (!discSettings?.enabled || !discSettings?.tiers?.length) return 0;
