@@ -525,6 +525,17 @@ async function handleSwapProposalPayment(pi, supa) {
       }).in('id', tradedIds);
     }
 
+    // Bekræftelses-mails til begge parter med hver deres pakkemærkat (Trin 5).
+    const shipmentIds = [initShipmentId, ownerShipmentId].filter(Boolean);
+    const { data: shipRows } = shipmentIds.length
+      ? await supa.from('shipments').select('id, tracking_number, tracking_url, label_pdf_url').in('id', shipmentIds)
+      : { data: [] };
+    const shipById = new Map((shipRows || []).map(s => [s.id, s]));
+    await Promise.all([
+      initInst?.email && sendSwapDoneEmail(initInst.email, initInst.name, shipById.get(initShipmentId), p.initiator_delivery),
+      ownerInst?.email && sendSwapDoneEmail(ownerInst.email, ownerInst.name, shipById.get(ownerShipmentId), p.owner_delivery),
+    ].filter(Boolean));
+
     if (convId) {
       // Kontant mellemlag: byt&leg holder beløbet og udbetaler manuelt til modtageren.
       const cashLine = (Number(p.cash_adjustment) > 0)
@@ -558,6 +569,12 @@ async function handleSwapProposalPayment(pi, supa) {
         owner_unread: (conv?.owner_unread || 0) + 1,
         initiator_unread: (conv?.initiator_unread || 0) + 1,
       }).eq('id', convId);
+    }
+    // "Din tur"-nudge til den part der endnu mangler at betale (Trin 5).
+    const owingInstId = p.initiator_paid ? p.owner_institution_id : p.initiator_institution_id;
+    if (owingInstId) {
+      const { data: oi } = await supa.from('institutions').select('email, name').eq('id', owingInstId).maybeSingle();
+      if (oi?.email) await sendSwapNudgeEmail(oi.email, oi.name, p.payment_deadline);
     }
   }
 
@@ -729,6 +746,84 @@ function sellerOrderEmailHtml({ sellerName, items, itemTotal, shippingMethod, pi
 }
 
 // ── Køber-email ────────────────────────────────────────────────
+
+// ── Bytte-mails (Trin 5) ───────────────────────────────────────
+
+async function sendSwapEmail(to, subject, html) {
+  if (!to || !process.env.RESEND_API_KEY) return;
+  try {
+    const res = await fetch('https://api.resend.com/emails', {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${process.env.RESEND_API_KEY}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ from: 'byt&leg <noreply@bytogleg.dk>', to: [to], subject, html }),
+    });
+    if (!res.ok) console.error('[stripe-webhook] bytte-email fejl:', await res.text());
+  } catch (err) {
+    console.error('[stripe-webhook] bytte-email fejl:', err.message);
+  }
+}
+
+function swapEmailShell(title, intro, bodyHtml) {
+  const base = process.env.NEXT_PUBLIC_BASE_URL || 'https://bytogleg.dk';
+  return `<!DOCTYPE html><html lang="da"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head>
+<body style="margin:0;padding:0;background:#F6F2EA;font-family:'Helvetica Neue',Helvetica,Arial,sans-serif;">
+  <div style="max-width:560px;margin:48px auto 32px;background:#FDFAF4;border-radius:20px;overflow:hidden;border:1px solid rgba(22,34,28,0.08);">
+    <div style="background:linear-gradient(160deg,#1B4332 0%,#2A7D4F 100%);padding:40px;text-align:center;">
+      <span style="display:inline-block;background:rgba(255,255,255,0.13);border-radius:14px;padding:10px 22px;color:#fff;font-size:24px;font-weight:800;letter-spacing:-0.04em;">byt<span style="opacity:0.6">&amp;</span>leg.</span>
+    </div>
+    <div style="padding:40px;">
+      <h1 style="font-size:23px;font-weight:800;color:#16221C;margin:0 0 14px;letter-spacing:-0.03em;">${title}</h1>
+      <p style="font-size:15px;color:#3A473D;line-height:1.65;margin:0 0 22px;">${intro}</p>
+      ${bodyHtml}
+      <div style="text-align:center;margin:32px 0 4px;">
+        <a href="${base}/beskeder" style="display:inline-block;background:#2A7D4F;color:#fff;text-decoration:none;font-weight:700;font-size:15px;padding:14px 34px;border-radius:99px;">Se byttehandlen →</a>
+      </div>
+    </div>
+    <div style="background:#F6F2EA;padding:20px 40px;border-top:1px solid rgba(22,34,28,0.06);text-align:center;">
+      <p style="font-size:12px;color:#6B7570;margin:0;">byt&amp;leg &middot; <a href="https://bytogleg.dk" style="color:#2A7D4F;text-decoration:none;">bytogleg.dk</a></p>
+    </div>
+  </div>
+</body></html>`;
+}
+
+async function sendSwapDoneEmail(to, name, shipment, delivery) {
+  const greeting = name ? `Hej ${escapeHtml(String(name))},` : 'Hej,';
+  let box;
+  if (delivery === 'custom') {
+    box = `<div style="background:#E8F1EC;border:1px solid #CFE3D8;border-radius:14px;padding:18px 20px;">
+      <div style="font-weight:800;font-size:14px;color:#133F2B;margin-bottom:6px;">🤝 Aftalt levering</div>
+      <p style="font-size:13px;color:#3A473D;line-height:1.6;margin:0;">I har valgt selv at aftale leveringen — koordinér nærmere via beskeder på byt&amp;leg.</p>
+    </div>`;
+  } else if (shipment?.label_pdf_url) {
+    box = `<div style="background:#E8F1EC;border:1px solid #CFE3D8;border-radius:14px;padding:18px 20px;">
+      <div style="font-weight:800;font-size:14px;color:#133F2B;margin-bottom:6px;">📦 Din pakkemærkat er klar</div>
+      ${shipment.tracking_number ? `<p style="font-size:13px;color:#3A473D;line-height:1.6;margin:0 0 12px;">Tracking-nummer: <strong>${escapeHtml(String(shipment.tracking_number))}</strong></p>` : ''}
+      <a href="${escapeHtml(String(shipment.label_pdf_url))}" style="display:inline-block;background:#2A7D4F;color:#fff;text-decoration:none;font-weight:700;font-size:13px;padding:10px 22px;border-radius:99px;">Download pakkemærkat (PDF) →</a>
+    </div>`;
+  } else {
+    box = `<div style="background:#E8F1EC;border:1px solid #CFE3D8;border-radius:14px;padding:18px 20px;">
+      <div style="font-weight:800;font-size:14px;color:#133F2B;margin-bottom:6px;">📦 Pakkemærkat på vej</div>
+      <p style="font-size:13px;color:#3A473D;line-height:1.6;margin:0;">Din pakkemærkat gøres klar — du finder den i beskeder på byt&amp;leg.</p>
+    </div>`;
+  }
+  const html = swapEmailShell(
+    'Byttehandel gennemført! 🎉',
+    `${greeting}<br><br>Begge parter har betalt, og jeres byttehandel er nu gennemført.`,
+    box
+  );
+  await sendSwapEmail(to, '🎉 Din byttehandel er gennemført — byt&leg', html);
+}
+
+async function sendSwapNudgeEmail(to, name, deadline) {
+  const greeting = name ? `Hej ${escapeHtml(String(name))},` : 'Hej,';
+  const frist = deadline ? new Date(deadline).toLocaleString('da-DK', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }) : null;
+  const html = swapEmailShell(
+    'Det er din tur at betale 🔄',
+    `${greeting}<br><br>Den anden part har betalt sin andel af jeres byttehandel. Betal din andel for at gennemføre byttet${frist ? ` — inden <strong>${escapeHtml(frist)}</strong>` : ''}. Ellers annulleres handlen automatisk, og betalte beløb refunderes.`,
+    ''
+  );
+  await sendSwapEmail(to, 'Din byttehandel afventer din betaling — byt&leg', html);
+}
 
 function buyerOrderEmailHtml({ buyerName, groups, orderId, grandTotal }) {
   const base = process.env.NEXT_PUBLIC_BASE_URL || 'https://bytogleg.dk';
