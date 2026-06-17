@@ -90,33 +90,40 @@ export async function POST(req) {
   const order = claimed;
   const groups = order.order_groups || [];
 
-  // For bid-type payments: mark the bid message and conversation as completed
+  // Bud-/tilbud-betalinger: markér bud/tilbud + samtale som gennemført.
   const bidMessageId = pi.metadata?.bid_message_id;
+  const offerId      = pi.metadata?.offer_id;
   const bidConvId    = pi.metadata?.conversation_id;
   const bidDelivery  = pi.metadata?.delivery_method || '';
-  if (bidMessageId || bidConvId) {
+  if (bidMessageId || offerId || bidConvId) {
     const now = new Date().toISOString();
-    const bidUpdates = [];
+    const dealType = offerId ? 'køb' : 'byd';
+    const dealUpdates = [];
     if (bidMessageId) {
-      bidUpdates.push(
+      dealUpdates.push(
         supa.from('chat_messages')
           .update({ bid_status: 'checkout_done', bid_note: bidDelivery })
           .eq('id', bidMessageId)
       );
     }
+    if (offerId) {
+      dealUpdates.push(
+        supa.from('offers').update({ status: 'completed' }).eq('id', offerId)
+      );
+    }
     if (bidConvId) {
-      bidUpdates.push(
+      dealUpdates.push(
         supa.from('conversations').update({
           deal_completed: true,
           deal_completed_at: now,
-          deal_type: 'byd',
+          deal_type: dealType,
           delivery_method: bidDelivery,
           last_message: '🎉 Handel gennemført!',
           last_message_at: now,
         }).eq('id', bidConvId)
       );
     }
-    await Promise.all(bidUpdates);
+    await Promise.all(dealUpdates);
   }
 
   // Markér alle købte opslag som solgt
@@ -130,6 +137,8 @@ export async function POST(req) {
         sold_at: new Date().toISOString(),
         sold_to: order.buyer_name || null,
         sold_to_institution_id: order.buyer_institution_id || null,
+        reserved_until: null,
+        reserved_for_institution_id: null,
       })
       .in('id', soldListingIds);
   }
