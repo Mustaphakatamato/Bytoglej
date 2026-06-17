@@ -142,6 +142,7 @@ export default function DashboardClient() {
   const [shippingLoading, setShippingLoading] = useState(false);
   const [pendingOrders, setPendingOrders] = useState([]);
   const [pendingOrdersLoading, setPendingOrdersLoading] = useState(false);
+  const [pendingSwaps, setPendingSwaps] = useState([]); // bytter der afventer denne institutions betaling
 
   const isAdmin = !!institution && !institution._memberRole;
   const [listingsView, setListingsView] = useState('list');
@@ -381,6 +382,20 @@ export default function DashboardClient() {
       // Confirmed but not yet shipped/picked up
       (c.is_handled && c.handled_action === 'order_confirmed' && !c.deal_completed)
     ));
+
+    // Bytter der afventer DENNE institutions betaling (escrow, inden frist).
+    if (instId) {
+      const { data: props } = await db.from('swap_proposals')
+        .select('id, initiator_institution_id, owner_institution_id, initiator_paid, owner_paid, payment_deadline, status, escrow_status')
+        .or(`initiator_institution_id.eq.${instId},owner_institution_id.eq.${instId}`)
+        .eq('status', 'accepted')
+        .gt('payment_deadline', new Date().toISOString());
+      setPendingSwaps((props || []).filter(p =>
+        ['awaiting_both', 'awaiting_initiator', 'awaiting_owner'].includes(p.escrow_status) &&
+        ((p.initiator_institution_id === instId && !p.initiator_paid) ||
+         (p.owner_institution_id === instId && !p.owner_paid))
+      ));
+    }
     setPendingOrdersLoading(false);
   }
 
@@ -741,6 +756,18 @@ export default function DashboardClient() {
             </div>
           ))}
         </div>
+
+        {/* Bytter der afventer betaling */}
+        {pendingSwaps.length > 0 && (
+          <div onClick={()=>router.push('/beskeder')} style={{ background:'#FFFBEB', border:'1.5px solid #FDE68A', borderRadius:16, padding:'14px 18px', marginBottom:isMobile?24:32, display:'flex', alignItems:'center', gap:12, cursor:'pointer' }}>
+            <span style={{ fontSize:22 }}>⏳</span>
+            <div style={{ flex:1, minWidth:0 }}>
+              <div style={{ fontFamily:FONT, fontWeight:800, fontSize:14, color:'#92400E' }}>{pendingSwaps.length} byttehandel{pendingSwaps.length>1?'er':''} afventer din betaling</div>
+              <div style={{ fontFamily:FONT, fontSize:12, color:'#B45309' }}>Betal din andel inden fristen, ellers annulleres byttet og beløb refunderes.</div>
+            </div>
+            <span style={{ fontFamily:FONT, fontWeight:700, fontSize:13, color:'#92400E', whiteSpace:'nowrap' }}>Gå til beskeder →</span>
+          </div>
+        )}
 
         {/* Main grid */}
         <div style={{ display:'grid', gridTemplateColumns:isMobile?'1fr':'1fr 1fr', gap:isMobile?16:24 }}>

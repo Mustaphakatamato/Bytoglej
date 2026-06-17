@@ -3,6 +3,7 @@ import Stripe from 'stripe';
 import { createServerClient } from '@/lib/supabase-server';
 import { createShipment } from '@/lib/shipmondo/client';
 import { escapeHtml } from '@/lib/escape-html';
+import { persistSwapCO2 } from '@/lib/co2/persist-server';
 
 function getStripe() {
   if (!process.env.STRIPE_SECRET_KEY) throw new Error('STRIPE_SECRET_KEY er ikke sat');
@@ -535,6 +536,21 @@ async function handleSwapProposalPayment(pi, supa) {
       initInst?.email && sendSwapDoneEmail(initInst.email, initInst.name, shipById.get(initShipmentId), p.initiator_delivery),
       ownerInst?.email && sendSwapDoneEmail(ownerInst.email, ownerInst.name, shipById.get(ownerShipmentId), p.owner_delivery),
     ].filter(Boolean));
+
+    // CO2-besparelse for byttet (server-side, Trin 5).
+    if (convId) {
+      const { data: catRows } = tradedIds.length
+        ? await supa.from('listings').select('category').in('id', tradedIds)
+        : { data: [] };
+      await persistSwapCO2(supa, {
+        transactionId: convId,
+        ownerInstId: p.owner_institution_id,
+        initiatorInstId: p.initiator_institution_id,
+        ownerName: ownerInst?.name || null,
+        initiatorName: initInst?.name || null,
+        categoryIds: (catRows || []).map(r => r.category).filter(Boolean),
+      });
+    }
 
     if (convId) {
       // Kontant mellemlag: byt&leg holder beløbet og udbetaler manuelt til modtageren.
