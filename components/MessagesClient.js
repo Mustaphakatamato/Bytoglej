@@ -260,6 +260,7 @@ export default function MessagesClient() {
   const [composeTarget, setComposeTarget] = useState(null);
   const [composeMsg, setComposeMsg] = useState('');
   const [counterAmount,setCounterAmount] = useState('');
+  const [offersById,  setOffersById]  = useState({}); // tilbud i den aktive samtale, by id
   const [swapPreview,  setSwapPreview]  = useState(null);
   const [shares,      setShares]      = useState([]);
   const [activeShare, setActiveShare] = useState(null);
@@ -436,6 +437,9 @@ export default function MessagesClient() {
     setMsgLoad(true);
     const { data } = await db.from('chat_messages').select('*').eq('conversation_id', conv.id).order('created_at', { ascending: true });
     if (data) setMessages(data);
+    // Hent tilbud (offers) for samtalen — bruges til live status på tilbud-bobler.
+    db.from('offers').select('*').eq('conversation_id', conv.id)
+      .then(({ data: offerRows }) => setOffersById(Object.fromEntries((offerRows || []).map(o => [o.id, o]))));
     setMsgLoad(false);
     setTimeout(() => bottomRef.current?.scrollIntoView({ behavior:'smooth' }), 60);
     inputRef.current?.focus();
@@ -960,7 +964,8 @@ export default function MessagesClient() {
           buyerInstitutionId: ctxInstId || ctxInstitution?.id,
           conversationId: active.id,
           checkoutMessageId: checkoutMsg.id,
-          groups: [{ sellerName: active.owner_name, items: [{ listingId: checkoutData.listing_id, fromBid: true }], shippingMethod }],
+          ...(checkoutData.offer_id ? { offerId: checkoutData.offer_id } : {}),
+          groups: [{ sellerName: active.owner_name, items: [checkoutData.offer_id ? { listingId: checkoutData.listing_id, offerId: checkoutData.offer_id } : { listingId: checkoutData.listing_id, fromBid: true }], shippingMethod }],
         }),
       });
       const data = await res.json();
@@ -1012,6 +1017,27 @@ export default function MessagesClient() {
     setActive(a => ({ ...a, ...upd }));
     setConvs(cs => cs.map(c => c.id === active.id ? { ...c, ...upd } : c));
     setCounterBidMsg(null); setCounterAmount('');
+  }
+
+  // Svar på et tilbud (offers): accept / afvis / modbud. Sælger svarer på
+  // køber-tilbud; køber svarer på sælgers modbud. Følgebeskeder (checkout,
+  // afvisning, modbud) indsættes server-side og dukker op via realtime.
+  async function handleOfferRespond(offer, action, extra = {}) {
+    if (!offer?.id) return;
+    try {
+      const res = await authedFetch('/api/offers/respond', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ offerId: offer.id, action, ...extra }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) { alert(data.error || 'Noget gik galt — prøv igen'); return; }
+      const newStatus = action === 'accept' ? 'accepted' : action === 'reject' ? 'rejected' : 'countered';
+      setOffersById(prev => ({
+        ...prev,
+        [offer.id]: { ...(prev[offer.id] || offer), status: newStatus },
+        ...(data.offer ? { [data.offer.id]: data.offer } : {}),
+      }));
+    } catch { alert('Noget gik galt — prøv igen'); }
   }
 
   async function toggleReadUnread(conv, e) {
@@ -1406,6 +1432,8 @@ export default function MessagesClient() {
                         const prevMine = i>0 && (ctxIsAdmin && adminInstName ? messages[i-1].sender_name === adminInstName : messages[i-1].sender_id === userId);
                         const grouped = mine === prevMine && !showDate && m.message_type !== 'bid' && messages[i-1]?.message_type !== 'bid' && m.message_type !== 'swap' && messages[i-1]?.message_type !== 'swap' && m.message_type !== 'bundle' && messages[i-1]?.message_type !== 'bundle' && m.message_type !== 'image' && messages[i-1]?.message_type !== 'image' && m.message_type !== 'buy_request' && messages[i-1]?.message_type !== 'buy_request' && m.message_type !== 'checkout_pending' && messages[i-1]?.message_type !== 'checkout_pending' && m.message_type !== 'shipment' && messages[i-1]?.message_type !== 'shipment' && m.message_type !== 'payment_confirmed' && messages[i-1]?.message_type !== 'payment_confirmed';
                         const isBid = m.message_type === 'bid';
+                        const isOffer = m.message_type === 'offer';
+                        const offerData = isOffer ? (() => { try { return JSON.parse(m.content); } catch { return null; } })() : null;
                         const isSwap = m.message_type === 'swap';
                         const isBundle = m.message_type === 'bundle';
                         const isImage = m.message_type === 'image';
@@ -1873,7 +1901,47 @@ export default function MessagesClient() {
                                   <div style={{ fontSize:10, color:INK3, marginTop:3, textAlign:mine?'right':'left', fontFamily:FONT }}>{d.toLocaleTimeString('da-DK',{hour:'2-digit',minute:'2-digit'})}</div>
                                 </div>
                               </div>
-                            ) : isBid ? (
+                            ) : isOffer ? (() => {
+                              const live = (offerData && offersById[offerData.offer_id]) || null;
+                              const status = live?.status || 'pending';
+                              const amount = (live?.amount ?? offerData?.amount) || 0;
+                              const proposedBy = live?.proposed_by || (offerData?.counter ? (mine ? 'seller' : 'buyer') : 'buyer');
+                              const canRespond = status === 'pending' && !!live &&
+                                ((proposedBy === 'buyer' && isOwnerInConv) || (proposedBy === 'seller' && !isOwnerInConv));
+                              const badge = status==='accepted' ? ['Accepteret', PRIMARY, '#D1FAE5']
+                                : status==='rejected' ? ['Afvist', '#e11d48', '#FEE2E2']
+                                : status==='countered' ? ['Modbud sendt', '#B45309', '#FEF9C3']
+                                : status==='cancelled' ? ['Erstattet', INK3, PAPER3]
+                                : status==='completed' ? ['Gennemført', PRIMARY, '#D1FAE5'] : null;
+                              const accepted = status==='accepted' || status==='completed';
+                              return (
+                                <div style={{ display:'flex', justifyContent:mine?'flex-end':'flex-start', marginTop:10 }}>
+                                  {!mine && <div style={{ width:30, height:30, borderRadius:'50%', background:GREEN_TINT, display:'flex', alignItems:'center', justifyContent:'center', fontSize:12, fontWeight:700, color:PRIMARY, flexShrink:0, marginRight:8, alignSelf:'flex-end', fontFamily:FONT }}>{(m.sender_name||'?').charAt(0).toUpperCase()}</div>}
+                                  <div style={{ maxWidth:'78%' }}>
+                                    {!mine && <div style={{ fontSize:11, fontWeight:700, color:INK3, marginBottom:3, marginLeft:2, fontFamily:FONT }}>{m.sender_name}</div>}
+                                    <div style={{ background: accepted ? GREEN_TINT : status==='rejected' ? '#FEF2F2' : mine ? '#EEF4FF' : PAPER3, border:`2px solid ${accepted ? PRIMARY : status==='rejected' ? '#FCA5A5' : mine ? '#93C5FD' : 'rgba(22,34,28,0.12)'}`, borderRadius:16, padding:'14px 16px' }}>
+                                      <div style={{ display:'flex', alignItems:'center', gap:8, flexWrap:'wrap' }}>
+                                        <span style={{ fontSize:18 }}>🏷️</span>
+                                        <span style={{ fontFamily:FONT, fontWeight:800, fontSize:17, color: status==='rejected' ? '#e11d48' : PRIMARY }}>{amount} kr.</span>
+                                        <span style={{ fontSize:12, color:INK3, fontWeight:600, fontFamily:FONT }}>{offerData?.counter ? 'modbud' : 'tilbud'}</span>
+                                        {badge && <span style={{ fontSize:11, fontWeight:700, color:badge[1], background:badge[2], padding:'2px 8px', borderRadius:99, fontFamily:FONT }}>{badge[0]}</span>}
+                                      </div>
+                                      {canRespond && (
+                                        <div style={{ display:'flex', gap:8, flexWrap:'wrap', marginTop:8 }}>
+                                          <button onClick={()=>handleOfferRespond(live,'accept')} style={{ padding:'8px 16px', borderRadius:99, background:PRIMARY, border:'none', color:'#fff', fontSize:12, fontWeight:700, cursor:'pointer', fontFamily:FONT }}>Accepter</button>
+                                          <button onClick={()=>{ const n = window.prompt('Begrundelse (valgfrit)') || ''; handleOfferRespond(live,'reject',{ note:n }); }} style={{ padding:'8px 16px', borderRadius:99, background:'#FEF2F2', border:'1.5px solid #FCA5A5', color:'#e11d48', fontSize:12, fontWeight:700, cursor:'pointer', fontFamily:FONT }}>Afvis</button>
+                                          <button onClick={()=>{ const v = window.prompt('Dit modbud (kr.)'); const a = Number(v); if (a > 0) handleOfferRespond(live,'counter',{ counterAmount:a }); }} style={{ padding:'8px 16px', borderRadius:99, background:'#FFFBEB', border:'1.5px solid #FDE68A', color:'#B45309', fontSize:12, fontWeight:700, cursor:'pointer', fontFamily:FONT }}>Modbud</button>
+                                        </div>
+                                      )}
+                                      {status==='pending' && !canRespond && (
+                                        <div style={{ fontSize:12, color:INK3, fontWeight:600, fontFamily:FONT, marginTop:8 }}>Afventer svar…</div>
+                                      )}
+                                    </div>
+                                    <div style={{ fontSize:10, color:INK3, marginTop:3, textAlign:mine?'right':'left', fontFamily:FONT }}>{d.toLocaleTimeString('da-DK',{hour:'2-digit',minute:'2-digit'})}</div>
+                                  </div>
+                                </div>
+                              );
+                            })() : isBid ? (
                               <div style={{ display:'flex', justifyContent:mine?'flex-end':'flex-start', marginTop:10 }}>
                                 {!mine && <div style={{ width:30, height:30, borderRadius:'50%', background:GREEN_TINT, display:'flex', alignItems:'center', justifyContent:'center', fontSize:12, fontWeight:700, color:PRIMARY, flexShrink:0, marginRight:8, alignSelf:'flex-end', fontFamily:FONT }}>{m.sender_name.charAt(0).toUpperCase()}</div>}
                                 <div style={{ maxWidth:'78%' }}>
