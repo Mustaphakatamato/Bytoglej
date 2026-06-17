@@ -155,5 +155,7 @@ export async function POST(req) {
     conversationId: convId,
     remainingToday: Math.max(0, DAILY_OFFER_LIMIT - usedToday - 1),
     dailyLimit: DAILY_OFFER_LIMIT,
+    buyerName: buyerInst?.name || null,
+    seller: { email: sellerInst?.email || null, name: sellerInst?.name || listing.institution_name || null },
   });
 }

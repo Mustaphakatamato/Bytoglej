@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { requireAuth, UNAUTHORIZED } from '@/lib/api-auth';
 import { createServerClient } from '@/lib/supabase-server';
-import { userBelongsToInstitution } from '@/lib/institution-server';
+import { userBelongsToInstitution, resolveInstitutionByName } from '@/lib/institution-server';
 
 // Hård reservation efter accept: varen holdes til køber i dette vindue.
 const RESERVATION_HOURS = 24;
@@ -55,6 +55,16 @@ export async function POST(req) {
   // Den part der skal notificeres (modparten af den der svarer).
   const bumpField = responderRole === 'seller' ? 'initiator_unread' : 'owner_unread';
   const senderName = (await senderNameFor(supa, user, responderRole, listing)) || user.email;
+
+  // Modtager af notifikationen = modparten af den der svarer.
+  let notify = null;
+  if (responderRole === 'seller' && offer.buyer_institution_id) {
+    const { data: bi } = await supa.from('institutions').select('email, name').eq('id', offer.buyer_institution_id).maybeSingle();
+    if (bi?.email) notify = { email: bi.email, name: bi.name };
+  } else if (responderRole === 'buyer') {
+    const si = await resolveInstitutionByName(supa, listing.institution_name);
+    if (si?.email) notify = { email: si.email, name: si.name };
+  }
 
   async function bumpConversation(lastMessage, extra = {}) {
     if (!convId) return;
@@ -111,7 +121,7 @@ export async function POST(req) {
       { is_handled: true, handled_at: now, handled_action: 'accepted' }
     );
 
-    return NextResponse.json({ ok: true, status: 'accepted', reservedUntil });
+    return NextResponse.json({ ok: true, status: 'accepted', reservedUntil, notify });
   }
 
   // ---- REJECT ----
@@ -122,7 +132,7 @@ export async function POST(req) {
       `Tilbud på ${offer.amount} kr. afvist`,
       { is_handled: true, handled_at: now, handled_action: 'rejected' }
     );
-    return NextResponse.json({ ok: true, status: 'rejected' });
+    return NextResponse.json({ ok: true, status: 'rejected', notify });
   }
 
   // ---- COUNTER (modbud) ----
@@ -157,7 +167,7 @@ export async function POST(req) {
   await bumpConversation(`🔄 Modbud: ${counterAmount} kr.`,
     { is_handled: false });
 
-  return NextResponse.json({ ok: true, status: 'countered', offer: counter });
+  return NextResponse.json({ ok: true, status: 'countered', offer: counter, notify });
 }
 
 // Bedste visningsnavn for afsenderen (institution hvis muligt).

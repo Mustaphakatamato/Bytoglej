@@ -69,6 +69,21 @@ export default function OfferModal({ open, onClose, listing, onSubmitted, showTo
         return;
       }
       showToast?.(`Tilbud på ${kr(num)} sendt! 🎉`);
+      // Notificér sælger (e-mail + push) — fire-and-forget.
+      if (data.seller?.email) {
+        authedFetch('/api/notify-message', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            ownerEmail: data.seller.email,
+            ownerName: data.seller.name,
+            senderName: data.buyerName || 'En institution',
+            listingTitle: listing.title,
+            listingEmoji: listing.emoji || '🧸',
+            convId: data.conversationId,
+          }),
+        }).catch(() => {});
+      }
       onSubmitted?.(data);
       setSaving(false);
       onClose?.();

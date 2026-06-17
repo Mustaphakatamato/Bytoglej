@@ -261,6 +261,10 @@ export default function MessagesClient() {
   const [composeMsg, setComposeMsg] = useState('');
   const [counterAmount,setCounterAmount] = useState('');
   const [offersById,  setOffersById]  = useState({}); // tilbud i den aktive samtale, by id
+  const [rejectingOffer, setRejectingOffer] = useState(null);
+  const [offerRejectNote, setOfferRejectNote] = useState('');
+  const [counteringOffer, setCounteringOffer] = useState(null);
+  const [offerCounterAmount, setOfferCounterAmount] = useState('');
   const [swapPreview,  setSwapPreview]  = useState(null);
   const [shares,      setShares]      = useState([]);
   const [activeShare, setActiveShare] = useState(null);
@@ -1037,6 +1041,20 @@ export default function MessagesClient() {
         [offer.id]: { ...(prev[offer.id] || offer), status: newStatus },
         ...(data.offer ? { [data.offer.id]: data.offer } : {}),
       }));
+      // Notificér modparten (e-mail + push) — fire-and-forget.
+      if (data.notify?.email) {
+        authedFetch('/api/notify-message', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            ownerEmail: data.notify.email,
+            ownerName: data.notify.name,
+            senderName: effectiveSenderName(),
+            listingTitle: active?.listing_title || '',
+            listingEmoji: active?.listing_emoji || '🧸',
+            convId: active?.id,
+          }),
+        }).catch(() => {});
+      }
     } catch { alert('Noget gik galt — prøv igen'); }
   }
 
@@ -1929,8 +1947,8 @@ export default function MessagesClient() {
                                       {canRespond && (
                                         <div style={{ display:'flex', gap:8, flexWrap:'wrap', marginTop:8 }}>
                                           <button onClick={()=>handleOfferRespond(live,'accept')} style={{ padding:'8px 16px', borderRadius:99, background:PRIMARY, border:'none', color:'#fff', fontSize:12, fontWeight:700, cursor:'pointer', fontFamily:FONT }}>Accepter</button>
-                                          <button onClick={()=>{ const n = window.prompt('Begrundelse (valgfrit)') || ''; handleOfferRespond(live,'reject',{ note:n }); }} style={{ padding:'8px 16px', borderRadius:99, background:'#FEF2F2', border:'1.5px solid #FCA5A5', color:'#e11d48', fontSize:12, fontWeight:700, cursor:'pointer', fontFamily:FONT }}>Afvis</button>
-                                          <button onClick={()=>{ const v = window.prompt('Dit modbud (kr.)'); const a = Number(v); if (a > 0) handleOfferRespond(live,'counter',{ counterAmount:a }); }} style={{ padding:'8px 16px', borderRadius:99, background:'#FFFBEB', border:'1.5px solid #FDE68A', color:'#B45309', fontSize:12, fontWeight:700, cursor:'pointer', fontFamily:FONT }}>Modbud</button>
+                                          <button onClick={()=>{ setRejectingOffer(live); setOfferRejectNote(''); }} style={{ padding:'8px 16px', borderRadius:99, background:'#FEF2F2', border:'1.5px solid #FCA5A5', color:'#e11d48', fontSize:12, fontWeight:700, cursor:'pointer', fontFamily:FONT }}>Afvis</button>
+                                          <button onClick={()=>{ setCounteringOffer(live); setOfferCounterAmount(''); }} style={{ padding:'8px 16px', borderRadius:99, background:'#FFFBEB', border:'1.5px solid #FDE68A', color:'#B45309', fontSize:12, fontWeight:700, cursor:'pointer', fontFamily:FONT }}>Modbud</button>
                                         </div>
                                       )}
                                       {status==='pending' && !canRespond && (
@@ -2162,6 +2180,30 @@ export default function MessagesClient() {
                     <input type="number" value={counterAmount} onChange={e=>setCounterAmount(e.target.value)} placeholder="Dit modbud (kr.)" style={{ flex:1, padding:'9px 12px', borderRadius:10, border:'1.5px solid #FDE68A', fontSize:14, fontWeight:700, outline:'none', fontFamily:FONT }} />
                     <button onClick={()=>setCounterBidMsg(null)} style={{ padding:'8px 14px', borderRadius:99, background:PAPER3, border:'none', fontWeight:700, fontSize:13, cursor:'pointer', fontFamily:FONT }}>✕</button>
                     <button onClick={handleCounterBid} disabled={!counterAmount} style={{ padding:'8px 16px', borderRadius:99, background:counterAmount?PRIMARY:PAPER3, border:'none', color:counterAmount?'#fff':INK3, fontWeight:700, fontSize:13, cursor:counterAmount?'pointer':'default', fontFamily:FONT }}>Send</button>
+                  </div>
+                </div>
+              )}
+
+              {/* Afvis tilbud-bar */}
+              {rejectingOffer && (
+                <div style={{ borderTop:`1px solid #FECACA`, background:'#FEF2F2', padding:'14px 16px' }}>
+                  <div style={{ fontSize:13, fontWeight:700, color:'#B91C1C', marginBottom:8, fontFamily:FONT }}>Afvis tilbud på {rejectingOffer.amount} kr.</div>
+                  <textarea value={offerRejectNote} onChange={e=>setOfferRejectNote(e.target.value)} placeholder="Evt. kommentar (valgfri)" rows={2} style={{ width:'100%', padding:'9px 12px', borderRadius:10, border:'1.5px solid #FCA5A5', fontSize:13, resize:'none', fontFamily:FONT, outline:'none', marginBottom:8 }} />
+                  <div style={{ display:'flex', gap:8 }}>
+                    <button onClick={()=>setRejectingOffer(null)} style={{ flex:1, padding:'8px', borderRadius:99, background:PAPER3, border:'none', fontWeight:700, fontSize:13, cursor:'pointer', fontFamily:FONT }}>Annuller</button>
+                    <button onClick={async()=>{ const o = rejectingOffer; setRejectingOffer(null); await handleOfferRespond(o, 'reject', { note: offerRejectNote }); setOfferRejectNote(''); }} style={{ flex:1, padding:'8px', borderRadius:99, background:'#e11d48', border:'none', color:'#fff', fontWeight:700, fontSize:13, cursor:'pointer', fontFamily:FONT }}>Bekræft afvisning</button>
+                  </div>
+                </div>
+              )}
+
+              {/* Modbud tilbud-bar */}
+              {counteringOffer && (
+                <div style={{ borderTop:`1px solid #FDE68A`, background:'#FFFBEB', padding:'14px 16px' }}>
+                  <div style={{ fontSize:13, fontWeight:700, color:'#7A5C00', marginBottom:8, fontFamily:FONT }}>Send modbud (nuværende tilbud: {counteringOffer.amount} kr.)</div>
+                  <div style={{ display:'flex', gap:8 }}>
+                    <input type="number" value={offerCounterAmount} onChange={e=>setOfferCounterAmount(e.target.value)} placeholder="Dit modbud (kr.)" style={{ flex:1, padding:'9px 12px', borderRadius:10, border:'1.5px solid #FDE68A', fontSize:14, fontWeight:700, outline:'none', fontFamily:FONT }} />
+                    <button onClick={()=>setCounteringOffer(null)} style={{ padding:'8px 14px', borderRadius:99, background:PAPER3, border:'none', fontWeight:700, fontSize:13, cursor:'pointer', fontFamily:FONT }}>✕</button>
+                    <button onClick={async()=>{ const a = Number(offerCounterAmount); if (a > 0) { const o = counteringOffer; setCounteringOffer(null); await handleOfferRespond(o, 'counter', { counterAmount: a }); setOfferCounterAmount(''); } }} disabled={!offerCounterAmount} style={{ padding:'8px 16px', borderRadius:99, background:offerCounterAmount?PRIMARY:PAPER3, border:'none', color:offerCounterAmount?'#fff':INK3, fontWeight:700, fontSize:13, cursor:offerCounterAmount?'pointer':'default', fontFamily:FONT }}>Send</button>
                   </div>
                 </div>
               )}
