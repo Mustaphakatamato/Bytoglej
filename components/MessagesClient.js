@@ -275,6 +275,7 @@ export default function MessagesClient() {
   const [nowTs,            setNowTs]            = useState(() => Date.now());
   const [showSwapProtection, setShowSwapProtection] = useState(false);
   const [bidCarrier, setBidCarrier] = useState({});
+  const [carrierPickerMsg, setCarrierPickerMsg] = useState(null);
   const [shipmentInfo, setShipmentInfo] = useState(null);
   const [confirmingOrder, setConfirmingOrder] = useState(false);
   const [shipmentLoading, setShipmentLoading] = useState(false);
@@ -1604,29 +1605,13 @@ export default function MessagesClient() {
                                                 Betal inden <strong>{deadlineStr}</strong> for at sikre prisen — {hrs}t {mins}m tilbage.
                                               </div>
                                             </div>
-                                            {checkoutData?.shipping_options?.allow_shipping && (() => {
-                                              const sel = bidCarrier[m.id] || 'parcel_shop_gls';
-                                              const carriers = [
-                                                { k:'parcel_shop_gls', l:'GLS pakkeshop' },
-                                                { k:'parcel_shop_pdk', l:'PostNord pakkeshop' },
-                                                { k:'parcel_shop_dao', l:'DAO pakkeshop' },
-                                              ];
-                                              return (
-                                                <div>
-                                                  <div style={{ fontFamily:FONT, fontWeight:700, fontSize:12, color:INK2, marginBottom:6 }}>Vælg transportør til pakkelevering</div>
-                                                  <div style={{ display:'flex', gap:6 }}>
-                                                    {carriers.map(o => (
-                                                      <button key={o.k} onClick={()=>setBidCarrier(prev=>({...prev,[m.id]:o.k}))}
-                                                        style={{ flex:1, padding:'8px 4px', borderRadius:10, border:`2px solid ${sel===o.k?PRIMARY:'rgba(22,34,28,0.12)'}`, background:sel===o.k?GREEN_TINT:'#fff', cursor:'pointer', fontFamily:FONT, fontSize:11, fontWeight:700, color:INK, lineHeight:1.4 }}>
-                                                        {o.l}
-                                                      </button>
-                                                    ))}
-                                                  </div>
-                                                </div>
-                                              );
-                                            })()}
                                             <button
-                                              onClick={()=>{ if(!paying) handleBidPayment(m, bidCarrier[m.id] || (checkoutData?.shipping_options?.allow_shipping ? 'parcel_shop_gls' : checkoutData?.shipping_options?.allow_pickup ? 'pickup' : 'custom')); }}
+                                              onClick={()=>{
+                                                if (paying) return;
+                                                const so = checkoutData?.shipping_options;
+                                                if (so?.allow_shipping) { setCarrierPickerMsg(m); }
+                                                else { handleBidPayment(m, so?.allow_pickup ? 'pickup' : 'custom'); }
+                                              }}
                                               disabled={paying}
                                               style={{ padding:'13px', borderRadius:99, background:paying?PAPER3:PRIMARY, border:'none', color:paying?INK3:'#fff', fontFamily:FONT, fontWeight:700, fontSize:14, cursor:paying?'default':'pointer' }}>
                                               {paying ? 'Forbereder betaling…' : '💳 Gå til betaling'}
@@ -2164,6 +2149,49 @@ export default function MessagesClient() {
 
       {/* Byttebeskyttelse-popup */}
       {showSwapProtection && <TradeProtectionPopup onClose={()=>setShowSwapProtection(false)} />}
+
+      {/* Transportørvalg-modal — åbnes når køber klikker "Gå til betaling" på et bud med forsendelse */}
+      {carrierPickerMsg && (() => {
+        const msg = carrierPickerMsg;
+        const sel = bidCarrier[msg.id] || 'parcel_shop_gls';
+        const paying = goingToPayment === msg.id;
+        const carriers = [
+          { k:'parcel_shop_gls', ic:'🟡', l:'GLS pakkeshop', desc:'Hurtig og billig, afleveres i nærmeste GLS-butik' },
+          { k:'parcel_shop_pdk', ic:'🔴', l:'PostNord pakkeshop', desc:'Afhentes i PostNord-punkt eller posthus' },
+          { k:'parcel_shop_dao', ic:'🔵', l:'DAO pakkeshop', desc:'Leveres til en lokal DAO-pakkeshop' },
+        ];
+        return (
+          <div onClick={()=>{ if(!paying) setCarrierPickerMsg(null); }} style={{ position:'fixed', inset:0, background:'rgba(22,34,28,0.55)', zIndex:2000, display:'flex', alignItems:'flex-end', justifyContent:'center' }}>
+            <div onClick={e=>e.stopPropagation()} style={{ background:PAPER2, borderRadius:'24px 24px 0 0', padding:'28px 24px 40px', width:'100%', maxWidth:520, boxShadow:'0 -8px 32px rgba(22,34,28,0.16)' }}>
+              <div style={{ width:40, height:4, borderRadius:99, background:PAPER3, margin:'0 auto 24px' }} />
+              <h3 style={{ fontFamily:FONT, fontWeight:800, fontSize:18, color:INK, marginBottom:6 }}>Vælg afhentningssted</h3>
+              <p style={{ fontFamily:FONT, fontSize:13, color:INK3, marginBottom:20, lineHeight:1.5 }}>Vælg hvilken transportør og pakkeshop du vil have pakken leveret til.</p>
+              <div style={{ display:'flex', flexDirection:'column', gap:10, marginBottom:24 }}>
+                {carriers.map(o => (
+                  <button key={o.k} onClick={()=>setBidCarrier(prev=>({...prev,[msg.id]:o.k}))}
+                    style={{ display:'flex', alignItems:'center', gap:14, padding:'14px 16px', borderRadius:14, border:`2px solid ${sel===o.k?PRIMARY:'rgba(22,34,28,0.10)'}`, background:sel===o.k?GREEN_TINT:PAPER, cursor:'pointer', textAlign:'left', transition:'all 0.12s' }}>
+                    <span style={{ fontSize:22, flexShrink:0 }}>{o.ic}</span>
+                    <div style={{ flex:1 }}>
+                      <div style={{ fontFamily:FONT, fontWeight:700, fontSize:14, color:INK }}>{o.l}</div>
+                      <div style={{ fontFamily:FONT, fontSize:12, color:INK3, marginTop:2 }}>{o.desc}</div>
+                    </div>
+                    <div style={{ width:20, height:20, borderRadius:'50%', border:`2px solid ${sel===o.k?PRIMARY:'rgba(22,34,28,0.20)'}`, background:sel===o.k?PRIMARY:'transparent', flexShrink:0, display:'flex', alignItems:'center', justifyContent:'center' }}>
+                      {sel===o.k && <div style={{ width:8, height:8, borderRadius:'50%', background:'#fff' }} />}
+                    </div>
+                  </button>
+                ))}
+              </div>
+              <button
+                onClick={()=>{ if(!paying) { handleBidPayment(msg, sel); setCarrierPickerMsg(null); } }}
+                disabled={paying}
+                style={{ width:'100%', padding:'15px', borderRadius:99, background:paying?PAPER3:PRIMARY, border:'none', color:paying?INK3:'#fff', fontFamily:FONT, fontWeight:700, fontSize:15, cursor:paying?'default':'pointer' }}>
+                {paying ? 'Forbereder betaling…' : '💳 Bekræft og gå til betaling'}
+              </button>
+              {!paying && <button onClick={()=>setCarrierPickerMsg(null)} style={{ width:'100%', marginTop:12, padding:'12px', borderRadius:99, background:'transparent', border:'none', color:INK3, fontFamily:FONT, fontWeight:600, fontSize:14, cursor:'pointer' }}>Annuller</button>}
+            </div>
+          </div>
+        );
+      })()}
 
       {/* Swap preview modal */}
       {swapPreview && (
