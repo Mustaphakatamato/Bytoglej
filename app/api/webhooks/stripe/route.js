@@ -54,6 +54,9 @@ export async function POST(req) {
 
   // ── Byttehandel (byt): escrow med gensidig forsendelse ────────
   if (event.type === 'payment_intent.succeeded' && event.data.object.metadata?.type === 'swap') {
+    if (event.data.object.metadata?.swap_proposal_id) {
+      return handleSwapProposalPayment(event.data.object, supa);
+    }
     return handleSwapPayment(event.data.object, supa);
   }
 
@@ -438,12 +441,132 @@ async function handleSwapPayment(pi, supa) {
   return NextResponse.json({ received: true });
 }
 
+// ── Bundt-bytte (swap_proposals): escrow pr. part ─────────────
+// Markerer parten betalt. Når BEGGE har betalt, bookes to forsendelser
+// (initiators bundt → ejer, ejers bundt → initiator), varerne markeres
+// solgt og reservationen ryddes.
+const SWAP_SIZE_RANK = { small: 1, medium: 2, large: 3 };
+async function swapBundleSize(supa, listingIds) {
+  if (!listingIds.length) return 'medium';
+  const { data } = await supa.from('shipping_options').select('shipping_size_category').in('listing_id', listingIds);
+  let best = 'medium', rank = 0;
+  for (const s of (data || [])) {
+    const r = SWAP_SIZE_RANK[s.shipping_size_category] || 2;
+    if (r > rank) { rank = r; best = s.shipping_size_category; }
+  }
+  return best;
+}
+
+async function handleSwapProposalPayment(pi, supa) {
+  const proposalId = pi.metadata?.swap_proposal_id;
+  const party    = pi.metadata?.party === 'owner' ? 'owner' : 'initiator';
+  const delivery = pi.metadata?.delivery_method || 'shipping';
+
+  // Idempotency: kun ét webhook-kald må behandle denne betaling.
+  const { data: claimed } = await supa
+    .from('orders')
+    .update({ status: 'paid', paid_at: new Date().toISOString() })
+    .eq('payment_intent_id', pi.id)
+    .eq('status', 'pending')
+    .select()
+    .maybeSingle();
+  if (!claimed) return NextResponse.json({ received: true, already_processed: true });
+  if (!proposalId) return NextResponse.json({ received: true, warning: 'Mangler forslag' });
+
+  // Markér denne part betalt + gem leveringsvalg.
+  const paidField     = party === 'owner' ? 'owner_paid' : 'initiator_paid';
+  const deliveryField = party === 'owner' ? 'owner_delivery' : 'initiator_delivery';
+  await supa.from('swap_proposals').update({ [paidField]: true, [deliveryField]: delivery }).eq('id', proposalId);
+
+  const { data: p } = await supa.from('swap_proposals').select('*').eq('id', proposalId).maybeSingle();
+  if (!p) return NextResponse.json({ received: true });
+
+  const convId = p.conversation_id;
+  const { data: conv } = convId
+    ? await supa.from('conversations').select('*').eq('id', convId).maybeSingle()
+    : { data: null };
+  const now = new Date().toISOString();
+
+  if (p.initiator_paid && p.owner_paid) {
+    const [{ data: initInst }, { data: ownerInst }] = await Promise.all([
+      p.initiator_institution_id ? supa.from('institutions').select('*').eq('id', p.initiator_institution_id).maybeSingle() : Promise.resolve({ data: null }),
+      p.owner_institution_id     ? supa.from('institutions').select('*').eq('id', p.owner_institution_id).maybeSingle()     : Promise.resolve({ data: null }),
+    ]);
+    const offeredIds   = (p.offered_items   || []).map(i => i.listing_id).filter(Boolean);
+    const requestedIds = (p.requested_items || []).map(i => i.listing_id).filter(Boolean);
+
+    // Forsendelse 1: initiator → ejer (initiators bundt)
+    let initShipmentId = p.initiator_shipment_id || null;
+    if (!initShipmentId && p.initiator_delivery !== 'custom' && conv) {
+      initShipmentId = await bookSwapShipment(supa, conv, offeredIds[0], initInst, ownerInst, await swapBundleSize(supa, offeredIds));
+    }
+    // Forsendelse 2: ejer → initiator (ejers bundt)
+    let ownerShipmentId = p.owner_shipment_id || null;
+    if (!ownerShipmentId && p.owner_delivery !== 'custom' && conv) {
+      ownerShipmentId = await bookSwapShipment(supa, conv, requestedIds[0], ownerInst, initInst, await swapBundleSize(supa, requestedIds));
+    }
+
+    await supa.from('swap_proposals').update({
+      escrow_status: 'both_paid_released',
+      completed_at: now,
+      initiator_shipment_id: initShipmentId,
+      owner_shipment_id: ownerShipmentId,
+    }).eq('id', proposalId);
+
+    // Markér alle byttede varer solgt + ryd reservation.
+    const tradedIds = [...offeredIds, ...requestedIds];
+    if (tradedIds.length) {
+      await supa.from('listings').update({
+        is_sold: true, is_active: false, sold_at: now,
+        reserved_until: null, reserved_for_institution_id: null,
+      }).in('id', tradedIds);
+    }
+
+    if (convId) {
+      // Kontant mellemlag: byt&leg holder beløbet og udbetaler manuelt til modtageren.
+      const cashLine = (Number(p.cash_adjustment) > 0)
+        ? ` Kontant mellemlag på ${p.cash_adjustment} kr. udbetales til modparten.`
+        : '';
+      await supa.from('conversations').update({
+        deal_completed: true, deal_completed_at: now, deal_type: 'byt',
+        delivery_status: 'in_progress',
+        last_message: '🎉 Byttehandel gennemført! Begge parter har betalt.',
+        last_message_at: now,
+        owner_unread: (conv?.owner_unread || 0) + 1,
+        initiator_unread: (conv?.initiator_unread || 0) + 1,
+      }).eq('id', convId);
+      await supa.from('chat_messages').insert({
+        conversation_id: convId,
+        sender_id: claimed.buyer_id,
+        sender_name: 'System',
+        content: `🎉 Byttehandel gennemført! Begge parter har betalt — pakkemærkater er klar.${cashLine}`,
+        message_type: 'swap_completed',
+      });
+    }
+  } else {
+    // Kun én part har betalt → opdatér escrow-tilstand + besked.
+    await supa.from('swap_proposals')
+      .update({ escrow_status: p.initiator_paid ? 'awaiting_owner' : 'awaiting_initiator' })
+      .eq('id', proposalId);
+    if (convId) {
+      await supa.from('conversations').update({
+        last_message: 'En part har betalt — afventer den anden part.',
+        last_message_at: now,
+        owner_unread: (conv?.owner_unread || 0) + 1,
+        initiator_unread: (conv?.initiator_unread || 0) + 1,
+      }).eq('id', convId);
+    }
+  }
+
+  return NextResponse.json({ received: true });
+}
+
 // Booker én forsendelse i en byttehandel og returnerer shipments.id (eller null).
-async function bookSwapShipment(supa, conv, listingId, senderInst, receiverInst) {
+async function bookSwapShipment(supa, conv, listingId, senderInst, receiverInst, sizeOverride) {
   if (!senderInst || !receiverInst) return null;
   try {
-    let sizeCategory = 'medium';
-    if (listingId) {
+    let sizeCategory = sizeOverride || 'medium';
+    if (!sizeOverride && listingId) {
       const { data: so } = await supa.from('shipping_options').select('shipping_size_category').eq('listing_id', listingId).maybeSingle();
       sizeCategory = so?.shipping_size_category || 'medium';
     }
