@@ -269,6 +269,8 @@ export default function MessagesClient() {
   const [bundleAcceptedAt,setBundleAcceptedAt]= useState({});
   const [checkoutDeliveries, setCheckoutDeliveries] = useState({});
   const [goingToPayment,   setGoingToPayment]   = useState(null);
+  const [swapPaying,       setSwapPaying]       = useState(false);
+  const [swapDelivery,     setSwapDelivery]     = useState('shipping');
   const [shipmentInfo, setShipmentInfo] = useState(null);
   const [confirmingOrder, setConfirmingOrder] = useState(false);
   const [shipmentLoading, setShipmentLoading] = useState(false);
@@ -878,6 +880,58 @@ export default function MessagesClient() {
         }
       } catch {}
     }
+  }
+
+  async function handleAcceptSwap(msg) {
+    const swapData = (() => { try { return JSON.parse(msg.content); } catch { return {}; } })();
+    await db.from('chat_messages').update({ bid_status: 'accepted' }).eq('id', msg.id);
+    const now = new Date().toISOString();
+    const upd = {
+      swap_accepted: true,
+      swap_initiator_listing_id: swapData.swap_listing_id || null,
+      swap_owner_listing_id: active.listing_id || null,
+      deal_type: 'byt',
+      is_handled: true, handled_at: now, handled_action: 'accepted',
+      last_message: '🔄 Byttehandel godkendt — begge parter betaler for forsendelse',
+      last_message_at: now,
+      initiator_unread: (active.initiator_unread||0)+1,
+    };
+    await db.from('conversations').update(upd).eq('id', active.id);
+    setActive(a => ({ ...a, ...upd }));
+    setConvs(cs => cs.map(c => c.id === active.id ? { ...c, ...upd } : c));
+    setMessages(ms => ms.map(x => x.id === msg.id ? { ...x, bid_status: 'accepted' } : x));
+  }
+
+  async function handleRejectSwap(msg) {
+    const senderName = effectiveSenderName();
+    const effUid = realUserId || userId;
+    await db.from('chat_messages').update({ bid_status: 'rejected' }).eq('id', msg.id);
+    const rejectMsg = `${senderName} har afvist bytteforslaget`;
+    await db.from('chat_messages').insert({ conversation_id: active.id, sender_id: effUid, sender_name: senderName, content: rejectMsg });
+    const now = new Date().toISOString();
+    const upd = {
+      last_message: rejectMsg, last_message_at: now,
+      initiator_unread: (active.initiator_unread||0)+1,
+      is_handled: true, handled_at: now, handled_action: 'rejected',
+    };
+    await db.from('conversations').update(upd).eq('id', active.id);
+    setActive(a => ({ ...a, ...upd }));
+    setConvs(cs => cs.map(c => c.id === active.id ? { ...c, ...upd } : c));
+    setMessages(ms => ms.map(x => x.id === msg.id ? { ...x, bid_status: 'rejected' } : x));
+  }
+
+  async function handleSwapPayment(deliveryMethod) {
+    setSwapPaying(true);
+    try {
+      const res = await authedFetch('/api/payments/create-swap-intent', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ conversationId: active.id, deliveryMethod }),
+      });
+      const data = await res.json();
+      if (!res.ok) { alert(data.error || 'Noget gik galt — prøv igen'); setSwapPaying(false); return; }
+      const bd = encodeURIComponent(JSON.stringify(data.breakdown));
+      router.push(`/betaling/${data.orderId}?cs=${encodeURIComponent(data.clientSecret)}&total=${data.grandTotal}&bd=${bd}`);
+    } catch { alert('Noget gik galt — prøv igen'); setSwapPaying(false); }
   }
 
   async function handleBidPayment(checkoutMsg, deliveryMethod) {
@@ -1559,7 +1613,11 @@ export default function MessagesClient() {
                                 <div style={{ maxWidth:'78%' }}>
                                   {!mine && <div style={{ fontSize:11, fontWeight:700, color:INK3, marginBottom:3, marginLeft:2, fontFamily:FONT }}>{m.sender_name}</div>}
                                   <div style={{ background:mine?'#FEF3EC':PAPER3, border:`1.5px solid ${mine?CORAL:'rgba(22,34,28,0.12)'}`, borderRadius:16, padding:'14px 16px', minWidth:200 }}>
-                                    <div style={{ fontSize:11, fontWeight:700, color:CORAL, textTransform:'uppercase', letterSpacing:0.6, marginBottom:10, fontFamily:FONT }}>Bytteforslag</div>
+                                    <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:10 }}>
+                                      <span style={{ fontSize:11, fontWeight:700, color:CORAL, textTransform:'uppercase', letterSpacing:0.6, fontFamily:FONT }}>Bytteforslag</span>
+                                      {m.bid_status==='accepted' && <span style={{ fontSize:11, fontWeight:700, color:PRIMARY, background:'#D1FAE5', padding:'2px 8px', borderRadius:99, fontFamily:FONT }}>Godkendt</span>}
+                                      {m.bid_status==='rejected' && <span style={{ fontSize:11, fontWeight:700, color:'#e11d48', background:'#FEE2E2', padding:'2px 8px', borderRadius:99, fontFamily:FONT }}>Afvist</span>}
+                                    </div>
                                     {swapData?.swap_title ? (
                                       <div onClick={swapData.swap_listing_id ? async ()=>{ const {data}=await db.from('listings').select('*').eq('id',swapData.swap_listing_id).maybeSingle(); if(data) setSwapPreview(data); } : undefined}
                                         style={{ display:'flex', alignItems:'center', gap:10, background:PAPER2, borderRadius:10, padding:'10px 12px', marginBottom: swapData?.note ? 8 : 0, cursor: swapData.swap_listing_id ? 'pointer' : 'default', transition:'opacity 0.15s' }}
@@ -1579,6 +1637,55 @@ export default function MessagesClient() {
                                       <div style={{ fontSize:13, color:INK, marginTop: swapData?.swap_title ? 8 : 0, lineHeight:1.5, fontFamily:FONT }}>{swapData.note}</div>
                                     )}
                                   </div>
+
+                                  {/* Ejeren kan godkende/afvise et bytteforslag */}
+                                  {!mine && isOwnerInConv && !m.bid_status && !active?.swap_accepted && !active?.deal_completed && (
+                                    <div style={{ display:'flex', gap:8, marginTop:8 }}>
+                                      <button onClick={()=>handleAcceptSwap(m)} style={{ flex:1, padding:'10px', borderRadius:99, background:PRIMARY, color:'#fff', border:'none', fontFamily:FONT, fontWeight:700, fontSize:13, cursor:'pointer' }}>Godkend byttehandel</button>
+                                      <button onClick={()=>handleRejectSwap(m)} style={{ padding:'10px 14px', borderRadius:99, background:'#fff', color:'#e11d48', border:'1.5px solid #FCA5A5', fontFamily:FONT, fontWeight:700, fontSize:13, cursor:'pointer' }}>Afvis</button>
+                                    </div>
+                                  )}
+
+                                  {/* Escrow: begge parter betaler beskyttelse + porto */}
+                                  {m.bid_status==='accepted' && active?.swap_accepted && (() => {
+                                    const party = isOwnerInConv ? 'owner' : 'initiator';
+                                    const myPaid    = party==='owner' ? active.swap_owner_paid     : active.swap_initiator_paid;
+                                    const otherPaid = party==='owner' ? active.swap_initiator_paid : active.swap_owner_paid;
+                                    const youSend    = party==='owner' ? active.listing_title : (swapData?.swap_title || 'din vare');
+                                    const youReceive = party==='owner' ? (swapData?.swap_title || 'deres vare') : active.listing_title;
+                                    const completed = active.deal_completed;
+                                    return (
+                                      <div style={{ marginTop:10, background:'#FFFBEB', border:`2px solid ${completed?PRIMARY:'#FDE68A'}`, borderRadius:14, padding:'14px' }}>
+                                        <div style={{ fontFamily:FONT, fontWeight:800, fontSize:13, color:INK, marginBottom:8 }}>{completed ? '🎉 Byttehandel gennemført!' : '🔄 Byttehandel godkendt'}</div>
+                                        <div style={{ fontFamily:FONT, fontSize:12, color:INK2, lineHeight:1.7, marginBottom:10 }}>
+                                          <div>📤 Du sender: <strong>{youSend}</strong></div>
+                                          <div>📥 Du modtager: <strong>{youReceive}</strong></div>
+                                        </div>
+                                        {completed ? (
+                                          <div style={{ fontFamily:FONT, fontSize:12, color:PRIMARY, fontWeight:700 }}>Begge har betalt — pakkemærkater er klar. Se forsendelsesbesked nedenfor.</div>
+                                        ) : myPaid ? (
+                                          <div style={{ fontFamily:FONT, fontSize:12, color:INK2 }}>
+                                            <div style={{ color:PRIMARY, fontWeight:700 }}>✓ Du har betalt</div>
+                                            <div style={{ color:INK3, marginTop:2 }}>{otherPaid ? 'Begge har betalt — afslutter…' : '⏳ Afventer den anden part betaler'}</div>
+                                          </div>
+                                        ) : (
+                                          <div style={{ display:'flex', flexDirection:'column', gap:8 }}>
+                                            <div style={{ display:'flex', gap:6 }}>
+                                              {[{k:'shipping',ic:'📦',l:'Send som pakke'},{k:'custom',ic:'🤝',l:'Aftalt levering'}].map(o=>(
+                                                <button key={o.k} onClick={()=>setSwapDelivery(o.k)} style={{ flex:1, padding:'8px', borderRadius:10, border:`2px solid ${swapDelivery===o.k?PRIMARY:'#FDE68A'}`, background:swapDelivery===o.k?GREEN_TINT:'#fff', cursor:'pointer', fontFamily:FONT, fontSize:11, fontWeight:700, color:INK }}>{o.ic} {o.l}</button>
+                                              ))}
+                                            </div>
+                                            <div style={{ fontFamily:FONT, fontSize:11, color:INK3, lineHeight:1.5 }}>
+                                              {swapDelivery==='shipping' ? 'Du betaler porto for din vare + 10 kr byttebeskyttelse. Porto beregnes på betalingssiden.' : 'Du betaler 10 kr byttebeskyttelse. I aftaler selv leveringen.'}
+                                            </div>
+                                            <button onClick={()=>{ if(!swapPaying) handleSwapPayment(swapDelivery); }} disabled={swapPaying} style={{ padding:'11px', borderRadius:99, background:swapPaying?PAPER3:PRIMARY, color:swapPaying?INK3:'#fff', border:'none', fontFamily:FONT, fontWeight:700, fontSize:13, cursor:swapPaying?'default':'pointer' }}>{swapPaying ? 'Forbereder betaling…' : '💳 Gå til betaling'}</button>
+                                            <div style={{ fontFamily:FONT, fontSize:11, color:INK3 }}>{otherPaid ? 'Den anden part har betalt ✓' : 'Den anden part har endnu ikke betalt'}</div>
+                                          </div>
+                                        )}
+                                      </div>
+                                    );
+                                  })()}
+
                                   <div style={{ fontSize:10, color:INK3, marginTop:3, textAlign:mine?'right':'left', fontFamily:FONT }}>{d.toLocaleTimeString('da-DK',{hour:'2-digit',minute:'2-digit'})}</div>
                                 </div>
                               </div>

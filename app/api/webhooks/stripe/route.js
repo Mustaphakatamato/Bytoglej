@@ -52,6 +52,11 @@ export async function POST(req) {
     return NextResponse.json({ received: true });
   }
 
+  // ── Byttehandel (byt): escrow med gensidig forsendelse ────────
+  if (event.type === 'payment_intent.succeeded' && event.data.object.metadata?.type === 'swap') {
+    return handleSwapPayment(event.data.object, supa);
+  }
+
   if (event.type !== 'payment_intent.succeeded') {
     return NextResponse.json({ received: true });
   }
@@ -338,6 +343,129 @@ export async function POST(req) {
   }
 
   return NextResponse.json({ received: true, shipments_created: anyShipment });
+}
+
+// ── Byttehandel: betaling fra én part ─────────────────────────
+// Markerer parten betalt. Når BEGGE har betalt, bookes to forsendelser
+// (initiator→ejer og ejer→initiator) og handlen markeres gennemført.
+async function handleSwapPayment(pi, supa) {
+  const convId   = pi.metadata?.conversation_id;
+  const party    = pi.metadata?.party === 'owner' ? 'owner' : 'initiator';
+  const delivery = pi.metadata?.delivery_method || 'shipping';
+
+  // Idempotency: kun ét webhook-kald må behandle denne betaling.
+  const { data: claimed } = await supa
+    .from('orders')
+    .update({ status: 'paid', paid_at: new Date().toISOString() })
+    .eq('payment_intent_id', pi.id)
+    .eq('status', 'pending')
+    .select()
+    .maybeSingle();
+  if (!claimed) return NextResponse.json({ received: true, already_processed: true });
+  if (!convId)  return NextResponse.json({ received: true, warning: 'Mangler samtale' });
+
+  // Markér denne part betalt + gem leveringsvalg
+  const paidField     = party === 'owner' ? 'swap_owner_paid' : 'swap_initiator_paid';
+  const deliveryField = party === 'owner' ? 'swap_owner_delivery' : 'swap_initiator_delivery';
+  await supa.from('conversations').update({ [paidField]: true, [deliveryField]: delivery }).eq('id', convId);
+
+  const { data: conv } = await supa.from('conversations').select('*').eq('id', convId).maybeSingle();
+  if (!conv) return NextResponse.json({ received: true });
+
+  const now = new Date().toISOString();
+
+  if (conv.swap_initiator_paid && conv.swap_owner_paid) {
+    // Begge har betalt → book forsendelser for de parter der valgte pakke.
+    const [{ data: initInst }, { data: ownerInst }] = await Promise.all([
+      conv.initiator_institution_id ? supa.from('institutions').select('*').eq('id', conv.initiator_institution_id).maybeSingle() : Promise.resolve({ data: null }),
+      conv.owner_institution_id     ? supa.from('institutions').select('*').eq('id', conv.owner_institution_id).maybeSingle()     : Promise.resolve({ data: null }),
+    ]);
+
+    // Forsendelse 1: initiator → ejer (initiators vare)
+    const initShipmentId = (conv.swap_initiator_delivery !== 'custom' && !conv.swap_initiator_shipment_id)
+      ? await bookSwapShipment(supa, conv, conv.swap_initiator_listing_id, initInst, ownerInst)
+      : conv.swap_initiator_shipment_id;
+    // Forsendelse 2: ejer → initiator (ejers vare)
+    const ownerShipmentId = (conv.swap_owner_delivery !== 'custom' && !conv.swap_owner_shipment_id)
+      ? await bookSwapShipment(supa, conv, conv.swap_owner_listing_id, ownerInst, initInst)
+      : conv.swap_owner_shipment_id;
+
+    await supa.from('conversations').update({
+      swap_initiator_shipment_id: initShipmentId || null,
+      swap_owner_shipment_id: ownerShipmentId || null,
+      deal_completed: true,
+      deal_completed_at: now,
+      deal_type: 'byt',
+      delivery_status: 'in_progress',
+      last_message: '🎉 Byttehandel gennemført! Begge parter har betalt.',
+      last_message_at: now,
+      owner_unread: (conv.owner_unread || 0) + 1,
+      initiator_unread: (conv.initiator_unread || 0) + 1,
+    }).eq('id', convId);
+
+    await supa.from('chat_messages').insert({
+      conversation_id: convId,
+      sender_id: claimed.buyer_id,
+      sender_name: claimed.buyer_name || 'System',
+      content: '🎉 Byttehandel gennemført! Begge parter har betalt — pakkemærkater er klar.',
+      message_type: 'swap_completed',
+    });
+
+    // Mark begge opslag som inaktive (byttet væk)
+    const tradedIds = [conv.swap_initiator_listing_id, conv.swap_owner_listing_id].filter(Boolean);
+    if (tradedIds.length) {
+      await supa.from('listings').update({ is_sold: true, is_active: false, sold_at: now }).in('id', tradedIds);
+    }
+  } else {
+    // Kun én part har betalt → besked om at afvente modparten.
+    await supa.from('conversations').update({
+      last_message: 'En part har betalt — afventer den anden part.',
+      last_message_at: now,
+      owner_unread: (conv.owner_unread || 0) + 1,
+      initiator_unread: (conv.initiator_unread || 0) + 1,
+    }).eq('id', convId);
+  }
+
+  return NextResponse.json({ received: true });
+}
+
+// Booker én forsendelse i en byttehandel og returnerer shipments.id (eller null).
+async function bookSwapShipment(supa, conv, listingId, senderInst, receiverInst) {
+  if (!senderInst || !receiverInst) return null;
+  try {
+    let sizeCategory = 'medium';
+    if (listingId) {
+      const { data: so } = await supa.from('shipping_options').select('shipping_size_category').eq('listing_id', listingId).maybeSingle();
+      sizeCategory = so?.shipping_size_category || 'medium';
+    }
+    const carrier = 'gls';
+    const service_type = 'parcel_shop';
+    const result = await createShipment({
+      sender:   { name: senderInst.name,   address: senderInst.address || 'Ukendt', zip_code: senderInst.zipcode || '2100', city: senderInst.city || 'København', country_code: 'DK', email: senderInst.email, phone: senderInst.phone || '' },
+      receiver: { name: receiverInst.name, address: receiverInst.address || 'Ukendt', zip_code: receiverInst.zipcode || '2100', city: receiverInst.city || 'København', country_code: 'DK', email: receiverInst.email, phone: receiverInst.phone || '' },
+      carrier, service_type, size_category: sizeCategory,
+      reference: conv.id,
+    });
+    const { data: shipment } = await supa.from('shipments').insert({
+      conversation_id: conv.id,
+      seller_institution_id: senderInst.id,
+      buyer_institution_id: receiverInst.id,
+      shipmondo_shipment_id: result.shipmondo_shipment_id,
+      carrier, service_type, size_category: sizeCategory,
+      cost_dkk: result.price_dkk,
+      markup_dkk: 0,
+      total_charged_to_seller_dkk: result.price_dkk,
+      tracking_number: result.tracking_number,
+      tracking_url: result.tracking_url,
+      label_pdf_url: result.label_pdf_url,
+      status: 'booked',
+      booked_at: new Date().toISOString(),
+    }).select().single();
+    return shipment?.id || null;
+  } catch (e) {
+    console.error('[stripe-webhook] swap shipment fejl:', e.message);
+    return null;
+  }
 }
 
 // ── Sælger-email ───────────────────────────────────────────────
