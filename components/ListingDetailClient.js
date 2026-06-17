@@ -26,6 +26,7 @@ function timeAgo(dateStr) {
 }
 import { useApp, useActiveUser } from '@/providers/AppProvider';
 import { Badge, Btn, Spinner, Modal } from '@/components/ui';
+import OfferModal from '@/components/OfferModal';
 import { authedFetch } from '@/lib/authed-fetch';
 
 function ImageGallery({ images, color, emoji, title }) {
@@ -84,6 +85,7 @@ export default function ListingDetailClient() {
 
   const inCart = cart?.some(c => c.listingId === listing?.id);
   const [bidModal,  setBidModal]  = useState(false);
+  const [offerModal, setOfferModal] = useState(false);
   const [swapModal, setSwapModal] = useState(false);
   const [bidAmount, setBidAmount] = useState('');
   const [swapOffer, setSwapOffer] = useState('');
@@ -841,6 +843,7 @@ export default function ListingDetailClient() {
             {!isOwn ? (
               <div style={{ display:'flex', flexDirection:'column', gap:10, marginBottom:20 }}>
                 {listing.type==='køb' && <Btn variant="primary" color={PRIMARY} radius={22} onClick={handleAddToCart} style={{ justifyContent:'center', padding:'15px', fontSize:16 }}>{inCart ? '🛒 Gå til kurv →' : (() => { const so = listing.shipping_options?.[0]; const canShip = so?.allow_shipping || (!so && listing.can_ship); const tag = canShip ? (so?.shipping_included_in_price ? ' inkl. fragt' : ' + fragt') : ''; return `🛒 Læg i kurv — ${listing.price} kr.${tag}`; })()}</Btn>}
+                {listing.type==='køb' && <Btn variant="outline" radius={22} onClick={()=>{ if(!loggedIn){ router.push('/login'); return; } setOfferModal(true); }} style={{ justifyContent:'center', padding:'13px', fontSize:15 }}>🏷️ Giv et tilbud</Btn>}
                 {listing.type==='byd' && <Btn variant="primary" color={ACCENT2} radius={22} onClick={()=>setBidModal(true)} style={{ justifyContent:'center', padding:'15px', fontSize:16 }}>📊 Afgiv bud</Btn>}
                 {listing.type==='byt' && <Btn variant="primary" color={ACCENT} radius={22} onClick={()=>setSwapModal(true)} style={{ justifyContent:'center', padding:'15px', fontSize:16 }}>🔄 Foreslå bytte</Btn>}
                 {listing.type==='søges' && <button onClick={()=>setSøgesModal(true)}
@@ -871,6 +874,14 @@ export default function ListingDetailClient() {
                 )}
               </div>
             )}
+
+            <OfferModal
+              open={offerModal}
+              onClose={()=>setOfferModal(false)}
+              listing={listing}
+              showToast={showToast}
+              onSubmitted={(data)=>{ if (data?.conversationId && setSelectedConvId) setSelectedConvId(data.conversationId); router.push('/beskeder'); }}
+            />
 
             {/* Trust checkmarks */}
             <div style={{ display:'flex', gap:isMobile?10:16, flexWrap:'wrap', marginBottom:16 }}>

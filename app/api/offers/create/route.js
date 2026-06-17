@@ -2,18 +2,10 @@ import { NextResponse } from 'next/server';
 import { requireAuth, UNAUTHORIZED } from '@/lib/api-auth';
 import { createServerClient } from '@/lib/supabase-server';
 import { resolveCallerInstitution, resolveInstitutionByName } from '@/lib/institution-server';
+import { DAILY_OFFER_LIMIT, offersUsedToday } from '@/lib/offer-quota';
 
-// Anti-spam: hvor mange tilbud en køber må sende pr. kalenderdag.
-const DAILY_OFFER_LIMIT = 20;
 // Hvor længe et tilbud er gyldigt indtil sælger har svaret.
 const OFFER_TTL_DAYS = 7;
-
-// Kalenderdato i Europe/Copenhagen som "YYYY-MM-DD" (til dagligt loft).
-function cphDate(d) {
-  return new Intl.DateTimeFormat('en-CA', {
-    timeZone: 'Europe/Copenhagen', year: 'numeric', month: '2-digit', day: '2-digit',
-  }).format(d);
-}
 
 export async function POST(req) {
   const user = await requireAuth(req);
@@ -66,19 +58,11 @@ export async function POST(req) {
     return NextResponse.json({ error: 'Varen er reserveret til en anden køber lige nu — prøv igen senere' }, { status: 409 });
   }
 
-  // Dagligt loft: tæl køberens tilbud fra i dag (Copenhagen-kalenderdag).
-  // Henter et lille vindue (36t) og tæller dagens i JS for at undgå tz-math i SQL.
-  const windowStart = new Date(Date.now() - 36 * 3600 * 1000).toISOString();
-  let countQ = supa.from('offers')
-    .select('id, created_at')
-    .eq('proposed_by', 'buyer')
-    .gte('created_at', windowStart);
-  countQ = buyerInst?.id
-    ? countQ.eq('buyer_institution_id', buyerInst.id)
-    : countQ.eq('buyer_id', user.id);
-  const { data: recent } = await countQ;
-  const today = cphDate(new Date());
-  const usedToday = (recent || []).filter(o => cphDate(new Date(o.created_at)) === today).length;
+  // Dagligt loft (Copenhagen-kalenderdag) — samme kilde som /api/offers/quota.
+  const usedToday = await offersUsedToday(supa, {
+    buyerInstitutionId: buyerInst?.id || null,
+    buyerId: user.id,
+  });
   if (usedToday >= DAILY_OFFER_LIMIT) {
     return NextResponse.json(
       { error: `Du har nået dagens grænse på ${DAILY_OFFER_LIMIT} tilbud. Prøv igen i morgen.`, remainingToday: 0, dailyLimit: DAILY_OFFER_LIMIT },
