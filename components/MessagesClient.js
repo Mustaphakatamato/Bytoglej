@@ -1045,6 +1045,11 @@ export default function MessagesClient() {
         [offer.id]: { ...(prev[offer.id] || offer), status: newStatus },
         ...(data.offer ? { [data.offer.id]: data.offer } : {}),
       }));
+      // Genindlæs beskeder så server-side indsatte beskeder (fx checkout_pending) vises med det samme.
+      if (action === 'accept' && active?.id) {
+        const { data: fresh } = await db.from('chat_messages').select('*').eq('conversation_id', active.id).order('created_at', { ascending: true });
+        if (fresh) setMessages(fresh);
+      }
       // Notificér modparten (e-mail + push) — fire-and-forget.
       if (data.notify?.email) {
         authedFetch('/api/notify-message', {
