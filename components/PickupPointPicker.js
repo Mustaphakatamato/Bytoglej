@@ -45,6 +45,7 @@ export default function PickupPointPicker({ points, cheapestCarrier, buyerCoords
   const mapRef = useRef(null);
   const mapInstanceRef = useRef(null);
   const markersRef = useRef(null);
+  const resizeObsRef = useRef(null);
 
   useEffect(() => {
     setMounted(true);
@@ -68,13 +69,12 @@ export default function PickupPointPicker({ points, cheapestCarrier, buyerCoords
 
     if (!mapInstanceRef.current) {
       mapInstanceRef.current = L.map(mapRef.current, { center, zoom: 12, zoomControl: true, scrollWheelZoom: true });
-      L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
+      const tiles = L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
         attribution: '© OpenStreetMap © CARTO', maxZoom: 19,
       }).addTo(mapInstanceRef.current);
       markersRef.current = L.layerGroup().addTo(mapInstanceRef.current);
 
-      // Genberegn størrelse + zoom til alle punkter. Kaldes både når CSS er klar
-      // og via fallback-timere, så kortet altid lander korrekt.
+      // Genberegn størrelse + zoom til alle punkter, og tving tiles til at gentegne.
       const fix = () => {
         const map = mapInstanceRef.current;
         if (!map) return;
@@ -82,12 +82,23 @@ export default function PickupPointPicker({ points, cheapestCarrier, buyerCoords
         if (valid.length > 1) {
           map.fitBounds(L.latLngBounds(valid.map(p => [p.lat, p.lng])), { padding: [40, 40] });
         }
+        tiles.redraw();
       };
       requestAnimationFrame(fix);
       setTimeout(fix, 150);
       setTimeout(fix, 500);
+
+      // Kortet ligger i en modal hvis flex-layout først har endelig størrelse
+      // efter mount. En ResizeObserver kalder fix() så snart containeren får
+      // sin rigtige størrelse — det er det der får tiles til at loade.
+      if (typeof ResizeObserver !== 'undefined' && mapRef.current) {
+        const ro = new ResizeObserver(() => fix());
+        ro.observe(mapRef.current);
+        resizeObsRef.current = ro;
+      }
     }
     return () => {
+      if (resizeObsRef.current) { resizeObsRef.current.disconnect(); resizeObsRef.current = null; }
       if (mapInstanceRef.current) { mapInstanceRef.current.remove(); mapInstanceRef.current = null; }
     };
   }, [mounted]); // eslint-disable-line
