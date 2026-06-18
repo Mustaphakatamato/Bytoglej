@@ -109,7 +109,7 @@ export default function ImageSearchModal({ onClose, onSearch, searching }) {
             /* Beskær-trin */
             <>
               <p style={{ fontFamily: FONT, fontSize: 13, color: INK2, margin: '0 0 12px', textAlign: 'center' }}>
-                Træk i rammen for at fjerne det AI'en ikke skal søge på.
+                Træk i rammen for at fjerne det, der ikke skal med i søgningen.
               </p>
               <div style={{ position: 'relative', display: 'flex', justifyContent: 'center', background: '#000', borderRadius: 12, overflow: 'hidden' }}>
                 <div ref={wrapRef} style={{ position: 'relative', display: 'inline-block', lineHeight: 0 }}>

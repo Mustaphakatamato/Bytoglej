@@ -206,7 +206,7 @@ function SøgesCard({ l, onContact }) {
 function OpslagInner() {
   const router = useRouter();
   const urlParams = useSearchParams();
-  const { listings: allListings, loadingListings: loading, fetchListings, refreshSeed, setActiveListing, favs, toggleFav, showToast, loggedIn, realUserId, institution, loadMoreListings, hasMore, loadingMore } = useApp();
+  const { listings: allListings, loadingListings: loading, fetchListings, refreshSeed, setActiveListing, favs, toggleFav, showToast, loggedIn, realUserId, institution, loadMoreListings, hasMore, loadingMore, imgSearchOpen, setImgSearchOpen } = useApp();
   const sentinelRef = useRef(null);
   useEffect(() => {
     if (!sentinelRef.current) return;
@@ -237,8 +237,8 @@ const [saveSearchModal, setSaveSearchModal] = useState(false);
   const [aiSearching, setAiSearching] = useState(false);
   const [aiResults, setAiResults] = useState(null);
   const [aiExplanation, setAiExplanation] = useState('');
+  const [aiKind, setAiKind] = useState('text'); // 'text' | 'image'
   const [imgSearching, setImgSearching] = useState(false);
-  const [imgModalOpen, setImgModalOpen] = useState(false);
   const aiInputRef = useRef(null);
   const [followedNames, setFollowedNames] = useState(null);
   const [showFollowed, setShowFollowed] = useState(false);
@@ -345,7 +345,7 @@ const [saveSearchModal, setSaveSearchModal] = useState(false);
       });
       const json = await res.json();
       if (json.error) { showToast(json.error, 'error'); }
-      else { setAiResults(json.listings || []); setAiExplanation(json.explanation || ''); }
+      else { setAiKind('text'); setAiResults(json.listings || []); setAiExplanation(json.explanation || ''); }
     } catch { showToast('AI-søgning mislykkedes — prøv igen', 'error'); }
     setAiSearching(false);
   }
@@ -368,7 +368,7 @@ const [saveSearchModal, setSaveSearchModal] = useState(false);
       const res = await authedFetch('/api/ai-image-search', { method: 'POST', body: fd });
       const json = await res.json();
       if (json.error) { showToast(json.error, 'error'); }
-      else { setAiResults(json.listings || []); setAiExplanation(json.explanation || ''); setImgModalOpen(false); }
+      else { setAiKind('image'); setAiResults(json.listings || []); setImgSearchOpen(false); }
     } catch { showToast('Billedsøgning mislykkedes — prøv igen', 'error'); }
     setImgSearching(false);
   }
@@ -381,9 +381,9 @@ const [saveSearchModal, setSaveSearchModal] = useState(false);
     <PullToRefresh onRefresh={fetchListings}>
     <div style={{ minHeight: '100vh', background: PAPER }}>
 
-      {imgModalOpen && (
+      {imgSearchOpen && (
         <ImageSearchModal
-          onClose={() => { if (!imgSearching) setImgModalOpen(false); }}
+          onClose={() => { if (!imgSearching) setImgSearchOpen(false); }}
           onSearch={runImageSearch}
           searching={imgSearching}
         />
@@ -427,25 +427,6 @@ const [saveSearchModal, setSaveSearchModal] = useState(false);
         padding: '12px 24px',
       }}>
         <div style={{ maxWidth: 1140, margin: '0 auto', display: 'flex', flexDirection: 'column', gap: 8 }}>
-          <div style={{ display: 'flex', gap: 8 }}>
-            <div style={{ flex: 1, background: PAPER2, borderRadius: 99, display: 'flex', alignItems: 'center', padding: '9px 16px', gap: 10, border: `1.5px solid ${PAPER3}` }}>
-              <svg width="14" height="14" viewBox="0 0 14 14" fill="none" style={{ flexShrink: 0, opacity: 0.4 }}>
-                <circle cx="6" cy="6" r="5" stroke={INK} strokeWidth="1.5"/>
-                <path d="M10 10L13 13" stroke={INK} strokeWidth="1.5" strokeLinecap="round"/>
-              </svg>
-              <input value={search} readOnly placeholder="Brug søgefeltet ovenfor..."
-                style={{ border: 'none', background: 'transparent', outline: 'none', fontSize: 13, fontFamily: FONT, flex: 1, minWidth: 0, color: INK }} />
-              {search && <span style={{ fontSize: 13, color: INK2, fontFamily: FONT, fontWeight: 600 }}>"{search}"</span>}
-              {/* Kamera: søg med billede (Vinted-stil) */}
-              <button onClick={() => setImgModalOpen(true)} title="Søg med billede" aria-label="Søg med billede"
-                style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 0, display: 'flex', alignItems: 'center', flexShrink: 0 }}>
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
-                  <path d="M3 8.5C3 7.4 3.9 6.5 5 6.5H6.6C6.95 6.5 7.27 6.32 7.45 6.02L8.1 4.98C8.28 4.68 8.6 4.5 8.95 4.5H15.05C15.4 4.5 15.72 4.68 15.9 4.98L16.55 6.02C16.73 6.32 17.05 6.5 17.4 6.5H19C20.1 6.5 21 7.4 21 8.5V17C21 18.1 20.1 19 19 19H5C3.9 19 3 18.1 3 17V8.5Z" stroke={PRIMARY} strokeWidth="1.7"/>
-                  <circle cx="12" cy="12.5" r="3.3" stroke={PRIMARY} strokeWidth="1.7"/>
-                </svg>
-              </button>
-            </div>
-          </div>
           {category && (
             <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, fontWeight: 600, color: PRIMARY, fontFamily: FONT }}>
               {(() => { const catObj = CATEGORIES.find(c => c.key === category); return catObj ? <><span>{catObj.emoji} {catObj.label}</span>{subcategory && <><span style={{ opacity: 0.5 }}>›</span><span>{subcategory}</span></>}</> : null; })()}
@@ -540,7 +521,7 @@ const [saveSearchModal, setSaveSearchModal] = useState(false);
         )}
         {isMobile && (
           <button
-            onClick={() => setImgModalOpen(true)}
+            onClick={() => setImgSearchOpen(true)}
             style={{ padding: '8px 16px', borderRadius: 99, border: 'none', background: PAPER2, color: INK2, fontFamily: FONT, fontWeight: 700, fontSize: 13, cursor: 'pointer', transition: 'all 0.15s', display: 'flex', alignItems: 'center', gap: 4 }}
           >
             📷 Søg med billede
@@ -650,16 +631,22 @@ const [saveSearchModal, setSaveSearchModal] = useState(false);
           </div>
         )}
 
-        {/* AI results banner */}
+        {/* Resultat-banner */}
         {aiResults !== null && (
           <div style={{ marginBottom: 14, background: `${PRIMARY}11`, border: `1.5px solid ${PRIMARY}33`, borderRadius: 12, padding: '10px 16px', display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
-            <span style={{ fontSize: 18 }}>✨</span>
+            <span style={{ fontSize: 18 }}>{aiKind === 'image' ? '📷' : '✨'}</span>
             <div style={{ flex: 1, minWidth: 0 }}>
-              <span style={{ fontFamily: FONT, fontWeight: 700, fontSize: 13, color: PRIMARY }}>{aiExplanation}</span>
-              <span style={{ fontFamily: FONT, fontSize: 12, color: INK3, marginLeft: 8 }}>— {aiResults.length} opslag fundet</span>
+              {aiKind === 'image' ? (
+                <span style={{ fontFamily: FONT, fontWeight: 700, fontSize: 13, color: PRIMARY }}>Lignende opslag</span>
+              ) : (
+                <>
+                  <span style={{ fontFamily: FONT, fontWeight: 700, fontSize: 13, color: PRIMARY }}>{aiExplanation}</span>
+                  <span style={{ fontFamily: FONT, fontSize: 12, color: INK3, marginLeft: 8 }}>— {aiResults.length} opslag fundet</span>
+                </>
+              )}
             </div>
             <button onClick={clearAiSearch} style={{ background: 'none', border: `1.5px solid ${PRIMARY}44`, borderRadius: 99, padding: '4px 12px', fontSize: 12, fontWeight: 700, color: PRIMARY, fontFamily: FONT, cursor: 'pointer', whiteSpace: 'nowrap' }}>
-              × Ryd AI-søgning
+              × Ryd
             </button>
           </div>
         )}

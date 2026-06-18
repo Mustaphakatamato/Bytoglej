@@ -172,7 +172,7 @@ function levenshtein(a, b) {
 function SearchBar({ transparent, router }) {
   const searchParams = useSearchParams();
   const pathname = usePathname();
-  const { listings: allListings, realUserId, institution, hiddenInstNames } = useApp();
+  const { listings: allListings, realUserId, institution, hiddenInstNames, setImgSearchOpen } = useApp();
   const listings = allListings.filter(l =>
     l.user_id !== realUserId && !(institution?.name && l.institution_name === institution.name)
   );
@@ -366,6 +366,15 @@ function SearchBar({ transparent, router }) {
             <button type="button" onClick={() => { setQ(''); setCursor(-1); }} aria-label="Ryd søgning"
               style={{ background:'none', border:'none', color: transparent ? 'rgba(255,255,255,0.7)' : INK3, fontSize:14, cursor:'pointer', padding:'4px', lineHeight:1, flexShrink:0 }}>✕</button>
           )}
+          {/* Søg med billede (Vinted-stil) — åbner crop-modalen på /opslag */}
+          <button type="button" aria-label="Søg med billede" title="Søg med billede"
+            onClick={() => { if (pathname !== '/opslag') router.push('/opslag'); setImgSearchOpen(true); setOpen(false); }}
+            style={{ background:'none', border:'none', cursor:'pointer', padding:'4px', display:'flex', alignItems:'center', flexShrink:0 }}>
+            <svg width="19" height="19" viewBox="0 0 24 24" fill="none">
+              <path d="M3 8.5C3 7.4 3.9 6.5 5 6.5H6.6C6.95 6.5 7.27 6.32 7.45 6.02L8.1 4.98C8.28 4.68 8.6 4.5 8.95 4.5H15.05C15.4 4.5 15.72 4.68 15.9 4.98L16.55 6.02C16.73 6.32 17.05 6.5 17.4 6.5H19C20.1 6.5 21 7.4 21 8.5V17C21 18.1 20.1 19 19 19H5C3.9 19 3 18.1 3 17V8.5Z" stroke={transparent ? '#fff' : PRIMARY} strokeWidth="1.7"/>
+              <circle cx="12" cy="12.5" r="3.3" stroke={transparent ? '#fff' : PRIMARY} strokeWidth="1.7"/>
+            </svg>
+          </button>
           <button type="submit" aria-label="Søg" style={{
             background: transparent ? 'rgba(255,255,255,0.25)' : PRIMARY,
             color:'#fff', border:'none', borderRadius:99,
