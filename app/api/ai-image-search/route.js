@@ -1,6 +1,5 @@
 import Groq from 'groq-sdk';
 import { NextResponse } from 'next/server';
-import { requireAuth, UNAUTHORIZED } from '@/lib/api-auth';
 import { createServerClient } from '@/lib/supabase-server';
 import { embedText } from '@/lib/embed';
 
@@ -8,8 +7,8 @@ export const maxDuration = 30;
 
 // Søg med et billede: foto → Groq-beskrivelse (gratis) → gte-small embedding (gratis)
 // → pgvector match_listings (gratis). Finder opslag hvis billeder "minder om" søge-fotoet.
+// Åben for alle (kræver ikke login) — kun offentlige, aktive opslag returneres.
 export async function POST(req) {
-  if (!await requireAuth(req)) return UNAUTHORIZED();
   if (!process.env.GROQ_API_KEY) {
     return NextResponse.json({ error: 'AI-søgning er ikke konfigureret' }, { status: 500 });
   }
