@@ -8,6 +8,7 @@ import { useWindowWidth, useFeedListings } from '@/lib/hooks';
 import { Btn, SkeletonCard, SkeletonMobileCard } from '@/components/ui';
 import ListingCard, { calcServiceFee, BuyerProtectionPopup } from '@/components/ListingCard';
 import PullToRefresh from '@/components/PullToRefresh';
+import ImageSearchModal from '@/components/ImageSearchModal';
 import { useApp } from '@/providers/AppProvider';
 import { db } from '@/lib/supabase';
 import { authedFetch } from '@/lib/authed-fetch';
@@ -237,8 +238,8 @@ const [saveSearchModal, setSaveSearchModal] = useState(false);
   const [aiResults, setAiResults] = useState(null);
   const [aiExplanation, setAiExplanation] = useState('');
   const [imgSearching, setImgSearching] = useState(false);
+  const [imgModalOpen, setImgModalOpen] = useState(false);
   const aiInputRef = useRef(null);
-  const imgInputRef = useRef(null);
   const [followedNames, setFollowedNames] = useState(null);
   const [showFollowed, setShowFollowed] = useState(false);
 
@@ -356,21 +357,18 @@ const [saveSearchModal, setSaveSearchModal] = useState(false);
     setAiExplanation('');
   }
 
-  async function handleImageSearch(e) {
-    const file = e.target.files?.[0];
-    e.target.value = ''; // tillad valg af samme fil igen
-    if (!file || imgSearching) return;
+  async function runImageSearch(blob) {
+    if (imgSearching) return;
     setImgSearching(true);
-    setAiMode(true);
     setAiResults(null);
     setAiQuery('');
     try {
       const fd = new FormData();
-      fd.append('image', file);
+      fd.append('image', blob, 'soegning.jpg');
       const res = await authedFetch('/api/ai-image-search', { method: 'POST', body: fd });
       const json = await res.json();
       if (json.error) { showToast(json.error, 'error'); }
-      else { setAiResults(json.listings || []); setAiExplanation(json.explanation || ''); }
+      else { setAiResults(json.listings || []); setAiExplanation(json.explanation || ''); setImgModalOpen(false); }
     } catch { showToast('Billedsøgning mislykkedes — prøv igen', 'error'); }
     setImgSearching(false);
   }
@@ -383,8 +381,13 @@ const [saveSearchModal, setSaveSearchModal] = useState(false);
     <PullToRefresh onRefresh={fetchListings}>
     <div style={{ minHeight: '100vh', background: PAPER }}>
 
-      {/* Skjult filinput til billedsøgning — udløses af "Søg med billede"-knapperne */}
-      <input ref={imgInputRef} type="file" accept="image/*" onChange={handleImageSearch} style={{ display: 'none' }} />
+      {imgModalOpen && (
+        <ImageSearchModal
+          onClose={() => { if (!imgSearching) setImgModalOpen(false); }}
+          onSearch={runImageSearch}
+          searching={imgSearching}
+        />
+      )}
 
       {/* ── Desktop header only ── */}
       {!isMobile && (
@@ -433,6 +436,14 @@ const [saveSearchModal, setSaveSearchModal] = useState(false);
               <input value={search} readOnly placeholder="Brug søgefeltet ovenfor..."
                 style={{ border: 'none', background: 'transparent', outline: 'none', fontSize: 13, fontFamily: FONT, flex: 1, minWidth: 0, color: INK }} />
               {search && <span style={{ fontSize: 13, color: INK2, fontFamily: FONT, fontWeight: 600 }}>"{search}"</span>}
+              {/* Kamera: søg med billede (Vinted-stil) */}
+              <button onClick={() => setImgModalOpen(true)} title="Søg med billede" aria-label="Søg med billede"
+                style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 0, display: 'flex', alignItems: 'center', flexShrink: 0 }}>
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
+                  <path d="M3 8.5C3 7.4 3.9 6.5 5 6.5H6.6C6.95 6.5 7.27 6.32 7.45 6.02L8.1 4.98C8.28 4.68 8.6 4.5 8.95 4.5H15.05C15.4 4.5 15.72 4.68 15.9 4.98L16.55 6.02C16.73 6.32 17.05 6.5 17.4 6.5H19C20.1 6.5 21 7.4 21 8.5V17C21 18.1 20.1 19 19 19H5C3.9 19 3 18.1 3 17V8.5Z" stroke={PRIMARY} strokeWidth="1.7"/>
+                  <circle cx="12" cy="12.5" r="3.3" stroke={PRIMARY} strokeWidth="1.7"/>
+                </svg>
+              </button>
             </div>
           </div>
           {category && (
@@ -501,15 +512,7 @@ const [saveSearchModal, setSaveSearchModal] = useState(false);
               onClick={() => { if (aiMode) clearAiSearch(); else { setAiMode(true); setTimeout(() => aiInputRef.current?.focus(), 50); } }}
               style={{ padding: '7px 16px', borderRadius: 99, border: aiMode ? 'none' : `1.5px solid ${PAPER3}`, background: aiMode ? PRIMARY : PAPER2, color: aiMode ? '#fff' : INK2, fontSize: 13, fontWeight: 700, fontFamily: FONT, cursor: 'pointer', whiteSpace: 'nowrap', display: 'flex', alignItems: 'center', gap: 5, transition: 'all 0.15s', marginLeft: 'auto' }}
             >
-              ✨ Søg med AI
-            </button>
-            {/* Søg med billede */}
-            <button
-              onClick={() => !imgSearching && imgInputRef.current?.click()}
-              disabled={imgSearching}
-              style={{ padding: '7px 16px', borderRadius: 99, border: `1.5px solid ${PAPER3}`, background: PAPER2, color: INK2, fontSize: 13, fontWeight: 700, fontFamily: FONT, cursor: imgSearching ? 'default' : 'pointer', whiteSpace: 'nowrap', display: 'flex', alignItems: 'center', gap: 5, transition: 'all 0.15s', opacity: imgSearching ? 0.6 : 1 }}
-            >
-              {imgSearching ? 'Analyserer…' : '📷 Søg med billede'}
+              ✨ AI tekst søgning
             </button>
           </div>
         </div>
@@ -532,16 +535,15 @@ const [saveSearchModal, setSaveSearchModal] = useState(false);
             onClick={() => { if (aiMode) clearAiSearch(); else { setAiMode(true); setTimeout(() => aiInputRef.current?.focus(), 50); } }}
             style={{ padding: '8px 16px', borderRadius: 99, border: 'none', background: aiMode ? PRIMARY : PAPER2, color: aiMode ? '#fff' : INK2, fontFamily: FONT, fontWeight: 700, fontSize: 13, cursor: 'pointer', transition: 'all 0.15s', display: 'flex', alignItems: 'center', gap: 4 }}
           >
-            ✨ AI
+            ✨ AI tekst
           </button>
         )}
         {isMobile && (
           <button
-            onClick={() => !imgSearching && imgInputRef.current?.click()}
-            disabled={imgSearching}
-            style={{ padding: '8px 16px', borderRadius: 99, border: 'none', background: PAPER2, color: INK2, fontFamily: FONT, fontWeight: 700, fontSize: 13, cursor: imgSearching ? 'default' : 'pointer', transition: 'all 0.15s', display: 'flex', alignItems: 'center', gap: 4, opacity: imgSearching ? 0.6 : 1 }}
+            onClick={() => setImgModalOpen(true)}
+            style={{ padding: '8px 16px', borderRadius: 99, border: 'none', background: PAPER2, color: INK2, fontFamily: FONT, fontWeight: 700, fontSize: 13, cursor: 'pointer', transition: 'all 0.15s', display: 'flex', alignItems: 'center', gap: 4 }}
           >
-            {imgSearching ? '…' : '📷 Billede'}
+            📷 Søg med billede
           </button>
         )}
       </div>
