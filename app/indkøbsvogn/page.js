@@ -382,6 +382,7 @@ export default function CartPage() {
             price: i.price,
             emoji: i.listingEmoji,
             category: i.category,
+            ...(i.offerId ? { offerId: i.offerId } : {}),
           })),
           shippingMethod: ds.method || null,
           shippingPrice: ds.price || 0,

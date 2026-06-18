@@ -235,7 +235,7 @@ function LoginInline({ onLogin }) {
 export default function MessagesClient() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const { selectedConvId, setSelectedConvId, setActiveListing, fetchUnread } = useApp();
+  const { selectedConvId, setSelectedConvId, setActiveListing, fetchUnread, addToCart } = useApp();
   const { isAdminView: ctxIsAdmin, adminInstName, institution: ctxInstitution, institutionId: ctxInstId, realUserId, userId: ctxUserId } = useActiveUser();
 
   const [userId,      setUserId]      = useState(null);
@@ -1718,8 +1718,13 @@ export default function MessagesClient() {
                                             <button
                                               onClick={()=>{
                                                 if (paying) return;
-                                                if (checkoutData?.can_ship || checkoutData?.shipping_options?.allow_shipping) { setCarrierPickerMsg(m); }
-                                                else { handleBidPayment(m, checkoutData?.shipping_options?.allow_pickup ? 'pickup' : 'custom'); }
+                                                addToCart({
+                                                  listingId: checkoutData.listing_id,
+                                                  offerId: checkoutData.offer_id,
+                                                  price: checkoutData.amount,
+                                                  title: checkoutData.listing_title,
+                                                });
+                                                router.push('/indkøbsvogn');
                                               }}
                                               disabled={paying}
                                               style={{ padding:'13px', borderRadius:99, background:paying?PAPER3:PRIMARY, border:'none', color:paying?INK3:'#fff', fontFamily:FONT, fontWeight:700, fontSize:14, cursor:paying?'default':'pointer' }}>
