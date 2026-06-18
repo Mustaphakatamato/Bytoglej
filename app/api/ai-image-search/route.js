@@ -32,7 +32,7 @@ export async function POST(req) {
         role: 'user',
         content: [
           { type: 'image_url', image_url: { url: `data:${mimeType};base64,${base64}` } },
-          { type: 'text', text: 'Beskriv legetøjet/genstanden på dette billede med 1-2 korte danske sætninger (type, materiale, farve, hvad det bruges til). Kun beskrivelsen — ingen indledning.' },
+          { type: 'text', text: 'Beskriv KUN hvad du ser på billedet i 1-2 korte danske sætninger: genstandstype, hovedfarve(r), materiale, form og evt. tekst/logo/mærke samt distinkte træk. Ingen vurdering af stand, alder eller egnethed. Intet salgssprog. Kun beskrivelsen — ingen indledning.' },
         ],
       }],
     });

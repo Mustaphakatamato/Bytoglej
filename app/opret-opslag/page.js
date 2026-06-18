@@ -78,6 +78,7 @@ export default function OpretOpslagPage() {
   const [aiFilledFields, setAiFilledFields] = useState({ title: false, description: false });
   const [priceSuggestion, setPriceSuggestion] = useState(null); // { basis, comparable_count, suggested_min, suggested_max, suggested_price }
   const [aiScanData, setAiScanData] = useState(null); // AI-forslag gemt til log ved submit
+  const [aiVisual, setAiVisual] = useState(null);     // ren visuel billedbeskrivelse til billedsøgning
   const [scanRejected, setScanRejected] = useState(false); // AI afviste billede → vis "send til gennemgang"
   const [rejectionLogId, setRejectionLogId] = useState(null); // person detection → "AI tog fejl" knap
   const [step1Attempted, setStep1Attempted] = useState(false);
@@ -391,6 +392,7 @@ export default function OpretOpslagPage() {
       setScanRejected(!!json.needs_review);
       setAiFilledFields({ title: !!json.title, description: !!json.description });
       setPriceSuggestion(json.price || null);
+      setAiVisual(json.visual_description || null);
       setAiScanData({
         scan_type: 'scan-toy',
         model_used: 'meta-llama/llama-4-scout-17b-16e-instruct',
@@ -506,7 +508,7 @@ export default function OpretOpslagPage() {
       review_requested_at: scanRejected ? new Date().toISOString() : null,
       category: form.category || null, subcategory: form.subcategory || null, brand: form.brand || null,
       can_ship: delivery.shipping || false,
-      image_description: aiScanData?.ai_description || null, // AI'ens rå billedbeskrivelse — bruges til semantisk billedsøgning
+      image_description: aiVisual || aiScanData?.ai_description || null, // ren visuel beskrivelse — bruges til semantisk billedsøgning
     };
     if (form.type==='byd' && form.min_bid) insertData.min_bid = Number(form.min_bid);
     const { data: listing, error } = await db.from('listings').insert(insertData).select().single();
@@ -540,7 +542,7 @@ export default function OpretOpslagPage() {
     }
     // Fire-and-forget: semantisk embedding til AI-billedsøgning (kun ikke-søges opslag indgår i søgning)
     if (listing?.id && !isSøges) {
-      const descText = aiScanData?.ai_description || `${form.title}. ${form.description}`;
+      const descText = aiVisual || aiScanData?.ai_description || `${form.title}. ${form.description}`;
       authedFetch('/api/embed-listing', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ listingId: listing.id, text: descText }),
