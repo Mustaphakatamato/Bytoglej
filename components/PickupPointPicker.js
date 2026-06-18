@@ -75,9 +75,19 @@ export default function PickupPointPicker({ points, cheapestCarrier, buyerCoords
       markersRef.current = L.layerGroup().addTo(mapInstanceRef.current);
 
       // Genberegn størrelse + zoom til alle punkter, og tving tiles til at gentegne.
+      // Safari resolver ikke altid højden på et position:absolute element fra dets
+      // flex-forælder, så vi sætter eksplicit højde fra forælderens målte størrelse —
+      // ellers ser invalidateSize 0 og loader ingen tiles.
       const fix = () => {
         const map = mapInstanceRef.current;
-        if (!map) return;
+        const el = mapRef.current;
+        if (!map || !el) return;
+        const parent = el.parentElement;
+        if (parent) {
+          const h = parent.clientHeight, w = parent.clientWidth;
+          if (h > 0) el.style.height = h + 'px';
+          if (w > 0) el.style.width = w + 'px';
+        }
         map.invalidateSize();
         if (valid.length > 1) {
           map.fitBounds(L.latLngBounds(valid.map(p => [p.lat, p.lng])), { padding: [40, 40] });
@@ -89,11 +99,11 @@ export default function PickupPointPicker({ points, cheapestCarrier, buyerCoords
       setTimeout(fix, 500);
 
       // Kortet ligger i en modal hvis flex-layout først har endelig størrelse
-      // efter mount. En ResizeObserver kalder fix() så snart containeren får
-      // sin rigtige størrelse — det er det der får tiles til at loade.
-      if (typeof ResizeObserver !== 'undefined' && mapRef.current) {
+      // efter mount. Observér forælder-wrapperen (konkret flex-størrelse) frem for
+      // det absolutte element, da Safari ikke pålideligt rapporterer sidstnævnte.
+      if (typeof ResizeObserver !== 'undefined' && mapRef.current?.parentElement) {
         const ro = new ResizeObserver(() => fix());
-        ro.observe(mapRef.current);
+        ro.observe(mapRef.current.parentElement);
         resizeObsRef.current = ro;
       }
     }
