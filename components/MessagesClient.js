@@ -1056,6 +1056,7 @@ export default function MessagesClient() {
             listingTitle: active?.listing_title || '',
             listingEmoji: active?.listing_emoji || '🧸',
             convId: active?.id,
+            ...(data.notify.messageType ? { messageType: data.notify.messageType } : {}),
           }),
         }).catch(() => {});
       }
@@ -1494,7 +1495,8 @@ export default function MessagesClient() {
                         const effUid = realUserId || userId;
                         const mine = ctxIsAdmin && adminInstName
                           ? m.sender_name === adminInstName
-                          : m.sender_id === effUid;
+                          : m.sender_id === effUid
+                            || (ctxInstitution?.name && m.sender_name?.toLowerCase() === ctxInstitution.name?.toLowerCase());
                         const d = new Date(m.created_at);
                         const dateStr = d.toLocaleDateString('da-DK',{weekday:'long',day:'numeric',month:'long'});
                         const showDate = dateStr !== lastDate;

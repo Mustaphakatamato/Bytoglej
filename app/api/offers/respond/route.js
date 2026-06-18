@@ -166,7 +166,7 @@ export async function POST(req) {
   await bumpConversation(`🔄 Modbud: ${counterAmount} kr.`,
     { is_handled: false });
 
-  return NextResponse.json({ ok: true, status: 'countered', offer: counter, notify });
+  return NextResponse.json({ ok: true, status: 'countered', offer: counter, notify: notify ? { ...notify, messageType: 'counter' } : null });
 }
 
 // Bedste visningsnavn for afsenderen (institution hvis muligt).

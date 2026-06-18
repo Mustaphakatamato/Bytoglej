@@ -15,6 +15,7 @@ export async function POST(req) {
     const senderName = String(body.senderName || 'En bruger').slice(0, 200);
     const listingTitle = String(body.listingTitle || '').slice(0, 200);
     const listingEmoji = String(body.listingEmoji || '').slice(0, 10);
+    const messageType = String(body.messageType || 'message').slice(0, 50);
 
     if (!ownerEmail || !EMAIL_RE.test(ownerEmail)) {
       return NextResponse.json({ error: 'ownerEmail er påkrævet' }, { status: 400 });
@@ -32,8 +33,8 @@ export async function POST(req) {
       body: JSON.stringify({
         from: 'byt&leg <noreply@bytogleg.dk>',
         to: [ownerEmail],
-        subject: `${senderName} har sendt dig en besked om ${listingEmoji} ${listingTitle}`,
-        html: emailHtml({ ownerName, senderName, listingTitle, listingEmoji, link }),
+        subject: messageType === 'counter' ? `${senderName} har sendt dig et modbud på ${listingEmoji} ${listingTitle}` : `${senderName} har sendt dig en besked om ${listingEmoji} ${listingTitle}`,
+        html: emailHtml({ ownerName, senderName, listingTitle, listingEmoji, link, messageType }),
       }),
     });
 
@@ -54,7 +55,7 @@ export async function POST(req) {
         const owner = users?.find(u => u.email?.toLowerCase() === ownerEmail.toLowerCase());
         if (owner?.id) {
           sendPushToUser(owner.id, {
-            title: `${senderName} har sendt dig en besked`,
+            title: messageType === 'counter' ? `${senderName} har sendt dig et modbud` : `${senderName} har sendt dig en besked`,
             body: `${listingEmoji || ''} ${listingTitle}`.trim(),
             url: '/beskeder',
           });
@@ -68,12 +69,17 @@ export async function POST(req) {
   }
 }
 
-function emailHtml({ ownerName: rawOwnerName, senderName: rawSenderName, listingTitle: rawTitle, listingEmoji: rawEmoji, link }) {
+function emailHtml({ ownerName: rawOwnerName, senderName: rawSenderName, listingTitle: rawTitle, listingEmoji: rawEmoji, link, messageType }) {
   const ownerName = escapeHtml(rawOwnerName);
   const senderName = escapeHtml(rawSenderName);
   const listingTitle = escapeHtml(rawTitle);
   const listingEmoji = escapeHtml(rawEmoji);
   const greeting = ownerName ? `Hej ${ownerName},` : 'Hej,';
+  const isCounter = messageType === 'counter';
+  const headline = isCounter ? 'Nyt modbud!' : 'Ny besked!';
+  const bodyText = isCounter
+    ? `<strong style="color:#16221C">${senderName}</strong> har sendt dig et modbud på dit opslag <strong style="color:#16221C">${listingEmoji} ${listingTitle}</strong>.`
+    : `<strong style="color:#16221C">${senderName}</strong> har sendt dig en besked om dit opslag <strong style="color:#16221C">${listingEmoji} ${listingTitle}</strong>.`;
   return `<!DOCTYPE html>
 <html lang="da">
 <head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head>
@@ -84,12 +90,9 @@ function emailHtml({ ownerName: rawOwnerName, senderName: rawSenderName, listing
       <p style="color:rgba(255,255,255,0.65);margin:16px 0 0;font-size:14px;letter-spacing:0.02em;">Danmarks legetøjsbyttemarkeds for institutioner</p>
     </div>
     <div style="padding:40px;">
-      <h1 style="font-size:24px;font-weight:800;color:#16221C;margin:0 0 8px;letter-spacing:-0.03em;">Ny besked!</h1>
+      <h1 style="font-size:24px;font-weight:800;color:#16221C;margin:0 0 8px;letter-spacing:-0.03em;">${headline}</h1>
       <p style="font-size:15px;color:#3A473D;line-height:1.65;margin:0 0 24px;">${greeting}</p>
-      <p style="font-size:15px;color:#3A473D;line-height:1.65;margin:0 0 28px;">
-        <strong style="color:#16221C">${senderName}</strong> har sendt dig en besked om dit opslag
-        <strong style="color:#16221C">${listingEmoji} ${listingTitle}</strong>.
-      </p>
+      <p style="font-size:15px;color:#3A473D;line-height:1.65;margin:0 0 28px;">${bodyText}</p>
       <div style="text-align:center;margin:36px 0;">
         <a href="${link}" style="display:inline-block;background:#2A7D4F;color:#fff;text-decoration:none;font-weight:700;font-size:16px;padding:17px 40px;border-radius:99px;letter-spacing:-0.01em;">Se besked →</a>
       </div>
