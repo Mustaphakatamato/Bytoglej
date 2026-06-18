@@ -1716,13 +1716,25 @@ export default function MessagesClient() {
                                               </div>
                                             </div>
                                             <button
-                                              onClick={()=>{
+                                              onClick={async ()=>{
                                                 if (paying) return;
+                                                // Hent hele opslaget så kurv-itemet får præcis samme form
+                                                // som et normalt køb — kun prisen overskrives med tilbudsbeløbet.
+                                                const { data: l } = await db.from('listings')
+                                                  .select('id, title, emoji, color, category, images, institution_name, user_id')
+                                                  .eq('id', checkoutData.listing_id).maybeSingle();
+                                                if (!l) { showToast('Opslaget kunne ikke hentes', 'error'); return; }
                                                 addToCart({
-                                                  listingId: checkoutData.listing_id,
-                                                  offerId: checkoutData.offer_id,
+                                                  listingId: l.id,
+                                                  listingTitle: l.title,
+                                                  listingEmoji: l.emoji || '🧸',
+                                                  listingColor: l.color,
                                                   price: checkoutData.amount,
-                                                  title: checkoutData.listing_title,
+                                                  category: l.category,
+                                                  images: l.images || [],
+                                                  ownerInstitutionName: l.institution_name,
+                                                  ownerId: l.user_id,
+                                                  offerId: checkoutData.offer_id,
                                                 });
                                                 router.push('/indkøbsvogn');
                                               }}
