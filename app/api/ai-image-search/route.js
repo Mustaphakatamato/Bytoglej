@@ -46,9 +46,10 @@ export async function POST(req) {
     if (!embedding) return NextResponse.json({ error: 'Kunne ikke behandle billedet' }, { status: 500 });
 
     const supa = createServerClient();
+    // match_listings bruger en lighedstærskel (absolut bund + relativ margin fra
+    // bedste match) og et loft, så kun opslag der faktisk ligner returneres.
     const { data: listings, error } = await supa.rpc('match_listings', {
       query_embedding: embedding,
-      match_count: 40,
     });
     if (error) return NextResponse.json({ error: error.message }, { status: 500 });
 
