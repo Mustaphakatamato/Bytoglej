@@ -18,7 +18,7 @@ export function BuyerProtectionPopup({ price, fee, onClose, image, emoji }) {
   if (!mounted) return null;
 
   const modal = (
-    <div onClick={onClose} style={{ position:'fixed', inset:0, background:'rgba(22,34,28,0.5)', zIndex:9999, display:'flex', alignItems:'center', justifyContent:'center', padding:24 }}>
+    <div onClick={onClose} style={{ position:'fixed', inset:0, background:'rgba(22,34,28,0.5)', zIndex:10100, display:'flex', alignItems:'center', justifyContent:'center', padding:24 }}>
       <div onClick={e=>e.stopPropagation()} style={{ background:'#fff', borderRadius:20, width:'100%', maxWidth:420, padding:'28px 24px', boxShadow:'0 24px 64px rgba(22,34,28,0.22)' }}>
         <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:24 }}>
           <span style={{ fontFamily:FONT, fontWeight:800, fontSize:17, color:'#111' }}>Prisoversigt</span>
