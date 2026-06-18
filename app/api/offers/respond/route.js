@@ -120,7 +120,37 @@ export async function POST(req) {
       { is_handled: true, handled_at: now, handled_action: 'accepted' }
     );
 
-    return NextResponse.json({ ok: true, status: 'accepted', reservedUntil, notify });
+    // Afvis automatisk alle ANDRE åbne bud på samme vare — sælger har valgt ét.
+    const { data: others } = await supa
+      .from('offers')
+      .select('id, conversation_id, amount')
+      .eq('listing_id', listing.id)
+      .eq('status', 'pending')
+      .neq('id', offer.id);
+    if (others?.length) {
+      await supa.from('offers')
+        .update({ status: 'rejected', responded_at: now })
+        .in('id', others.map(o => o.id));
+      for (const o of others) {
+        if (!o.conversation_id) continue;
+        await supa.from('chat_messages').insert({
+          conversation_id: o.conversation_id,
+          sender_id: user.id,
+          sender_name: senderName,
+          content: `Tilbuddet på ${o.amount} kr. blev desværre ikke valgt — sælger har accepteret et andet bud.`,
+        });
+        const { data: c } = await supa.from('conversations')
+          .select('initiator_unread').eq('id', o.conversation_id).maybeSingle();
+        await supa.from('conversations').update({
+          last_message: `Tilbud på ${o.amount} kr. blev ikke valgt`,
+          last_message_at: now,
+          initiator_unread: ((c?.initiator_unread) || 0) + 1,
+          is_handled: true, handled_at: now, handled_action: 'rejected',
+        }).eq('id', o.conversation_id);
+      }
+    }
+
+    return NextResponse.json({ ok: true, status: 'accepted', reservedUntil, notify, rejectedOthers: others?.length || 0 });
   }
 
   // ---- REJECT ----

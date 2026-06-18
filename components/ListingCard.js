@@ -118,6 +118,7 @@ export default function ListingCard({ listing, onClick, favs, toggleFav, onInsti
   const router = useRouter();
   const { realUserId, institution } = useApp();
   const isOwn = listing.user_id === realUserId || (institution?.name && listing.institution_name === institution.name);
+  const isReserved = !!(listing.reserved_until && new Date(listing.reserved_until).getTime() > Date.now());
   const isFav = favs.includes(listing.id);
   const [popping, setPopping] = useState(false);
   const [showFeePopup, setShowFeePopup] = useState(false);
@@ -169,6 +170,11 @@ export default function ListingCard({ listing, onClick, favs, toggleFav, onInsti
           <img src={imgs[0]} alt={listing.title || ''} style={{ width:'100%', height:'100%', objectFit:'cover', display:'block' }} />
         ) : (
           <span style={{ fontSize:52, opacity:0.45 }}>{listing.emoji || '🧸'}</span>
+        )}
+        {isReserved && (
+          <div style={{ position:'absolute', top:10, left:10, zIndex:2, background:'#F59E0B', color:'#fff', fontWeight:800, fontSize:11, padding:'5px 10px', borderRadius:99, letterSpacing:'0.02em', boxShadow:'0 2px 6px rgba(0,0,0,0.2)', display:'flex', alignItems:'center', gap:4 }}>
+            ⏳ Reserveret
+          </div>
         )}
         {imgs.length > 1 && <>
           <button onClick={prevImg} style={{ position: 'absolute', left: 8, top: '50%', transform: 'translateY(-50%)', background: 'rgba(22,34,28,0.52)', border: 'none', borderRadius: '50%', width: 32, height: 32, color: '#fff', fontSize: 18, fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>‹</button>
