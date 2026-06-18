@@ -102,7 +102,8 @@ export default function CartPage() {
     return Object.values(map);
   }, [cart]);
 
-  const [selected, setSelected] = useState({});
+  // Kun én sælger kan checkes ud ad gangen (radio). null = default til første gruppe.
+  const [selectedSeller, setSelectedSeller] = useState(null);
   const [notes, setNotes] = useState({});
   const [shippingOptions, setShippingOptions] = useState({});  // listingId → shipping_options row
   const [listingsCanShip, setListingsCanShip] = useState({});  // listingId → can_ship bool
@@ -212,8 +213,12 @@ export default function CartPage() {
       });
   }, [groups]);
 
-  function isSelected(name) { return name in selected ? selected[name] : true; }
-  function toggleSelected(name) { setSelected(p => ({ ...p, [name]: !isSelected(name) })); }
+  // Default til første gruppe hvis intet (gyldigt) valg er sat.
+  const effectiveSeller = (selectedSeller && groups.some(g => g.ownerInstitutionName === selectedSeller))
+    ? selectedSeller
+    : groups[0]?.ownerInstitutionName;
+  function isSelected(name) { return name === effectiveSeller; }
+  function selectSeller(name) { setSelectedSeller(name); }
 
   function setDeliveryMethod(sellerName, method, price) {
     setDeliveryState(p => ({ ...p, [sellerName]: { ...p[sellerName], method, price: price ?? null, pickupPoint: null } }));
@@ -469,10 +474,10 @@ export default function CartPage() {
               <div key={name} style={{ background: '#fff', borderRadius: 20, border: `1.5px solid ${PAPER3}`, marginBottom: 24, overflow: 'hidden' }}>
 
                 {/* Seller header */}
-                <div style={{ padding: '14px 20px', borderBottom: `1px solid ${PAPER2}`, display: 'flex', alignItems: 'center', gap: 10, cursor: groups.length > 1 ? 'pointer' : 'default' }} onClick={() => groups.length > 1 && toggleSelected(name)}>
+                <div style={{ padding: '14px 20px', borderBottom: `1px solid ${PAPER2}`, display: 'flex', alignItems: 'center', gap: 10, cursor: groups.length > 1 ? 'pointer' : 'default' }} onClick={() => groups.length > 1 && selectSeller(name)}>
                   {groups.length > 1 && (
-                    <div style={{ width: 20, height: 20, borderRadius: 5, border: `2px solid ${sel ? PRIMARY : PAPER3}`, background: sel ? PRIMARY : '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, transition: 'all 0.15s' }}>
-                      {sel && <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="3" strokeLinecap="round"><polyline points="20 6 9 17 4 12"/></svg>}
+                    <div style={{ width: 20, height: 20, borderRadius: '50%', border: `2px solid ${sel ? PRIMARY : PAPER3}`, background: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, transition: 'all 0.15s' }}>
+                      {sel && <div style={{ width: 10, height: 10, borderRadius: '50%', background: PRIMARY }} />}
                     </div>
                   )}
                   <div style={{ fontFamily: FONT, fontWeight: 700, fontSize: 14, color: INK, flex: 1 }}>{name}</div>
