@@ -237,6 +237,7 @@ const [saveSearchModal, setSaveSearchModal] = useState(false);
   const [aiSearching, setAiSearching] = useState(false);
   const [aiResults, setAiResults] = useState(null);
   const [aiExplanation, setAiExplanation] = useState('');
+  const [aiKind, setAiKind] = useState('text'); // 'text' | 'image'
   const [imgSearching, setImgSearching] = useState(false);
   const aiInputRef = useRef(null);
   const [followedNames, setFollowedNames] = useState(null);
@@ -344,7 +345,7 @@ const [saveSearchModal, setSaveSearchModal] = useState(false);
       });
       const json = await res.json();
       if (json.error) { showToast(json.error, 'error'); }
-      else { setAiResults(json.listings || []); setAiExplanation(json.explanation || ''); }
+      else { setAiKind('text'); setAiResults(json.listings || []); setAiExplanation(json.explanation || ''); }
     } catch { showToast('AI-søgning mislykkedes — prøv igen', 'error'); }
     setAiSearching(false);
   }
@@ -367,7 +368,7 @@ const [saveSearchModal, setSaveSearchModal] = useState(false);
       const res = await authedFetch('/api/ai-image-search', { method: 'POST', body: fd });
       const json = await res.json();
       if (json.error) { showToast(json.error, 'error'); }
-      else { setAiResults(json.listings || []); setAiExplanation(json.explanation || ''); setImgSearchOpen(false); }
+      else { setAiKind('image'); setAiResults(json.listings || []); setImgSearchOpen(false); }
     } catch { showToast('Billedsøgning mislykkedes — prøv igen', 'error'); }
     setImgSearching(false);
   }
@@ -630,16 +631,22 @@ const [saveSearchModal, setSaveSearchModal] = useState(false);
           </div>
         )}
 
-        {/* AI results banner */}
+        {/* Resultat-banner */}
         {aiResults !== null && (
           <div style={{ marginBottom: 14, background: `${PRIMARY}11`, border: `1.5px solid ${PRIMARY}33`, borderRadius: 12, padding: '10px 16px', display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
-            <span style={{ fontSize: 18 }}>✨</span>
+            <span style={{ fontSize: 18 }}>{aiKind === 'image' ? '📷' : '✨'}</span>
             <div style={{ flex: 1, minWidth: 0 }}>
-              <span style={{ fontFamily: FONT, fontWeight: 700, fontSize: 13, color: PRIMARY }}>{aiExplanation}</span>
-              <span style={{ fontFamily: FONT, fontSize: 12, color: INK3, marginLeft: 8 }}>— {aiResults.length} opslag fundet</span>
+              {aiKind === 'image' ? (
+                <span style={{ fontFamily: FONT, fontWeight: 700, fontSize: 13, color: PRIMARY }}>Lignende opslag</span>
+              ) : (
+                <>
+                  <span style={{ fontFamily: FONT, fontWeight: 700, fontSize: 13, color: PRIMARY }}>{aiExplanation}</span>
+                  <span style={{ fontFamily: FONT, fontSize: 12, color: INK3, marginLeft: 8 }}>— {aiResults.length} opslag fundet</span>
+                </>
+              )}
             </div>
             <button onClick={clearAiSearch} style={{ background: 'none', border: `1.5px solid ${PRIMARY}44`, borderRadius: 99, padding: '4px 12px', fontSize: 12, fontWeight: 700, color: PRIMARY, fontFamily: FONT, cursor: 'pointer', whiteSpace: 'nowrap' }}>
-              × Ryd AI-søgning
+              × Ryd
             </button>
           </div>
         )}
