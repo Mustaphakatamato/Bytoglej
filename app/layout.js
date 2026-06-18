@@ -45,9 +45,6 @@ export default function RootLayout({ children }) {
         <link rel="preconnect" href="https://fonts.googleapis.com" />
         <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="" />
         <link href="https://fonts.googleapis.com/css2?family=Sora:wght@400;500;600;700;800&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet" />
-        {/* Leaflet-kort (afhentningssted-vælger) — indlæses globalt så kortets pane-CSS
-            altid er klar før kortet initialiseres. */}
-        <link id="leaflet-css" rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
       </head>
       <body>
         {/* Splash — paper bg = invisible transition from browser default, logo springs in, splash slides up */}
