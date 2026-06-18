@@ -8,9 +8,10 @@ import { useApp } from '@/providers/AppProvider';
 import { Spinner } from '@/components/ui';
 const FILTERS = ['Alle', 'Aktive', 'Inaktive', 'Solgt'];
 
-function ListingCard({ l, favoriters, onToggleActive, onDelete, onEdit, onPriceChange }) {
+function ListingCard({ l, favoriters, offers = [], onOpenBid, onToggleActive, onDelete, onEdit, onPriceChange }) {
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [showLikers, setShowLikers] = useState(false);
+  const [showBids, setShowBids] = useState(false);
   const [priceMode, setPriceMode] = useState(false);
   const [newPrice, setNewPrice] = useState('');
   const [savingPrice, setSavingPrice] = useState(false);
@@ -62,9 +63,35 @@ function ListingCard({ l, favoriters, onToggleActive, onDelete, onEdit, onPriceC
                 ❤️ {likers.length} interesseret{likers.length !== 1 ? 'e' : ''}
               </button>
             )}
+            {offers.length > 0 && (
+              <button onClick={() => setShowBids(v => !v)}
+                style={{ background:'#FEF3C7', border:'1px solid #F59E0B', cursor:'pointer', padding:'2px 9px', borderRadius:99, fontFamily:FONT, fontSize:12, color:'#92400E', fontWeight:700, display:'flex', alignItems:'center', gap:4 }}>
+                🏷️ {offers.length} bud {showBids ? '▴' : '▾'}
+              </button>
+            )}
           </div>
         </div>
       </div>
+
+      {showBids && offers.length > 0 && (
+        <div style={{ background:'#FFFBEB', padding:'8px 14px 10px', borderTop:`1px solid ${PAPER3}` }}>
+          <div style={{ fontFamily:FONT, fontSize:11, fontWeight:700, color:'#92400E', marginBottom:6, textTransform:'uppercase', letterSpacing:'0.03em' }}>Bud på denne vare</div>
+          {offers.map(o => (
+            <button key={o.id} onClick={() => onOpenBid(o.conversation_id)}
+              style={{ width:'100%', display:'flex', alignItems:'center', justifyContent:'space-between', gap:10, background:'#fff', border:`1px solid ${PAPER3}`, borderRadius:10, padding:'9px 12px', marginBottom:6, cursor:'pointer', textAlign:'left' }}>
+              <div style={{ minWidth:0 }}>
+                <div style={{ fontFamily:FONT, fontSize:13, fontWeight:700, color:INK, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{o.buyerName}</div>
+                <div style={{ fontFamily:FONT, fontSize:11, color:INK3 }}>Afventer dit svar</div>
+              </div>
+              <div style={{ display:'flex', alignItems:'center', gap:8, flexShrink:0 }}>
+                <span style={{ fontFamily:FONT, fontSize:15, fontWeight:800, color:PRIMARY }}>{o.amount} kr.</span>
+                <span style={{ fontFamily:FONT, fontSize:12, color:PRIMARY, fontWeight:700 }}>→</span>
+              </div>
+            </button>
+          ))}
+          <div style={{ fontFamily:FONT, fontSize:11, color:INK3, marginTop:2 }}>Klik et bud for at svare i beskeder</div>
+        </div>
+      )}
 
       {showLikers && likers.length > 0 && (
         <div style={{ background:GREEN_TINT, padding:'8px 14px', borderTop:`1px solid ${PAPER3}` }}>
@@ -148,14 +175,21 @@ function ListingCard({ l, favoriters, onToggleActive, onDelete, onEdit, onPriceC
 
 export default function MineOpslagPage() {
   const router = useRouter();
-  const { effectiveInstitution, showToast } = useApp();
+  const { effectiveInstitution, showToast, setSelectedConvId } = useApp();
   const ww = useWindowWidth();
   const isMobile = ww < 768;
 
   const [listings, setListings] = useState([]);
   const [favoriters, setFavoriters] = useState([]);
+  const [offersByListing, setOffersByListing] = useState({});
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState('Alle');
+
+  function openBid(conversationId) {
+    if (!conversationId) { router.push('/beskeder'); return; }
+    setSelectedConvId?.(conversationId);
+    router.push('/beskeder');
+  }
 
   useEffect(() => {
     let cancelled = false;
@@ -212,6 +246,25 @@ export default function MineOpslagPage() {
           .select('listing_id,institution_name,institution_id,user_id')
           .in('listing_id', rows.map(l => l.id));
         if (!cancelled) setFavoriters(favs || []);
+
+        // Hent åbne bud pr. vare (fra køber) så sælger får overblik.
+        const { data: offers } = await db.from('offers')
+          .select('id,listing_id,buyer_institution_id,amount,status,conversation_id,proposed_by,created_at')
+          .in('listing_id', rows.map(l => l.id))
+          .eq('status', 'pending')
+          .eq('proposed_by', 'buyer')
+          .order('created_at', { ascending: false });
+        const instIds = [...new Set((offers || []).map(o => o.buyer_institution_id).filter(Boolean))];
+        const nameById = {};
+        if (instIds.length) {
+          const { data: insts } = await db.from('institutions').select('id,name').in('id', instIds);
+          for (const i of (insts || [])) nameById[i.id] = i.name;
+        }
+        const byListing = {};
+        for (const o of (offers || [])) {
+          (byListing[o.listing_id] ||= []).push({ ...o, buyerName: nameById[o.buyer_institution_id] || 'Ukendt køber' });
+        }
+        if (!cancelled) setOffersByListing(byListing);
       }
 
       setLoading(false);
@@ -292,6 +345,8 @@ export default function MineOpslagPage() {
           ) : (
             filtered.map(l => (
               <ListingCard key={l.id} l={l} favoriters={favoriters}
+                offers={offersByListing[l.id] || []}
+                onOpenBid={openBid}
                 onToggleActive={toggleActive}
                 onDelete={deleteListing}
                 onEdit={id => router.push('/rediger-opslag/' + id)}
