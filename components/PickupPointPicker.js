@@ -58,11 +58,18 @@ export default function PickupPointPicker({ points, cheapestCarrier, buyerCoords
   // Init Leaflet-kort
   useEffect(() => {
     if (!mounted || typeof window === 'undefined' || !mapRef.current) return;
-    if (!document.getElementById('leaflet-css')) {
-      const link = document.createElement('link');
-      link.id = 'leaflet-css'; link.rel = 'stylesheet';
-      link.href = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.css';
-      document.head.appendChild(link);
+    // Leaflet's pane-CSS skal være indlæst FØR kortet får sin layout, ellers
+    // placeres tiles/markører i normalt dokumentflow (spredt rundt). Vi sikrer
+    // CSS'en og venter på dens onload før vi retter kortets størrelse.
+    let cssLink = document.getElementById('leaflet-css');
+    let cssAlreadyLoaded = false;
+    if (!cssLink) {
+      cssLink = document.createElement('link');
+      cssLink.id = 'leaflet-css'; cssLink.rel = 'stylesheet';
+      cssLink.href = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.css';
+      document.head.appendChild(cssLink);
+    } else {
+      cssAlreadyLoaded = cssLink.sheet != null;
     }
     const L = require('leaflet');
     const valid = points.filter(p => p.lat != null && p.lng != null);
@@ -76,16 +83,23 @@ export default function PickupPointPicker({ points, cheapestCarrier, buyerCoords
         attribution: '© OpenStreetMap © CARTO', maxZoom: 19,
       }).addTo(mapInstanceRef.current);
       markersRef.current = L.layerGroup().addTo(mapInstanceRef.current);
-      if (valid.length > 1) {
-        const b = L.latLngBounds(valid.map(p => [p.lat, p.lng]));
-        mapInstanceRef.current.fitBounds(b, { padding: [40, 40] });
-      }
-      // Tiles placeres forkert hvis containeren endnu ikke har sin endelige størrelse.
-      // Kald invalidateSize gentagne gange så animerede layouts nås.
-      const fix = () => mapInstanceRef.current?.invalidateSize();
-      requestAnimationFrame(fix);
+
+      // Genberegn størrelse + zoom til alle punkter. Kaldes både når CSS er klar
+      // og via fallback-timere, så kortet altid lander korrekt.
+      const fix = () => {
+        const map = mapInstanceRef.current;
+        if (!map) return;
+        map.invalidateSize();
+        if (valid.length > 1) {
+          map.fitBounds(L.latLngBounds(valid.map(p => [p.lat, p.lng])), { padding: [40, 40] });
+        }
+      };
+      if (cssAlreadyLoaded) { requestAnimationFrame(fix); }
+      else { cssLink.addEventListener('load', () => requestAnimationFrame(fix), { once: true }); }
+      // Fallback hvis onload allerede er sket eller blokeres.
       setTimeout(fix, 150);
-      setTimeout(fix, 400);
+      setTimeout(fix, 500);
+      setTimeout(fix, 1200);
     }
     return () => {
       if (mapInstanceRef.current) { mapInstanceRef.current.remove(); mapInstanceRef.current = null; }
