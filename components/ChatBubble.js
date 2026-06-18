@@ -184,6 +184,11 @@ export default function ChatBubble() {
     }
     if (m.message_type === 'bundle') return <span style={{ fontSize: 12 }}>📦 Bundttilbud — tryk for at se</span>;
     if (m.message_type === 'bid')    return <span style={{ fontSize: 12 }}>💰 Bud</span>;
+    if (m.message_type === 'offer') {
+      let d = null;
+      try { d = JSON.parse(m.content); } catch {}
+      return <span style={{ fontSize: 12 }}>🏷️ Tilbud: {d?.amount ?? '?'} kr.</span>;
+    }
     if (m.message_type === 'swap')   return <span style={{ fontSize: 12 }}>🔄 Bytteforslag</span>;
     if (m.message_type === 'buy_request') {
       let d = null;
