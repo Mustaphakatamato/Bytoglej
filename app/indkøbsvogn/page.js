@@ -503,6 +503,11 @@ export default function CartPage() {
                         </div>
                         <div style={{ flex: 1, minWidth: 0 }}>
                           <div style={{ fontFamily: FONT, fontWeight: 700, fontSize: 14, color: INK, lineHeight: 1.3 }}>{item.listingTitle}</div>
+                          {item.offerId && (
+                            <div style={{ display: 'inline-flex', alignItems: 'center', gap: 4, marginTop: 4, background: '#FEF3C7', border: '1px solid #F59E0B', borderRadius: 99, padding: '2px 8px', fontFamily: FONT, fontSize: 11, fontWeight: 700, color: '#92400E' }}>
+                              ⏳ Reserveret til dig
+                            </div>
+                          )}
                           {cat && <div style={{ fontFamily: FONT, fontSize: 11, color: INK3, marginTop: 2 }}>{cat.emoji} {cat.label}</div>}
                         </div>
                         <span style={{ fontFamily: FONT, fontWeight: 800, fontSize: 16, color: PRIMARY, flexShrink: 0 }}>{item.price ? `${item.price} kr.` : '—'}</span>
