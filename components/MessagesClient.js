@@ -1503,17 +1503,29 @@ export default function MessagesClient() {
                           || (myInstId   && active.owner_institution_id === myInstId)
                           || (myInstName && active.owner_name?.toLowerCase() === myInstName?.toLowerCase());
                       let lastDate = null;
+                      const effUid = realUserId || userId;
+                      // Robust afsender-side: en 2-parts samtale har altid en initiator (køber)
+                      // og en owner (sælger). Vi afgør om en besked er "min" ud fra hvilken side
+                      // afsenderen tilhører + hvilken side jeg er på (isOwnerInConv) — det virker
+                      // også for server-indsatte beskeder hvor sender_id ≠ klientens realUserId.
+                      const isMine = (m) => {
+                        if (ctxIsAdmin && adminInstName) return m.sender_name === adminInstName;
+                        const sn = m.sender_name?.toLowerCase();
+                        const ownerSide = (active.owner_id && m.sender_id === active.owner_id)
+                          || (active.owner_name && sn === active.owner_name?.toLowerCase());
+                        const initiatorSide = (active.initiator_id && m.sender_id === active.initiator_id)
+                          || (active.initiator_name && sn === active.initiator_name?.toLowerCase());
+                        if (ownerSide || initiatorSide) return isOwnerInConv ? !!ownerSide : !!initiatorSide;
+                        // Fallback hvis afsenderen ikke kan matches til en samtale-part.
+                        return m.sender_id === effUid || (ctxInstitution?.name && sn === ctxInstitution.name?.toLowerCase());
+                      };
                       return messages.map((m, i) => {
-                        const effUid = realUserId || userId;
-                        const mine = ctxIsAdmin && adminInstName
-                          ? m.sender_name === adminInstName
-                          : m.sender_id === effUid
-                            || (ctxInstitution?.name && m.sender_name?.toLowerCase() === ctxInstitution.name?.toLowerCase());
+                        const mine = isMine(m);
                         const d = new Date(m.created_at);
                         const dateStr = d.toLocaleDateString('da-DK',{weekday:'long',day:'numeric',month:'long'});
                         const showDate = dateStr !== lastDate;
                         lastDate = dateStr;
-                        const prevMine = i>0 && (ctxIsAdmin && adminInstName ? messages[i-1].sender_name === adminInstName : messages[i-1].sender_id === userId);
+                        const prevMine = i>0 && isMine(messages[i-1]);
                         const grouped = mine === prevMine && !showDate && m.message_type !== 'bid' && messages[i-1]?.message_type !== 'bid' && m.message_type !== 'swap' && messages[i-1]?.message_type !== 'swap' && m.message_type !== 'bundle' && messages[i-1]?.message_type !== 'bundle' && m.message_type !== 'image' && messages[i-1]?.message_type !== 'image' && m.message_type !== 'buy_request' && messages[i-1]?.message_type !== 'buy_request' && m.message_type !== 'checkout_pending' && messages[i-1]?.message_type !== 'checkout_pending' && m.message_type !== 'shipment' && messages[i-1]?.message_type !== 'shipment' && m.message_type !== 'payment_confirmed' && messages[i-1]?.message_type !== 'payment_confirmed' && m.message_type !== 'offer' && messages[i-1]?.message_type !== 'offer';
                         const isBid = m.message_type === 'bid';
                         const isOffer = m.message_type === 'offer';
