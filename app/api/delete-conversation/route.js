@@ -51,13 +51,17 @@ export async function POST(req) {
     const { data: convs } = await svc.from('conversations').select('*').in('id', convIds);
     if (!convs?.length) return NextResponse.json({ ok: true, deleted: 0 });
 
-    const allowed = convs.filter(isParticipant).map(c => c.id);
+    const allowed = convs.filter(isParticipant);
     if (!allowed.length) return NextResponse.json({ error: 'Ingen adgang til disse samtaler' }, { status: 403 });
 
-    // Slet beskeder først (chat_messages har FK on delete cascade, men vi er eksplicitte).
-    await svc.from('chat_messages').delete().in('conversation_id', allowed);
-    const { error: convErr } = await svc.from('conversations').delete().in('id', allowed);
-    if (convErr) throw convErr;
+    // Soft delete: sæt flag for den part der sletter — modparten beholder samtalen.
+    for (const conv of allowed) {
+      const isInit = conv.initiator_id === user.id
+        || (conv.initiator_institution_id && myInstIds.has(conv.initiator_institution_id))
+        || myInstNames.has((conv.initiator_name || '').toLowerCase());
+      const field = isInit ? 'deleted_by_initiator' : 'deleted_by_owner';
+      await svc.from('conversations').update({ [field]: true }).eq('id', conv.id);
+    }
 
     return NextResponse.json({ ok: true, deleted: allowed.length });
   } catch (e) {

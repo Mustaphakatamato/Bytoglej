@@ -1147,10 +1147,12 @@ export default function MessagesClient() {
   const myUnread = c => amInitiator(c) ? (c.initiator_unread||0) : (c.owner_unread||0);
   const otherName  = c => amInitiator(c) ? c.owner_name : c.initiator_name;
   const isArchived = c => amInitiator(c) ? (c.archived_by_initiator||false) : (c.archived_by_owner||false);
+  const isDeleted = c => amInitiator(c) ? (c.deleted_by_initiator||false) : (c.deleted_by_owner||false);
   const filtered = convs
+    .filter(c => !isDeleted(c))
     .filter(c => showArchived ? isArchived(c) : !isArchived(c))
     .filter(c => otherName(c).toLowerCase().includes(search.toLowerCase()) || c.listing_title.toLowerCase().includes(search.toLowerCase()));
-  const totalUnread = convs.filter(c => !isArchived(c)).reduce((s,c) => s + myUnread(c), 0);
+  const totalUnread = convs.filter(c => !isArchived(c) && !isDeleted(c)).reduce((s,c) => s + myUnread(c), 0);
 
   if (!authChecked) return <div style={{ minHeight:'100vh', background:PAPER }} />;
   if (!userId) return (
