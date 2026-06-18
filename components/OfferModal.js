@@ -5,6 +5,7 @@ import { PRIMARY, INK, INK2, INK3, GREEN_TINT, GREEN_SOFT, PAPER2, PAPER3, FONT 
 import { calcServiceFee } from '@/lib/pricing';
 import { getShippingPrice } from '@/lib/shipping-rates';
 import { authedFetch } from '@/lib/authed-fetch';
+import { BuyerProtectionPopup } from '@/components/ListingCard';
 
 const kr = n => `${Number(n || 0).toFixed(2).replace('.', ',')} kr.`;
 
@@ -14,7 +15,7 @@ export default function OfferModal({ open, onClose, listing, onSubmitted, showTo
   const [note, setNote] = useState('');
   const [saving, setSaving] = useState(false);
   const [quota, setQuota] = useState(null); // { remainingToday, dailyLimit }
-  const [showProtectionInfo, setShowProtectionInfo] = useState(false);
+  const [showProtectionPopup, setShowProtectionPopup] = useState(false);
 
   const price = Number(listing?.price) || 0;
   const hasPrice = price > 0;
@@ -102,6 +103,16 @@ export default function OfferModal({ open, onClose, listing, onSubmitted, showTo
   );
 
   return (
+    <>
+    {showProtectionPopup && (
+      <BuyerProtectionPopup
+        price={valid ? num : 0}
+        fee={valid ? protection : 0}
+        onClose={() => setShowProtectionPopup(false)}
+        emoji={listing?.emoji}
+        image={listing?.images?.[0]}
+      />
+    )}
     <Modal open={open} onClose={onClose} title="Giv et tilbud">
       <div style={{ display:'flex', flexDirection:'column', gap:16 }}>
         {hasPrice && (
@@ -160,19 +171,13 @@ export default function OfferModal({ open, onClose, listing, onSubmitted, showTo
             {row('Dit tilbud', kr(num))}
             {canShip && !portoIncluded && row('Porto (fra)', kr(portoFrom), '~')}
             {portoIncluded && row('Porto', 'inkluderet')}
-            <div>
-              <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', fontFamily:FONT, fontSize:13 }}>
-                <button type="button" onClick={() => setShowProtectionInfo(v => !v)}
-                  style={{ background:'none', border:'none', padding:0, cursor:'pointer', display:'flex', alignItems:'center', gap:4, color:INK3, fontFamily:FONT, fontSize:13 }}>
-                  Køberbeskyttelse <span style={{ fontSize:12, color:PRIMARY }}>ℹ️</span>
-                </button>
-                <span style={{ color:INK2, fontWeight:600 }}>{kr(protection)}</span>
-              </div>
-              {showProtectionInfo && (
-                <div style={{ marginTop:6, padding:'8px 10px', background:'#f0fdf4', borderRadius:8, fontFamily:FONT, fontSize:12, color:INK2, lineHeight:1.6 }}>
-                  5% af tilbudsbeløbet + 5 kr. Dækker dig hvis sælger ikke sender varen, og sikrer sikker betaling via vores platform.
-                </div>
-              )}
+            <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', fontFamily:FONT, fontSize:13 }}>
+              <button type="button" onClick={() => setShowProtectionPopup(true)}
+                style={{ background:'none', border:'none', padding:0, cursor:'pointer', display:'flex', alignItems:'center', gap:4, color:INK3, fontFamily:FONT, fontSize:13 }}>
+                Køberbeskyttelse
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#aaa" strokeWidth="2" strokeLinecap="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+              </button>
+              <span style={{ color:INK2, fontWeight:600 }}>{kr(protection)}</span>
             </div>
             <div style={{ borderTop:`1px solid ${GREEN_SOFT}`, marginTop:2, paddingTop:8, display:'flex', justifyContent:'space-between', alignItems:'center' }}>
               <span style={{ fontFamily:FONT, fontWeight:800, fontSize:14, color:INK }}>Du betaler ca.</span>
@@ -198,5 +203,6 @@ export default function OfferModal({ open, onClose, listing, onSubmitted, showTo
         )}
       </div>
     </Modal>
+    </>
   );
 }
