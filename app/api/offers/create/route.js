@@ -50,6 +50,11 @@ export async function POST(req) {
   const buyerInst = await resolveCallerInstitution(supa, user);
   const sellerInst = await resolveInstitutionByName(supa, listing.institution_name);
 
+  // Blokér institutioner fra at give tilbud på egne opslag.
+  if (buyerInst?.id && sellerInst?.id && buyerInst.id === sellerInst.id) {
+    return NextResponse.json({ error: 'Du kan ikke give tilbud på dit eget opslag' }, { status: 400 });
+  }
+
   // Hård reservation (beslutning 1.5): er varen reserveret til en ANDEN
   // institution lige nu, kan man ikke byde.
   const reservedActive = listing.reserved_until && new Date(listing.reserved_until).getTime() > Date.now();

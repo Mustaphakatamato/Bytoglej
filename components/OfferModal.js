@@ -14,6 +14,7 @@ export default function OfferModal({ open, onClose, listing, onSubmitted, showTo
   const [note, setNote] = useState('');
   const [saving, setSaving] = useState(false);
   const [quota, setQuota] = useState(null); // { remainingToday, dailyLimit }
+  const [showProtectionInfo, setShowProtectionInfo] = useState(false);
 
   const price = Number(listing?.price) || 0;
   const hasPrice = price > 0;
@@ -22,15 +23,15 @@ export default function OfferModal({ open, onClose, listing, onSubmitted, showTo
   // Hurtigvalg ud fra prisen (afrundet til hele kroner).
   const quick = hasPrice
     ? [
-        { label: '−10%', value: Math.round(price * 0.9) },
-        { label: '−20%', value: Math.round(price * 0.8) },
+        { label: '−10%', value: Math.round(price * 0.9 * 100) / 100 },
+        { label: '−20%', value: Math.round(price * 0.8 * 100) / 100 },
         { label: 'Fuld pris', value: price },
       ]
     : [];
 
   useEffect(() => {
     if (!open) return;
-    setAmount(hasPrice ? String(Math.round(price * 0.9)) : (minBid ? String(minBid) : ''));
+    setAmount(hasPrice ? String(Math.round(price * 0.9 * 100) / 100) : (minBid ? String(minBid) : ''));
     setNote('');
     setQuota(null);
     authedFetch('/api/offers/quota')
@@ -159,7 +160,20 @@ export default function OfferModal({ open, onClose, listing, onSubmitted, showTo
             {row('Dit tilbud', kr(num))}
             {canShip && !portoIncluded && row('Porto (fra)', kr(portoFrom), '~')}
             {portoIncluded && row('Porto', 'inkluderet')}
-            {row('Køberbeskyttelse', kr(protection))}
+            <div>
+              <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', fontFamily:FONT, fontSize:13 }}>
+                <button type="button" onClick={() => setShowProtectionInfo(v => !v)}
+                  style={{ background:'none', border:'none', padding:0, cursor:'pointer', display:'flex', alignItems:'center', gap:4, color:INK3, fontFamily:FONT, fontSize:13 }}>
+                  Køberbeskyttelse <span style={{ fontSize:12, color:PRIMARY }}>ℹ️</span>
+                </button>
+                <span style={{ color:INK2, fontWeight:600 }}>{kr(protection)}</span>
+              </div>
+              {showProtectionInfo && (
+                <div style={{ marginTop:6, padding:'8px 10px', background:'#f0fdf4', borderRadius:8, fontFamily:FONT, fontSize:12, color:INK2, lineHeight:1.6 }}>
+                  5% af tilbudsbeløbet + 5 kr. Dækker dig hvis sælger ikke sender varen, og sikrer sikker betaling via vores platform.
+                </div>
+              )}
+            </div>
             <div style={{ borderTop:`1px solid ${GREEN_SOFT}`, marginTop:2, paddingTop:8, display:'flex', justifyContent:'space-between', alignItems:'center' }}>
               <span style={{ fontFamily:FONT, fontWeight:800, fontSize:14, color:INK }}>Du betaler ca.</span>
               <span style={{ fontFamily:FONT, fontWeight:800, fontSize:16, color:PRIMARY }}>{kr(totalCa)}</span>
