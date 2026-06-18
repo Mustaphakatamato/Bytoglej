@@ -678,10 +678,17 @@ export default function CartPage() {
             <div style={{ fontFamily: FONT, fontWeight: 800, fontSize: 17, color: INK, marginBottom: 20 }}>Prisoversigt</div>
 
             <div style={{ display: 'flex', flexDirection: 'column', gap: 12, marginBottom: 20 }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <span style={{ fontFamily: FONT, fontSize: 14, color: INK2 }}>Ordre</span>
-                <span style={{ fontFamily: FONT, fontWeight: 600, fontSize: 14, color: INK }}>{itemsTotal.toFixed(2).replace('.', ',')} kr.</span>
-              </div>
+              {selectedGroups.flatMap(g => g.items).map((item, i) => (
+                <div key={i} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 10 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 10, minWidth: 0 }}>
+                    <div style={{ width: 36, height: 36, borderRadius: 9, background: item.images?.[0] ? '#ddd' : (item.listingColor || GREEN_TINT), overflow: 'hidden', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 18 }}>
+                      {item.images?.[0] ? <img src={item.images[0]} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : (item.listingEmoji || '🧸')}
+                    </div>
+                    <span style={{ fontFamily: FONT, fontSize: 14, color: INK2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{item.listingTitle}</span>
+                  </div>
+                  <span style={{ fontFamily: FONT, fontWeight: 600, fontSize: 14, color: INK, flexShrink: 0 }}>{(item.price || 0).toFixed(2).replace('.', ',')} kr.</span>
+                </div>
+              ))}
 
               {discountTotal > 0 && (
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
