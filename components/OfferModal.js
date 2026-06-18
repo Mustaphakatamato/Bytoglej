@@ -26,7 +26,7 @@ export default function OfferModal({ open, onClose, listing, onSubmitted, showTo
     ? [
         { label: '−10%', value: Math.round(price * 0.9 * 100) / 100 },
         { label: '−20%', value: Math.round(price * 0.8 * 100) / 100 },
-        { label: 'Fuld pris', value: price },
+        { label: 'Egen pris', value: price },
       ]
     : [];
 
