@@ -506,6 +506,7 @@ export default function OpretOpslagPage() {
       review_requested_at: scanRejected ? new Date().toISOString() : null,
       category: form.category || null, subcategory: form.subcategory || null, brand: form.brand || null,
       can_ship: delivery.shipping || false,
+      image_description: aiScanData?.ai_description || null, // AI'ens rå billedbeskrivelse — bruges til semantisk billedsøgning
     };
     if (form.type==='byd' && form.min_bid) insertData.min_bid = Number(form.min_bid);
     const { data: listing, error } = await db.from('listings').insert(insertData).select().single();
@@ -537,6 +538,15 @@ export default function OpretOpslagPage() {
       }
       if (urls.length) await db.from('listings').update({ images: urls }).eq('id', listing.id);
     }
+    // Fire-and-forget: semantisk embedding til AI-billedsøgning (kun ikke-søges opslag indgår i søgning)
+    if (listing?.id && !isSøges) {
+      const descText = aiScanData?.ai_description || `${form.title}. ${form.description}`;
+      authedFetch('/api/embed-listing', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ listingId: listing.id, text: descText }),
+      }).then(() => {}).catch(() => {});
+    }
+
     // Fire-and-forget: log AI-scan kun ved faktisk submit
     if (aiScanData) {
       const finalPrice = form.price ? Number(form.price) : null;
