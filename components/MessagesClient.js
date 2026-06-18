@@ -482,6 +482,10 @@ export default function MessagesClient() {
         })
       .on('postgres_changes', { event:'UPDATE', schema:'public', table:'chat_messages', filter:`conversation_id=eq.${active.id}` },
         ({ new: m }) => { setMessages(prev => prev.map(x => x.id === m.id ? m : x)); })
+      // Hold tilbud-status synkron hos begge parter (accept/afvis/modbud), så
+      // boblens badge opdaterer i realtid uden at modparten skal genindlæse.
+      .on('postgres_changes', { event:'*', schema:'public', table:'offers', filter:`conversation_id=eq.${active.id}` },
+        ({ new: o }) => { if (o?.id) setOffersById(prev => ({ ...prev, [o.id]: { ...(prev[o.id] || {}), ...o } })); })
       .subscribe();
     return () => db.removeChannel(ch);
   }, [active?.id]);
