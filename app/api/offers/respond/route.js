@@ -30,7 +30,7 @@ export async function POST(req) {
 
   const { data: listing } = await supa
     .from('listings')
-    .select('id, title, user_id, institution_name, is_active, is_sold, shipping_options')
+    .select('id, title, user_id, institution_name, is_active, is_sold, can_ship')
     .eq('id', offer.listing_id)
     .maybeSingle();
   if (!listing) return NextResponse.json({ error: 'Opslaget findes ikke længere' }, { status: 404 });
@@ -105,7 +105,6 @@ export async function POST(req) {
     }).eq('id', listing.id);
 
     // Checkout-besked så køber kan vælge levering og betale.
-    const shippingOptions = listing.shipping_options?.[0] || null;
     await insertMessage(JSON.stringify({
       offer_id: offer.id,
       listing_id: listing.id,
@@ -113,7 +112,7 @@ export async function POST(req) {
       deal_type: 'offer',
       amount: offer.amount,
       reserved_until: reservedUntil,
-      shipping_options: shippingOptions,
+      can_ship: listing.can_ship || false,
     }), 'checkout_pending');
 
     await bumpConversation(
