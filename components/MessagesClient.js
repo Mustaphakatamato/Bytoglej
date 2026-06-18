@@ -310,6 +310,12 @@ export default function MessagesClient() {
   const bottomRef = useRef(null);
   const inputRef  = useRef(null);
   const fileInputRef = useRef(null);
+  // Skrive-indikator (flygtig, via realtime broadcast — ingen DB-skrivning).
+  const [otherTyping, setOtherTyping] = useState(false);
+  const channelRef = useRef(null);
+  const typingHideRef = useRef(null);
+  const lastTypingSentRef = useRef(0);
+  const [clientId] = useState(() => Math.random().toString(36).slice(2));
 
   // Tikker hvert minut så 24-timers nedtællingen på accepterede bud opdateres.
   useEffect(() => {
@@ -486,8 +492,21 @@ export default function MessagesClient() {
       // boblens badge opdaterer i realtid uden at modparten skal genindlæse.
       .on('postgres_changes', { event:'*', schema:'public', table:'offers', filter:`conversation_id=eq.${active.id}` },
         ({ new: o }) => { if (o?.id) setOffersById(prev => ({ ...prev, [o.id]: { ...(prev[o.id] || {}), ...o } })); })
+      // Skrive-indikator: modpartens transiente "typing"-events (ikke vores egne).
+      .on('broadcast', { event:'typing' }, ({ payload }) => {
+        if (!payload || payload.from === clientId) return;
+        setOtherTyping(true);
+        if (typingHideRef.current) clearTimeout(typingHideRef.current);
+        typingHideRef.current = setTimeout(() => setOtherTyping(false), 3000);
+      })
       .subscribe();
-    return () => db.removeChannel(ch);
+    channelRef.current = ch;
+    return () => {
+      if (typingHideRef.current) clearTimeout(typingHideRef.current);
+      setOtherTyping(false);
+      channelRef.current = null;
+      db.removeChannel(ch);
+    };
   }, [active?.id]);
 
   useEffect(() => {
@@ -1133,6 +1152,16 @@ export default function MessagesClient() {
   }
 
   function onKey(e) { if (e.key==='Enter' && !e.shiftKey) { e.preventDefault(); send(); } }
+
+  // Send et flygtigt "typing"-broadcast — throttlet til højst hvert 1,5. sekund.
+  function sendTyping() {
+    const ch = channelRef.current;
+    if (!ch) return;
+    const now = Date.now();
+    if (now - lastTypingSentRef.current < 1500) return;
+    lastTypingSentRef.current = now;
+    ch.send({ type: 'broadcast', event: 'typing', payload: { from: clientId } });
+  }
 
   async function openActiveListing() {
     if (!active?.listing_id) return;
@@ -2299,6 +2328,16 @@ export default function MessagesClient() {
                         );
                       });
                     })()}
+                {otherTyping && (
+                  <div style={{ display:'flex', justifyContent:'flex-start', marginTop:10 }}>
+                    <div style={{ background:PAPER3, borderRadius:16, padding:'12px 16px', display:'flex', alignItems:'center', gap:5 }}>
+                      <style>{`@keyframes ltbTyping{0%,60%,100%{transform:translateY(0);opacity:0.4}30%{transform:translateY(-4px);opacity:1}}`}</style>
+                      {[0,1,2].map(i => (
+                        <span key={i} style={{ width:7, height:7, borderRadius:'50%', background:INK3, display:'inline-block', animation:`ltbTyping 1.2s infinite ${i*0.2}s` }} />
+                      ))}
+                    </div>
+                  </div>
+                )}
                 <div ref={bottomRef} />
               </div>
 
@@ -2416,7 +2455,7 @@ export default function MessagesClient() {
                     style={{ background:'none', border:'none', cursor:'pointer', padding:'8px', borderRadius:10, flexShrink:0, color:chatImages.length>0?PRIMARY:INK3, lineHeight:1, height:44, display:'flex', alignItems:'center' }}>
                     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
                   </button>
-                  <textarea ref={inputRef} value={newMsg} onChange={e=>setNewMsg(e.target.value)} onKeyDown={onKey}
+                  <textarea ref={inputRef} value={newMsg} onChange={e=>{ setNewMsg(e.target.value); sendTyping(); }} onKeyDown={onKey}
                     placeholder="Skriv en besked…" rows={1}
                     style={{ flex:1, padding:'11px 14px', borderRadius:14, border:`1.5px solid ${PAPER3}`, fontSize:14, resize:'none', fontFamily:FONT, outline:'none', lineHeight:1.5, maxHeight:120, minHeight:44, overflowY:'auto', background:PAPER }}
                     onInput={e=>{ e.target.style.height='auto'; e.target.style.height=Math.min(e.target.scrollHeight,120)+'px'; }}
