@@ -5,6 +5,49 @@ Arbejd ovenfra og ned.
 
 ---
 
+## Status (opdateret 2026-06-18)
+
+| Punkt | Status |
+|-------|--------|
+| 1) Tilbud — opret & dagligt loft | ✅ Gennemført |
+| 2) Tilbud — sælgers svar | ✅ Gennemført (modbud, afvis m. kommentar, accept) |
+| 3) Reservation | ✅ Gennemført (+ marketplace-badge, auto-afvis, bud-overblik) |
+| 4) Tilbud — checkout & gennemførsel | ⬜ Ikke testet endnu |
+| 5) Bundt-bytte — opret | ⬜ Ikke testet |
+| 6) Bundt-bytte — accept & escrow | ⬜ Ikke testet |
+| 7) Bundt-bytte — tosidet betaling | ⬜ Ikke testet |
+| 8) 48t auto-refusion | ⬜ Ikke testet |
+| 9) Udfasning | 🟡 Delvist (køb håndterer bud; QuickView er død kode) |
+| 10) Regression | ⬜ Ikke testet |
+
+### Rettelser & forbedringer lavet under test (denne session)
+
+**Tilbuds-flow (Punkt 1–3):**
+- OfferModal: rettet afrunding på −10%/−20%, "Fuld pris" → "Egen pris", info-ikon bruger BuyerProtectionPopup (z-index 10100 > Modal)
+- `offers/create`: blokér selvtilbud på institutions-niveau; blokér nye tilbud mens varen er reserveret (også for vinderen selv)
+- `offers/respond`: rettet ugyldig kolonne (`shipping_options` → `can_ship`); modbud-mail siger nu "Nyt modbud"; **auto-afvis af alle andre åbne bud ved accept**
+- ChatBubble: tilbud-boble i stedet for rå JSON
+- Reserveret-badge i marketplace (ListingCard) + "Varen er reserveret"-banner på opslag for andre/vinderen
+- Tilbud → checkout går nu gennem det fulde **indkøbsvogn-flow** (forsendelsesvalg) med tilbudsprisen + "Reserveret til dig"-badge
+
+**Beskeder/realtime:**
+- **Realtime aktiveret** på `offers`, `chat_messages`, `conversations` (var slået fra — rodårsag til "kræver genindlæsning"-fejl)
+- Robust afsender-side (`isMine`): bobler havner nu korrekt højre/venstre via samtalens initiator/owner
+- Soft-delete af samtaler (slettede før hos begge parter)
+- Skrive-indikator ("…"-boble) via realtime broadcast
+
+**Sælger-værktøjer:**
+- "Mine opslag" redesignet til to-pane master-detail med bud-overblik pr. vare (→ besked)
+
+**Checkout:**
+- Enkelt-sælger checkout (radio i kurven) — kun én institutions varer ad gangen
+- Prisoversigt viser varenavn + miniature
+
+**Kendte/parkerede:**
+- 🅿️ Leaflet-kort (afhentningssted) virker i Chrome, men tiles vises grå i Safari — parkeret til senere
+
+---
+
 ## 0) Forberedelse
 
 - [ ] To institutionskonti: **A** (køber/initiator) og **B** (sælger/ejer). Brug to browsere/inkognito.
@@ -14,30 +57,32 @@ Arbejd ovenfra og ned.
 
 ---
 
-## 1) Tilbud — opret & dagligt loft (Trin 3)
+## 1) Tilbud — opret & dagligt loft (Trin 3) — ✅
 
-- [ ] Som **A**: åbn et af **B's køb-opslag** → **🏷️ Giv et tilbud**.
-- [ ] Tjek modal: **−10% / −20% / fuld pris** viser korrekte beløb; prisoversigt (tilbud + porto-fra + køberbeskyttelse 5% + 5 kr.); **"X af 20 tilbud tilbage i dag"**.
-- [ ] Send et tilbud (fx −10%). Forventet: toast, redirect til **/beskeder**, dagstæller falder ved næste åbning.
-- [ ] **DB:** ny `offers`-række, `status='pending'`, `proposed_by='buyer'`, korrekt `amount`, `buyer_institution_id`/`seller_institution_id`.
-- [ ] **Loft:** send flere tilbud — tælleren tæller korrekt pr. dag.
-- [ ] **Negativ:** tilbud under et evt. mindstebud → afvises.
-- [ ] **Negativ:** tilbud på dit eget opslag → blokeres.
+- [x] Som **A**: åbn et af **B's køb-opslag** → **🏷️ Giv et tilbud**.
+- [x] Tjek modal: **−10% / −20% / egen pris** viser korrekte beløb; prisoversigt (tilbud + porto-fra + køberbeskyttelse 5% + 5 kr.); **"X af 20 tilbud tilbage i dag"**.
+- [x] Send et tilbud (fx −10%). Forventet: toast, redirect til **/beskeder**, dagstæller falder ved næste åbning.
+- [x] **DB:** ny `offers`-række, `status='pending'`, `proposed_by='buyer'`, korrekt `amount`, `buyer_institution_id`/`seller_institution_id`.
+- [x] **Loft:** send flere tilbud — tælleren tæller korrekt pr. dag.
+- [x] **Negativ:** tilbud under et evt. mindstebud → afvises.
+- [x] **Negativ:** tilbud på dit eget opslag → blokeres (rettet til institutions-niveau).
 
-## 2) Tilbud — sælgers svar (Trin 3)
+## 2) Tilbud — sælgers svar (Trin 3) — ✅
 
-- [ ] Som **B**: tilbud-boble i beskeder med **Accepter / Afvis / Modbud**.
-- [ ] **Modbud:** indtast beløb → send → ny boble; som **A** kan du svare på den.
-- [ ] **Afvis:** med kommentar → bekræft → boble viser "Afvist".
-- [ ] **Accepter:** Forventet:
+- [x] Som **B**: tilbud-boble i beskeder med **Accepter / Afvis / Modbud**.
+- [x] **Modbud:** indtast beløb → send → ny boble; som **A** kan du svare på den. (Vises nu korrekt højre/venstre + live.)
+- [x] **Afvis:** med kommentar → bekræft → boble viser "Afvist".
+- [x] **Accepter:** Forventet:
   - `offers.status='accepted'`
   - varen reserveres: `listings.reserved_until` ≈ nu+24t, `reserved_for_institution_id` = A
   - A får checkout-besked i samtalen.
+  - **Alle andre åbne bud på varen afvises automatisk.**
 
-## 3) Reservation (beslutning 1.5)
+## 3) Reservation (beslutning 1.5) — ✅
 
-- [ ] Mens varen er reserveret til A: prøv at give tilbud på samme vare fra anden konto → **blokering**.
-- [ ] **DB:** `reserved_until` i fremtiden.
+- [x] Mens varen er reserveret til A: prøv at give tilbud på samme vare fra anden konto → **blokering**.
+- [x] **DB:** `reserved_until` i fremtiden.
+- [x] Reserveret-badge vises i marketplace; opslaget viser "Varen er reserveret"-banner.
 
 ## 4) Tilbud — checkout & gennemførsel (Trin 3 + 3e)
 
