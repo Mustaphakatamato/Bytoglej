@@ -193,12 +193,13 @@ export default function ListingDetailClient() {
     (currentUserId && listing?.user_id === currentUserId)
   );
 
-  const isReservedForOther = !!(
-    listing?.reserved_until &&
-    new Date(listing.reserved_until).getTime() > Date.now() &&
-    listing.reserved_for_institution_id &&
-    listing.reserved_for_institution_id !== (ctxInstId || ctxInstitution?.id)
+  const reservedActive = !!(
+    listing?.reserved_until && new Date(listing.reserved_until).getTime() > Date.now()
   );
+  const isReservedForMe = reservedActive &&
+    listing.reserved_for_institution_id &&
+    listing.reserved_for_institution_id === (ctxInstId || ctxInstitution?.id);
+  const isReservedForOther = reservedActive && !isReservedForMe && !!listing.reserved_for_institution_id;
 
   useEffect(() => { if (listing) setIsFav(favs?.includes(listing.id) || false); }, [favs, listing?.id]);
 
@@ -856,10 +857,16 @@ export default function ListingDetailClient() {
                     ⏳ Varen er reserveret til en anden køber og kan ikke købes eller bydes på lige nu.
                   </div>
                 )}
-                {listing.type==='køb' && !isReservedForOther && <Btn variant="primary" color={PRIMARY} radius={22} onClick={handleAddToCart} style={{ justifyContent:'center', padding:'15px', fontSize:16 }}>{inCart ? '🛒 Gå til kurv →' : (() => { const so = listing.shipping_options?.[0]; const canShip = so?.allow_shipping || (!so && listing.can_ship); const tag = canShip ? (so?.shipping_included_in_price ? ' inkl. fragt' : ' + fragt') : ''; return `🛒 Læg i kurv — ${listing.price} kr.${tag}`; })()}</Btn>}
-                {listing.type==='køb' && !isReservedForOther && <Btn variant="outline" radius={22} onClick={()=>{ if(!loggedIn){ router.push('/login'); return; } setOfferModal(true); }} style={{ justifyContent:'center', padding:'13px', fontSize:15 }}>🏷️ Giv et tilbud</Btn>}
-                {listing.type==='byd' && !isReservedForOther && <Btn variant="primary" color={PRIMARY} radius={22} onClick={()=>{ if(!loggedIn){ router.push('/login'); return; } setOfferModal(true); }} style={{ justifyContent:'center', padding:'15px', fontSize:16 }}>🏷️ Giv et tilbud</Btn>}
-                {listing.type==='byt' && !isReservedForOther && <Btn variant="primary" color={ACCENT} radius={22} onClick={()=>{ if(!loggedIn){ router.push('/login'); return; } setSwapProposalModal(true); }} style={{ justifyContent:'center', padding:'15px', fontSize:16 }}>🔄 Foreslå bytte</Btn>}
+                {isReservedForMe && (
+                  <button onClick={()=>{ setSelectedConvId && setSelectedConvId(null); router.push('/beskeder'); }}
+                    style={{ width:'100%', textAlign:'left', background:'#ECFDF5', border:`1.5px solid ${PRIMARY}`, borderRadius:14, padding:'12px 16px', fontSize:13, fontFamily:FONT, color:PRIMARY, fontWeight:600, cursor:'pointer' }}>
+                    🎉 Du har et accepteret tilbud på denne vare — gå til beskeder for at betale →
+                  </button>
+                )}
+                {listing.type==='køb' && !reservedActive && <Btn variant="primary" color={PRIMARY} radius={22} onClick={handleAddToCart} style={{ justifyContent:'center', padding:'15px', fontSize:16 }}>{inCart ? '🛒 Gå til kurv →' : (() => { const so = listing.shipping_options?.[0]; const canShip = so?.allow_shipping || (!so && listing.can_ship); const tag = canShip ? (so?.shipping_included_in_price ? ' inkl. fragt' : ' + fragt') : ''; return `🛒 Læg i kurv — ${listing.price} kr.${tag}`; })()}</Btn>}
+                {listing.type==='køb' && !reservedActive && <Btn variant="outline" radius={22} onClick={()=>{ if(!loggedIn){ router.push('/login'); return; } setOfferModal(true); }} style={{ justifyContent:'center', padding:'13px', fontSize:15 }}>🏷️ Giv et tilbud</Btn>}
+                {listing.type==='byd' && !reservedActive && <Btn variant="primary" color={PRIMARY} radius={22} onClick={()=>{ if(!loggedIn){ router.push('/login'); return; } setOfferModal(true); }} style={{ justifyContent:'center', padding:'15px', fontSize:16 }}>🏷️ Giv et tilbud</Btn>}
+                {listing.type==='byt' && !reservedActive && <Btn variant="primary" color={ACCENT} radius={22} onClick={()=>{ if(!loggedIn){ router.push('/login'); return; } setSwapProposalModal(true); }} style={{ justifyContent:'center', padding:'15px', fontSize:16 }}>🔄 Foreslå bytte</Btn>}
                 {listing.type==='søges' && <button onClick={()=>setSøgesModal(true)}
                   style={{ width:'100%', padding:'15px', borderRadius:22, border:'none', background:'#7C3AED', color:'#fff', fontSize:15, fontWeight:700, cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center', gap:8, fontFamily:FONT, transition:'all 0.2s' }}>
                   🎯 Jeg har noget der matcher

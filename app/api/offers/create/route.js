@@ -55,12 +55,17 @@ export async function POST(req) {
     return NextResponse.json({ error: 'Du kan ikke give tilbud på dit eget opslag' }, { status: 400 });
   }
 
-  // Hård reservation (beslutning 1.5): er varen reserveret til en ANDEN
-  // institution lige nu, kan man ikke byde.
+  // Hård reservation (beslutning 1.5): mens varen er reserveret kan der ikke
+  // afgives nye tilbud — handlen er låst indtil reservationen udløber/betales.
   const reservedActive = listing.reserved_until && new Date(listing.reserved_until).getTime() > Date.now();
-  if (reservedActive && listing.reserved_for_institution_id
-      && listing.reserved_for_institution_id !== (buyerInst?.id || null)) {
-    return NextResponse.json({ error: 'Varen er reserveret til en anden køber lige nu — prøv igen senere' }, { status: 409 });
+  if (reservedActive) {
+    const reservedForMe = listing.reserved_for_institution_id
+      && listing.reserved_for_institution_id === (buyerInst?.id || null);
+    return NextResponse.json({
+      error: reservedForMe
+        ? 'Du har allerede et accepteret tilbud på denne vare — gennemfør betalingen i beskeder'
+        : 'Varen er reserveret til en anden køber lige nu — prøv igen senere',
+    }, { status: 409 });
   }
 
   // Dagligt loft (Copenhagen-kalenderdag) — samme kilde som /api/offers/quota.
