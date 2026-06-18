@@ -960,10 +960,11 @@ export default function MessagesClient() {
   async function handleBidPayment(checkoutMsg, selectedCarrier) {
     setGoingToPayment(checkoutMsg.id);
     const checkoutData = (() => { try { return JSON.parse(checkoutMsg.content); } catch { return {}; } })();
-    const so = checkoutData.shipping_options;
+    const canShip = checkoutData.can_ship || checkoutData.shipping_options?.allow_shipping;
+    const canPickup = checkoutData.shipping_options?.allow_pickup;
     let shippingMethod = 'custom';
-    if (so?.allow_shipping) shippingMethod = selectedCarrier || 'parcel_shop_gls';
-    else if (so?.allow_pickup) shippingMethod = 'pickup';
+    if (canShip) shippingMethod = selectedCarrier || 'parcel_shop_gls';
+    else if (canPickup) shippingMethod = 'pickup';
     try {
       const res = await authedFetch('/api/payments/create-intent', {
         method: 'POST',
@@ -1684,10 +1685,10 @@ export default function MessagesClient() {
                                           <span style={{ fontSize:18 }}>{done ? '✅' : '🛍️'}</span>
                                           <div>
                                             <div style={{ fontFamily:FONT, fontWeight:800, fontSize:14, color:INK }}>
-                                              {done ? 'Handel gennemført!' : 'Dit bud er accepteret 🎉'}
+                                              {done ? 'Handel gennemført!' : checkoutData.deal_type === 'offer' ? 'Dit tilbud er accepteret 🎉' : 'Dit bud er accepteret 🎉'}
                                             </div>
                                             <div style={{ fontFamily:FONT, fontSize:12, color:INK3, marginTop:1 }}>
-                                              {checkoutData.listing_title} · {checkoutData.deal_type === 'byd' ? `${checkoutData.amount} kr.` : 'Bytte'}
+                                              {checkoutData.listing_title} · {(checkoutData.deal_type === 'byd' || checkoutData.deal_type === 'offer') ? `${checkoutData.amount} kr.` : 'Bytte'}
                                             </div>
                                           </div>
                                         </div>
@@ -1715,9 +1716,8 @@ export default function MessagesClient() {
                                             <button
                                               onClick={()=>{
                                                 if (paying) return;
-                                                const so = checkoutData?.shipping_options;
-                                                if (so?.allow_shipping) { setCarrierPickerMsg(m); }
-                                                else { handleBidPayment(m, so?.allow_pickup ? 'pickup' : 'custom'); }
+                                                if (checkoutData?.can_ship || checkoutData?.shipping_options?.allow_shipping) { setCarrierPickerMsg(m); }
+                                                else { handleBidPayment(m, checkoutData?.shipping_options?.allow_pickup ? 'pickup' : 'custom'); }
                                               }}
                                               disabled={paying}
                                               style={{ padding:'13px', borderRadius:99, background:paying?PAPER3:PRIMARY, border:'none', color:paying?INK3:'#fff', fontFamily:FONT, fontWeight:700, fontSize:14, cursor:paying?'default':'pointer' }}>

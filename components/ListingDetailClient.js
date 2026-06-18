@@ -193,6 +193,13 @@ export default function ListingDetailClient() {
     (currentUserId && listing?.user_id === currentUserId)
   );
 
+  const isReservedForOther = !!(
+    listing?.reserved_until &&
+    new Date(listing.reserved_until).getTime() > Date.now() &&
+    listing.reserved_for_institution_id &&
+    listing.reserved_for_institution_id !== (ctxInstId || ctxInstitution?.id)
+  );
+
   useEffect(() => { if (listing) setIsFav(favs?.includes(listing.id) || false); }, [favs, listing?.id]);
 
   useEffect(() => {
@@ -844,10 +851,15 @@ export default function ListingDetailClient() {
             {/* Action buttons */}
             {!isOwn ? (
               <div style={{ display:'flex', flexDirection:'column', gap:10, marginBottom:20 }}>
-                {listing.type==='køb' && <Btn variant="primary" color={PRIMARY} radius={22} onClick={handleAddToCart} style={{ justifyContent:'center', padding:'15px', fontSize:16 }}>{inCart ? '🛒 Gå til kurv →' : (() => { const so = listing.shipping_options?.[0]; const canShip = so?.allow_shipping || (!so && listing.can_ship); const tag = canShip ? (so?.shipping_included_in_price ? ' inkl. fragt' : ' + fragt') : ''; return `🛒 Læg i kurv — ${listing.price} kr.${tag}`; })()}</Btn>}
-                {listing.type==='køb' && <Btn variant="outline" radius={22} onClick={()=>{ if(!loggedIn){ router.push('/login'); return; } setOfferModal(true); }} style={{ justifyContent:'center', padding:'13px', fontSize:15 }}>🏷️ Giv et tilbud</Btn>}
-                {listing.type==='byd' && <Btn variant="primary" color={PRIMARY} radius={22} onClick={()=>{ if(!loggedIn){ router.push('/login'); return; } setOfferModal(true); }} style={{ justifyContent:'center', padding:'15px', fontSize:16 }}>🏷️ Giv et tilbud</Btn>}
-                {listing.type==='byt' && <Btn variant="primary" color={ACCENT} radius={22} onClick={()=>{ if(!loggedIn){ router.push('/login'); return; } setSwapProposalModal(true); }} style={{ justifyContent:'center', padding:'15px', fontSize:16 }}>🔄 Foreslå bytte</Btn>}
+                {isReservedForOther && (
+                  <div style={{ background:'#FEF3C7', border:'1.5px solid #F59E0B', borderRadius:14, padding:'12px 16px', fontSize:13, fontFamily:FONT, color:'#92400E', fontWeight:600 }}>
+                    ⏳ Varen er reserveret til en anden køber og kan ikke købes eller bydes på lige nu.
+                  </div>
+                )}
+                {listing.type==='køb' && !isReservedForOther && <Btn variant="primary" color={PRIMARY} radius={22} onClick={handleAddToCart} style={{ justifyContent:'center', padding:'15px', fontSize:16 }}>{inCart ? '🛒 Gå til kurv →' : (() => { const so = listing.shipping_options?.[0]; const canShip = so?.allow_shipping || (!so && listing.can_ship); const tag = canShip ? (so?.shipping_included_in_price ? ' inkl. fragt' : ' + fragt') : ''; return `🛒 Læg i kurv — ${listing.price} kr.${tag}`; })()}</Btn>}
+                {listing.type==='køb' && !isReservedForOther && <Btn variant="outline" radius={22} onClick={()=>{ if(!loggedIn){ router.push('/login'); return; } setOfferModal(true); }} style={{ justifyContent:'center', padding:'13px', fontSize:15 }}>🏷️ Giv et tilbud</Btn>}
+                {listing.type==='byd' && !isReservedForOther && <Btn variant="primary" color={PRIMARY} radius={22} onClick={()=>{ if(!loggedIn){ router.push('/login'); return; } setOfferModal(true); }} style={{ justifyContent:'center', padding:'15px', fontSize:16 }}>🏷️ Giv et tilbud</Btn>}
+                {listing.type==='byt' && !isReservedForOther && <Btn variant="primary" color={ACCENT} radius={22} onClick={()=>{ if(!loggedIn){ router.push('/login'); return; } setSwapProposalModal(true); }} style={{ justifyContent:'center', padding:'15px', fontSize:16 }}>🔄 Foreslå bytte</Btn>}
                 {listing.type==='søges' && <button onClick={()=>setSøgesModal(true)}
                   style={{ width:'100%', padding:'15px', borderRadius:22, border:'none', background:'#7C3AED', color:'#fff', fontSize:15, fontWeight:700, cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center', gap:8, fontFamily:FONT, transition:'all 0.2s' }}>
                   🎯 Jeg har noget der matcher
