@@ -374,8 +374,9 @@ const [saveSearchModal, setSaveSearchModal] = useState(false);
   }
 
   const noFilters = !category && !search && filter === 'alle';
-  const showCategoryBrowser    = isMobile && noFilters && !pendingCategory && !aiMode && !browserDismissed;
-  const showSubcategoryBrowser = isMobile && noFilters && !!pendingCategory && !aiMode;
+  // aiResults === null: ellers skjuler kategori-browseren billed-/AI-resultater på mobil
+  const showCategoryBrowser    = isMobile && noFilters && !pendingCategory && !aiMode && !browserDismissed && aiResults === null;
+  const showSubcategoryBrowser = isMobile && noFilters && !!pendingCategory && !aiMode && aiResults === null;
 
   return (
     <PullToRefresh onRefresh={fetchListings}>
@@ -510,24 +511,24 @@ const [saveSearchModal, setSaveSearchModal] = useState(false);
             {key === 'søges' && <span style={{ marginRight:5 }}>🔍</span>}{label}
           </button>
         ))}
-        {/* Mobile AI search */}
-        {isMobile && (
+      </div>
+      {/* Mobile: dedikeret søge-række (AI tekst + billede) — egen linje så den er tydelig */}
+      {isMobile && (
+        <div style={{ maxWidth: 1140, margin: '0 auto', padding: '8px 16px 0', display: 'flex', gap: 8 }}>
           <button
             onClick={() => { if (aiMode) clearAiSearch(); else { setAiMode(true); setTimeout(() => aiInputRef.current?.focus(), 50); } }}
-            style={{ padding: '8px 16px', borderRadius: 99, border: 'none', background: aiMode ? PRIMARY : PAPER2, color: aiMode ? '#fff' : INK2, fontFamily: FONT, fontWeight: 700, fontSize: 13, cursor: 'pointer', transition: 'all 0.15s', display: 'flex', alignItems: 'center', gap: 4 }}
+            style={{ flex: 1, justifyContent: 'center', padding: '10px 16px', borderRadius: 99, border: 'none', background: aiMode ? PRIMARY : PAPER2, color: aiMode ? '#fff' : INK2, fontFamily: FONT, fontWeight: 700, fontSize: 13, cursor: 'pointer', transition: 'all 0.15s', display: 'flex', alignItems: 'center', gap: 5 }}
           >
-            ✨ AI tekst
+            ✨ AI tekst søgning
           </button>
-        )}
-        {isMobile && (
           <button
             onClick={() => setImgSearchOpen(true)}
-            style={{ padding: '8px 16px', borderRadius: 99, border: 'none', background: PAPER2, color: INK2, fontFamily: FONT, fontWeight: 700, fontSize: 13, cursor: 'pointer', transition: 'all 0.15s', display: 'flex', alignItems: 'center', gap: 4 }}
+            style={{ flex: 1, justifyContent: 'center', padding: '10px 16px', borderRadius: 99, border: 'none', background: PAPER2, color: INK2, fontFamily: FONT, fontWeight: 700, fontSize: 13, cursor: 'pointer', transition: 'all 0.15s', display: 'flex', alignItems: 'center', gap: 5 }}
           >
             📷 Søg med billede
           </button>
-        )}
-      </div>
+        </div>
+      )}
       {/* Mobile AI search bar */}
       {isMobile && aiMode && (
         <div style={{ maxWidth: 1140, margin: '0 auto', padding: '8px 16px 0' }}>
