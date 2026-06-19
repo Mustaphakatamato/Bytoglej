@@ -249,7 +249,7 @@ export async function POST(req) {
       });
 
       await supa.from('conversations').update({
-        last_message:    `Betaling bekræftet — ${(g.items || []).map(i => i.title).join(', ')}`,
+        last_message:    `Betaling bekræftet: ${(g.items || []).map(i => i.title).join(', ')}`,
         last_message_at: new Date().toISOString(),
         owner_unread:    (conv?.owner_unread || 0) + 1,
         delivery_method: g.shippingMethod === 'pickup' || g.shippingMethod === 'custom' ? g.shippingMethod : 'shipping',
@@ -325,7 +325,7 @@ export async function POST(req) {
         body: JSON.stringify({
           from: 'byt&leg <noreply@bytogleg.dk>',
           to: [order.buyer_email],
-          subject: `Din ordre er bekræftet — byt&leg`,
+          subject: `Din ordre er bekræftet hos byt&leg`,
           html: buyerOrderEmailHtml({
             buyerName:  order.buyer_name,
             groups:     updatedGroups,
@@ -407,7 +407,7 @@ async function handleSwapPayment(pi, supa) {
       conversation_id: convId,
       sender_id: claimed.buyer_id,
       sender_name: claimed.buyer_name || 'System',
-      content: '🎉 Byttehandel gennemført! Begge parter har betalt — pakkemærkater er klar.',
+      content: '🎉 Byttehandel gennemført! Begge parter har betalt. Pakkemærkater er klar.',
       message_type: 'swap_completed',
     });
 
@@ -419,7 +419,7 @@ async function handleSwapPayment(pi, supa) {
   } else {
     // Kun én part har betalt → besked om at afvente modparten.
     await supa.from('conversations').update({
-      last_message: 'En part har betalt — afventer den anden part.',
+      last_message: 'En part har betalt. Afventer den anden part.',
       last_message_at: now,
       owner_unread: (conv.owner_unread || 0) + 1,
       initiator_unread: (conv.initiator_unread || 0) + 1,
@@ -500,7 +500,7 @@ function sellerOrderEmailHtml({ sellerName, items, itemTotal, shippingMethod, pi
       <div style="background:#E8F1EC;border:1px solid #CFE3D8;border-radius:14px;padding:18px 20px;margin:0 0 28px;">
         <div style="font-weight:800;font-size:14px;color:#133F2B;margin-bottom:6px;">📦 Din pakkemærkat er klar</div>
         <p style="font-size:13px;color:#3A473D;line-height:1.6;margin:0 0 14px;">
-          Vi har oprettet en forsendelse med ${escapeHtml(methodLabel)}${trackingNumber ? ` — tracking-nummer <strong>${escapeHtml(String(trackingNumber))}</strong>` : ''}.
+          Vi har oprettet en forsendelse med ${escapeHtml(methodLabel)}${trackingNumber ? `, tracking-nummer <strong>${escapeHtml(String(trackingNumber))}</strong>` : ''}.
         </p>
         <a href="${escapeHtml(String(labelUrl))}" style="display:inline-block;background:#2A7D4F;color:#fff;text-decoration:none;font-weight:700;font-size:13px;padding:10px 22px;border-radius:99px;">Download pakkemærkat (PDF) →</a>
       </div>`
@@ -515,7 +515,7 @@ function sellerOrderEmailHtml({ sellerName, items, itemTotal, shippingMethod, pi
       <div style="background:#E8F1EC;border:1px solid #CFE3D8;border-radius:14px;padding:18px 20px;margin:0 0 28px;">
         <div style="font-weight:800;font-size:14px;color:#133F2B;margin-bottom:6px;">🤝 Levering: ${escapeHtml(methodLabel)}</div>
         <p style="font-size:13px;color:#3A473D;line-height:1.6;margin:0;">
-          Køberen har valgt ${shippingMethod === 'pickup' ? 'at afhente varen hos jer' : 'en egen leveringsaftale'} — aftal nærmere via beskeder på byt&amp;leg.
+          Køberen har valgt ${shippingMethod === 'pickup' ? 'at afhente varen hos jer' : 'en egen leveringsaftale'}. Aftal nærmere via beskeder på byt&amp;leg.
         </p>
       </div>`;
 
@@ -540,7 +540,7 @@ function sellerOrderEmailHtml({ sellerName, items, itemTotal, shippingMethod, pi
     <div style="background-color:#1B4332;background:linear-gradient(160deg,#133F2B 0%,#2A7D4F 100%);border-radius:20px 20px 0 0;padding:44px 44px 36px;text-align:center;">
       <div style="display:inline-block;background:rgba(255,255,255,0.12);border-radius:14px;padding:10px 22px;color:#fff;font-size:26px;font-weight:900;letter-spacing:-0.04em;margin-bottom:20px;">byt<span style="opacity:0.55">&amp;</span>leg.</div>
       <h1 style="color:#fff;font-size:26px;font-weight:800;margin:0 0 10px;letter-spacing:-0.03em;">Tillykke, du har solgt noget! 🎉</h1>
-      <p style="color:rgba(255,255,255,0.7);font-size:15px;margin:0;line-height:1.55;">Betalingen er modtaget og bekræftet — ${isShipping ? 'nu skal varen bare afsted.' : 'nu skal varen bare overdrages.'}</p>
+      <p style="color:rgba(255,255,255,0.7);font-size:15px;margin:0;line-height:1.55;">Betalingen er modtaget og bekræftet. ${isShipping ? 'Nu skal varen bare afsted.' : 'Nu skal varen bare overdrages.'}</p>
     </div>
 
     <!-- Body -->
@@ -644,7 +644,7 @@ function buyerOrderEmailHtml({ buyerName, groups, orderId, grandTotal }) {
     <div style="background-color:#1B4332;background:linear-gradient(160deg,#133F2B 0%,#2A7D4F 100%);border-radius:20px 20px 0 0;padding:44px 44px 36px;text-align:center;">
       <div style="display:inline-block;background:rgba(255,255,255,0.12);border-radius:14px;padding:10px 22px;color:#fff;font-size:26px;font-weight:900;letter-spacing:-0.04em;margin-bottom:20px;">byt<span style="opacity:0.55">&amp;</span>leg.</div>
       <h1 style="color:#fff;font-size:26px;font-weight:800;margin:0 0 10px;letter-spacing:-0.03em;">Din betaling er gennemført! 🎉</h1>
-      <p style="color:rgba(255,255,255,0.7);font-size:15px;margin:0;line-height:1.55;">${anyShipping ? 'Sælger er notificeret og pakker varen til dig.' : 'Sælger er notificeret — aftal afhentning i beskeder.'}</p>
+      <p style="color:rgba(255,255,255,0.7);font-size:15px;margin:0;line-height:1.55;">${anyShipping ? 'Sælger er notificeret og pakker varen til dig.' : 'Sælger er notificeret. Aftal afhentning i beskeder.'}</p>
     </div>
 
     <!-- Body -->

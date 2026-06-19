@@ -38,7 +38,7 @@ export async function POST(req) {
     });
 
     const description = (completion.choices[0]?.message?.content || '').trim();
-    if (!description) return NextResponse.json({ error: 'Kunne ikke beskrive billedet — prøv et andet foto' }, { status: 502 });
+    if (!description) return NextResponse.json({ error: 'Kunne ikke beskrive billedet. Prøv et andet foto' }, { status: 502 });
 
     // Step 2: embed beskrivelsen og find nærmeste opslag
     const embedding = await embedText(description);
@@ -59,6 +59,6 @@ export async function POST(req) {
     });
   } catch (e) {
     console.error('ai-image-search error:', e.message);
-    return NextResponse.json({ error: 'Noget gik galt — prøv igen' }, { status: 500 });
+    return NextResponse.json({ error: 'Noget gik galt. Prøv igen' }, { status: 500 });
   }
 }

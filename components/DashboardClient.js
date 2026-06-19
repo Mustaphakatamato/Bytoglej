@@ -557,7 +557,7 @@ export default function DashboardClient() {
     setMemberSaving(false);
     if (!res.ok) {
       await db.from('institution_invitations').delete().eq('id', inv.id);
-      showToast('E-mail kunne ikke sendes — prøv igen', 'error');
+      showToast('E-mail kunne ikke sendes. Prøv igen', 'error');
       return;
     }
     setMemberEmail('');
@@ -907,7 +907,7 @@ export default function DashboardClient() {
             <div style={{ display:'flex', flexDirection:'column', gap:12 }}>
               {false && (
                 <div style={{ background:'#FEF9C3', border:'1px solid #FDE047', borderRadius:12, padding:'12px 16px', fontSize:13, color:'#92400E', fontFamily:FONT }}>
-                  <strong>Tæller vises, men ikke hvem</strong> — kontakt os for at aktivere fuldt visning af interesserede.
+                  <strong>Tæller vises, men ikke hvem</strong>. Kontakt os for at aktivere fuldt visning af interesserede.
                 </div>
               )}
               {favoritersGrouped.map(({ listing, favoriters }) => (
@@ -925,7 +925,7 @@ export default function DashboardClient() {
                   </div>
                   {favoriters.length === 0 && listing.fav_count > 0 && (
                     <div style={{ padding:'10px 16px', fontSize:12, color:INK3, fontStyle:'italic', fontFamily:FONT }}>
-                      {listing.fav_count} {listing.fav_count === 1 ? 'person har' : 'personer har'} vist interesse — de var ikke logget ind
+                      {listing.fav_count} {listing.fav_count === 1 ? 'person har' : 'personer har'} vist interesse, men de var ikke logget ind
                     </div>
                   )}
                   {favoriters.length > 0 && <div>
@@ -1040,7 +1040,7 @@ export default function DashboardClient() {
               </div>
               {co2Savings.length === 0 ? (
                 <div style={{ textAlign:'center', padding:'24px 0' }}>
-                  <p style={{ fontSize:14, color:INK3, fontFamily:FONT, margin:0 }}>Ingen gennemførte handler endnu — besparelser beregnes automatisk</p>
+                  <p style={{ fontSize:14, color:INK3, fontFamily:FONT, margin:0 }}>Ingen gennemførte handler endnu. Besparelser beregnes automatisk</p>
                 </div>
               ) : (
                 <>
@@ -1091,7 +1091,7 @@ export default function DashboardClient() {
             const needsPickup = c.is_handled && c.handled_action === 'order_confirmed' && c.delivery_method !== 'shipping';
             let label, sublabel, bg, border, dot;
             if (isNew) {
-              label = 'Ny ordre — afventer bekræftelse';
+              label = 'Ny ordre, afventer bekræftelse';
               sublabel = 'Gå til samtalen og tryk "Bekræft ordre"';
               bg = '#FFFBEB'; border = '#FDE68A'; dot = '#F59E0B';
             } else if (needsLabel) {
@@ -1187,7 +1187,7 @@ export default function DashboardClient() {
               {shippingLoading ? (
                 <div style={{ padding:'20px 0', textAlign:'center', color:INK3, fontFamily:FONT, fontSize:13 }}>Indlæser…</div>
               ) : myShipments.length === 0 ? (
-                <div style={{ textAlign:'center', padding:'20px 0', color:INK3, fontFamily:FONT, fontSize:13 }}>Ingen forsendelser endnu — de oprettes automatisk når en handel med pakkelevering bekræftes</div>
+                <div style={{ textAlign:'center', padding:'20px 0', color:INK3, fontFamily:FONT, fontSize:13 }}>Ingen forsendelser endnu. De oprettes automatisk når en handel med pakkelevering bekræftes</div>
               ) : (
                 <div style={{ display:'flex', flexDirection:'column', gap:8, marginBottom:20 }}>
                   {myShipments.map(s => {
@@ -1195,7 +1195,7 @@ export default function DashboardClient() {
                     const needsAction = s.status === 'booked' || s.status === 'printed';
                     const carrierName = s.carrier === 'postnord' ? 'PostNord' : s.carrier === 'dao' ? 'DAO' : s.carrier === 'gls' ? 'GLS' : s.carrier || '';
                     const steps = s.carrier === 'postnord'
-                      ? ['Print forsendelseslabelen (PDF) — eller skriv blot trackingnummeret tydeligt på pakken', 'Klæb labelen på pakken eller skriv nummeret', 'Aflever pakken på nærmeste PostNord-punkt']
+                      ? ['Print forsendelseslabelen (PDF), eller skriv blot trackingnummeret tydeligt på pakken', 'Klæb labelen på pakken eller skriv nummeret', 'Aflever pakken på nærmeste PostNord-punkt']
                       : s.carrier === 'dao'
                       ? ['Print forsendelseslabelen (PDF)', 'Klæb labelen på pakken', 'Aflever pakken hos nærmeste DAO-agent']
                       : ['Print forsendelseslabelen (PDF)', 'Klæb labelen på pakken', 'Aflever pakken hos transportørens udleveringssted'];
@@ -1228,7 +1228,7 @@ export default function DashboardClient() {
                         {needsAction && (
                           <div style={{ borderTop:`1px solid #FEF08A`, background:'#FFFBEB', padding:'12px 16px' }}>
                             <div style={{ fontFamily:FONT, fontSize:12, fontWeight:700, color:'#92400E', marginBottom:8 }}>
-                              📬 Klar til afsendelse — hvad skal du gøre?
+                              📬 Klar til afsendelse. Hvad skal du gøre?
                             </div>
                             <ol style={{ margin:0, paddingLeft:18, display:'flex', flexDirection:'column', gap:4 }}>
                               {steps.map((step, i) => (
@@ -1237,7 +1237,7 @@ export default function DashboardClient() {
                             </ol>
                             {s.tracking_number && !s.label_pdf_url && (
                               <div style={{ marginTop:10, padding:'8px 12px', background:'rgba(42,125,79,0.08)', borderRadius:8, fontFamily:FONT, fontSize:12, color:PRIMARY, fontWeight:600 }}>
-                                💡 PostNord-tip: Skriv <strong>{s.tracking_number}</strong> tydeligt på pakken — du behøver ikke nødvendigvis printe et label.
+                                💡 PostNord-tip: Skriv <strong>{s.tracking_number}</strong> tydeligt på pakken. Du behøver ikke nødvendigvis printe et label.
                               </div>
                             )}
                           </div>
@@ -1685,7 +1685,7 @@ export default function DashboardClient() {
               <div style={{ textAlign:'center', padding:'40px 0' }}>
                 <div style={{ fontSize:36, marginBottom:10 }}>🔍</div>
                 <div style={{ fontFamily:FONT, fontWeight:700, fontSize:15, color:INK, marginBottom:6 }}>Ingen matches fundet endnu</div>
-                <div style={{ fontSize:13, color:INK3, fontFamily:FONT }}>Prøv igen senere — nye opslag tilføjes løbende</div>
+                <div style={{ fontSize:13, color:INK3, fontFamily:FONT }}>Prøv igen senere. Nye opslag tilføjes løbende</div>
               </div>
             ) : (
               <div style={{ display:'flex', flexDirection:'column', gap:10 }}>

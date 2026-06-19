@@ -218,7 +218,7 @@ function HeroSection({ stats }) {
       lineHeight: 1.65,
       marginBottom: 28,
     }}>
-      Den første markedsplads hvor børnehaver, skoler og SFO'er køber, sælger og bytter legetøj direkte med hinanden — sikkert og bæredygtigt.
+      Den første markedsplads hvor børnehaver, skoler og SFO'er køber, sælger og bytter legetøj direkte med hinanden, sikkert og bæredygtigt.
     </p>
   );
 
@@ -300,7 +300,7 @@ function HeroSection({ stats }) {
           {pill}
           {headline}
           <p style={{ fontSize: isMobile ? 15 : 18, color: 'rgba(255,255,255,0.68)', lineHeight: 1.65, maxWidth: 520, margin: '0 auto 36px' }}>
-            Den første markedsplads hvor børnehaver, skoler og SFO'er køber, sælger og bytter legetøj direkte med hinanden — sikkert og bæredygtigt.
+            Den første markedsplads hvor børnehaver, skoler og SFO'er køber, sælger og bytter legetøj direkte med hinanden, sikkert og bæredygtigt.
           </p>
           <div style={{ display: 'flex', gap: 12, justifyContent: 'center', flexWrap: 'wrap', marginBottom: 56 }}>
             <button onClick={() => router.push('/signup')} style={{
@@ -442,8 +442,8 @@ function HeroSection({ stats }) {
 const JOURNEY_STEPS = [
   { emoji: '🧸', bg: '#FFFBEB', accent: '#D97706', n: '01', title: 'Legetøjet samler støv', desc: 'Du har cykler, puslespil eller møbler der ikke bruges. Et andet sted vil de gøre børn glade.' },
   { emoji: '📸', bg: '#F0FDF4', accent: '#16A34A', n: '02', title: 'Opret et opslag på 2 min.', desc: 'Tag ét billede. AI udfylder titel, kategori og beskrivelse automatisk. Nemmere end en brugtannonce.' },
-  { emoji: '💬', bg: '#EFF6FF', accent: '#2563EB', n: '03', title: 'Institutioner byder og skriver', desc: 'Verificerede børnehaver og skoler kontakter dig direkte. Byd, byt eller sælg — du bestemmer.' },
-  { emoji: '🚀', bg: '#FDF4FF', accent: '#9333EA', n: '04', title: 'Nyt hjem, ny glæde', desc: 'I aftaler pris og afhentning. Legetøjet giver glæde et nyt sted — og du har skabt plads.' },
+  { emoji: '💬', bg: '#EFF6FF', accent: '#2563EB', n: '03', title: 'Institutioner byder og skriver', desc: 'Verificerede børnehaver og skoler kontakter dig direkte. Byd, byt eller sælg. Du bestemmer.' },
+  { emoji: '🚀', bg: '#FDF4FF', accent: '#9333EA', n: '04', title: 'Nyt hjem, ny glæde', desc: 'I aftaler pris og afhentning. Legetøjet giver glæde et nyt sted, og du har skabt plads.' },
 ];
 
 /* ── How steps — shared grid, works on both mobile and desktop ── */

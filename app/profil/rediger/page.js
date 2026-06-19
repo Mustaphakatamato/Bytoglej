@@ -283,7 +283,7 @@ export default function IndstillingerPage() {
       showToast('Indstilling gemt ✓');
     } catch {
       setter(prev);
-      showToast('Kunne ikke gemme — prøv igen', 'error');
+      showToast('Kunne ikke gemme. Prøv igen', 'error');
     }
     setConsentSaving(null);
   }
@@ -305,7 +305,7 @@ export default function IndstillingerPage() {
       URL.revokeObjectURL(url);
       showToast('Dine data er downloadet ✓');
     } catch {
-      showToast('Kunne ikke hente data — prøv igen', 'error');
+      showToast('Kunne ikke hente data. Prøv igen', 'error');
     }
     setExporting(false);
   }
@@ -594,7 +594,7 @@ export default function IndstillingerPage() {
               {/* ── NOTIFIKATIONER ── */}
               {section === 'notifikationer' && (
                 <div>
-                  <SectionHead title="Notifikationer" desc="Få besked direkte på din enhed når der sker noget vigtigt — fx nye beskeder, salg og matchende opslag." />
+                  <SectionHead title="Notifikationer" desc="Få besked direkte på din enhed når der sker noget vigtigt, fx nye beskeder, salg og matchende opslag." />
                   {typeof Notification !== 'undefined' ? (
                     <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', padding:'16px 18px', background:PAPER2, borderRadius:14, border:`1px solid ${PAPER3}` }}>
                       <div>
@@ -644,7 +644,7 @@ export default function IndstillingerPage() {
                     <div>
                       <div style={{ fontFamily:FONT, fontWeight:700, fontSize:14, color:INK }}>Offentlig profil</div>
                       <div style={{ fontSize:12, color:INK3, marginTop:4, lineHeight:1.5 }}>
-                        Når den er slået til, kan alle se din institutions profilside og finde den i søgning. Slå fra for at skjule profilen — dine aktive opslag kan stadig købes.
+                        Når den er slået til, kan alle se din institutions profilside og finde den i søgning. Slå fra for at skjule profilen. Dine aktive opslag kan stadig købes.
                       </div>
                     </div>
                     <button
@@ -668,7 +668,7 @@ export default function IndstillingerPage() {
                       <div>
                         <div style={{ fontFamily:FONT, fontWeight:700, fontSize:14, color:INK }}>Download mine data</div>
                         <div style={{ fontSize:12, color:INK3, marginTop:4, lineHeight:1.5 }}>
-                          Hent en kopi af alle oplysninger vi har om din institution — profil, opslag, ordrer og samtaler (GDPR art. 15 &amp; 20).
+                          Hent en kopi af alle oplysninger vi har om din institution: profil, opslag, ordrer og samtaler (GDPR art. 15 &amp; 20).
                         </div>
                       </div>
                       <button onClick={exporting ? undefined : handleDataExport} disabled={exporting}

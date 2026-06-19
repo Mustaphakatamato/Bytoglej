@@ -116,7 +116,7 @@ export default function MetodePage() {
             ['Rebound-effekt udover displacement rate', 'fx at sparede penge bruges på andet forbrug. Delvist dækket via lav displacement rate'],
             ['Vandforbrug, biodiversitet, kemikalier', 'vi rapporterer kun klima-fodaftryk (kg CO₂e)'],
           ].map(([term, note]) => (
-            <li key={term} style={{ marginBottom: 8 }}><strong>{term}</strong> — {note}</li>
+            <li key={term} style={{ marginBottom: 8 }}><strong>{term}</strong>: {note}</li>
           ))}
         </ul>
 

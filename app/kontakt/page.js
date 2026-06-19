@@ -19,7 +19,7 @@ const faqs = [
   },
   {
     q: 'Kan jeg sælge privat legetøj på platformen?',
-    a: 'Nej — byt&leg er udelukkende for institutioner. Alt legetøj der handles på platformen skal tilhøre den pågældende institution og bruges i institutionsmæssig sammenhæng.',
+    a: 'Nej, byt&leg er udelukkende for institutioner. Alt legetøj der handles på platformen skal tilhøre den pågældende institution og bruges i institutionsmæssig sammenhæng.',
   },
   {
     q: 'Hvad sker der hvis et produkt ikke er som beskrevet?',
