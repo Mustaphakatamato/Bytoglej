@@ -352,20 +352,20 @@ function HeroSection({ stats }) {
       minHeight: '88vh',
       display: 'flex', alignItems: 'stretch',
     }}>
-      {/* Right: hero image */}
+      {/* Right: hero image — left-anchored zoom nudges both kids right, clear of the card */}
       <div style={{ position: 'absolute', inset: 0 }}>
-        <img src={heroImageUrl} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover', objectPosition: '65% center', display: 'block' }} />
-        {/* subtle right-to-left fade so card blends in */}
-        <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(to right, rgba(255,255,255,0.88) 0%, rgba(255,255,255,0.50) 42%, rgba(255,255,255,0) 65%)' }} />
+        <img src={heroImageUrl} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover', objectPosition: 'center', transform: 'scale(1.12)', transformOrigin: '0% 45%', display: 'block' }} />
+        {/* soft left fade so the card blends in without washing out the boy */}
+        <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(to right, rgba(255,255,255,0.95) 0%, rgba(255,255,255,0.85) 14%, rgba(255,255,255,0.40) 30%, rgba(255,255,255,0) 44%)' }} />
       </div>
 
-      {/* Left: floating white card */}
-      <div style={{ position: 'relative', zIndex: 1, display: 'flex', alignItems: 'center', padding: '120px 0 100px', maxWidth: 1200, margin: '0 auto', width: '100%', paddingLeft: 64, paddingRight: 64 }}>
+      {/* Left: floating white card — anchored to the viewport edge, responsive width */}
+      <div style={{ position: 'relative', zIndex: 1, display: 'flex', alignItems: 'center', padding: '120px 0 100px', width: '100%', paddingLeft: 'clamp(32px, 6vw, 96px)', paddingRight: 32 }}>
         <div style={{
           background: 'rgba(255,255,255,0.97)',
           borderRadius: 24,
           padding: '52px 48px',
-          maxWidth: 480,
+          maxWidth: 'clamp(340px, 33vw, 440px)',
           boxShadow: '0 24px 80px rgba(10,24,16,0.13), 0 2px 8px rgba(10,24,16,0.06)',
           backdropFilter: 'blur(8px)',
         }}>
