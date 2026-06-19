@@ -59,7 +59,7 @@ function SuccessContent() {
         } catch { /* ignorér — kurven ryddes blot ikke */ }
         setVerifying(false);
       } catch {
-        if (!cancelled) { setVerifyError('Kunne ikke verificere ordren — prøv igen.'); setVerifying(false); }
+        if (!cancelled) { setVerifyError('Kunne ikke verificere ordren. Prøv igen.'); setVerifying(false); }
       }
     }
 

@@ -1,7 +1,7 @@
 import Link from 'next/link';
 import { PRIMARY, GREEN_DEEP, PAPER, PAPER2, PAPER3, INK, INK2, INK3, FONT } from '@/lib/constants';
 
-export const metadata = { title: 'Vilkår og betingelser — byt&leg', description: 'Læs byt&legs vilkår og betingelser for brug af platformen.' };
+export const metadata = { title: 'Vilkår og betingelser | byt&leg', description: 'Læs byt&legs vilkår og betingelser for brug af platformen.' };
 
 function Section({ title, children }) {
   return (
@@ -46,7 +46,7 @@ export default function VilkaarPage() {
             <li style={{ marginBottom: 6 }}>Du er ansvarlig for at opslag er korrekte, lovlige og ikke krænker tredjeparts rettigheder.</li>
             <li style={{ marginBottom: 6 }}>Det er ikke tilladt at sælge farlige, beskadigede eller tilbagekaldte produkter.</li>
             <li style={{ marginBottom: 6 }}>byt&amp;leg kan til enhver tid fjerne opslag der vurderes at være i strid med disse vilkår.</li>
-            <li style={{ marginBottom: 6 }}>AI-genererede beskrivelser er vejledende — du er selv ansvarlig for at kontrollere og godkende indholdet.</li>
+            <li style={{ marginBottom: 6 }}>AI-genererede beskrivelser er vejledende. Du er selv ansvarlig for at kontrollere og godkende indholdet.</li>
           </ul>
         </Section>
 
@@ -65,7 +65,7 @@ export default function VilkaarPage() {
 
         <Section title="5a. Pakkelevering og forsendelsestjeneste">
           <ul style={{ paddingLeft: 20, marginTop: 8 }}>
-            <li style={{ marginBottom: 6 }}>byt&amp;leg tilbyder en integreret pakkeleveringstjeneste via Shipmondo. Tjenesten er valgfri — institutioner kan altid vælge afhentning eller individuel leveringsaftale.</li>
+            <li style={{ marginBottom: 6 }}>byt&amp;leg tilbyder en integreret pakkeleveringstjeneste via Shipmondo. Tjenesten er valgfri. Institutioner kan altid vælge afhentning eller individuel leveringsaftale.</li>
             <li style={{ marginBottom: 6 }}>Forsendelsesomkostninger afholdes af sælgerinstitutionen og faktureres månedligt.</li>
             <li style={{ marginBottom: 6 }}>byt&amp;leg agerer som formidler af transportaftalen og er ikke part i transportkontrakten mellem afsender og transportør (PostNord, DAO eller GLS).</li>
             <li style={{ marginBottom: 6 }}>byt&amp;leg hæfter ikke for forsinkelser, beskadigelse eller tab af pakker under transport. Reklamationer håndteres direkte med den pågældende transportør.</li>
@@ -76,7 +76,7 @@ export default function VilkaarPage() {
         </Section>
 
         <Section title="6. Immaterielle rettigheder">
-          <p>Alt indhold på platformen — herunder design, tekst og funktionalitet — tilhører byt&amp;leg. Du beholder rettighederne til det indhold (billeder, tekster) du selv uploader, men giver byt&amp;leg en ikke-eksklusiv licens til at vise det på platformen.</p>
+          <p>Alt indhold på platformen, herunder design, tekst og funktionalitet, tilhører byt&amp;leg. Du beholder rettighederne til det indhold (billeder, tekster) du selv uploader, men giver byt&amp;leg en ikke-eksklusiv licens til at vise det på platformen.</p>
         </Section>
 
         <Section title="7. Ansvarsfraskrivelse">

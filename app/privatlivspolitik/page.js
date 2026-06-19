@@ -1,7 +1,7 @@
 import Link from 'next/link';
 import { PRIMARY, GREEN_DEEP, PAPER, PAPER2, PAPER3, INK, INK2, INK3, FONT } from '@/lib/constants';
 
-export const metadata = { title: 'Privatlivspolitik — byt&leg', description: 'Læs om hvordan byt&leg behandler dine data.' };
+export const metadata = { title: 'Privatlivspolitik | byt&leg', description: 'Læs om hvordan byt&leg behandler dine data.' };
 
 function Section({ title, children }) {
   return (
@@ -65,9 +65,9 @@ export default function PrivatlivspolitikPage() {
         <Section title="5. Deling af data">
           <p>Vi deler dine data med:</p>
           <ul style={{ paddingLeft: 20, marginTop: 8 }}>
-            <li style={{ marginBottom: 6 }}><strong>Supabase</strong> (databaseudbyder, EU-servere) — opbevaring af alle data</li>
-            <li style={{ marginBottom: 6 }}><strong>Resend</strong> (email-udbyder) — udsendelse af notifikationer</li>
-            <li style={{ marginBottom: 6 }}><strong>Groq / Google Gemini</strong> — AI-behandling af billedbeskrivelser og søgninger (ingen persondata sendes)</li>
+            <li style={{ marginBottom: 6 }}><strong>Supabase</strong> (databaseudbyder, EU-servere): opbevaring af alle data</li>
+            <li style={{ marginBottom: 6 }}><strong>Resend</strong> (email-udbyder): udsendelse af notifikationer</li>
+            <li style={{ marginBottom: 6 }}><strong>Groq / Google Gemini</strong>: AI-behandling af billedbeskrivelser og søgninger (ingen persondata sendes)</li>
           </ul>
           <p style={{ marginTop: 8 }}>Vi sælger <strong>aldrig</strong> dine data til tredjepart.</p>
         </Section>

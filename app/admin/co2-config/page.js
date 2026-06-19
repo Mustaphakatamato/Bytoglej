@@ -228,7 +228,7 @@ export default function Co2ConfigPage() {
               </div>
               <div style={{ marginBottom: 16 }}>
                 <label style={{ display: 'block', fontSize: 12, fontWeight: 700, fontFamily: FONT, color: '#e11d48', marginBottom: 5 }}>Begrundelse for ændring *</label>
-                <input value={newVersion.reason} onChange={e => setNewVersion(p => ({ ...p, reason: e.target.value }))} placeholder="Skal udfyldes — gemmes i audit log" style={{ ...inputStyle, border: `1.5px solid ${newVersion.reason ? PAPER3 : '#FCA5A5'}` }} />
+                <input value={newVersion.reason} onChange={e => setNewVersion(p => ({ ...p, reason: e.target.value }))} placeholder="Skal udfyldes, gemmes i audit log" style={{ ...inputStyle, border: `1.5px solid ${newVersion.reason ? PAPER3 : '#FCA5A5'}` }} />
               </div>
               <button onClick={createVersion} disabled={creatingVersion}
                 style={{ padding: '10px 20px', borderRadius: 99, background: PRIMARY, border: 'none', color: '#fff', fontFamily: FONT, fontWeight: 700, fontSize: 13, cursor: creatingVersion ? 'not-allowed' : 'pointer' }}>
@@ -280,7 +280,7 @@ export default function Co2ConfigPage() {
               Ændringen gælder KUN fremtidige handler. Historiske beregninger er låst.
             </p>
             <div style={{ background: '#FEF9C3', borderRadius: 10, padding: '10px 14px', marginBottom: 16, fontSize: 12, fontFamily: FONT, color: '#92400E' }}>
-              <strong>{editRow.name_da}</strong> — nuværende værdi: {editRow.co2_kg_per_unit} kg CO₂e/enhed
+              <strong>{editRow.name_da}</strong>, nuværende værdi: {editRow.co2_kg_per_unit} kg CO₂e/enhed
             </div>
             <div style={{ marginBottom: 12 }}>
               <label style={{ display: 'block', fontSize: 12, fontWeight: 700, fontFamily: FONT, color: INK2, marginBottom: 5 }}>Ny værdi (kg CO₂e/enhed)</label>

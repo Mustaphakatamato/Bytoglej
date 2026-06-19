@@ -117,11 +117,11 @@ export default function RedigerOpslagPage() {
     const validFiles = [];
     for (const f of files) {
       if (!ALLOWED_IMAGE_TYPES.includes(f.type)) {
-        showToast(`"${f.name}" er ikke et understøttet format — brug JPG, PNG, WEBP eller GIF`, 'error');
+        showToast(`"${f.name}" er ikke et understøttet format. Brug JPG, PNG, WEBP eller GIF`, 'error');
         continue;
       }
       if (f.size > MAX_IMAGE_SIZE) {
-        showToast(`"${f.name}" er for stor — maks 10 MB per billede`, 'error');
+        showToast(`"${f.name}" er for stor. Maks 10 MB per billede`, 'error');
         continue;
       }
       validFiles.push(f);
@@ -241,7 +241,7 @@ export default function RedigerOpslagPage() {
       can_ship: delivery.shipping || false,
     }).eq('id', id);
 
-    if (error) { setSaving(false); showToast('Noget gik galt — prøv igen', 'error'); return; }
+    if (error) { setSaving(false); showToast('Noget gik galt. Prøv igen', 'error'); return; }
 
     // Gem/opdater forsendelses-indstillinger
     const { error: soError } = await db.from('shipping_options').upsert({
@@ -344,7 +344,7 @@ export default function RedigerOpslagPage() {
               )}
               {form.type === 'byd' && (
                 <div>
-                  <label style={labelStyle}>Mindste bud (kr.) <span style={{ fontWeight: 400, color: INK3 }}>— valgfri</span></label>
+                  <label style={labelStyle}>Mindste bud (kr.) <span style={{ fontWeight: 400, color: INK3 }}>(valgfri)</span></label>
                   <input type="number" value={form.min_bid || ''} onChange={e => setForm({ ...form, min_bid: e.target.value })} placeholder="Lad stå tom for intet minimum" min="1" style={inputStyle} />
                 </div>
               )}
@@ -448,7 +448,7 @@ export default function RedigerOpslagPage() {
                         </div>
                       </div>
                       <div style={{ background: '#EFF6FF', borderRadius: 10, padding: '10px 14px', fontSize: 13, color: '#1D4ED8', fontFamily: FONT, fontWeight: 600 }}>
-                        ℹ️ Prisen du har sat er ekskl. porto — køber betaler den billigste porto oveni ved checkout.
+                        ℹ️ Prisen du har sat er ekskl. porto. Køber betaler den billigste porto oveni ved checkout.
                       </div>
                     </div>
                   )}

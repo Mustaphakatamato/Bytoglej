@@ -81,7 +81,7 @@ export async function POST(req) {
       const creditLimit = Number(sellerInst.shipping_credit_limit_dkk || 500);
       const currentBalance = Number(sellerInst.shipping_current_balance_dkk || 0);
       if (currentBalance >= creditLimit) {
-        return NextResponse.json({ error: 'Kreditgrænse nået — kontakt support for at øge grænsen', code: 'credit_limit' }, { status: 402 });
+        return NextResponse.json({ error: 'Kreditgrænse nået. Kontakt support for at øge grænsen', code: 'credit_limit' }, { status: 402 });
       }
     }
 
@@ -155,7 +155,7 @@ export async function POST(req) {
         body: JSON.stringify({
           from: 'byt&leg <noreply@bytogleg.dk>',
           to: [sellerInst.email],
-          subject: 'Forsendelseslabel klar — din pakke er booket',
+          subject: 'Forsendelseslabel klar: din pakke er booket',
           html: shipmentEmailHtml({
             institutionName: sellerInst.name,
             trackingNumber: shipmentResult.tracking_number,

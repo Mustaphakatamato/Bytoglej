@@ -72,7 +72,7 @@ Ingen markdown, ingen forklaring — kun JSON.`;
 
     const text = completion.choices[0].message.content.trim();
     const jsonMatch = text.match(/\{[\s\S]*\}/);
-    if (!jsonMatch) return NextResponse.json({ error: 'Ugyldigt AI-svar — prøv igen' }, { status: 500 });
+    if (!jsonMatch) return NextResponse.json({ error: 'Ugyldigt AI-svar. Prøv igen' }, { status: 500 });
 
     const parsed = JSON.parse(jsonMatch[0]);
 
@@ -134,6 +134,6 @@ Ingen markdown, ingen forklaring — kun JSON.`;
     return NextResponse.json({ ...parsed, price, needs_review: needsReview, reject_reason: rejectReason });
   } catch (e) {
     console.error('scan-toy error:', e.message);
-    return NextResponse.json({ error: 'Noget gik galt — prøv igen' }, { status: 500 });
+    return NextResponse.json({ error: 'Noget gik galt. Prøv igen' }, { status: 500 });
   }
 }

@@ -412,7 +412,7 @@ export default function ListingDetailClient() {
         setSøgesModal(false); setSøgesOffer(''); setSøgesSelectedId(null);
         setSelectedConvId(convId); router.push('/beskeder');
       }
-    } catch (e) { showToast('Noget gik galt — prøv igen', 'error'); }
+    } catch (e) { showToast('Noget gik galt. Prøv igen', 'error'); }
     setSaving(false);
   }
 
@@ -840,7 +840,7 @@ export default function ListingDetailClient() {
             {/* Action buttons */}
             {!isOwn ? (
               <div style={{ display:'flex', flexDirection:'column', gap:10, marginBottom:20 }}>
-                {listing.type==='køb' && <Btn variant="primary" color={PRIMARY} radius={22} onClick={handleAddToCart} style={{ justifyContent:'center', padding:'15px', fontSize:16 }}>{inCart ? '🛒 Gå til kurv →' : (() => { const so = listing.shipping_options?.[0]; const canShip = so?.allow_shipping || (!so && listing.can_ship); const tag = canShip ? (so?.shipping_included_in_price ? ' inkl. fragt' : ' + fragt') : ''; const total = listing.price + calcServiceFee(listing.price); return `🛒 Læg i kurv — ${total.toFixed(2).replace('.',',')} kr.${tag}`; })()}</Btn>}
+                {listing.type==='køb' && <Btn variant="primary" color={PRIMARY} radius={22} onClick={handleAddToCart} style={{ justifyContent:'center', padding:'15px', fontSize:16 }}>{inCart ? '🛒 Gå til kurv →' : (() => { const so = listing.shipping_options?.[0]; const canShip = so?.allow_shipping || (!so && listing.can_ship); const tag = canShip ? (so?.shipping_included_in_price ? ' inkl. fragt' : ' + fragt') : ''; const total = listing.price + calcServiceFee(listing.price); return `🛒 Læg i kurv (${total.toFixed(2).replace('.',',')} kr.${tag})`; })()}</Btn>}
                 {listing.type==='byd' && <Btn variant="primary" color={ACCENT2} radius={22} onClick={()=>setBidModal(true)} style={{ justifyContent:'center', padding:'15px', fontSize:16 }}>📊 Afgiv bud</Btn>}
                 {listing.type==='byt' && <Btn variant="primary" color={ACCENT} radius={22} onClick={()=>setSwapModal(true)} style={{ justifyContent:'center', padding:'15px', fontSize:16 }}>🔄 Foreslå bytte</Btn>}
                 {listing.type==='søges' && <button onClick={()=>setSøgesModal(true)}
@@ -1030,7 +1030,7 @@ export default function ListingDetailClient() {
           ) : (
             <>
               <div>
-                <label style={{ display:'block', fontSize:13, fontWeight:700, marginBottom:8 }}>Dit bud (kr.){listing.min_bid ? ` — minimum ${listing.min_bid} kr.` : ''}</label>
+                <label style={{ display:'block', fontSize:13, fontWeight:700, marginBottom:8 }}>Dit bud (kr.){listing.min_bid ? ` (minimum ${listing.min_bid} kr.)` : ''}</label>
                 <input type="number" value={bidAmount} onChange={e=>setBidAmount(e.target.value)} placeholder={listing.min_bid ? `Minimum ${listing.min_bid} kr.` : 'Fx 150'} min={listing.min_bid||1} style={{ width:'100%', padding:'12px 14px', borderRadius:12, border:'1.5px solid #e5e5e5', fontSize:16, fontFamily:"'Nunito',sans-serif", fontWeight:700, outline:'none' }} />
                 {listing.min_bid && bidAmount && Number(bidAmount) < listing.min_bid && <p style={{ fontSize:12, color:'#e11d48', marginTop:4 }}>Mindste bud er {listing.min_bid} kr.</p>}
               </div>
@@ -1168,7 +1168,7 @@ export default function ListingDetailClient() {
               body: JSON.stringify({ listingId:listing.id, listingTitle:listing.title, reason:reportReason, note:reportNote, reporterName:inst?.name||user?.email||'Ukendt' }) });
           } catch {}
           setReportSending(false); setReportModal(false); setReportReason(''); setReportNote('');
-          showToast('Tak — vi kigger på det hurtigst muligt');
+          showToast('Tak! Vi kigger på det hurtigst muligt');
         }} disabled={reportSending||!reportReason} style={{ justifyContent:'center', padding:'13px', fontSize:14 }}>
           {reportSending ? <><Spinner/>Sender…</> : 'Send rapport'}
         </Btn>
@@ -1227,7 +1227,7 @@ export default function ListingDetailClient() {
         <div onClick={e => e.stopPropagation()} style={{ background:'#fff', borderRadius:20, padding:32, maxWidth:520, width:'100%', boxShadow:'0 20px 60px rgba(22,34,28,0.2)' }}>
           <div style={{ fontFamily:FONT, fontWeight:800, fontSize:20, color:INK, marginBottom:20 }}>Rediger opslag <span style={{ fontSize:14, color:'#B45309', fontWeight:600 }}>(admin)</span></div>
           <div style={{ display:'flex', flexDirection:'column', gap:14 }}>
-            {[['TITEL','title','text'],['BESKRIVELSE','description','textarea'],['PRIS (KR.) — TOM = INGEN PRIS','price','number'],['STAND','condition','text']].map(([label, field, type]) => (
+            {[['TITEL','title','text'],['BESKRIVELSE','description','textarea'],['PRIS (KR.), TOM = INGEN PRIS','price','number'],['STAND','condition','text']].map(([label, field, type]) => (
               <div key={field}>
                 <label style={{ display:'block', fontFamily:FONT, fontWeight:700, fontSize:12, color:'#6B7570', marginBottom:6 }}>{label}</label>
                 {type === 'textarea'

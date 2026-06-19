@@ -106,7 +106,7 @@ export async function GET(req) {
           body: JSON.stringify({
             from: 'byt&leg <noreply@bytogleg.dk>',
             to: [inst.email],
-            subject: `Faktura for forsendelser — ${invoiceNumber}`,
+            subject: `Faktura for forsendelser: ${invoiceNumber}`,
             html,
           }),
         }).catch(() => {});

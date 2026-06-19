@@ -7,7 +7,7 @@ import PwaInit from '@/components/PwaInit';
 import PwaInstallPrompt from '@/components/PwaInstallPrompt';
 
 export const metadata = {
-  title: 'byt&leg — Legetøjsmarkedsplads for institutioner',
+  title: 'byt&leg: Legetøjsmarkedsplads for institutioner',
   description: 'Den første markedsplads hvor børnehaver, skoler og SFO\'er kan handle legetøj og udstyr bæredygtigt.',
 };
 

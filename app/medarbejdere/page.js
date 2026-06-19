@@ -76,7 +76,7 @@ export default function MedarbejderePage() {
     setSaving(false);
     if (!res.ok) {
       await db.from('institution_invitations').delete().eq('id', inv.id);
-      showToast('E-mail kunne ikke sendes — prøv igen', 'error');
+      showToast('E-mail kunne ikke sendes. Prøv igen', 'error');
       return;
     }
     setMemberEmail('');
