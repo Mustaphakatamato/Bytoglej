@@ -423,7 +423,7 @@ export default function CartPage() {
       router.push(`/betaling/${data.orderId}?${params}`);
     } catch (e) {
       console.error(e);
-      showToast('Noget gik galt — prøv igen', 'error');
+      showToast('Noget gik galt. Prøv igen', 'error');
     }
     setSending(false);
   }
@@ -531,7 +531,7 @@ export default function CartPage() {
                   <div style={{ padding: '10px 20px', background: '#f0fdf4', borderBottom: `1px solid ${PAPER2}`, display: 'flex', alignItems: 'center', gap: 8 }}>
                     <span style={{ fontSize: 14 }}>✅</span>
                     <span style={{ fontFamily: FONT, fontSize: 12, color: '#15803d', fontWeight: 700 }}>
-                      Bundlerabat på {[...discSettings.tiers].sort((a,b)=>b.min_items-a.min_items).find(t=>group.items.length>=t.min_items)?.percent}% anvendt — du sparer {groupDiscount.toFixed(2).replace('.', ',')} kr.!
+                      Bundlerabat på {[...discSettings.tiers].sort((a,b)=>b.min_items-a.min_items).find(t=>group.items.length>=t.min_items)?.percent}% anvendt. Du sparer {groupDiscount.toFixed(2).replace('.', ',')} kr.!
                     </span>
                   </div>
                 )}

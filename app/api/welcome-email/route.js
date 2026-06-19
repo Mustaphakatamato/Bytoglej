@@ -47,7 +47,7 @@ export async function POST(req) {
 
 function welcomeHtml({ firstName, institutionName, base }) {
   const steps = [
-    { icon: '📦', title: 'Opret dit første opslag', desc: 'Del det legetøj I ikke længere bruger — AI hjælper dig med beskrivelse og kategori.', href: `${base}/opret-opslag`, cta: 'Opret opslag' },
+    { icon: '📦', title: 'Opret dit første opslag', desc: 'Del det legetøj I ikke længere bruger. AI hjælper dig med beskrivelse og kategori.', href: `${base}/opret-opslag`, cta: 'Opret opslag' },
     { icon: '🔍', title: 'Find noget at bytte', desc: 'Søg i markedspladsen og find legetøj fra institutioner i dit område.', href: `${base}/opslag`, cta: 'Søg legetøj' },
     { icon: '💬', title: 'Tag kontakt', desc: 'Send en besked direkte til institutionen og aftale en handel.', href: `${base}/beskeder`, cta: 'Åbn indbakke' },
   ];
@@ -69,7 +69,7 @@ function welcomeHtml({ firstName, institutionName, base }) {
     <div style="background:#fff;padding:40px 44px;border-left:1px solid rgba(22,34,28,0.08);border-right:1px solid rgba(22,34,28,0.08);">
       <p style="font-size:15px;color:#3A473D;line-height:1.65;margin:0 0 32px;">
         Hej ${firstName},<br><br>
-        Din konto er klar — nu skal vi bare i gang. Her er 3 hurtige trin til at komme godt fra start:
+        Din konto er klar. Nu skal vi bare i gang. Her er 3 hurtige trin til at komme godt fra start:
       </p>
 
       ${steps.map((s, i) => `

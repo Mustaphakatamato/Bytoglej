@@ -77,7 +77,7 @@ export async function POST(req) {
               body: JSON.stringify({
                 from: 'byt&leg <noreply@bytogleg.dk>',
                 to: [buyerInst.email],
-                subject: `Din pakke er leveret — ${conv.listing_title || 'byt&leg'}`,
+                subject: `Din pakke er leveret: ${conv.listing_title || 'byt&leg'}`,
                 html: deliveredEmailHtml({ buyerName: buyerInst.name, listingTitle: conv.listing_title, baseUrl }),
               }),
             }).catch(() => {});

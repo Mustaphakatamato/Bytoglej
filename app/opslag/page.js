@@ -346,7 +346,7 @@ const [saveSearchModal, setSaveSearchModal] = useState(false);
       const json = await res.json();
       if (json.error) { showToast(json.error, 'error'); }
       else { setAiKind('text'); setAiResults(json.listings || []); setAiExplanation(json.explanation || ''); }
-    } catch { showToast('AI-søgning mislykkedes — prøv igen', 'error'); }
+    } catch { showToast('AI-søgning mislykkedes. Prøv igen', 'error'); }
     setAiSearching(false);
   }
 
@@ -369,7 +369,7 @@ const [saveSearchModal, setSaveSearchModal] = useState(false);
       const json = await res.json();
       if (json.error) { showToast(json.error, 'error'); }
       else { setAiKind('image'); setAiResults(json.listings || []); setImgSearchOpen(false); }
-    } catch { showToast('Billedsøgning mislykkedes — prøv igen', 'error'); }
+    } catch { showToast('Billedsøgning mislykkedes. Prøv igen', 'error'); }
     setImgSearching(false);
   }
 
@@ -642,7 +642,7 @@ const [saveSearchModal, setSaveSearchModal] = useState(false);
               ) : (
                 <>
                   <span style={{ fontFamily: FONT, fontWeight: 700, fontSize: 13, color: PRIMARY }}>{aiExplanation}</span>
-                  <span style={{ fontFamily: FONT, fontSize: 12, color: INK3, marginLeft: 8 }}>— {aiResults.length} opslag fundet</span>
+                  <span style={{ fontFamily: FONT, fontSize: 12, color: INK3, marginLeft: 8 }}>{aiResults.length} opslag fundet</span>
                 </>
               )}
             </div>

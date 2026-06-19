@@ -164,7 +164,7 @@ function HeroSection({ stats }) {
       lineHeight: 1.65,
       marginBottom: 28,
     }}>
-      Den første markedsplads hvor børnehaver, skoler og SFO'er køber, sælger og bytter legetøj direkte med hinanden — sikkert og bæredygtigt.
+      Den første markedsplads hvor børnehaver, skoler og SFO'er køber, sælger og bytter legetøj direkte med hinanden, sikkert og bæredygtigt.
     </p>
   );
 
@@ -246,7 +246,7 @@ function HeroSection({ stats }) {
           {pill}
           {headline}
           <p style={{ fontSize: isMobile ? 15 : 18, color: 'rgba(255,255,255,0.68)', lineHeight: 1.65, maxWidth: 520, margin: '0 auto 36px' }}>
-            Den første markedsplads hvor børnehaver, skoler og SFO'er køber, sælger og bytter legetøj direkte med hinanden — sikkert og bæredygtigt.
+            Den første markedsplads hvor børnehaver, skoler og SFO'er køber, sælger og bytter legetøj direkte med hinanden, sikkert og bæredygtigt.
           </p>
           <div style={{ display: 'flex', gap: 12, justifyContent: 'center', flexWrap: 'wrap', marginBottom: 56 }}>
             <button onClick={() => router.push('/signup')} style={{
@@ -324,7 +324,7 @@ function HeroSection({ stats }) {
             Legetøj til glæde<br /><span style={{ color: GREEN_SOFT }}>for alle.</span>
           </h1>
           <p style={{ fontSize: 14, color: 'rgba(255,255,255,0.75)', lineHeight: 1.65, marginBottom: 28 }}>
-            Den første markedsplads hvor børnehaver, skoler og SFO'er køber, sælger og bytter legetøj direkte med hinanden — sikkert og bæredygtigt.
+            Den første markedsplads hvor børnehaver, skoler og SFO'er køber, sælger og bytter legetøj direkte med hinanden, sikkert og bæredygtigt.
           </p>
           <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', marginBottom: 32, justifyContent: 'center' }}>
             <button onClick={() => router.push('/signup')} style={{ background: PAPER, color: PRIMARY, border: 'none', borderRadius: 999, padding: '12px 24px', fontSize: 14, fontWeight: 700, fontFamily: FONT, cursor: 'pointer' }}>
@@ -376,7 +376,7 @@ function HeroSection({ stats }) {
             Legetøj til glæde<br /><span style={{ color: PRIMARY }}>for alle.</span>
           </h1>
           <p style={{ fontSize: 16, color: INK3, lineHeight: 1.65, marginBottom: 28 }}>
-            Den første markedsplads hvor børnehaver, skoler og SFO'er køber, sælger og bytter legetøj direkte med hinanden — sikkert og bæredygtigt.
+            Den første markedsplads hvor børnehaver, skoler og SFO'er køber, sælger og bytter legetøj direkte med hinanden, sikkert og bæredygtigt.
           </p>
           <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', marginBottom: 36 }}>
             <button onClick={() => router.push('/signup')} style={{ background: PRIMARY, color: '#fff', border: 'none', borderRadius: 999, padding: '13px 30px', fontSize: 15, fontWeight: 700, fontFamily: FONT, cursor: 'pointer' }}>
@@ -427,8 +427,8 @@ function HeroSection({ stats }) {
 const JOURNEY_STEPS = [
   { emoji: '🧸', bg: '#FFFBEB', accent: '#D97706', n: '01', title: 'Legetøjet samler støv', desc: 'Du har cykler, puslespil eller møbler der ikke bruges. Et andet sted vil de gøre børn glade.' },
   { emoji: '📸', bg: '#F0FDF4', accent: '#16A34A', n: '02', title: 'Opret et opslag på 2 min.', desc: 'Tag ét billede. AI udfylder titel, kategori og beskrivelse automatisk. Nemmere end en brugtannonce.' },
-  { emoji: '💬', bg: '#EFF6FF', accent: '#2563EB', n: '03', title: 'Institutioner byder og skriver', desc: 'Verificerede børnehaver og skoler kontakter dig direkte. Byd, byt eller sælg — du bestemmer.' },
-  { emoji: '🚀', bg: '#FDF4FF', accent: '#9333EA', n: '04', title: 'Nyt hjem, ny glæde', desc: 'I aftaler pris og afhentning. Legetøjet giver glæde et nyt sted — og du har skabt plads.' },
+  { emoji: '💬', bg: '#EFF6FF', accent: '#2563EB', n: '03', title: 'Institutioner byder og skriver', desc: 'Verificerede børnehaver og skoler kontakter dig direkte. Byd, byt eller sælg. Du bestemmer.' },
+  { emoji: '🚀', bg: '#FDF4FF', accent: '#9333EA', n: '04', title: 'Nyt hjem, ny glæde', desc: 'I aftaler pris og afhentning. Legetøjet giver glæde et nyt sted, og du har skabt plads.' },
 ];
 
 /* ── How steps — shared grid, works on both mobile and desktop ── */

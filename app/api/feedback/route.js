@@ -47,7 +47,7 @@ export async function POST(req) {
         body: JSON.stringify({
           from: 'byt&leg <noreply@bytogleg.dk>',
           to: [to],
-          subject: `[Pilot-feedback] ${categoryLabel} — ${institutionName || userEmail || 'Ukendt'}`,
+          subject: `[Pilot-feedback] ${categoryLabel}: ${institutionName || userEmail || 'Ukendt'}`,
           html: `
             <div style="font-family:Arial,sans-serif;max-width:560px;margin:0 auto;padding:24px;">
               <h2 style="color:#1B4332;margin:0 0 16px;">Ny pilot-feedback</h2>

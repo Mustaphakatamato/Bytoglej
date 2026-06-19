@@ -9,7 +9,7 @@ export default function NotFound() {
       <div style={{ fontSize: 40, marginBottom: 16 }}>🧸</div>
       <h1 style={{ fontFamily: FONT, fontWeight: 800, fontSize: 28, color: INK, letterSpacing: '-0.04em', marginBottom: 12 }}>Siden blev ikke fundet</h1>
       <p style={{ fontSize: 15, color: INK3, maxWidth: 360, lineHeight: 1.6, marginBottom: 32 }}>
-        Det opslag eller den side du leder efter eksisterer ikke — det kan være slettet eller flyttet.
+        Det opslag eller den side du leder efter eksisterer ikke. Det kan være slettet eller flyttet.
       </p>
       <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', justifyContent: 'center' }}>
         <Link href="/opslag" style={{ background: PRIMARY, color: '#fff', borderRadius: 99, padding: '12px 28px', fontFamily: FONT, fontWeight: 700, fontSize: 14, textDecoration: 'none', display: 'inline-block' }}>

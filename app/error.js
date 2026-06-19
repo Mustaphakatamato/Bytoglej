@@ -11,7 +11,7 @@ export default function GlobalError({ error, reset }) {
       <div style={{ fontSize: 60, marginBottom: 16 }}>⚙️</div>
       <h1 style={{ fontFamily: FONT, fontWeight: 800, fontSize: 28, color: INK, letterSpacing: '-0.04em', marginBottom: 12 }}>Noget gik galt</h1>
       <p style={{ fontSize: 15, color: INK3, maxWidth: 360, lineHeight: 1.6, marginBottom: 32 }}>
-        Vi beklager — der opstod en uventet fejl. Prøv igen, eller gå tilbage til forsiden.
+        Vi beklager. Der opstod en uventet fejl. Prøv igen, eller gå tilbage til forsiden.
       </p>
       <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', justifyContent: 'center' }}>
         <button onClick={reset} style={{ background: PRIMARY, color: '#fff', borderRadius: 99, padding: '12px 28px', fontFamily: FONT, fontWeight: 700, fontSize: 14, border: 'none', cursor: 'pointer' }}>

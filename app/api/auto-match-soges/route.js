@@ -43,7 +43,7 @@ export async function POST(req) {
             institution_name: m.institution_name,
             type: 'auto_match_soges',
             title: `Nogen søger noget du måske har!`,
-            body: `${institutionName || 'En institution'} leder efter "${title}" — dit opslag "${m.title}" kan måske matche.`,
+            body: `${institutionName || 'En institution'} leder efter "${title}". Dit opslag "${m.title}" kan måske matche.`,
             data: { søgesListingId: listingId, matchedListingId: m.id, søgesTitle: title },
           });
         }

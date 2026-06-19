@@ -347,7 +347,7 @@ export default function SignupPage() {
     // Check if email already exists in institutions table
     const { data: existingInst } = await db.from('institutions').select('email').ilike('email', form.email.trim()).maybeSingle();
     if (existingInst) {
-      setAuthError(`Denne e-mail er allerede tilknyttet en konto — log ind i stedet.`);
+      setAuthError(`Denne e-mail er allerede tilknyttet en konto. Log ind i stedet.`);
       setAlreadyExists(true);
       setSaving(false);
       return;
@@ -359,7 +359,7 @@ export default function SignupPage() {
     });
     if (error) {
       if (error.message?.toLowerCase().includes('already registered') || error.message?.toLowerCase().includes('already exists')) {
-        setAuthError('Denne e-mail er allerede tilknyttet en konto — log ind i stedet.');
+        setAuthError('Denne e-mail er allerede tilknyttet en konto. Log ind i stedet.');
         setAlreadyExists(true);
       } else {
         setAuthError(error.message);
@@ -537,7 +537,7 @@ export default function SignupPage() {
                       borderRadius: '0 0 14px 14px', padding: '14px 16px',
                       fontSize: 13, color: INK3, fontFamily: FONT,
                     }}>
-                      Ingen institution fundet — prøv et andet navn eller CVR-nummer
+                      Ingen institution fundet. Prøv et andet navn eller CVR-nummer
                     </div>
                   )}
                 </div>

@@ -95,7 +95,7 @@ export default function QuickViewModal({ listing, onClose }) {
       const { data: ownerInst } = await db.from('institutions').select('id,email,name').ilike('name', listing.institution_name).maybeSingle();
       const { convId } = await getConvId(user, ownerInst);
       if (convId) { setSelectedConvId(convId); onClose(); router.push('/beskeder'); }
-    } catch { showToast('Noget gik galt — prøv igen', 'error'); }
+    } catch { showToast('Noget gik galt. Prøv igen', 'error'); }
     setSaving(false);
   }
 
@@ -118,7 +118,7 @@ export default function QuickViewModal({ listing, onClose }) {
         setSelectedConvId(convId); onClose(); router.push('/beskeder');
         showToast(`Bud på ${bidAmount} kr. afsendt! 🎉`);
       }
-    } catch { showToast('Noget gik galt — prøv igen', 'error'); }
+    } catch { showToast('Noget gik galt. Prøv igen', 'error'); }
     setSaving(false);
   }
 
@@ -139,7 +139,7 @@ export default function QuickViewModal({ listing, onClose }) {
         setSelectedConvId(convId); onClose(); router.push('/beskeder');
         showToast('Bytteforslag sendt!');
       }
-    } catch { showToast('Noget gik galt — prøv igen', 'error'); }
+    } catch { showToast('Noget gik galt. Prøv igen', 'error'); }
     setSaving(false);
   }
 
@@ -256,7 +256,7 @@ export default function QuickViewModal({ listing, onClose }) {
                       <button onClick={handleAddToCart}
                         style={{ flex:2, padding:'14px', borderRadius:99, background:inCart?'#16a34a':PRIMARY, color:'#fff', border:'none', fontFamily:FONT, fontWeight:700, fontSize:15, cursor:'pointer', transition:'all 0.2s', display:'flex', alignItems:'center', justifyContent:'center', gap:8 }}>
                         <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><circle cx="9" cy="21" r="1"/><circle cx="20" cy="21" r="1"/><path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"/></svg>
-                        {inCart ? 'I kurven — gå til kurv →' : 'Læg i kurv'}
+                        {inCart ? 'I kurven, gå til kurv →' : 'Læg i kurv'}
                       </button>
                       <button onClick={handleContact} disabled={saving}
                         style={{ flex:1, padding:'14px', borderRadius:99, background:saving?PAPER3:GREEN_TINT, color:saving?INK3:PRIMARY, border:`1.5px solid ${PRIMARY}`, fontFamily:FONT, fontWeight:600, fontSize:13, cursor:saving?'not-allowed':'pointer', transition:'all 0.2s' }}>
@@ -347,7 +347,7 @@ export default function QuickViewModal({ listing, onClose }) {
               </div>
               <div>
                 <label style={{ display:'block', fontSize:13, fontWeight:700, marginBottom:8, fontFamily:FONT }}>
-                  Dit bud (kr.){listing.min_bid ? ` — minimum ${listing.min_bid} kr.` : ''}
+                  Dit bud (kr.){listing.min_bid ? ` (minimum ${listing.min_bid} kr.)` : ''}
                 </label>
                 <input type="number" value={bidAmount} onChange={e=>setBidAmount(e.target.value)}
                   placeholder={listing.min_bid ? `Minimum ${listing.min_bid} kr.` : 'Fx 150'} min={listing.min_bid||1}

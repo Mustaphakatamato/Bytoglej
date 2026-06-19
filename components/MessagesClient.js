@@ -168,7 +168,7 @@ function LoginInline({ onLogin }) {
     setLoading(true); setError(null);
     const { data: authData, error } = await db.auth.signInWithPassword({ email, password: pass });
     setLoading(false);
-    if (error) { setError('Forkert adgangskode — prøv igen'); return; }
+    if (error) { setError('Forkert adgangskode. Prøv igen'); return; }
     setLoggedIn(true);
     onLogin?.();
   }
@@ -783,7 +783,7 @@ export default function MessagesClient() {
       amount: msg.bid_amount,
       shipping_options: shippingOptions,
     });
-    const confirmMsg = `✅ ${senderName} har accepteret dit bud på ${msg.bid_amount} kr. — vælg leveringsmetode for at afslutte købet.`;
+    const confirmMsg = `✅ ${senderName} har accepteret dit bud på ${msg.bid_amount} kr. Vælg leveringsmetode for at afslutte købet.`;
     const { data: newMsg } = await db.from('chat_messages').insert({
       conversation_id: active.id,
       sender_id: effUid1,
@@ -903,7 +903,7 @@ export default function MessagesClient() {
       swap_owner_listing_id: active.listing_id || null,
       deal_type: 'byt',
       is_handled: true, handled_at: now, handled_action: 'accepted',
-      last_message: '🔄 Byttehandel godkendt — begge parter betaler for forsendelse',
+      last_message: '🔄 Byttehandel godkendt. Begge parter betaler for forsendelse',
       last_message_at: now,
       initiator_unread: (active.initiator_unread||0)+1,
     };
@@ -939,10 +939,10 @@ export default function MessagesClient() {
         body: JSON.stringify({ conversationId: active.id, deliveryMethod }),
       });
       const data = await res.json();
-      if (!res.ok) { alert(data.error || 'Noget gik galt — prøv igen'); setSwapPaying(false); return; }
+      if (!res.ok) { alert(data.error || 'Noget gik galt. Prøv igen'); setSwapPaying(false); return; }
       const bd = encodeURIComponent(JSON.stringify(data.breakdown));
       router.push(`/betaling/${data.orderId}?cs=${encodeURIComponent(data.clientSecret)}&total=${data.grandTotal}&bd=${bd}`);
-    } catch { alert('Noget gik galt — prøv igen'); setSwapPaying(false); }
+    } catch { alert('Noget gik galt. Prøv igen'); setSwapPaying(false); }
   }
 
   async function handleBidPayment(checkoutMsg, selectedCarrier) {
@@ -964,10 +964,10 @@ export default function MessagesClient() {
         }),
       });
       const data = await res.json();
-      if (!res.ok) { alert(data.error || 'Noget gik galt — prøv igen'); setGoingToPayment(null); return; }
+      if (!res.ok) { alert(data.error || 'Noget gik galt. Prøv igen'); setGoingToPayment(null); return; }
       const bd = encodeURIComponent(JSON.stringify(data.breakdown));
       router.push(`/betaling/${data.orderId}?cs=${encodeURIComponent(data.clientSecret)}&total=${data.grandTotal}&bd=${bd}`);
-    } catch { alert('Noget gik galt — prøv igen'); setGoingToPayment(null); }
+    } catch { alert('Noget gik galt. Prøv igen'); setGoingToPayment(null); }
   }
 
   async function handleRejectBid() {
@@ -1453,7 +1453,7 @@ export default function MessagesClient() {
                                         setConfirmingOrder(true);
                                         const effUid = realUserId || userId;
                                         const senderName = effectiveSenderName();
-                                        const confirmMsg = `✅ ${senderName} har bekræftet din ordre — du modtager snart en faktura.`;
+                                        const confirmMsg = `✅ ${senderName} har bekræftet din ordre. Du modtager snart en faktura.`;
                                         const { data: newMsg } = await db.from('chat_messages').insert({ conversation_id: active.id, sender_id: effUid, sender_name: senderName, content: confirmMsg }).select().single();
                                         for (const item of (buyData?.items || [])) {
                                           await db.from('listings').update({ is_sold: true, is_active: false, sold_at: new Date().toISOString(), sold_to: active.initiator_name, sold_to_institution_id: active.initiator_institution_id }).eq('id', item.listingId);
@@ -1505,7 +1505,7 @@ export default function MessagesClient() {
                                               const trackingContent = JSON.stringify({ type: 'shipment', tracking_number: result.tracking_number, tracking_url: result.tracking_url, label_pdf_url: result.label_pdf_url });
                                               const { data: trackMsg } = await db.from('chat_messages').insert({ conversation_id: active.id, sender_id: effUid, sender_name: senderName, content: trackingContent, message_type: 'shipment' }).select().single();
                                               const now = new Date().toISOString();
-                                              const convUpd = { last_message: '📦 Label genereret — marker som afsendt i Mine opgaver', last_message_at: now, owner_unread: 0, shipment_id: result.shipment_id, delivery_method: 'shipping' };
+                                              const convUpd = { last_message: '📦 Label genereret. Marker som afsendt i Mine opgaver', last_message_at: now, owner_unread: 0, shipment_id: result.shipment_id, delivery_method: 'shipping' };
                                               await db.from('conversations').update(convUpd).eq('id', active.id);
                                               const convWithFallback = active.initiator_institution_id ? active : { ...active, initiator_institution_id: ctxInstId || null };
                                               persistCO2Saving(convWithFallback, buyData?.items?.[0]?.category || null);
@@ -1591,18 +1591,18 @@ export default function MessagesClient() {
                                           </div>
                                         ) : isOwnerInConv ? (
                                           <div style={{ fontFamily:FONT, fontSize:13, color:'#B45309', fontWeight:600, textAlign:'center', padding:'8px 0' }}>
-                                            {expired ? '⏰ Tilbuddet udløb — køber betalte ikke i tide' : `⏳ Afventer købers betaling (udløber ${deadlineStr})`}
+                                            {expired ? '⏰ Tilbuddet udløb. Køber betalte ikke i tide' : `⏳ Afventer købers betaling (udløber ${deadlineStr})`}
                                           </div>
                                         ) : expired ? (
                                           <div style={{ fontFamily:FONT, fontSize:13, color:'#B45309', fontWeight:600, textAlign:'center', padding:'8px 0', lineHeight:1.5 }}>
-                                            ⏰ Tilbuddet er udløbet — buddet er ikke længere reserveret til denne pris.
+                                            ⏰ Tilbuddet er udløbet. Buddet er ikke længere reserveret til denne pris.
                                           </div>
                                         ) : (
                                           <div style={{ display:'flex', flexDirection:'column', gap:10 }}>
                                             <div style={{ background:'#FEF9C3', border:'1px solid #FDE68A', borderRadius:12, padding:'10px 12px' }}>
                                               <div style={{ fontFamily:FONT, fontWeight:700, fontSize:12, color:'#92400e' }}>⏳ Reserveret til dig i 24 timer</div>
                                               <div style={{ fontFamily:FONT, fontSize:12, color:'#92400e', marginTop:2, lineHeight:1.5 }}>
-                                                Betal inden <strong>{deadlineStr}</strong> for at sikre prisen — {hrs}t {mins}m tilbage.
+                                                Betal inden <strong>{deadlineStr}</strong> for at sikre prisen. {hrs}t {mins}m tilbage.
                                               </div>
                                             </div>
                                             <button
@@ -1678,11 +1678,11 @@ export default function MessagesClient() {
                                           <div>📥 Du modtager: <strong>{youReceive}</strong></div>
                                         </div>
                                         {completed ? (
-                                          <div style={{ fontFamily:FONT, fontSize:12, color:PRIMARY, fontWeight:700 }}>Begge har betalt — pakkemærkater er klar. Se forsendelsesbesked nedenfor.</div>
+                                          <div style={{ fontFamily:FONT, fontSize:12, color:PRIMARY, fontWeight:700 }}>Begge har betalt. Pakkemærkater er klar. Se forsendelsesbesked nedenfor.</div>
                                         ) : myPaid ? (
                                           <div style={{ fontFamily:FONT, fontSize:12, color:INK2 }}>
                                             <div style={{ color:PRIMARY, fontWeight:700 }}>✓ Du har betalt</div>
-                                            <div style={{ color:INK3, marginTop:2 }}>{otherPaid ? 'Begge har betalt — afslutter…' : '⏳ Afventer den anden part betaler'}</div>
+                                            <div style={{ color:INK3, marginTop:2 }}>{otherPaid ? 'Begge har betalt, afslutter…' : '⏳ Afventer den anden part betaler'}</div>
                                           </div>
                                         ) : (
                                           <div style={{ display:'flex', flexDirection:'column', gap:8 }}>
@@ -1801,7 +1801,7 @@ export default function MessagesClient() {
                                             bundle_items: bundleData?.bundle_items,
                                             shipping_options: shippingOptions,
                                           });
-                                          const previewMsg = `✅ ${senderName} har accepteret bundttilbuddet — vælg leveringsmetode for at afslutte.`;
+                                          const previewMsg = `✅ ${senderName} har accepteret bundttilbuddet. Vælg leveringsmetode for at afslutte.`;
                                           const { data: newMsg } = await db.from('chat_messages').insert({
                                             conversation_id: active.id,
                                             sender_id: effUid,
@@ -2016,7 +2016,7 @@ export default function MessagesClient() {
                                   )}
                                   {!paymentData.tracking?.label_pdf_url && isOwnerInConv && paymentData.shippingMethod && paymentData.shippingMethod !== 'pickup' && paymentData.shippingMethod !== 'custom' && (
                                     <div style={{ marginTop:10, background:'rgba(42,125,79,0.07)', borderRadius:10, padding:'10px 12px', fontFamily:FONT, fontSize:12, color:INK2 }}>
-                                      Pakkemærkaten er sendt til din e-mail — tjek din indbakke.
+                                      Pakkemærkaten er sendt til din e-mail. Tjek din indbakke.
                                     </div>
                                   )}
                                 </div>

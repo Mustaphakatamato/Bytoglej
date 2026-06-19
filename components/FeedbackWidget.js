@@ -130,7 +130,7 @@ export default function FeedbackWidget({ loggedIn, institutionName, userEmail })
       });
       const json = await res.json().catch(() => ({}));
       if (!res.ok) {
-        setError(json.error || json.detail || 'Noget gik galt — prøv igen');
+        setError(json.error || json.detail || 'Noget gik galt. Prøv igen');
         setSending(false);
         return;
       }
@@ -145,7 +145,7 @@ export default function FeedbackWidget({ loggedIn, institutionName, userEmail })
         removeScreenshot();
       }, 2200);
     } catch {
-      setError('Kunne ikke sende — tjek din internetforbindelse');
+      setError('Kunne ikke sende. Tjek din internetforbindelse');
     }
     setSending(false);
   }

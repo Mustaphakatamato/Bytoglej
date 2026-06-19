@@ -20,7 +20,7 @@ export default function AfventerGodkendelse() {
           Din ansøgning behandles
         </h1>
         <p style={{ fontSize: 15, color: INK3, lineHeight: 1.7, marginBottom: 32 }}>
-          Tak for din tilmelding! Vi gennemgår din ansøgning og aktiverer din konto hurtigst muligt — typisk inden for 1 arbejdsdag.<br /><br />
+          Tak for din tilmelding! Vi gennemgår din ansøgning og aktiverer din konto hurtigst muligt, typisk inden for 1 arbejdsdag.<br /><br />
           Du modtager en e-mail når din institution er godkendt.
         </p>
         <div style={{ background: GREEN_TINT, borderRadius: 16, padding: '20px 24px', marginBottom: 32, textAlign: 'left' }}>
