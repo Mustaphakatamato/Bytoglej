@@ -840,7 +840,7 @@ export default function ListingDetailClient() {
             {/* Action buttons */}
             {!isOwn ? (
               <div style={{ display:'flex', flexDirection:'column', gap:10, marginBottom:20 }}>
-                {listing.type==='køb' && <Btn variant="primary" color={PRIMARY} radius={22} onClick={handleAddToCart} style={{ justifyContent:'center', padding:'15px', fontSize:16 }}>{inCart ? '🛒 Gå til kurv →' : (() => { const so = listing.shipping_options?.[0]; const canShip = so?.allow_shipping || (!so && listing.can_ship); const tag = canShip ? (so?.shipping_included_in_price ? ' inkl. fragt' : ' + fragt') : ''; return `🛒 Læg i kurv — ${listing.price} kr.${tag}`; })()}</Btn>}
+                {listing.type==='køb' && <Btn variant="primary" color={PRIMARY} radius={22} onClick={handleAddToCart} style={{ justifyContent:'center', padding:'15px', fontSize:16 }}>{inCart ? '🛒 Gå til kurv →' : (() => { const so = listing.shipping_options?.[0]; const canShip = so?.allow_shipping || (!so && listing.can_ship); const tag = canShip ? (so?.shipping_included_in_price ? ' inkl. fragt' : ' + fragt') : ''; const total = listing.price + calcServiceFee(listing.price); return `🛒 Læg i kurv — ${total.toFixed(2).replace('.',',')} kr.${tag}`; })()}</Btn>}
                 {listing.type==='byd' && <Btn variant="primary" color={ACCENT2} radius={22} onClick={()=>setBidModal(true)} style={{ justifyContent:'center', padding:'15px', fontSize:16 }}>📊 Afgiv bud</Btn>}
                 {listing.type==='byt' && <Btn variant="primary" color={ACCENT} radius={22} onClick={()=>setSwapModal(true)} style={{ justifyContent:'center', padding:'15px', fontSize:16 }}>🔄 Foreslå bytte</Btn>}
                 {listing.type==='søges' && <button onClick={()=>setSøgesModal(true)}
