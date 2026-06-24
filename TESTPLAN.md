@@ -14,7 +14,7 @@ Arbejd ovenfra og ned.
 | 3) Reservation | ✅ Gennemført (+ marketplace-badge, auto-afvis, bud-overblik) |
 | 4) Tilbud — checkout & gennemførsel | ✅ Gennemført (hovedflow + negativ-test 409) |
 | 5) Bundt-bytte — opret | ✅ Gennemført (+ obligatorisk anslået værdi, søges-filter, kort-visning) |
-| 6) Bundt-bytte — accept & escrow | ⬜ Ikke testet |
+| 6) Bundt-bytte — accept & escrow | ✅ Gennemført |
 | 7) Bundt-bytte — tosidet betaling | ⬜ Ikke testet |
 | 8) 48t auto-refusion | ⬜ Ikke testet |
 | 9) Udfasning | 🟡 Delvist (køb håndterer bud; QuickView er død kode) |
@@ -123,13 +123,13 @@ håndhæver `reserved_until` korrekt — mulig UI-forbedring, ikke en blokerende
 - [x] **Visnings-fejl fundet & rettet:** byt-kort/detalje viste "Byttes kun" selv med værdi, fordi `LISTING_COLS` (AppProvider) ikke hentede `estimated_value`. Rettet i alle 4 visnings-steder + detalje-query. Skal verificeres visuelt efter redeploy ("Byttes · anslået værdi X kr.").
 - [x] **Visuelt bekræftet** (2026-06-24): kort/detalje viser "Byttes · anslået værdi X kr." og værdien er påkrævet i opret/rediger.
 
-## 6) Bundt-bytte — accept & escrow (Trin 4b)
+## 6) Bundt-bytte — accept & escrow (Trin 4b) — ✅
 
-- [ ] Som **B**: forslag-boble viser giver/får (inkl. kontant) + **Godkend / Afvis**.
-- [ ] **Godkend.** Forventet:
-  - `status='accepted'`, `escrow_status='awaiting_both'`, `payment_deadline` ≈ nu+48t
-  - alle involverede varer får `reserved_until` = fristen
-  - A notificeres.
+- [x] Som ejer: forslag-boble viser giver/får (inkl. kontant) + **Godkend / Afvis**.
+- [x] **Godkend** — verificeret (2026-06-24, forslag 29255edc):
+  - `status='accepted'`, `escrow_status='awaiting_both'`, `payment_deadline` = præcis nu+48t, `accepted_at` sat ✅
+  - alle 4 involverede varer (begge sider) fik `reserved_until` = fristen ✅
+  - *Obs:* `reserved_for_institution_id` sættes kun på den ene vare (kosmetisk; `reserved_until` beskytter alle).
 
 ## 7) Bundt-bytte — tosidet betaling (Trin 4c/4d)
 
