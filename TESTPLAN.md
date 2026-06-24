@@ -131,9 +131,14 @@ håndhæver `reserved_until` korrekt — mulig UI-forbedring, ikke en blokerende
   - alle 4 involverede varer (begge sider) fik `reserved_until` = fristen ✅
   - *Obs:* `reserved_for_institution_id` sættes kun på den ene vare (kosmetisk; `reserved_until` beskytter alle).
 
-## 7) Bundt-bytte — tosidet betaling (Trin 4c/4d)
+## 7) Bundt-bytte — tosidet betaling (Trin 4c/4d) — 🟡
 
-- [ ] Som **A**: boblen viser **din andel** (porto + 10 kr. + kontant hvis betaler) + **"Betal — send med pakke"** / **"Aftalt levering"**.
+> **Bug fundet & rettet (2026-06-24):** "Betal — send med pakke" fejlede med alert **"Mangler samtale"**.
+> `create-swap-intent` havde en tidlig `conversationId`-guard, men det nye `swap_proposals`-flow sender kun
+> `proposalId` (samtalen udledes af forslaget). Guarden flyttet til kun at gælde det gamle flow. Afventer re-test.
+
+- [x] Boblen viser **din andel** korrekt (porto + 10 kr. + 75 kr. kontant for betaleren) + **"Betal — send med pakke"** / **"Aftalt levering"**. ✅ (visuelt bekræftet)
+- [ ] Initiator betaler → `initiator_paid=true`, `escrow_status='awaiting_owner'`, boble "afventer modpart", modpart får "din tur"-mail. *(re-test efter fix)*
 - [ ] A betaler → `initiator_paid=true`, `escrow_status='awaiting_owner'`, boble "afventer modpart", **B får "din tur"-mail**.
 - [ ] **Dashboard (B):** banner "1 byttehandel afventer din betaling".
 - [ ] Som **B**: betal. Forventet (begge betalt):
