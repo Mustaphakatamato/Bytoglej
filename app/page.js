@@ -91,7 +91,7 @@ function MobileCard({ listing, onClick, favs, toggleFav }) {
                 </div>
               );
             })()
-          : <div style={{ fontFamily: FONT, fontWeight: 700, fontSize: 12, color: CORAL }}>Byttes kun</div>}
+          : <div style={{ fontFamily: FONT, fontWeight: 700, fontSize: 12, color: CORAL }}>Byttes{listing.estimated_value ? ` · ~${listing.estimated_value} kr.` : ' kun'}</div>}
         {listing.condition && <div style={{ fontSize: 11, color: INK3, marginTop: 2 }}>{listing.condition}</div>}
       </div>
     </div>

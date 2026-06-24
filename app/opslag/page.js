@@ -73,7 +73,7 @@ function MobileListingCard({ l, isFav, onToggleFav, onOpen }) {
                 </div>
               );
             })()
-          : <div style={{ fontFamily: FONT, fontWeight: 700, fontSize: 12, color: CORAL }}>Byttes kun</div>}
+          : <div style={{ fontFamily: FONT, fontWeight: 700, fontSize: 12, color: CORAL }}>Byttes{l.estimated_value ? ` · ~${l.estimated_value} kr.` : ' kun'}</div>}
         {l.condition && <div style={{ fontSize: 11, color: INK3, marginTop: 2 }}>{l.condition}</div>}
         {(() => {
           const so = l.shipping_options?.[0];

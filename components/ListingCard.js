@@ -258,7 +258,7 @@ export default function ListingCard({ listing, onClick, favs, toggleFav, onInsti
                   </div>
                 );
               })()
-            : <div style={{ fontSize: 13, color: CORAL, fontWeight: 700, marginBottom: 4, fontFamily: FONT }}>Byttes kun</div>
+            : <div style={{ fontSize: 13, color: CORAL, fontWeight: 700, marginBottom: 4, fontFamily: FONT }}>Byttes{listing.estimated_value ? ` · anslået værdi ${listing.estimated_value} kr.` : ' kun'}</div>
           }
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
             <div style={{ fontSize: 11, color: INK3, fontFamily: FONT }}>

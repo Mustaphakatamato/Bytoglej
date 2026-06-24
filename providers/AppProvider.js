@@ -121,7 +121,7 @@ export function AppProvider({ children }) {
     }
   }
 
-  const LISTING_COLS = 'id,title,description,price,original_price,type,condition,age_group,category,subcategory,emoji,color,images,institution_name,user_id,city,fav_count,bid_count,created_at,is_active,is_sold,can_ship,urgency,reserved_until,shipping_options(allow_pickup,allow_shipping,allow_custom)';
+  const LISTING_COLS = 'id,title,description,price,estimated_value,original_price,type,condition,age_group,category,subcategory,emoji,color,images,institution_name,user_id,city,fav_count,bid_count,created_at,is_active,is_sold,can_ship,urgency,reserved_until,shipping_options(allow_pickup,allow_shipping,allow_custom)';
 
   async function fetchListings() {
     setLoadingListings(true);

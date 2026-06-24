@@ -132,7 +132,7 @@ export default function ListingDetailClient() {
   useEffect(() => {
     if (!listing) return;
     db.from('listings')
-      .select('id,title,description,type,condition,age_group,price,images,emoji,color,city,institution_name,fav_count,is_active,tags,created_at')
+      .select('id,title,description,type,condition,age_group,price,estimated_value,images,emoji,color,city,institution_name,fav_count,is_active,tags,created_at')
       .eq('institution_name', listing.institution_name)
       .eq('is_active', true)
       .neq('id', listing.id)
@@ -147,7 +147,7 @@ export default function ListingDetailClient() {
   useEffect(() => {
     if (!instListingsLoaded || instListings.length > 0 || !listing) return;
     const q = db.from('listings')
-      .select('id,title,description,type,condition,age_group,price,images,emoji,color,city,institution_name,fav_count,is_active,tags,created_at')
+      .select('id,title,description,type,condition,age_group,price,estimated_value,images,emoji,color,city,institution_name,fav_count,is_active,tags,created_at')
       .eq('is_active', true)
       .neq('id', listing.id)
       .neq('institution_name', listing.institution_name)
@@ -843,7 +843,7 @@ export default function ListingDetailClient() {
                       </div>
                     );
                   })()
-                : listing.type === 'byt' ? <div style={{ fontSize:20, color:CORAL, fontWeight:800, fontFamily:FONT }}>Byttes kun</div>
+                : listing.type === 'byt' ? <div style={{ fontSize:20, color:CORAL, fontWeight:800, fontFamily:FONT }}>Byttes{listing.estimated_value ? <span style={{ fontSize:14, fontWeight:700 }}> · anslået værdi {listing.estimated_value} kr.</span> : ' kun'}</div>
                 : <div style={{ fontSize:20, color:ACCENT2, fontWeight:800, fontFamily:FONT }}>Afgiv bud</div>}
               {bidCount > 0 && <div style={{ color:INK3, fontSize:12, fontFamily:FONT, marginTop:4 }}>{bidCount} bud afgivet</div>}
               {listing.type === 'byd' && listing.min_bid && <div style={{ color:INK3, fontSize:12, fontFamily:FONT }}>Mindstebud: {listing.min_bid} kr.</div>}
