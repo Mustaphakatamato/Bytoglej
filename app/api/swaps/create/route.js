@@ -169,6 +169,18 @@ export async function POST(req) {
     }).eq('id', convId);
   }
 
+  // In-app notifikation til modtageren (klokke-menuen).
+  if (ownerInst?.id || ownerName) {
+    await supa.from('notifications').insert({
+      institution_id: ownerInst?.id || null,
+      institution_name: ownerInst?.name || ownerName || null,
+      type: 'swap_proposal_received',
+      title: 'Nyt bytteforslag 🔄',
+      body: `${initiatorInst?.name || 'En institution'} har sendt dig et bytteforslag${cashAdjustment > 0 ? ` (+ ${cashAdjustment} kr. kontant)` : ''}.`,
+      data: { proposal_id: proposal.id, conversation_id: convId },
+    }).catch(() => {});
+  }
+
   return NextResponse.json({
     proposal,
     conversationId: convId,
