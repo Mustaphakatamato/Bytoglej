@@ -149,6 +149,12 @@ export default function BetalingPage() {
                 <span style={{ fontFamily: FONT, fontSize: 12, color: INK3 }}>Bytogleg beskyttelse</span>
                 <span style={{ fontFamily: FONT, fontSize: 12, color: INK3 }}>{g.serviceFee?.toFixed(2)} kr.</span>
               </div>
+              {g.cashAdjustment > 0 && (
+                <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 4 }}>
+                  <span style={{ fontFamily: FONT, fontSize: 12, color: INK3 }}>Kontant mellemlag</span>
+                  <span style={{ fontFamily: FONT, fontSize: 12, color: INK3 }}>{g.cashAdjustment.toFixed(2)} kr.</span>
+                </div>
+              )}
             </div>
           ))}
           <div style={{ borderTop: `1px solid ${PAPER2}`, marginTop: 14, paddingTop: 14, display: 'flex', justifyContent: 'space-between' }}>
