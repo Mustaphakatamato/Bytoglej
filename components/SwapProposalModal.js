@@ -8,6 +8,8 @@ import { authedFetch } from '@/lib/authed-fetch';
 const kr = n => `${Number(n || 0).toFixed(2).replace('.', ',')} kr.`;
 // Køb-opslag bærer værdien i price; byt-opslag i estimated_value.
 const itemValue = l => Number(l?.price ?? l?.estimated_value) || 0;
+// Reserveret = låst i en anden igangværende handel (reserved_until i fremtiden).
+const isReserved = l => !!(l?.reserved_until && new Date(l.reserved_until).getTime() > Date.now());
 
 // Bundt-for-bundt bytteforslag: vælg egne varer at tilbyde + modpartens
 // varer du vil have + valgfrit kontant mellemlag.
@@ -24,10 +26,10 @@ export default function SwapProposalModal({ open, onClose, listing, ownListings 
     setOfferedIds([]); setExtraRequestedIds([]); setCash(''); setCashPayer('initiator');
     // Hent modpartens øvrige aktive varer (ud over den primære).
     db.from('listings')
-      .select('id, title, price, estimated_value, emoji, color, images')
+      .select('id, title, price, estimated_value, emoji, color, images, reserved_until')
       .eq('institution_name', listing.institution_name)
       .eq('is_active', true).eq('is_sold', false)
-      .then(({ data }) => setOwnerListings((data || []).filter(l => l.id !== listing.id)));
+      .then(({ data }) => setOwnerListings((data || []).filter(l => l.id !== listing.id && !isReserved(l))));
   }, [open, listing?.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const offered = ownListings.filter(l => offeredIds.includes(l.id));

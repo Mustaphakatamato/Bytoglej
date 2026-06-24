@@ -6,6 +6,8 @@ import { SWAP_PROTECTION_FEE } from '@/lib/pricing';
 
 // Køb-opslag bærer værdien i price; byt-opslag i estimated_value.
 const itemValue = l => Number(l?.price ?? l?.estimated_value) || 0;
+// Reserveret = låst i en anden igangværende handel (reserved_until i fremtiden).
+const isReserved = l => !!(l?.reserved_until && new Date(l.reserved_until).getTime() > Date.now());
 
 // Snapshot af et opslag til lagring i swap_proposals.offered_items/requested_items.
 function itemSnapshot(l) {
@@ -63,6 +65,7 @@ export async function POST(req) {
     const l = byId.get(id);
     if (!l) return NextResponse.json({ error: 'En tilbudt vare findes ikke' }, { status: 400 });
     if (l.is_sold || l.is_active === false) return NextResponse.json({ error: `"${l.title}" er ikke længere aktiv` }, { status: 409 });
+    if (isReserved(l)) return NextResponse.json({ error: `"${l.title}" er reserveret i en anden handel` }, { status: 409 });
     const ownsIt = l.user_id === user.id || (initiatorInst && l.institution_name === initiatorInst.name);
     if (!ownsIt) return NextResponse.json({ error: 'Du kan kun tilbyde dine egne varer' }, { status: 403 });
     offered.push(l);
@@ -76,6 +79,7 @@ export async function POST(req) {
     const l = byId.get(id);
     if (!l) return NextResponse.json({ error: 'En ønsket vare findes ikke' }, { status: 400 });
     if (l.is_sold || l.is_active === false) return NextResponse.json({ error: `"${l.title}" er ikke længere aktiv` }, { status: 409 });
+    if (isReserved(l)) return NextResponse.json({ error: `"${l.title}" er reserveret i en anden handel` }, { status: 409 });
     if (l.user_id === user.id) return NextResponse.json({ error: 'Du kan ikke bytte til dine egne varer' }, { status: 400 });
     if (ownerName === null) { ownerName = l.institution_name; ownerUserId = l.user_id; }
     else if (l.institution_name !== ownerName) {
