@@ -5,20 +5,25 @@ Arbejd ovenfra og ned.
 
 ---
 
-## Status (opdateret 2026-06-18)
+## Status (opdateret 2026-06-24)
 
 | Punkt | Status |
 |-------|--------|
 | 1) Tilbud — opret & dagligt loft | ✅ Gennemført |
 | 2) Tilbud — sælgers svar | ✅ Gennemført (modbud, afvis m. kommentar, accept) |
 | 3) Reservation | ✅ Gennemført (+ marketplace-badge, auto-afvis, bud-overblik) |
-| 4) Tilbud — checkout & gennemførsel | ⬜ Ikke testet endnu |
+| 4) Tilbud — checkout & gennemførsel | 🟡 Hovedflow bestået; negativ-test (udløbet reservation → 409) mangler |
 | 5) Bundt-bytte — opret | ⬜ Ikke testet |
 | 6) Bundt-bytte — accept & escrow | ⬜ Ikke testet |
 | 7) Bundt-bytte — tosidet betaling | ⬜ Ikke testet |
 | 8) 48t auto-refusion | ⬜ Ikke testet |
 | 9) Udfasning | 🟡 Delvist (køb håndterer bud; QuickView er død kode) |
 | 10) Regression | ⬜ Ikke testet |
+
+**Punkt 4 — verificeret (2026-06-24):** Accepteret tilbud → "Gå til betaling" → kurv (tilbudspris) → betaling
+med Stripe testkort gennemført. Bekræftet: `offers.status='completed'`, `listings.is_sold=true` +
+`is_active=false` + `reserved_until=null`, samtale `deal_completed=true`, ordrebekræftelses-mails til
+både køber og sælger. **Mangler stadig:** negativ-test med udløbet reservation (→ 409).
 
 ### Rettelser & forbedringer lavet under test (denne session)
 
@@ -84,16 +89,16 @@ Arbejd ovenfra og ned.
 - [x] **DB:** `reserved_until` i fremtiden.
 - [x] Reserveret-badge vises i marketplace; opslaget viser "Varen er reserveret"-banner.
 
-## 4) Tilbud — checkout & gennemførsel (Trin 3 + 3e)
+## 4) Tilbud — checkout & gennemførsel (Trin 3 + 3e) — 🟡
 
-- [ ] Som **A**: vælg levering i checkout-beskeden → **betal** (testkort) → kvittering.
-- [ ] **DB efter betaling:**
+- [x] Som **A**: vælg levering i checkout-beskeden → **betal** (testkort) → kvittering. (Går nu via fulde kurv-flow.)
+- [x] **DB efter betaling:**
   - `offers.status='completed'`
   - `listings`: `is_sold=true`, `is_active=false`, `reserved_until=null`
   - `conversations.deal_completed=true`, `deal_type='køb'`
   - `orders` paid/shipped.
-- [ ] **Mail:** køber + sælger får ordrebekræftelse.
-- [ ] **Negativ (udløbet reservation):** sæt `reserved_until` i fortiden i DB → forsøg betaling → **409 "reservationen er udløbet"**.
+- [x] **Mail:** køber + sælger får ordrebekræftelse.
+- [ ] **Negativ (udløbet reservation):** sæt `reserved_until` i fortiden i DB → forsøg betaling → **409 "reservationen er udløbet"**. *(mangler)*
 
 ## 5) Bundt-bytte — opret (Trin 4 + 4f)
 
@@ -167,3 +172,4 @@ Arbejd ovenfra og ned.
 - Afvis/modbud er **in-chat barer**, ikke separate modaler.
 - Kontant mellemlag + sælger-udbetaling afregnes via den eksisterende **manuelle** udbetalingsproces.
 - Gammelt flow er **udfaset, ikke hård-slettet** — historiske bud/bytter håndteres stadig. Hård oprydning (+ drop af `conversations.swap_*`) sker efter test.
+- **Marketplace auto-opdaterer ikke efter et køb** — en netop solgt vare hænger i søgningen indtil hard-refresh (klient-cache). DB er korrekt (is_sold/is_active/reserved_until). Mulig forbedring: refresh listings efter gennemført handel.
