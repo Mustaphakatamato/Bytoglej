@@ -117,10 +117,11 @@ håndhæver `reserved_until` korrekt — mulig UI-forbedring, ikke en blokerende
 1. **"Du tilbyder" hentede aldrig `price`** → offer-sidens værdi var altid 0. Nu hentes værdi; desuden ekskluderes **søges-opslag** (kan ikke tilbydes — man har dem ikke) og solgte varer.
 2. **Anslået værdi på byt-opslag (obligatorisk).** Byt-opslag havde ingen pris → værdi-sammenligning + kontant mellemlag var "0 mod 0". Ny kolonne `listings.estimated_value`; opret/rediger kræver nu en værdi for byt; swap-flowet bruger `COALESCE(price, estimated_value)`. **Migration skal køres:** `supabase/migrations/20260624_listing_estimated_value.sql`.
 
-**Re-test (efter migration + preview-redeploy):**
-- [ ] Opret/rediger et **byt-opslag** → "Anslået værdi" er påkrævet (rød kant + toast hvis tom); værdi gemmes i `estimated_value` (ikke `price`); kortet viser stadig "Byttes · anslået værdi X kr." (ikke salgspris/køb-knap).
-- [ ] I bundt-modalen viser "Du tilbyder" og "Du vil have" nu **rigtige værdier**; et **søges-opslag** kan ikke vælges som tilbud.
-- [ ] Send et forslag med byt-varer på begge sider → `offered_value`/`requested_value` ≠ 0 i `swap_proposals`.
+**Re-test (efter migration + preview-redeploy) — verificeret 2026-06-24:**
+- [x] **Anslået værdi gemmes:** "Hejsa" `estimated_value=250`, "Vildkatten Go" `=75` (i `estimated_value`, ikke `price`). ✅
+- [x] **Bundt-modal med rigtige værdier + køb-opslag som tilbud:** forslag med `offered_value=175` (køb "Test 4.1" 100 + byt "Vildkatten Go" 75) mod `requested_value=250` (byt "Hejsa"), `cash_adjustment=75` (= differencen). ✅
+- [x] **Visnings-fejl fundet & rettet:** byt-kort/detalje viste "Byttes kun" selv med værdi, fordi `LISTING_COLS` (AppProvider) ikke hentede `estimated_value`. Rettet i alle 4 visnings-steder + detalje-query. Skal verificeres visuelt efter redeploy ("Byttes · anslået værdi X kr.").
+- [ ] **Mangler visuelt:** bekræft "Anslået værdi" er påkrævet i opret/rediger (rød kant/toast hvis tom), og at kortet viser værdien efter hard-refresh.
 
 ## 6) Bundt-bytte — accept & escrow (Trin 4b)
 
