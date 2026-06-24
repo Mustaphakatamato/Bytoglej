@@ -13,7 +13,7 @@ Arbejd ovenfra og ned.
 | 2) Tilbud — sælgers svar | ✅ Gennemført (modbud, afvis m. kommentar, accept) |
 | 3) Reservation | ✅ Gennemført (+ marketplace-badge, auto-afvis, bud-overblik) |
 | 4) Tilbud — checkout & gennemførsel | ✅ Gennemført (hovedflow + negativ-test 409) |
-| 5) Bundt-bytte — opret | 🟡 Hovedflow bestået; 2 forbedringer lavet (kræver DB-migration + re-test) |
+| 5) Bundt-bytte — opret | ✅ Gennemført (+ obligatorisk anslået værdi, søges-filter, kort-visning) |
 | 6) Bundt-bytte — accept & escrow | ⬜ Ikke testet |
 | 7) Bundt-bytte — tosidet betaling | ⬜ Ikke testet |
 | 8) 48t auto-refusion | ⬜ Ikke testet |
@@ -107,7 +107,7 @@ håndhæver `reserved_until` korrekt — mulig UI-forbedring, ikke en blokerende
 - [x] **Mail:** køber + sælger får ordrebekræftelse.
 - [x] **Negativ (udløbet reservation):** sæt `reserved_until` i fortiden i DB → forsøg betaling → **409 "Reservationen er udløbet"** (verificeret; ingen ordre oprettet).
 
-## 5) Bundt-bytte — opret (Trin 4 + 4f) — 🟡
+## 5) Bundt-bytte — opret (Trin 4 + 4f) — ✅
 
 - [x] Som **A**: åbn et af **B's byt-opslag** → **🔄 Foreslå bytte** (bundt-modal).
 - [x] **DB (1. forslag):** `swap_proposals`-række korrekt — `offered_items` (2), `requested_items` (1), `cash_adjustment=100`, `cash_payer='owner'`, `status='pending'`, `escrow_status='none'`, `protection_fee=10`. ✅
@@ -121,7 +121,7 @@ håndhæver `reserved_until` korrekt — mulig UI-forbedring, ikke en blokerende
 - [x] **Anslået værdi gemmes:** "Hejsa" `estimated_value=250`, "Vildkatten Go" `=75` (i `estimated_value`, ikke `price`). ✅
 - [x] **Bundt-modal med rigtige værdier + køb-opslag som tilbud:** forslag med `offered_value=175` (køb "Test 4.1" 100 + byt "Vildkatten Go" 75) mod `requested_value=250` (byt "Hejsa"), `cash_adjustment=75` (= differencen). ✅
 - [x] **Visnings-fejl fundet & rettet:** byt-kort/detalje viste "Byttes kun" selv med værdi, fordi `LISTING_COLS` (AppProvider) ikke hentede `estimated_value`. Rettet i alle 4 visnings-steder + detalje-query. Skal verificeres visuelt efter redeploy ("Byttes · anslået værdi X kr.").
-- [ ] **Mangler visuelt:** bekræft "Anslået værdi" er påkrævet i opret/rediger (rød kant/toast hvis tom), og at kortet viser værdien efter hard-refresh.
+- [x] **Visuelt bekræftet** (2026-06-24): kort/detalje viser "Byttes · anslået værdi X kr." og værdien er påkrævet i opret/rediger.
 
 ## 6) Bundt-bytte — accept & escrow (Trin 4b)
 
