@@ -97,6 +97,7 @@ function OrderCard({ order, onUpdate, autoOpen }) {
   const grandTotal = order.grand_total ?? groups.reduce((s, g) => s + (g.itemTotal || 0) + (g.shippingTotal || 0) + (g.serviceFee || 0), 0);
   const trackingUrl = order.tracking_url || groups.find(g => g.tracking_url)?.tracking_url;
   const trackingNumber = order.tracking_number || groups.find(g => g.tracking_number)?.tracking_number;
+  const labelUrl = order.label_pdf_url || groups.find(g => g.label_pdf_url)?.label_pdf_url;
   const isShipping = groups.some(g => g.shippingMethod && g.shippingMethod !== 'pickup' && g.shippingMethod !== 'custom');
 
   async function handleConfirmReceived() {
@@ -189,6 +190,15 @@ function OrderCard({ order, onUpdate, autoOpen }) {
                 background: PRIMARY, color: '#fff', fontFamily: FONT, fontWeight: 700, fontSize: 13, textDecoration: 'none',
               }}>
                 📦 Spor pakken
+              </a>
+            )}
+            {labelUrl && (
+              <a href={labelUrl} target="_blank" rel="noopener noreferrer" style={{
+                display: 'block', textAlign: 'center', padding: '11px', borderRadius: 99,
+                background: GREEN_TINT, color: PRIMARY, border: `1.5px solid ${PRIMARY}`,
+                fontFamily: FONT, fontWeight: 700, fontSize: 13, textDecoration: 'none',
+              }}>
+                🖨️ Download pakkemærkat (PDF)
               </a>
             )}
             {trackingNumber && !trackingUrl && (

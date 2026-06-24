@@ -262,6 +262,7 @@ export default function MessagesClient() {
   const [counterAmount,setCounterAmount] = useState('');
   const [offersById,  setOffersById]  = useState({}); // tilbud i den aktive samtale, by id
   const [proposalsById, setProposalsById] = useState({}); // bytteforslag i den aktive samtale, by id
+  const [swapShipmentsById, setSwapShipmentsById] = useState({}); // shipments for byttehandler, by shipment-id
   const [rejectingOffer, setRejectingOffer] = useState(null);
   const [offerRejectNote, setOfferRejectNote] = useState('');
   const [counteringOffer, setCounteringOffer] = useState(null);
@@ -453,7 +454,15 @@ export default function MessagesClient() {
       .then(({ data: offerRows }) => setOffersById(Object.fromEntries((offerRows || []).map(o => [o.id, o]))));
     // Hent bytteforslag (swap_proposals) — live status på forslag-bobler.
     db.from('swap_proposals').select('*').eq('conversation_id', conv.id)
-      .then(({ data: propRows }) => setProposalsById(Object.fromEntries((propRows || []).map(p => [p.id, p]))));
+      .then(({ data: propRows }) => {
+        setProposalsById(Object.fromEntries((propRows || []).map(p => [p.id, p])));
+        // Hent forsendelser for byttehandlerne, så completion-boblen kan vise pakkemærkat + tracking.
+        const shipIds = (propRows || []).flatMap(p => [p.initiator_shipment_id, p.owner_shipment_id]).filter(Boolean);
+        if (shipIds.length) {
+          db.from('shipments').select('id,tracking_number,tracking_url,label_pdf_url,status').in('id', shipIds)
+            .then(({ data: srows }) => setSwapShipmentsById(Object.fromEntries((srows || []).map(s => [s.id, s]))));
+        }
+      });
     setMsgLoad(false);
     setTimeout(() => bottomRef.current?.scrollIntoView({ behavior:'smooth' }), 60);
     inputRef.current?.focus();
@@ -2116,9 +2125,21 @@ export default function MessagesClient() {
                                       </div>
                                     )}
 
-                                    {completed && (
-                                      <div style={{ fontFamily:FONT, fontSize:13, fontWeight:700, color:PRIMARY, marginTop:12 }}>🎉 Byttehandel gennemført — pakkemærkater er klar.</div>
-                                    )}
+                                    {completed && (() => {
+                                      const sh = swapShipmentsById[party === 'owner' ? p.owner_shipment_id : p.initiator_shipment_id];
+                                      return (
+                                        <div style={{ marginTop:12 }}>
+                                          <div style={{ fontFamily:FONT, fontSize:13, fontWeight:700, color:PRIMARY }}>🎉 Byttehandel gennemført{sh?.label_pdf_url ? ' — din pakkemærkat er klar.' : '.'}</div>
+                                          {sh && (
+                                            <div style={{ display:'flex', flexDirection:'column', gap:8, marginTop:10 }}>
+                                              {sh.label_pdf_url && <a href={sh.label_pdf_url} target="_blank" rel="noopener noreferrer" style={{ display:'block', textAlign:'center', padding:'10px', borderRadius:99, background:GREEN_TINT, color:PRIMARY, border:`1.5px solid ${PRIMARY}`, fontFamily:FONT, fontWeight:700, fontSize:13, textDecoration:'none' }}>🖨️ Download din pakkemærkat (PDF)</a>}
+                                              {sh.tracking_url && <a href={sh.tracking_url} target="_blank" rel="noopener noreferrer" style={{ display:'block', textAlign:'center', padding:'10px', borderRadius:99, background:PRIMARY, color:'#fff', fontFamily:FONT, fontWeight:700, fontSize:13, textDecoration:'none' }}>📦 Spor pakken</a>}
+                                              {sh.tracking_number && !sh.tracking_url && <div style={{ textAlign:'center', fontFamily:FONT, fontSize:11, color:INK3 }}>Tracking: {sh.tracking_number}</div>}
+                                            </div>
+                                          )}
+                                        </div>
+                                      );
+                                    })()}
                                     {p.escrow_status === 'cancelled_timeout' && (
                                       <div style={{ fontFamily:FONT, fontSize:12, color:'#e11d48', marginTop:12 }}>⏰ Annulleret — betalingsfristen udløb. Betalte beløb refunderes.</div>
                                     )}

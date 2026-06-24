@@ -537,6 +537,21 @@ async function handleSwapProposalPayment(pi, supa) {
       ownerInst?.email && sendSwapDoneEmail(ownerInst.email, ownerInst.name, shipById.get(ownerShipmentId), p.owner_delivery),
     ].filter(Boolean));
 
+    // Skriv tracking + mærkat ind på hver parts ordre, så Mine ordrer kan vise/downloade dem.
+    async function patchOrderShipment(orderId, shipment) {
+      if (!orderId || !shipment) return;
+      const { data: ord } = await supa.from('orders').select('order_groups').eq('id', orderId).maybeSingle();
+      const groups = Array.isArray(ord?.order_groups) ? ord.order_groups : [];
+      if (groups[0]) {
+        groups[0] = { ...groups[0], tracking_number: shipment.tracking_number, tracking_url: shipment.tracking_url, label_pdf_url: shipment.label_pdf_url };
+        await supa.from('orders').update({ order_groups: groups, status: 'shipped' }).eq('id', orderId);
+      }
+    }
+    await Promise.all([
+      patchOrderShipment(p.initiator_order_id, shipById.get(initShipmentId)),
+      patchOrderShipment(p.owner_order_id, shipById.get(ownerShipmentId)),
+    ]);
+
     // CO2-besparelse for byttet (server-side, Trin 5).
     if (convId) {
       const { data: catRows } = tradedIds.length
