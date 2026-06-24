@@ -600,10 +600,26 @@ function CategoryStrip({ router }) {
 
 // ── Notification bell ─────────────────────────────────────────────────────────
 function NotificationBell({ institution, transparent, isMobile, onMobileClick }) {
+  const router = useRouter();
   const [open, setOpen] = useState(false);
   const [notes, setNotes] = useState([]);
   const [unread, setUnread] = useState(0);
   const ref = useRef(null);
+
+  // Naviger til den relevante side når en notifikation klikkes.
+  function goToNotification(n) {
+    setOpen(false);
+    const d = n?.data || {};
+    if (n?.type === 'swap_proposal_received' || n?.type === 'swap_payment_turn') {
+      router.push(d.conversation_id ? `/beskeder?conv=${d.conversation_id}` : '/beskeder');
+    } else if (n?.type === 'listing_review_approved' || n?.type === 'listing_review_rejected') {
+      router.push('/mine-opslag');
+    } else if (d.conversation_id) {
+      router.push(`/beskeder?conv=${d.conversation_id}`);
+    } else {
+      router.push('/beskeder');
+    }
+  }
 
   useEffect(() => {
     if (!institution?.name) return;
@@ -658,7 +674,7 @@ function NotificationBell({ institution, transparent, isMobile, onMobileClick })
       {notes.length === 0 ? (
         <div style={{ padding:'32px 16px', textAlign:'center', color:INK3, fontFamily:FONT, fontSize:13 }}>Ingen notifikationer endnu</div>
       ) : notes.map((n, i) => (
-        <div key={n.id} style={{ display:'flex', alignItems:'flex-start', gap:12, padding:'14px 16px', borderBottom: i < notes.length - 1 ? `1px solid ${PAPER2}` : 'none', background: n.read ? '#fff' : '#FFF7ED' }}>
+        <div key={n.id} onClick={() => goToNotification(n)} style={{ display:'flex', alignItems:'flex-start', gap:12, padding:'14px 16px', borderBottom: i < notes.length - 1 ? `1px solid ${PAPER2}` : 'none', background: n.read ? '#fff' : '#FFF7ED', cursor:'pointer' }}>
           <span style={{ fontSize:20, flexShrink:0, marginTop:1 }}>{n.type === 'listing_review_approved' ? '✅' : n.type === 'listing_review_rejected' ? '❌' : (n.type === 'swap_payment_turn' || n.type === 'swap_proposal_received') ? '🔄' : '📬'}</span>
           <div style={{ flex:1, minWidth:0 }}>
             <div style={{ fontFamily:FONT, fontWeight: n.read ? 600 : 800, fontSize:14, color:INK, marginBottom:3 }}>{n.title}</div>
