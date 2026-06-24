@@ -557,6 +557,10 @@ async function handleSwapProposalPayment(pi, supa) {
       const cashLine = (Number(p.cash_adjustment) > 0)
         ? ` Kontant mellemlag på ${p.cash_adjustment} kr. udbetales til modparten.`
         : '';
+      // Sig kun "pakkemærkater er klar" hvis der faktisk blev booket forsendelse(r).
+      const deliveryLine = shipmentIds.length > 0
+        ? ' Pakkemærkater er klar.'
+        : ' Aftal levering indbyrdes.';
       await supa.from('conversations').update({
         deal_completed: true, deal_completed_at: now, deal_type: 'byt',
         delivery_status: 'in_progress',
@@ -569,7 +573,7 @@ async function handleSwapProposalPayment(pi, supa) {
         conversation_id: convId,
         sender_id: claimed.buyer_id,
         sender_name: 'System',
-        content: `🎉 Byttehandel gennemført! Begge parter har betalt — pakkemærkater er klar.${cashLine}`,
+        content: `🎉 Byttehandel gennemført! Begge parter har betalt —${deliveryLine}${cashLine}`,
         message_type: 'swap_completed',
       });
     }
