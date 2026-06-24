@@ -123,9 +123,9 @@ export default function SwapPaymentPage() {
     } catch { showToast?.('Noget gik galt — prøv igen', 'error'); setPaying(false); }
   }
 
-  if (loading) return <div style={{ maxWidth: 720, margin: '40px auto', padding: 24, fontFamily: FONT, color: INK3 }}>Henter byttehandel…</div>;
-  if (!proposal || !party) return <div style={{ maxWidth: 720, margin: '40px auto', padding: 24, fontFamily: FONT, color: INK }}>Byttehandlen blev ikke fundet, eller du er ikke en del af den. <button onClick={() => router.push('/beskeder')} style={linkBtn}>← Til beskeder</button></div>;
-  if (alreadyPaid) return <div style={{ maxWidth: 720, margin: '40px auto', padding: 24, fontFamily: FONT, color: INK }}>✓ Du har allerede betalt din del af denne byttehandel. <button onClick={() => router.push('/beskeder')} style={linkBtn}>← Til beskeder</button></div>;
+  if (loading) return <div style={{ maxWidth: 720, margin: '0 auto', padding: 24, paddingTop: 100, fontFamily: FONT, color: INK3 }}>Henter byttehandel…</div>;
+  if (!proposal || !party) return <div style={{ maxWidth: 720, margin: '0 auto', padding: 24, paddingTop: 100, fontFamily: FONT, color: INK }}>Byttehandlen blev ikke fundet, eller du er ikke en del af den. <button onClick={() => router.push('/beskeder')} style={linkBtn}>← Til beskeder</button></div>;
+  if (alreadyPaid) return <div style={{ maxWidth: 720, margin: '0 auto', padding: 24, paddingTop: 100, fontFamily: FONT, color: INK }}>✓ Du har allerede betalt din del af denne byttehandel. <button onClick={() => router.push('/beskeder')} style={linkBtn}>← Til beskeder</button></div>;
 
   const methodCard = (m, label, sub, price, onClick) => {
     const active = method === m;
@@ -141,7 +141,7 @@ export default function SwapPaymentPage() {
   };
 
   return (
-    <div style={{ maxWidth: 720, margin: '24px auto', padding: '0 16px', fontFamily: FONT }}>
+    <div style={{ maxWidth: 720, margin: '0 auto', padding: '0 16px 60px', paddingTop: 100, fontFamily: FONT }}>
       <button onClick={() => router.push('/beskeder')} style={linkBtn}>← Tilbage til beskeder</button>
       <h1 style={{ fontFamily: FONT, fontWeight: 800, fontSize: 24, color: INK, margin: '8px 0 4px' }}>Betal din del af byttet</h1>
       <p style={{ fontFamily: FONT, fontSize: 14, color: INK3, marginTop: 0 }}>Du sender dine varer til {receiver?.name || 'modparten'} — vælg hvordan.</p>
