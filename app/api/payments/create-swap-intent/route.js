@@ -197,6 +197,9 @@ export async function POST(req) {
 // beskyttelse + kontant mellemlag hvis denne part er betaleren.
 async function handleProposalIntent(user, supa, body) {
   const deliveryMethod = body.deliveryMethod === 'custom' ? 'custom' : 'shipping';
+  // Valgt udleveringssted (GLS/PostNord/DAO pakkeshop) — påkrævet for pakkeshop-booking.
+  const pickupPointId = body.pickupPointId || null;
+  const pickupPoint = (body.pickupPoint && typeof body.pickupPoint === 'object') ? body.pickupPoint : null;
 
   const { data: proposal } = await supa.from('swap_proposals').select('*').eq('id', body.proposalId).maybeSingle();
   if (!proposal) return NextResponse.json({ error: 'Bytteforslaget findes ikke' }, { status: 404 });
@@ -245,9 +248,10 @@ async function handleProposalIntent(user, supa, body) {
     if (myInst && receiverInst) {
       try {
         const quote = await getPriceQuote({
-          carrier: 'gls', service_type: 'parcel_shop', size_category: sizeCategory,
+          carrier: pickupPoint?.carrier_code || 'gls', service_type: 'parcel_shop', size_category: sizeCategory,
           sender:   { name: myInst.name, address: myInst.address, zip: myInst.zipcode, city: myInst.city, email: myInst.email },
           receiver: { name: receiverInst.name, address: receiverInst.address, zip: receiverInst.zipcode, city: receiverInst.city, email: receiverInst.email },
+          service_point_id: pickupPointId,
         });
         if (quote?.price_dkk > 0) porto = Math.round(quote.price_dkk * 100) / 100;
       } catch (e) {
@@ -277,6 +281,7 @@ async function handleProposalIntent(user, supa, body) {
         conversation_id: proposal.conversation_id || '',
         party,
         delivery_method: deliveryMethod,
+        pickup_point_id: pickupPointId ? String(pickupPointId) : '',
         size_category: String(sizeCategory),
         cash_ore: String(Math.round(cash * 100)),
         buyer_id: user.id,
@@ -313,6 +318,15 @@ async function handleProposalIntent(user, supa, body) {
     try { await stripe.paymentIntents.cancel(paymentIntent.id); } catch {}
     return NextResponse.json({ error: 'Kunne ikke oprette ordre' }, { status: 500 });
   }
+
+  // Gem partens leveringsvalg + udleveringssted på forslaget, så webhooken
+  // kan booke forsendelsen med det rigtige service point ved completion.
+  const deliveryField = party === 'owner' ? 'owner_delivery' : 'initiator_delivery';
+  const pickupField   = party === 'owner' ? 'owner_pickup'   : 'initiator_pickup';
+  await supa.from('swap_proposals').update({
+    [deliveryField]: deliveryMethod,
+    [pickupField]: pickupPoint,
+  }).eq('id', proposal.id);
 
   return NextResponse.json({ clientSecret: paymentIntent.client_secret, orderId: order.id, grandTotal, breakdown });
 }

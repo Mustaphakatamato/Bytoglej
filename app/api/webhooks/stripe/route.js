@@ -499,15 +499,15 @@ async function handleSwapProposalPayment(pi, supa) {
     const offeredIds   = (p.offered_items   || []).map(i => i.listing_id).filter(Boolean);
     const requestedIds = (p.requested_items || []).map(i => i.listing_id).filter(Boolean);
 
-    // Forsendelse 1: initiator → ejer (initiators bundt)
+    // Forsendelse 1: initiator → ejer (initiators bundt), til ejers valgte udleveringssted
     let initShipmentId = p.initiator_shipment_id || null;
     if (!initShipmentId && p.initiator_delivery !== 'custom' && conv) {
-      initShipmentId = await bookSwapShipment(supa, conv, offeredIds[0], initInst, ownerInst, await swapBundleSize(supa, offeredIds));
+      initShipmentId = await bookSwapShipment(supa, conv, offeredIds[0], initInst, ownerInst, await swapBundleSize(supa, offeredIds), p.initiator_pickup?.id || null);
     }
-    // Forsendelse 2: ejer → initiator (ejers bundt)
+    // Forsendelse 2: ejer → initiator (ejers bundt), til initiators valgte udleveringssted
     let ownerShipmentId = p.owner_shipment_id || null;
     if (!ownerShipmentId && p.owner_delivery !== 'custom' && conv) {
-      ownerShipmentId = await bookSwapShipment(supa, conv, requestedIds[0], ownerInst, initInst, await swapBundleSize(supa, requestedIds));
+      ownerShipmentId = await bookSwapShipment(supa, conv, requestedIds[0], ownerInst, initInst, await swapBundleSize(supa, requestedIds), p.owner_pickup?.id || null);
     }
 
     await supa.from('swap_proposals').update({
@@ -611,7 +611,7 @@ async function handleSwapProposalPayment(pi, supa) {
 }
 
 // Booker én forsendelse i en byttehandel og returnerer shipments.id (eller null).
-async function bookSwapShipment(supa, conv, listingId, senderInst, receiverInst, sizeOverride) {
+async function bookSwapShipment(supa, conv, listingId, senderInst, receiverInst, sizeOverride, pickupPointId) {
   if (!senderInst || !receiverInst) return null;
   try {
     let sizeCategory = sizeOverride || 'medium';
@@ -626,6 +626,7 @@ async function bookSwapShipment(supa, conv, listingId, senderInst, receiverInst,
       receiver: { name: receiverInst.name, address: receiverInst.address || 'Ukendt', zip_code: receiverInst.zipcode || '2100', city: receiverInst.city || 'København', country_code: 'DK', email: receiverInst.email, phone: receiverInst.phone || '' },
       carrier, service_type, size_category: sizeCategory,
       reference: conv.id,
+      pickup_point_id: pickupPointId || null,
     });
     const { data: shipment } = await supa.from('shipments').insert({
       conversation_id: conv.id,

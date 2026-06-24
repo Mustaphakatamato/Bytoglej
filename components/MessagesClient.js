@@ -2105,7 +2105,7 @@ export default function MessagesClient() {
                                               <div style={{ fontFamily:FONT, fontSize:13, fontWeight:700, color:PRIMARY, marginBottom:8 }}>✓ Modparten har betalt — det er din tur</div>
                                             )}
                                             <div style={{ display:'flex', gap:8, flexWrap:'wrap' }}>
-                                              <button disabled={paying} onClick={()=>handleSwapProposalPay(p,'shipping')} style={{ padding:'9px 16px', borderRadius:99, background:PRIMARY, border:'none', color:'#fff', fontSize:13, fontWeight:700, cursor:paying?'default':'pointer', fontFamily:FONT, opacity:paying?0.6:1 }}>{paying ? 'Et øjeblik…' : 'Betal — send med pakke'}</button>
+                                              <button disabled={paying} onClick={()=>router.push(`/bytte-betaling/${p.id}`)} style={{ padding:'9px 16px', borderRadius:99, background:PRIMARY, border:'none', color:'#fff', fontSize:13, fontWeight:700, cursor:paying?'default':'pointer', fontFamily:FONT, opacity:paying?0.6:1 }}>Betal — send med pakke</button>
                                               <button disabled={paying} onClick={()=>handleSwapProposalPay(p,'custom')} style={{ padding:'9px 16px', borderRadius:99, background:'#fff', border:`1.5px solid ${PAPER3}`, color:INK, fontSize:13, fontWeight:700, cursor:paying?'default':'pointer', fontFamily:FONT, opacity:paying?0.6:1 }}>Aftalt levering</button>
                                             </div>
                                             {p.payment_deadline && (
