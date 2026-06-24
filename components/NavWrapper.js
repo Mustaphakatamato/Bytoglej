@@ -659,7 +659,7 @@ function NotificationBell({ institution, transparent, isMobile, onMobileClick })
         <div style={{ padding:'32px 16px', textAlign:'center', color:INK3, fontFamily:FONT, fontSize:13 }}>Ingen notifikationer endnu</div>
       ) : notes.map((n, i) => (
         <div key={n.id} style={{ display:'flex', alignItems:'flex-start', gap:12, padding:'14px 16px', borderBottom: i < notes.length - 1 ? `1px solid ${PAPER2}` : 'none', background: n.read ? '#fff' : '#FFF7ED' }}>
-          <span style={{ fontSize:20, flexShrink:0, marginTop:1 }}>{n.type === 'listing_review_approved' ? '✅' : n.type === 'listing_review_rejected' ? '❌' : '📬'}</span>
+          <span style={{ fontSize:20, flexShrink:0, marginTop:1 }}>{n.type === 'listing_review_approved' ? '✅' : n.type === 'listing_review_rejected' ? '❌' : n.type === 'swap_payment_turn' ? '🔄' : '📬'}</span>
           <div style={{ flex:1, minWidth:0 }}>
             <div style={{ fontFamily:FONT, fontWeight: n.read ? 600 : 800, fontSize:14, color:INK, marginBottom:3 }}>{n.title}</div>
             <div style={{ fontFamily:FONT, fontSize:12, color:INK3, lineHeight:1.5 }}>{n.body}</div>

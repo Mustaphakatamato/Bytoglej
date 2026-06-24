@@ -586,11 +586,20 @@ async function handleSwapProposalPayment(pi, supa) {
         initiator_unread: (conv?.initiator_unread || 0) + 1,
       }).eq('id', convId);
     }
-    // "Din tur"-nudge til den part der endnu mangler at betale (Trin 5).
+    // "Din tur"-nudge til den part der endnu mangler at betale (Trin 5):
+    // både e-mail og en in-app notifikation (klokke-menuen).
     const owingInstId = p.initiator_paid ? p.owner_institution_id : p.initiator_institution_id;
     if (owingInstId) {
       const { data: oi } = await supa.from('institutions').select('email, name').eq('id', owingInstId).maybeSingle();
       if (oi?.email) await sendSwapNudgeEmail(oi.email, oi.name, p.payment_deadline);
+      await supa.from('notifications').insert({
+        institution_id: owingInstId,
+        institution_name: oi?.name || null,
+        type: 'swap_payment_turn',
+        title: 'Det er din tur at betale 🔄',
+        body: 'Modparten har betalt sin del af byttehandlen. Betal din andel for at fuldføre handlen.',
+        data: { proposal_id: p.id, conversation_id: convId || p.conversation_id },
+      }).catch(() => {});
     }
   }
 
