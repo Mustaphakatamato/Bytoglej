@@ -35,15 +35,18 @@ export async function POST(req) {
 
   const conversationId = body.conversationId;
   const deliveryMethod = body.deliveryMethod === 'custom' ? 'custom' : 'shipping';
-  if (!conversationId) return NextResponse.json({ error: 'Mangler samtale' }, { status: 400 });
 
   const supa = createServerClient();
 
   // Nyt swap_proposals-baseret bundt-bytte (additivt ved siden af det
-  // gamle conversations.swap_*-flow).
+  // gamle conversations.swap_*-flow). Udleder selv samtalen fra forslaget,
+  // så det kræver ikke conversationId i requesten.
   if (body.proposalId) {
     return handleProposalIntent(user, supa, body);
   }
+
+  // Gammelt flow (conversations.swap_*) kræver en samtale.
+  if (!conversationId) return NextResponse.json({ error: 'Mangler samtale' }, { status: 400 });
 
   const { data: conv } = await supa
     .from('conversations')
