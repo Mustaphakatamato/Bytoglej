@@ -123,6 +123,8 @@ håndhæver `reserved_until` korrekt — mulig UI-forbedring, ikke en blokerende
 - [x] **Visnings-fejl fundet & rettet:** byt-kort/detalje viste "Byttes kun" selv med værdi, fordi `LISTING_COLS` (AppProvider) ikke hentede `estimated_value`. Rettet i alle 4 visnings-steder + detalje-query. Skal verificeres visuelt efter redeploy ("Byttes · anslået værdi X kr.").
 - [x] **Visuelt bekræftet** (2026-06-24): kort/detalje viser "Byttes · anslået værdi X kr." og værdien er påkrævet i opret/rediger.
 
+**Bug fundet & rettet (2026-06-24):** Varer der allerede er **reserveret i en anden igangværende handel** (reserved i marketplace) kunne stadig vælges i et nyt bytteforslag — både på "Du vil have" og "Du tilbyder". Nu filtreret fra i modalen (begge sider) + afvist server-side i `swaps/create` (409 "… er reserveret i en anden handel"). *(re-test efter redeploy)*
+
 ## 6) Bundt-bytte — accept & escrow (Trin 4b) — ✅
 
 - [x] Som ejer: forslag-boble viser giver/får (inkl. kontant) + **Godkend / Afvis**.
