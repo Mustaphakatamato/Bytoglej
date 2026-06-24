@@ -139,18 +139,26 @@ håndhæver `reserved_until` korrekt — mulig UI-forbedring, ikke en blokerende
 > `create-swap-intent` havde en tidlig `conversationId`-guard, men det nye `swap_proposals`-flow sender kun
 > `proposalId` (samtalen udledes af forslaget). Guarden flyttet til kun at gælde det gamle flow. Afventer re-test.
 
-- [x] Boblen viser **din andel** korrekt (porto + 10 kr. + 75 kr. kontant for betaleren) + **"Betal — send med pakke"** / **"Aftalt levering"**. ✅ (visuelt bekræftet)
-- [ ] Initiator betaler → `initiator_paid=true`, `escrow_status='awaiting_owner'`, boble "afventer modpart", modpart får "din tur"-mail. *(re-test efter fix)*
-- [ ] A betaler → `initiator_paid=true`, `escrow_status='awaiting_owner'`, boble "afventer modpart", **B får "din tur"-mail**.
-- [ ] **Dashboard (B):** banner "1 byttehandel afventer din betaling".
-- [ ] Som **B**: betal. Forventet (begge betalt):
-  - to forsendelser bookes (begge retninger) — pakke-/tracking-beskeder
-  - byttede varer `is_sold=true`, `reserved_until=null`
-  - `escrow_status='both_paid_released'`, `completed_at` sat
-  - `conversations.deal_completed=true`, `deal_type='byt'`
-  - completion-mails til begge (m. pakkemærkat/tracking)
-  - CO2: ny `transaction_co2_savings`-række + `conversations.co2_net_saved_kg`.
-- [ ] Test også **"Aftalt levering"** for den ene part → ingen label, men handlen fuldføres.
+### Webhook-opsætning under test (vigtigt)
+> Punkt 7-8's escrow/forsendelse/refusion lever i **webhook-koden**, som kun findes i branchen. Produktions-webhooken (main) kender ikke `swap_proposals`. Derfor blev Stripe **TEST**-webhook midlertidigt peget på preview (2026-06-24). **Skal sættes tilbage til prod efter Punkt 7-8.** Preview var desuden bag **Vercel Deployment Protection** (302→SSO) → Stripe blev afvist; løst med Protection-Bypass-secret i endpoint-URL'en.
+
+### Bugs fundet & rettet (2026-06-24)
+1. **"Mangler samtale":** `create-swap-intent` havde en tidlig `conversationId`-guard; det nye flow sender kun `proposalId`. Guarden flyttet til kun det gamle flow. ✅
+2. **Kontant mellemlag manglede som linje** på betalingssiden (var i totalen). Tilføjet synlig linje. ✅
+3. **"Din tur"-notifikation + besked-status:** webhook opretter nu in-app notifikation (`swap_payment_turn`); boblen viser "Modparten har betalt — det er din tur". ✅ (kode; verificeres på frisk bytte)
+4. **Forsendelse fejlede med 422 "A service point is required for ShopDelivery":** swap-bookingen valgte aldrig et udleveringssted. **Stort fix:** "Betal — send med pakke" sender nu til ny side `/bytte-betaling/[proposalId]` hvor betaleren vælger pakkeshop + udleveringssted (genbruger `PickupPointPicker`); gemmes på `initiator/owner_pickup` og bruges ved booking. ✅ (kode; kræver frisk re-test)
+
+### Verificeret på forslag 29255edc (før service-point-fix)
+- [x] Boblen viser din andel korrekt (porto + 10 kr. + 75 kr. kontant). ✅
+- [x] Initiator betaler → `initiator_paid=true`, `escrow_status='awaiting_owner'`, boble "afventer modpart". ✅
+- [x] Begge betaler → `escrow_status='both_paid_released'`, `completed_at` sat, alle varer `is_sold=true`+`reserved_until=null`, `conversations.deal_completed=true`/`deal_type='byt'`, CO2-række oprettet. ✅
+- [⚠️] **Forsendelser IKKE booket** (422 service point) → rettet, se #4. `co2_net_saved_kg=0` (konservativ metode, flag til CO2-agent).
+
+### Frisk re-test (efter service-point-fix) — ⬜
+- [ ] Nyt bytte med forsendelsesegnede varer → accepter.
+- [ ] Initiator: "Betal — send med pakke" → **ny leveringsside** → vælg pakkeshop + udleveringssted → betal. Tjek `initiator_pickup` gemt, `initiator_paid=true`, **"din tur"-notifikation + mail** til modpart.
+- [ ] Owner: samme → vælg udleveringssted → betal. Tjek **begge `*_shipment_id` ≠ null**, varer solgt, escrow frigivet, completion-mails m. pakkemærkat.
+- [ ] Test også **"Aftalt levering"** for den ene part → ingen label, handlen fuldføres.
 
 ## 8) 48t auto-refusion (Trin 4e)
 
