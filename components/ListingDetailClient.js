@@ -162,7 +162,7 @@ export default function ListingDetailClient() {
       if (!user) return;
       setCurrentUserId(user.id);
       setCurrentUserEmail(user.email);
-      db.from('listings').select('id,title,emoji,color,images').eq('user_id', user.id).eq('is_active', true).neq('id', listing.id)
+      db.from('listings').select('id,title,emoji,color,images,price,estimated_value,type').eq('user_id', user.id).eq('is_active', true).eq('is_sold', false).neq('id', listing.id).neq('type', 'søges')
         .then(({ data }) => { if (data) setOwnListings(data); });
       const { data: inst } = await db.from('institutions').select('id,name,email').eq('email', user.email).maybeSingle();
       if (inst) {

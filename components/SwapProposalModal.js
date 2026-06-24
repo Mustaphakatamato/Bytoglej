@@ -6,6 +6,8 @@ import { db } from '@/lib/supabase';
 import { authedFetch } from '@/lib/authed-fetch';
 
 const kr = n => `${Number(n || 0).toFixed(2).replace('.', ',')} kr.`;
+// Køb-opslag bærer værdien i price; byt-opslag i estimated_value.
+const itemValue = l => Number(l?.price ?? l?.estimated_value) || 0;
 
 // Bundt-for-bundt bytteforslag: vælg egne varer at tilbyde + modpartens
 // varer du vil have + valgfrit kontant mellemlag.
@@ -22,7 +24,7 @@ export default function SwapProposalModal({ open, onClose, listing, ownListings 
     setOfferedIds([]); setExtraRequestedIds([]); setCash(''); setCashPayer('initiator');
     // Hent modpartens øvrige aktive varer (ud over den primære).
     db.from('listings')
-      .select('id, title, price, emoji, color, images')
+      .select('id, title, price, estimated_value, emoji, color, images')
       .eq('institution_name', listing.institution_name)
       .eq('is_active', true).eq('is_sold', false)
       .then(({ data }) => setOwnerListings((data || []).filter(l => l.id !== listing.id)));
@@ -30,8 +32,8 @@ export default function SwapProposalModal({ open, onClose, listing, ownListings 
 
   const offered = ownListings.filter(l => offeredIds.includes(l.id));
   const requested = [listing, ...ownerListings.filter(l => extraRequestedIds.includes(l.id))].filter(Boolean);
-  const offeredValue = offered.reduce((s, l) => s + (Number(l.price) || 0), 0);
-  const requestedValue = requested.reduce((s, l) => s + (Number(l.price) || 0), 0);
+  const offeredValue = offered.reduce((s, l) => s + itemValue(l), 0);
+  const requestedValue = requested.reduce((s, l) => s + itemValue(l), 0);
   const cashNum = Number(cash) || 0;
   const diff = requestedValue - offeredValue; // >0: initiator giver mindre værdi
 
@@ -80,7 +82,7 @@ export default function SwapProposalModal({ open, onClose, listing, ownListings 
         {l.images?.[0] ? <img src={l.images[0]} alt="" style={{ width:'100%', height:'100%', objectFit:'cover' }} /> : (l.emoji || '🧸')}
       </div>
       <span style={{ flex:1, minWidth:0, fontFamily:FONT, fontSize:13, fontWeight:600, color:INK, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{l.title}</span>
-      <span style={{ fontFamily:FONT, fontSize:12, fontWeight:700, color:INK3 }}>{l.price ? kr(l.price) : '—'}</span>
+      <span style={{ fontFamily:FONT, fontSize:12, fontWeight:700, color:INK3 }}>{itemValue(l) ? kr(itemValue(l)) : '—'}</span>
       <span style={{ fontSize:14 }}>{checked ? '✅' : '＋'}</span>
     </button>
   );

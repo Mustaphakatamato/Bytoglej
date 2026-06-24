@@ -4,12 +4,15 @@ import { createServerClient } from '@/lib/supabase-server';
 import { resolveCallerInstitution, resolveInstitutionByName } from '@/lib/institution-server';
 import { SWAP_PROTECTION_FEE } from '@/lib/pricing';
 
+// Køb-opslag bærer værdien i price; byt-opslag i estimated_value.
+const itemValue = l => Number(l?.price ?? l?.estimated_value) || 0;
+
 // Snapshot af et opslag til lagring i swap_proposals.offered_items/requested_items.
 function itemSnapshot(l) {
   return {
     listing_id: l.id,
     title: l.title,
-    price: Number(l.price) || 0,
+    price: itemValue(l),
     emoji: l.emoji || '🧸',
     color: l.color || null,
     image: l.images?.[0] || null,
@@ -50,7 +53,7 @@ export async function POST(req) {
   const allIds = [...new Set([...offeredIds, ...requestedIds])];
   const { data: listings } = await supa
     .from('listings')
-    .select('id, title, price, emoji, color, images, user_id, institution_name, is_active, is_sold, reserved_until')
+    .select('id, title, price, estimated_value, emoji, color, images, user_id, institution_name, is_active, is_sold, reserved_until')
     .in('id', allIds);
   const byId = new Map((listings || []).map(l => [l.id, l]));
 
@@ -86,8 +89,8 @@ export async function POST(req) {
     return NextResponse.json({ error: 'Du kan ikke bytte med dig selv' }, { status: 400 });
   }
 
-  const offeredValue = offered.reduce((s, l) => s + (Number(l.price) || 0), 0);
-  const requestedValue = requested.reduce((s, l) => s + (Number(l.price) || 0), 0);
+  const offeredValue = offered.reduce((s, l) => s + itemValue(l), 0);
+  const requestedValue = requested.reduce((s, l) => s + itemValue(l), 0);
 
   // Find/opret samtale med den primære ønskede vare som kontekst.
   const primary = requested[0];
