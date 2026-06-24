@@ -13,7 +13,7 @@ Arbejd ovenfra og ned.
 | 2) Tilbud — sælgers svar | ✅ Gennemført (modbud, afvis m. kommentar, accept) |
 | 3) Reservation | ✅ Gennemført (+ marketplace-badge, auto-afvis, bud-overblik) |
 | 4) Tilbud — checkout & gennemførsel | ✅ Gennemført (hovedflow + negativ-test 409) |
-| 5) Bundt-bytte — opret | ⬜ Ikke testet |
+| 5) Bundt-bytte — opret | 🟡 Hovedflow bestået; 2 forbedringer lavet (kræver DB-migration + re-test) |
 | 6) Bundt-bytte — accept & escrow | ⬜ Ikke testet |
 | 7) Bundt-bytte — tosidet betaling | ⬜ Ikke testet |
 | 8) 48t auto-refusion | ⬜ Ikke testet |
@@ -107,13 +107,20 @@ håndhæver `reserved_until` korrekt — mulig UI-forbedring, ikke en blokerende
 - [x] **Mail:** køber + sælger får ordrebekræftelse.
 - [x] **Negativ (udløbet reservation):** sæt `reserved_until` i fortiden i DB → forsøg betaling → **409 "Reservationen er udløbet"** (verificeret; ingen ordre oprettet).
 
-## 5) Bundt-bytte — opret (Trin 4 + 4f)
+## 5) Bundt-bytte — opret (Trin 4 + 4f) — 🟡
 
-- [ ] Som **A**: åbn et af **B's byt-opslag** → **🔄 Foreslå bytte** (bundt-modal).
-- [ ] Tjek modal: "Du vil have" (+ tilføj flere af B's varer), "Du tilbyder" (A's egne, multivalg), værdi-sammenligning, **kontant mellemlag** (beløb + betaler mig/modpart).
-- [ ] Send → toast + redirect.
-- [ ] **DB:** `swap_proposals` med korrekte `offered_items`/`requested_items`, `offered_value`/`requested_value`, `cash_adjustment`, `cash_payer`, `status='pending'`, `escrow_status='none'`, `protection_fee=10`.
-- [ ] **Negativ:** ønskede varer fra to forskellige institutioner → afvises.
+- [x] Som **A**: åbn et af **B's byt-opslag** → **🔄 Foreslå bytte** (bundt-modal).
+- [x] **DB (1. forslag):** `swap_proposals`-række korrekt — `offered_items` (2), `requested_items` (1), `cash_adjustment=100`, `cash_payer='owner'`, `status='pending'`, `escrow_status='none'`, `protection_fee=10`. ✅
+- [x] **Negativ (to institutioner):** håndhæves både i UI (modalen tilbyder kun "Tilføj flere fra *samme* institution") og server-side (`swaps/create` afviser med "Alle ønskede varer skal være fra samme institution"). ✅
+
+### Fundne forbedringer (rettet 2026-06-24, kræver re-test efter migration)
+1. **"Du tilbyder" hentede aldrig `price`** → offer-sidens værdi var altid 0. Nu hentes værdi; desuden ekskluderes **søges-opslag** (kan ikke tilbydes — man har dem ikke) og solgte varer.
+2. **Anslået værdi på byt-opslag (obligatorisk).** Byt-opslag havde ingen pris → værdi-sammenligning + kontant mellemlag var "0 mod 0". Ny kolonne `listings.estimated_value`; opret/rediger kræver nu en værdi for byt; swap-flowet bruger `COALESCE(price, estimated_value)`. **Migration skal køres:** `supabase/migrations/20260624_listing_estimated_value.sql`.
+
+**Re-test (efter migration + preview-redeploy):**
+- [ ] Opret/rediger et **byt-opslag** → "Anslået værdi" er påkrævet (rød kant + toast hvis tom); værdi gemmes i `estimated_value` (ikke `price`); kortet viser stadig "Byttes · anslået værdi X kr." (ikke salgspris/køb-knap).
+- [ ] I bundt-modalen viser "Du tilbyder" og "Du vil have" nu **rigtige værdier**; et **søges-opslag** kan ikke vælges som tilbud.
+- [ ] Send et forslag med byt-varer på begge sider → `offered_value`/`requested_value` ≠ 0 i `swap_proposals`.
 
 ## 6) Bundt-bytte — accept & escrow (Trin 4b)
 
