@@ -12,7 +12,7 @@ Arbejd ovenfra og ned.
 | 1) Tilbud — opret & dagligt loft | ✅ Gennemført |
 | 2) Tilbud — sælgers svar | ✅ Gennemført (modbud, afvis m. kommentar, accept) |
 | 3) Reservation | ✅ Gennemført (+ marketplace-badge, auto-afvis, bud-overblik) |
-| 4) Tilbud — checkout & gennemførsel | 🟡 Hovedflow bestået; negativ-test (udløbet reservation → 409) mangler |
+| 4) Tilbud — checkout & gennemførsel | ✅ Gennemført (hovedflow + negativ-test 409) |
 | 5) Bundt-bytte — opret | ⬜ Ikke testet |
 | 6) Bundt-bytte — accept & escrow | ⬜ Ikke testet |
 | 7) Bundt-bytte — tosidet betaling | ⬜ Ikke testet |
@@ -23,7 +23,14 @@ Arbejd ovenfra og ned.
 **Punkt 4 — verificeret (2026-06-24):** Accepteret tilbud → "Gå til betaling" → kurv (tilbudspris) → betaling
 med Stripe testkort gennemført. Bekræftet: `offers.status='completed'`, `listings.is_sold=true` +
 `is_active=false` + `reserved_until=null`, samtale `deal_completed=true`, ordrebekræftelses-mails til
-både køber og sælger. **Mangler stadig:** negativ-test med udløbet reservation (→ 409).
+både køber og sælger.
+
+**Punkt 4 negativ-test — verificeret (2026-06-24):** Sat `listings.reserved_until` i fortiden på et
+aktivt, ikke-solgt opslag med accepteret tilbud ("Test 4.1") → A "Gå til betaling" → kurv → Betal.
+`create-intent` svarede **409 "Reservationen er udløbet — tilbuddet er ikke længere gyldigt"`. Ingen
+redirect/Stripe, ingen ny ordre; `offers.status` forblev `accepted`, opslaget forblev aktivt/usolgt.
+*Bemærk:* klient-UI viste stadig 24t-nedtælling (bruger checkout-beskedens tidsstempel), men serveren
+håndhæver `reserved_until` korrekt — mulig UI-forbedring, ikke en blokerende fejl.
 
 ### Rettelser & forbedringer lavet under test (denne session)
 
@@ -89,7 +96,7 @@ både køber og sælger. **Mangler stadig:** negativ-test med udløbet reservati
 - [x] **DB:** `reserved_until` i fremtiden.
 - [x] Reserveret-badge vises i marketplace; opslaget viser "Varen er reserveret"-banner.
 
-## 4) Tilbud — checkout & gennemførsel (Trin 3 + 3e) — 🟡
+## 4) Tilbud — checkout & gennemførsel (Trin 3 + 3e) — ✅
 
 - [x] Som **A**: vælg levering i checkout-beskeden → **betal** (testkort) → kvittering. (Går nu via fulde kurv-flow.)
 - [x] **DB efter betaling:**
@@ -98,7 +105,7 @@ både køber og sælger. **Mangler stadig:** negativ-test med udløbet reservati
   - `conversations.deal_completed=true`, `deal_type='køb'`
   - `orders` paid/shipped.
 - [x] **Mail:** køber + sælger får ordrebekræftelse.
-- [ ] **Negativ (udløbet reservation):** sæt `reserved_until` i fortiden i DB → forsøg betaling → **409 "reservationen er udløbet"**. *(mangler)*
+- [x] **Negativ (udløbet reservation):** sæt `reserved_until` i fortiden i DB → forsøg betaling → **409 "Reservationen er udløbet"** (verificeret; ingen ordre oprettet).
 
 ## 5) Bundt-bytte — opret (Trin 4 + 4f)
 
