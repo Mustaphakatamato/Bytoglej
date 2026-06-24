@@ -15,7 +15,7 @@ Arbejd ovenfra og ned.
 | 4) Tilbud — checkout & gennemførsel | ✅ Gennemført (hovedflow + negativ-test 409) |
 | 5) Bundt-bytte — opret | ✅ Gennemført (+ obligatorisk anslået værdi, søges-filter, kort-visning) |
 | 6) Bundt-bytte — accept & escrow | ✅ Gennemført |
-| 7) Bundt-bytte — tosidet betaling | ⬜ Ikke testet |
+| 7) Bundt-bytte — tosidet betaling | ✅ Kode verificeret (forsendelse gated på Shipmondo-saldo) |
 | 8) 48t auto-refusion | ⬜ Ikke testet |
 | 9) Udfasning | 🟡 Delvist (køb håndterer bud; QuickView er død kode) |
 | 10) Regression | ⬜ Ikke testet |
@@ -133,7 +133,16 @@ håndhæver `reserved_until` korrekt — mulig UI-forbedring, ikke en blokerende
   - alle 4 involverede varer (begge sider) fik `reserved_until` = fristen ✅
   - *Obs:* `reserved_for_institution_id` sættes kun på den ene vare (kosmetisk; `reserved_until` beskytter alle).
 
-## 7) Bundt-bytte — tosidet betaling (Trin 4c/4d) — 🟡
+## 7) Bundt-bytte — tosidet betaling (Trin 4c/4d) — ✅ (kode) / forsendelse gated på Shipmondo-saldo
+
+> **Slutstatus (2026-06-24):** Hele flowet er verificeret ende-til-ende på et frisk bytte (forslag e26d2dfc):
+> begge parter valgte udleveringssted på den nye `/bytte-betaling`-side → `initiator_pickup`/`owner_pickup`
+> gemt → begge betalte → `escrow_status='both_paid_released'`, `completed_at` sat, varer `is_sold=true`+reservation ryddet.
+> **Forsendelses-bookingen er kode-korrekt** (Shipmondo accepterer nu request'en — service-point-fejlen væk),
+> men returnerer **422 "Insufficient funds"**: preview hitter PRODUKTIONS-Shipmondo (mangler `SHIMONDO_BASE_URL` i
+> Vercel) hvor saldoen er tom. Sandbox-saldoen er ~100 mio. DKK. **Ikke en kodefejl** — `*_shipment_id` populeres
+> så snart der er dækning, eller preview peges mod sandbox (`SHIPMONDO_BASE_URL` + sandbox-creds i Preview-scope).
+> Completion-beskeden degraderer pænt ("Aftal levering indbyrdes") når ingen pakke blev booket.
 
 > **Bug fundet & rettet (2026-06-24):** "Betal — send med pakke" fejlede med alert **"Mangler samtale"**.
 > `create-swap-intent` havde en tidlig `conversationId`-guard, men det nye `swap_proposals`-flow sender kun
