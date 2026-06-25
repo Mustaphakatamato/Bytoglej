@@ -226,22 +226,32 @@ export default function ProfilPage() {
           ).length);
         });
 
-      // Tællere til hub-kortene (konsistent med Mine opslag)
-      db.from('listing_favorites').select('id', { count:'exact', head:true }).eq('user_id', uid)
-        .then(({ count }) => { if (!cancelled) setFavCount(count ?? 0); });
-      if (inst?.email) {
-        db.from('saved_searches').select('id', { count:'exact', head:true }).ilike('email', inst.email)
-          .then(({ count }) => { if (!cancelled) setSavedCount(count ?? 0); });
-      } else { setSavedCount(0); }
-      // Mine køb = ikke-bytte køb-ordrer + bytter hvor jeg er part (modtager)
-      Promise.all([
-        db.from('orders').select('order_groups').eq('buyer_id', uid).not('status', 'in', '("pending","failed","cancelled")'),
-        db.from('swap_proposals').select('id', { count:'exact', head:true }).or(`initiator_institution_id.eq.${instId},owner_institution_id.eq.${instId}`).eq('status', 'accepted'),
-      ]).then(([ord, sw]) => {
+      // Tællere til hub-kortene (konsistent med Mine opslag).
+      // Hent auth-bruger pålideligt — uid fra context kan mangle når inst kom derfra.
+      (async () => {
+        const { data: { user: au } } = await db.auth.getUser();
         if (cancelled) return;
-        const kob = (ord.data || []).filter(o => !String(o.order_groups?.[0]?.sellerName || '').startsWith('Byttehandel')).length;
-        setBuyCount(kob + (sw.count ?? 0));
-      });
+        const cuid = au?.id || uid;
+        const cemail = inst?.email || au?.email;
+
+        if (cuid) {
+          db.from('listing_favorites').select('id', { count:'exact', head:true }).eq('user_id', cuid)
+            .then(({ count }) => { if (!cancelled) setFavCount(count ?? 0); });
+          Promise.all([
+            db.from('orders').select('order_groups').eq('buyer_id', cuid).not('status', 'in', '("pending","failed","cancelled")'),
+            db.from('swap_proposals').select('id', { count:'exact', head:true }).or(`initiator_institution_id.eq.${instId},owner_institution_id.eq.${instId}`).eq('status', 'accepted'),
+          ]).then(([ord, sw]) => {
+            if (cancelled) return;
+            const kob = (ord.data || []).filter(o => !String(o.order_groups?.[0]?.sellerName || '').startsWith('Byttehandel')).length;
+            setBuyCount(kob + (sw.count ?? 0));
+          });
+        } else { setFavCount(0); setBuyCount(0); }
+
+        if (cemail) {
+          db.from('saved_searches').select('id', { count:'exact', head:true }).ilike('email', cemail)
+            .then(({ count }) => { if (!cancelled) setSavedCount(count ?? 0); });
+        } else { setSavedCount(0); }
+      })();
     }
 
     boot();
