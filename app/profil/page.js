@@ -284,7 +284,6 @@ export default function ProfilPage() {
             <div style={{ fontFamily:FONT, fontWeight:700, fontSize:11, color:INK3, textTransform:'uppercase', letterSpacing:'0.08em', padding:'4px 20px 0' }}>Jeg køber</div>
             <MenuSection>
               <MenuItem icon="🛍️" label="Mine køb" onClick={() => router.push('/mine-ordrer')} />
-              <MenuItem icon="🔄" label="Byttehandler" onClick={() => router.push('/mine-handeler')} />
               <MenuItem icon="❤️" label="Favoritter" onClick={() => router.push('/favoritter')} />
               <MenuItem icon="🔍" label="Gemte søgninger" onClick={() => router.push('/gemte-soegninger')} />
             </MenuSection>
@@ -491,13 +490,6 @@ export default function ProfilPage() {
               sublabel="Følg & modtag"
               value={null}
               onClick={() => router.push('/mine-ordrer')}
-            />
-            <ActivityCard
-              icon="🔄"
-              label="Byttehandler"
-              sublabel="Byt & aftaler"
-              value={tradeCount ?? '—'}
-              onClick={() => router.push('/mine-handeler')}
             />
             <ActivityCard
               icon="❤️"
