@@ -7,8 +7,19 @@ import { PRIMARY, GREEN_TINT, INK, INK2, INK3, PAPER, PAPER2, PAPER3, FONT, CORA
 import CarrierLogo from '@/components/CarrierLogo';
 
 // Et bytte hvor JEG modtager modpartens varer (indgående). Tracking, ingen mærkat.
-function SwapReceiveCard({ r, router }) {
+function SwapReceiveCard({ r, router, onReceived }) {
+  const [marking, setMarking] = useState(false);
   const sh = r.shipment;
+  async function markReceived() {
+    setMarking(true);
+    const res = await fetch('/api/swaps/mark-received', {
+      method: 'POST', credentials: 'same-origin',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ proposalId: r.id }),
+    });
+    setMarking(false);
+    if (res.ok) onReceived(r.id);
+  }
   const status = r.completed
     ? (sh ? '🚚 På vej til dig' : '🤝 Aftalt levering')
     : '⏳ Afventer betaling';
@@ -37,6 +48,11 @@ function SwapReceiveCard({ r, router }) {
         {!r.completed && (
           <div style={{ textAlign: 'center', fontFamily: FONT, fontSize: 12, color: INK3 }}>Pakken bookes når begge parter har betalt.</div>
         )}
+        {r.completed && (r.received ? (
+          <div style={{ textAlign: 'center', fontFamily: FONT, fontSize: 13, fontWeight: 700, color: PRIMARY }}>✓ Du har bekræftet modtagelse</div>
+        ) : (
+          <button disabled={marking} onClick={markReceived} style={{ padding: '11px', borderRadius: 99, border: `1.5px solid ${PRIMARY}`, background: marking ? PAPER2 : GREEN_TINT, color: marking ? INK3 : PRIMARY, fontFamily: FONT, fontWeight: 700, fontSize: 13, cursor: marking ? 'default' : 'pointer' }}>{marking ? 'Gemmer…' : '✅ Marker som modtaget'}</button>
+        ))}
         <button onClick={() => router.push(r.conversation_id ? `/beskeder?conv=${r.conversation_id}` : '/beskeder')} style={{ padding: '11px', borderRadius: 99, background: PAPER2, border: 'none', fontFamily: FONT, fontWeight: 600, fontSize: 13, color: INK3, cursor: 'pointer' }}>💬 Åbn byttehandel</button>
       </div>
     </div>
@@ -305,7 +321,7 @@ function MineOrdrerContent() {
     let cancelled = false;
     (async () => {
       const { data: props } = await db.from('swap_proposals')
-        .select('id, conversation_id, escrow_status, initiator_institution_id, owner_institution_id, offered_items, requested_items, initiator_shipment_id, owner_shipment_id')
+        .select('id, conversation_id, escrow_status, initiator_institution_id, owner_institution_id, offered_items, requested_items, initiator_shipment_id, owner_shipment_id, initiator_received, owner_received')
         .or(`initiator_institution_id.eq.${institutionId},owner_institution_id.eq.${institutionId}`)
         .eq('status', 'accepted')
         .order('created_at', { ascending: false });
@@ -327,6 +343,7 @@ function MineOrdrerContent() {
           otherName: nameById[meInit ? p.owner_institution_id : p.initiator_institution_id] || 'Modpart',
           shipment: shipById[meInit ? p.owner_shipment_id : p.initiator_shipment_id] || null,
           completed: p.escrow_status === 'both_paid_released',
+          received: meInit ? p.initiator_received : p.owner_received,
         };
       }).filter(r => r.items.length);
       if (!cancelled) setSwapReceives(receives);
@@ -381,7 +398,8 @@ function MineOrdrerContent() {
         {!loading && swapReceives.length > 0 && (
           <>
             <div style={{ fontFamily: FONT, fontWeight: 800, fontSize: 13, color: INK2, margin: `${orders.length > 0 ? '24px' : '0'} 0 12px` }}>Bytte — på vej til dig</div>
-            {swapReceives.map(r => <SwapReceiveCard key={r.id} r={r} router={router} />)}
+            {swapReceives.map(r => <SwapReceiveCard key={r.id} r={r} router={router}
+              onReceived={(id) => setSwapReceives(rs => rs.map(x => x.id === id ? { ...x, received: true } : x))} />)}
           </>
         )}
       </div>
