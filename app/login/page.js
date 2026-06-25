@@ -7,7 +7,7 @@ import { Spinner } from '@/components/ui';
 import { db } from '@/lib/supabase';
 import { useApp } from '@/providers/AppProvider';
 import { LogoLockup } from '@/components/Logo';
-import { isValidEmail, suggestEmailFix, hasValidTld } from '@/lib/email-validation';
+import { isValidEmail, suggestEmailFix, hasValidTld, checkEmailDeliverable } from '@/lib/email-validation';
 
 const TRUST_POINTS = [
   'CVR-verificerede institutioner',
@@ -57,6 +57,11 @@ export default function LoginPage() {
     if (!hasValidTld(email)) { setError('E-mailen ser ikke ud til at være gyldig. Tjek at den er skrevet rigtigt.'); return; }
     setChecking(true);
     setError(null);
+    if (!(await checkEmailDeliverable(email))) {
+      setChecking(false);
+      setError('Vi kan ikke finde en mailserver for det domæne. Tjek at e-mailen er skrevet rigtigt.');
+      return;
+    }
     const emailLower = email.trim().toLowerCase();
     const [{ data: inst }, { data: member }] = await Promise.all([
       db.from('institutions').select('email').ilike('email', emailLower).maybeSingle(),
