@@ -1733,7 +1733,10 @@ export default function MessagesClient() {
                                     const hrs = Math.max(0, Math.floor(remaining / 3600000));
                                     const mins = Math.max(0, Math.floor((remaining % 3600000) / 60000));
                                     const deadlineStr = new Date(deadline).toLocaleString('da-DK', { day:'numeric', month:'long', hour:'2-digit', minute:'2-digit' });
-                                    const done = m.bid_status === 'checkout_done';
+                                    // Handlen er gennemført hvis checkout-beskeden er markeret,
+                                    // ELLER hvis samtalen som helhed er afsluttet (betaling bekræftet
+                                    // ad anden vej) — undgår falsk "Tilbuddet udløb"-tekst bagefter.
+                                    const done = m.bid_status === 'checkout_done' || !!active?.deal_completed;
                                     const paying = goingToPayment === m.id;
                                     return (
                                       <>
