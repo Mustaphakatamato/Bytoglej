@@ -72,7 +72,7 @@ function ActivityCard({ icon, label, sublabel, value, badge, highlight, onClick 
 
 export default function ProfilPage() {
   const router = useRouter();
-  const { effectiveInstitution, setLoggedIn } = useApp();
+  const { effectiveInstitution, setLoggedIn, favs } = useApp();
   const { realUserId, userId } = useActiveUser();
   const ww = useWindowWidth();
   const isMobile = ww > 0 && ww < 768;
@@ -525,7 +525,7 @@ export default function ProfilPage() {
               icon="❤️"
               label="Favoritter"
               sublabel="Gemte annoncer"
-              value={favCount ?? '—'}
+              value={Math.max(favCount ?? 0, favs?.length || 0)}
               onClick={() => router.push('/favoritter')}
             />
           </div>
