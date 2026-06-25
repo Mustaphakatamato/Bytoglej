@@ -326,7 +326,7 @@ export default function RedigerOpslagPage() {
               <div>
                 <label style={labelStyle}>Handelsform</label>
                 <div style={{ display: 'flex', gap: 8 }}>
-                  {['køb', 'byd', 'byt'].map(t => (
+                  {['køb', 'byt', 'søges'].map(t => (
                     <button key={t} onClick={() => setForm({ ...form, type: t })} style={{ flex: 1, padding: '12px 8px', borderRadius: 12, background: form.type === t ? TYPE_CFG[t].bg : PAPER2, color: form.type === t ? TYPE_CFG[t].color : INK3, fontFamily: FONT, fontWeight: 700, fontSize: 13, border: form.type === t ? `2px solid ${TYPE_CFG[t].color}` : '2px solid transparent', cursor: 'pointer', transition: 'all 0.15s' }}>
                       {TYPE_CFG[t].icon} {TYPE_CFG[t].label}
                     </button>

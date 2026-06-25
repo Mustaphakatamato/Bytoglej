@@ -17,7 +17,7 @@ Arbejd ovenfra og ned.
 | 6) Bundt-bytte — accept & escrow | ✅ Gennemført |
 | 7) Bundt-bytte — tosidet betaling | ✅ Gennemført (inkl. pakke-booking mod sandbox) |
 | 8) 48t auto-refusion | ✅ Gennemført (forslag cd666dfc) |
-| 9) Udfasning | 🟡 Delvist (køb håndterer bud; QuickView er død kode) |
+| 9) Udfasning | ✅ Gennemført (rediger-opslag rettet: byd fjernet, søges tilføjet) |
 | 10) Regression | ⬜ Ikke testet |
 
 **Punkt 4 — verificeret (2026-06-24):** Accepteret tilbud → "Gå til betaling" → kurv (tilbudspris) → betaling
@@ -219,11 +219,16 @@ håndhæver `reserved_until` korrekt — mulig UI-forbedring, ikke en blokerende
 
 **Observation (ikke blokerende):** cron'en laver Stripe-refusionen men opdaterer ikke `orders.status` til `refunded` (forbliver `paid`). Pengene er refunderet, men ordre-historik kan vise misvisende. Mulig lille forbedring.
 
-## 9) Udfasning (Trin 6)
+## 9) Udfasning (Trin 6) — ✅
 
-- [ ] Opret-opslag: **"Byd"** er ikke længere en valgmulighed (kun køb/byt/søges).
-- [ ] Historisk byd-opslag: knappen er nu **"🏷️ Giv et tilbud"** og åbner tilbud-modalen.
-- [ ] Byt-opslag: kun **én** byttehandel-knap (bundt-modal); duplikaten er væk.
+Verificeret i koden (2026-06-25):
+- [x] **Opret-opslag:** "Byd" er ikke en valgmulighed — kun `['køb','byt','søges']` (`app/opret-opslag/page.js:800`).
+- [x] **Historisk byd-opslag:** knappen er **"🏷️ Giv et tilbud"** → `OfferModal` (`components/ListingDetailClient.js:868`).
+- [x] **Byt-opslag:** kun **én** byttehandel-knap "🔄 Foreslå bytte" (bundt-modal, `:869`). Gamle `bidModal`/`swapModal` er død kode (`setBidModal(true)`/`setSwapModal(true)` kaldes aldrig).
+
+**Fund + rettet:** `rediger-opslag` tilbød stadig "byd" (og manglede "søges") → kunne gen-introducere udfaset type. Rettet til `['køb','byt','søges']` (`app/rediger-opslag/[id]/page.js:329`). Historiske byd-opslag kan stadig redigeres (min_bid-feltet vises hvis `type==='byd'`).
+
+**Resterende død kode (kosmetisk, ikke rettet):** `bidModal`/`handleBid`/`swapModal` i ListingDetailClient; døde `'byd'`-grene i opret-opslag (linje 49, 512, 843).
 
 ## 10) Regression — må ikke være brækket
 
