@@ -30,7 +30,6 @@ function statusStyle(status) {
 function dealTypeLabel(type) {
   switch (type) {
     case 'køb':    return 'Køb';
-    case 'byd':    return 'Tilbud';
     case 'byt':    return 'Bytte';
     case 'bundle': return 'Bundle';
     default:       return 'Forespørgsel';

@@ -84,7 +84,6 @@ function TypeBadge({ type }) {
     'søges':  { label: 'Søges', bg: '#F5F0FF', color: '#7C3AED' },
     'byttes': { label: 'Byttes', bg: '#FCEAE6', color: CORAL },
     køb:      { label: 'Køb', bg: GREEN_TINT, color: PRIMARY },
-    byd:      { label: 'Byd', bg: '#E6EEF7', color: SKY },
     byt:      { label: 'Byt', bg: '#FCEAE6', color: CORAL },
   };
   const s = map[type] || { label: type || '—', bg: PAPER3, color: INK3 };

@@ -113,7 +113,7 @@ export default function MineHandlerPage() {
         db.from('conversations')
           .select(SELECT)
           .or(soldParts.join(','))
-          .in('deal_type', ['køb','byd','byt','bundle'])
+          .in('deal_type', ['køb','byt','bundle'])
           .order('last_message_at', { ascending: false })
           .limit(100),
 
@@ -121,7 +121,7 @@ export default function MineHandlerPage() {
           ? db.from('conversations')
               .select(SELECT)
               .or(boughtParts.join(','))
-              .in('deal_type', ['køb','byd','byt','bundle'])
+              .in('deal_type', ['køb','byt','bundle'])
               .order('last_message_at', { ascending: false })
               .limit(100)
           : Promise.resolve({ data: [], error: null }),

@@ -480,7 +480,7 @@ export default function ListingDetailClient() {
         </div>
         <div style={{ display:'grid', gridTemplateColumns: cols, gap: isMobile ? 10 : 14 }}>
           {displayListings.slice(0, limit).map(l => {
-            const typeColors = { køb: { bg:'#EEF4FF', text:'#2563EB' }, byt: { bg:'#FFF3E8', text:'#C2551E' }, byd: { bg:'#F5F0FF', text:'#7C3AED' }, gratis: { bg:'#F0FFF4', text:'#15803D' } };
+            const typeColors = { køb: { bg:'#EEF4FF', text:'#2563EB' }, byt: { bg:'#FFF3E8', text:'#C2551E' }, søges: { bg:'#F5F0FF', text:'#7C3AED' }, gratis: { bg:'#F0FFF4', text:'#15803D' } };
             const tc = typeColors[l.type] || { bg:PAPER3, text:INK3 };
             return (
               <div key={l.id} onClick={()=>{ setActiveListing(l); router.push('/opslag/detail'); }} style={{ cursor:'pointer', background:PAPER2, borderRadius:16, overflow:'hidden', border:`1px solid ${PAPER3}`, transition:'transform 0.15s, box-shadow 0.15s' }}

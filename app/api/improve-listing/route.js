@@ -11,7 +11,7 @@ export async function POST(req) {
       return NextResponse.json({ error: 'Titel eller beskrivelse påkrævet' }, { status: 400 });
     }
 
-    const typeLabel = type === 'køb' ? 'til salg' : type === 'byd' ? 'til bud' : 'til bytte';
+    const typeLabel = type === 'køb' ? 'til salg' : type === 'søges' ? 'efterlyses' : 'til bytte';
     const tagList = tags?.length ? tags.join(', ') : 'ingen';
 
     const completion = await groq.chat.completions.create({
