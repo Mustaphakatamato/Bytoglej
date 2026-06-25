@@ -72,7 +72,7 @@ function ActivityCard({ icon, label, sublabel, value, badge, highlight, onClick 
 
 export default function ProfilPage() {
   const router = useRouter();
-  const { effectiveInstitution, setLoggedIn } = useApp();
+  const { effectiveInstitution, setLoggedIn, favs } = useApp();
   const { realUserId, userId } = useActiveUser();
   const ww = useWindowWidth();
   const isMobile = ww > 0 && ww < 768;
@@ -84,6 +84,9 @@ export default function ProfilPage() {
   const [activeListingCount, setActiveListingCount] = useState(null);
   const [pendingCount, setPendingCount] = useState(0);
   const [sentCount, setSentCount] = useState(null);
+  const [favCount, setFavCount] = useState(null);
+  const [savedCount, setSavedCount] = useState(null);
+  const [buyCount, setBuyCount] = useState(null);
   const [notifPermission, setNotifPermission] = useState('default');
   const [notifLoading, setNotifLoading] = useState(false);
 
@@ -222,6 +225,44 @@ export default function ProfilPage() {
             (c.is_handled && c.handled_action === 'order_confirmed' && !c.deal_completed)
           ).length);
         });
+
+      // Tællere til hub-kortene (konsistent med Mine opslag).
+      // Hent auth-bruger pålideligt — uid fra context kan mangle når inst kom derfra.
+      (async () => {
+        const { data: { user: au } } = await db.auth.getUser();
+        if (cancelled) return;
+        const cuid = au?.id || uid;
+        const cemail = inst?.email || au?.email;
+
+        // Favoritter: præcis samme logik som /favoritter — gyldige (aktive, usolgte)
+        // fav-ids fra DB (primær) eller localStorage (fallback). Forældede tæller ikke.
+        let favIds = [];
+        if (cuid) {
+          const { data: favRows } = await db.from('listing_favorites').select('listing_id').eq('user_id', cuid);
+          if (favRows?.length) favIds = favRows.map(r => r.listing_id);
+        }
+        if (!favIds.length && favs?.length) favIds = favs;
+        if (favIds.length) {
+          const { data: ls } = await db.from('listings').select('id').in('id', favIds).eq('is_active', true).eq('is_sold', false);
+          if (!cancelled) setFavCount(new Set((ls || []).map(l => l.id)).size);
+        } else if (!cancelled) setFavCount(0);
+
+        if (cuid) {
+          Promise.all([
+            db.from('orders').select('order_groups').eq('buyer_id', cuid).not('status', 'in', '("pending","failed","cancelled")'),
+            db.from('swap_proposals').select('id', { count:'exact', head:true }).or(`initiator_institution_id.eq.${instId},owner_institution_id.eq.${instId}`).eq('status', 'accepted'),
+          ]).then(([ord, sw]) => {
+            if (cancelled) return;
+            const kob = (ord.data || []).filter(o => !String(o.order_groups?.[0]?.sellerName || '').startsWith('Byttehandel')).length;
+            setBuyCount(kob + (sw.count ?? 0));
+          });
+        } else { setBuyCount(0); }
+
+        if (cemail) {
+          db.from('saved_searches').select('id', { count:'exact', head:true }).ilike('email', cemail)
+            .then(({ count }) => { if (!cancelled) setSavedCount(count ?? 0); });
+        } else { setSavedCount(0); }
+      })();
     }
 
     boot();
@@ -279,12 +320,11 @@ export default function ProfilPage() {
             <div style={{ fontFamily:FONT, fontWeight:700, fontSize:11, color:INK3, textTransform:'uppercase', letterSpacing:'0.08em', padding:'4px 20px 0' }}>Jeg sælger</div>
             <MenuSection>
               <MenuItem icon="🏷️" label="Mine opslag" value={activeListingCount !== null ? `${activeListingCount} aktive` : undefined} onClick={() => router.push('/mine-opslag')} />
-              <MenuItem icon="📋" label="Mine salg" badge={pendingCount} onClick={() => router.push('/mine-opgaver')} />
+              <MenuItem icon="📋" label="Skal sendes" badge={pendingCount} onClick={() => router.push('/mine-opgaver')} />
             </MenuSection>
             <div style={{ fontFamily:FONT, fontWeight:700, fontSize:11, color:INK3, textTransform:'uppercase', letterSpacing:'0.08em', padding:'4px 20px 0' }}>Jeg køber</div>
             <MenuSection>
-              <MenuItem icon="🛍️" label="Mine ordrer" onClick={() => router.push('/mine-ordrer')} />
-              <MenuItem icon="🔄" label="Byttehandler" onClick={() => router.push('/mine-handeler')} />
+              <MenuItem icon="🛍️" label="Mine køb" onClick={() => router.push('/mine-ordrer')} />
               <MenuItem icon="❤️" label="Favoritter" onClick={() => router.push('/favoritter')} />
               <MenuItem icon="🔍" label="Gemte søgninger" onClick={() => router.push('/gemte-soegninger')} />
             </MenuSection>
@@ -473,9 +513,9 @@ export default function ProfilPage() {
             />
             <ActivityCard
               icon="📋"
-              label="Mine salg"
-              sublabel="Ordrer & opgaver"
-              value={pendingCount || null}
+              label="Skal sendes"
+              sublabel="Pak & send med mærkat"
+              value={pendingCount}
               badge={pendingCount}
               highlight={pendingCount > 0}
               onClick={() => router.push('/mine-opgaver')}
@@ -484,26 +524,19 @@ export default function ProfilPage() {
 
           {/* Jeg køber */}
           <div style={{ fontFamily:FONT, fontWeight:700, fontSize:12, color:INK3, textTransform:'uppercase', letterSpacing:'0.08em', marginBottom:10 }}>Jeg køber</div>
-          <div style={{ display:'grid', gridTemplateColumns:'repeat(3, 1fr)', gap:14, marginBottom:28 }}>
+          <div style={{ display:'grid', gridTemplateColumns:'repeat(2, 1fr)', gap:14, marginBottom:28 }}>
             <ActivityCard
               icon="🛍️"
-              label="Mine ordrer"
-              sublabel="Stripe-betalte køb"
-              value={null}
+              label="Mine køb"
+              sublabel="Følg & modtag"
+              value={buyCount ?? '—'}
               onClick={() => router.push('/mine-ordrer')}
-            />
-            <ActivityCard
-              icon="🔄"
-              label="Byttehandler"
-              sublabel="Byt & aftaler"
-              value={tradeCount ?? '—'}
-              onClick={() => router.push('/mine-handeler')}
             />
             <ActivityCard
               icon="❤️"
               label="Favoritter"
               sublabel="Gemte annoncer"
-              value={null}
+              value={favCount ?? '—'}
               onClick={() => router.push('/favoritter')}
             />
           </div>
@@ -515,7 +548,7 @@ export default function ProfilPage() {
               icon="🔍"
               label="Gemte søgninger"
               sublabel="Søge-notifikationer"
-              value={null}
+              value={savedCount ?? '—'}
               onClick={() => router.push('/gemte-soegninger')}
             />
             <ActivityCard

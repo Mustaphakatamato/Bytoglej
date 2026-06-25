@@ -3,6 +3,7 @@ import Stripe from 'stripe';
 import { createServerClient } from '@/lib/supabase-server';
 import { createShipment } from '@/lib/shipmondo/client';
 import { escapeHtml } from '@/lib/escape-html';
+import { persistSwapCO2 } from '@/lib/co2/persist-server';
 
 function getStripe() {
   if (!process.env.STRIPE_SECRET_KEY) throw new Error('STRIPE_SECRET_KEY er ikke sat');
@@ -54,6 +55,9 @@ export async function POST(req) {
 
   // ── Byttehandel (byt): escrow med gensidig forsendelse ────────
   if (event.type === 'payment_intent.succeeded' && event.data.object.metadata?.type === 'swap') {
+    if (event.data.object.metadata?.swap_proposal_id) {
+      return handleSwapProposalPayment(event.data.object, supa);
+    }
     return handleSwapPayment(event.data.object, supa);
   }
 
@@ -90,33 +94,40 @@ export async function POST(req) {
   const order = claimed;
   const groups = order.order_groups || [];
 
-  // For bid-type payments: mark the bid message and conversation as completed
+  // Bud-/tilbud-betalinger: markér bud/tilbud + samtale som gennemført.
   const bidMessageId = pi.metadata?.bid_message_id;
+  const offerId      = pi.metadata?.offer_id;
   const bidConvId    = pi.metadata?.conversation_id;
   const bidDelivery  = pi.metadata?.delivery_method || '';
-  if (bidMessageId || bidConvId) {
+  if (bidMessageId || offerId || bidConvId) {
     const now = new Date().toISOString();
-    const bidUpdates = [];
+    const dealType = offerId ? 'køb' : 'byd';
+    const dealUpdates = [];
     if (bidMessageId) {
-      bidUpdates.push(
+      dealUpdates.push(
         supa.from('chat_messages')
           .update({ bid_status: 'checkout_done', bid_note: bidDelivery })
           .eq('id', bidMessageId)
       );
     }
+    if (offerId) {
+      dealUpdates.push(
+        supa.from('offers').update({ status: 'completed' }).eq('id', offerId)
+      );
+    }
     if (bidConvId) {
-      bidUpdates.push(
+      dealUpdates.push(
         supa.from('conversations').update({
           deal_completed: true,
           deal_completed_at: now,
-          deal_type: 'byd',
+          deal_type: dealType,
           delivery_method: bidDelivery,
           last_message: '🎉 Handel gennemført!',
           last_message_at: now,
         }).eq('id', bidConvId)
       );
     }
-    await Promise.all(bidUpdates);
+    await Promise.all(dealUpdates);
   }
 
   // Markér alle købte opslag som solgt
@@ -130,6 +141,8 @@ export async function POST(req) {
         sold_at: new Date().toISOString(),
         sold_to: order.buyer_name || null,
         sold_to_institution_id: order.buyer_institution_id || null,
+        reserved_until: null,
+        reserved_for_institution_id: null,
       })
       .in('id', soldListingIds);
   }
@@ -429,12 +442,197 @@ async function handleSwapPayment(pi, supa) {
   return NextResponse.json({ received: true });
 }
 
+// ── Bundt-bytte (swap_proposals): escrow pr. part ─────────────
+// Markerer parten betalt. Når BEGGE har betalt, bookes to forsendelser
+// (initiators bundt → ejer, ejers bundt → initiator), varerne markeres
+// solgt og reservationen ryddes.
+const SWAP_SIZE_RANK = { small: 1, medium: 2, large: 3 };
+async function swapBundleSize(supa, listingIds) {
+  if (!listingIds.length) return 'medium';
+  const { data } = await supa.from('shipping_options').select('shipping_size_category').in('listing_id', listingIds);
+  let best = 'medium', rank = 0;
+  for (const s of (data || [])) {
+    const r = SWAP_SIZE_RANK[s.shipping_size_category] || 2;
+    if (r > rank) { rank = r; best = s.shipping_size_category; }
+  }
+  return best;
+}
+
+async function handleSwapProposalPayment(pi, supa) {
+  const proposalId = pi.metadata?.swap_proposal_id;
+  const party    = pi.metadata?.party === 'owner' ? 'owner' : 'initiator';
+  const delivery = pi.metadata?.delivery_method || 'shipping';
+
+  // Idempotency: kun ét webhook-kald må behandle denne betaling.
+  const { data: claimed } = await supa
+    .from('orders')
+    .update({ status: 'paid', paid_at: new Date().toISOString() })
+    .eq('payment_intent_id', pi.id)
+    .eq('status', 'pending')
+    .select()
+    .maybeSingle();
+  if (!claimed) return NextResponse.json({ received: true, already_processed: true });
+  if (!proposalId) return NextResponse.json({ received: true, warning: 'Mangler forslag' });
+
+  // Markér denne part betalt + gem leveringsvalg + ordre-id (til evt. refusion).
+  const paidField     = party === 'owner' ? 'owner_paid' : 'initiator_paid';
+  const deliveryField = party === 'owner' ? 'owner_delivery' : 'initiator_delivery';
+  const orderField    = party === 'owner' ? 'owner_order_id' : 'initiator_order_id';
+  await supa.from('swap_proposals')
+    .update({ [paidField]: true, [deliveryField]: delivery, [orderField]: claimed.id })
+    .eq('id', proposalId);
+
+  const { data: p } = await supa.from('swap_proposals').select('*').eq('id', proposalId).maybeSingle();
+  if (!p) return NextResponse.json({ received: true });
+
+  const convId = p.conversation_id;
+  const { data: conv } = convId
+    ? await supa.from('conversations').select('*').eq('id', convId).maybeSingle()
+    : { data: null };
+  const now = new Date().toISOString();
+
+  if (p.initiator_paid && p.owner_paid) {
+    const [{ data: initInst }, { data: ownerInst }] = await Promise.all([
+      p.initiator_institution_id ? supa.from('institutions').select('*').eq('id', p.initiator_institution_id).maybeSingle() : Promise.resolve({ data: null }),
+      p.owner_institution_id     ? supa.from('institutions').select('*').eq('id', p.owner_institution_id).maybeSingle()     : Promise.resolve({ data: null }),
+    ]);
+    const offeredIds   = (p.offered_items   || []).map(i => i.listing_id).filter(Boolean);
+    const requestedIds = (p.requested_items || []).map(i => i.listing_id).filter(Boolean);
+
+    // Forsendelse 1: initiator → ejer (initiators bundt), til ejers valgte udleveringssted
+    let initShipmentId = p.initiator_shipment_id || null;
+    if (!initShipmentId && p.initiator_delivery !== 'custom' && conv) {
+      initShipmentId = await bookSwapShipment(supa, conv, offeredIds[0], initInst, ownerInst, await swapBundleSize(supa, offeredIds), p.initiator_pickup?.id || null);
+    }
+    // Forsendelse 2: ejer → initiator (ejers bundt), til initiators valgte udleveringssted
+    let ownerShipmentId = p.owner_shipment_id || null;
+    if (!ownerShipmentId && p.owner_delivery !== 'custom' && conv) {
+      ownerShipmentId = await bookSwapShipment(supa, conv, requestedIds[0], ownerInst, initInst, await swapBundleSize(supa, requestedIds), p.owner_pickup?.id || null);
+    }
+
+    await supa.from('swap_proposals').update({
+      escrow_status: 'both_paid_released',
+      completed_at: now,
+      initiator_shipment_id: initShipmentId,
+      owner_shipment_id: ownerShipmentId,
+    }).eq('id', proposalId);
+
+    // Markér alle byttede varer solgt + ryd reservation.
+    const tradedIds = [...offeredIds, ...requestedIds];
+    if (tradedIds.length) {
+      await supa.from('listings').update({
+        is_sold: true, is_active: false, sold_at: now,
+        reserved_until: null, reserved_for_institution_id: null,
+      }).in('id', tradedIds);
+    }
+
+    // Bekræftelses-mails til begge parter med hver deres pakkemærkat (Trin 5).
+    const shipmentIds = [initShipmentId, ownerShipmentId].filter(Boolean);
+    const { data: shipRows } = shipmentIds.length
+      ? await supa.from('shipments').select('id, tracking_number, tracking_url, label_pdf_url').in('id', shipmentIds)
+      : { data: [] };
+    const shipById = new Map((shipRows || []).map(s => [s.id, s]));
+    await Promise.all([
+      initInst?.email && sendSwapDoneEmail(initInst.email, initInst.name, shipById.get(initShipmentId), p.initiator_delivery),
+      ownerInst?.email && sendSwapDoneEmail(ownerInst.email, ownerInst.name, shipById.get(ownerShipmentId), p.owner_delivery),
+    ].filter(Boolean));
+
+    // Skriv tracking + mærkat ind på hver parts ordre, så Mine ordrer kan vise/downloade dem.
+    async function patchOrderShipment(orderId, shipment) {
+      if (!orderId || !shipment) return;
+      const { data: ord } = await supa.from('orders').select('order_groups').eq('id', orderId).maybeSingle();
+      const groups = Array.isArray(ord?.order_groups) ? ord.order_groups : [];
+      if (groups[0]) {
+        groups[0] = { ...groups[0], tracking_number: shipment.tracking_number, tracking_url: shipment.tracking_url, label_pdf_url: shipment.label_pdf_url };
+        await supa.from('orders').update({ order_groups: groups, status: 'shipped' }).eq('id', orderId);
+      }
+    }
+    await Promise.all([
+      patchOrderShipment(p.initiator_order_id, shipById.get(initShipmentId)),
+      patchOrderShipment(p.owner_order_id, shipById.get(ownerShipmentId)),
+    ]);
+
+    // CO2-besparelse for byttet (server-side, Trin 5).
+    if (convId) {
+      const { data: catRows } = tradedIds.length
+        ? await supa.from('listings').select('category').in('id', tradedIds)
+        : { data: [] };
+      await persistSwapCO2(supa, {
+        transactionId: convId,
+        ownerInstId: p.owner_institution_id,
+        initiatorInstId: p.initiator_institution_id,
+        ownerName: ownerInst?.name || null,
+        initiatorName: initInst?.name || null,
+        categoryIds: (catRows || []).map(r => r.category).filter(Boolean),
+      });
+    }
+
+    if (convId) {
+      // Kontant mellemlag: byt&leg holder beløbet og udbetaler manuelt til modtageren.
+      const cashLine = (Number(p.cash_adjustment) > 0)
+        ? ` Kontant mellemlag på ${p.cash_adjustment} kr. udbetales til modparten.`
+        : '';
+      // Sig kun "pakkemærkater er klar" hvis der faktisk blev booket forsendelse(r).
+      const deliveryLine = shipmentIds.length > 0
+        ? ' Pakkemærkater er klar.'
+        : ' Aftal levering indbyrdes.';
+      await supa.from('conversations').update({
+        deal_completed: true, deal_completed_at: now, deal_type: 'byt',
+        delivery_status: 'in_progress',
+        last_message: '🎉 Byttehandel gennemført! Begge parter har betalt.',
+        last_message_at: now,
+        owner_unread: (conv?.owner_unread || 0) + 1,
+        initiator_unread: (conv?.initiator_unread || 0) + 1,
+      }).eq('id', convId);
+      await supa.from('chat_messages').insert({
+        conversation_id: convId,
+        sender_id: claimed.buyer_id,
+        sender_name: 'System',
+        content: `🎉 Byttehandel gennemført! Begge parter har betalt —${deliveryLine}${cashLine}`,
+        message_type: 'swap_completed',
+      });
+    }
+  } else {
+    // Kun én part har betalt → opdatér escrow-tilstand + besked.
+    await supa.from('swap_proposals')
+      .update({ escrow_status: p.initiator_paid ? 'awaiting_owner' : 'awaiting_initiator' })
+      .eq('id', proposalId);
+    if (convId) {
+      await supa.from('conversations').update({
+        last_message: 'En part har betalt — afventer den anden part.',
+        last_message_at: now,
+        owner_unread: (conv?.owner_unread || 0) + 1,
+        initiator_unread: (conv?.initiator_unread || 0) + 1,
+      }).eq('id', convId);
+    }
+    // "Din tur"-nudge til den part der endnu mangler at betale (Trin 5):
+    // både e-mail og en in-app notifikation (klokke-menuen).
+    const owingInstId = p.initiator_paid ? p.owner_institution_id : p.initiator_institution_id;
+    if (owingInstId) {
+      const { data: oi } = await supa.from('institutions').select('email, name').eq('id', owingInstId).maybeSingle();
+      if (oi?.email) await sendSwapNudgeEmail(oi.email, oi.name, p.payment_deadline);
+      try {
+        await supa.from('notifications').insert({
+          institution_id: owingInstId,
+          institution_name: oi?.name || null,
+          type: 'swap_payment_turn',
+          title: 'Det er din tur at betale 🔄',
+          body: 'Modparten har betalt sin del af byttehandlen. Betal din andel for at fuldføre handlen.',
+          data: { proposal_id: p.id, conversation_id: convId || p.conversation_id },
+        });
+      } catch (e) { console.error('[stripe-webhook] notifikation fejl:', e?.message); }
+    }
+  }
+
+  return NextResponse.json({ received: true });
+}
+
 // Booker én forsendelse i en byttehandel og returnerer shipments.id (eller null).
-async function bookSwapShipment(supa, conv, listingId, senderInst, receiverInst) {
+async function bookSwapShipment(supa, conv, listingId, senderInst, receiverInst, sizeOverride, pickupPointId) {
   if (!senderInst || !receiverInst) return null;
   try {
-    let sizeCategory = 'medium';
-    if (listingId) {
+    let sizeCategory = sizeOverride || 'medium';
+    if (!sizeOverride && listingId) {
       const { data: so } = await supa.from('shipping_options').select('shipping_size_category').eq('listing_id', listingId).maybeSingle();
       sizeCategory = so?.shipping_size_category || 'medium';
     }
@@ -445,6 +643,7 @@ async function bookSwapShipment(supa, conv, listingId, senderInst, receiverInst)
       receiver: { name: receiverInst.name, address: receiverInst.address || 'Ukendt', zip_code: receiverInst.zipcode || '2100', city: receiverInst.city || 'København', country_code: 'DK', email: receiverInst.email, phone: receiverInst.phone || '' },
       carrier, service_type, size_category: sizeCategory,
       reference: conv.id,
+      pickup_point_id: pickupPointId || null,
     });
     const { data: shipment } = await supa.from('shipments').insert({
       conversation_id: conv.id,
@@ -594,6 +793,84 @@ function sellerOrderEmailHtml({ sellerName, items, itemTotal, shippingMethod, pi
 }
 
 // ── Køber-email ────────────────────────────────────────────────
+
+// ── Bytte-mails (Trin 5) ───────────────────────────────────────
+
+async function sendSwapEmail(to, subject, html) {
+  if (!to || !process.env.RESEND_API_KEY) return;
+  try {
+    const res = await fetch('https://api.resend.com/emails', {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${process.env.RESEND_API_KEY}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ from: 'byt&leg <noreply@bytogleg.dk>', to: [to], subject, html }),
+    });
+    if (!res.ok) console.error('[stripe-webhook] bytte-email fejl:', await res.text());
+  } catch (err) {
+    console.error('[stripe-webhook] bytte-email fejl:', err.message);
+  }
+}
+
+function swapEmailShell(title, intro, bodyHtml) {
+  const base = process.env.NEXT_PUBLIC_BASE_URL || 'https://bytogleg.dk';
+  return `<!DOCTYPE html><html lang="da"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head>
+<body style="margin:0;padding:0;background:#F6F2EA;font-family:'Helvetica Neue',Helvetica,Arial,sans-serif;">
+  <div style="max-width:560px;margin:48px auto 32px;background:#FDFAF4;border-radius:20px;overflow:hidden;border:1px solid rgba(22,34,28,0.08);">
+    <div style="background:linear-gradient(160deg,#1B4332 0%,#2A7D4F 100%);padding:40px;text-align:center;">
+      <span style="display:inline-block;background:rgba(255,255,255,0.13);border-radius:14px;padding:10px 22px;color:#fff;font-size:24px;font-weight:800;letter-spacing:-0.04em;">byt<span style="opacity:0.6">&amp;</span>leg.</span>
+    </div>
+    <div style="padding:40px;">
+      <h1 style="font-size:23px;font-weight:800;color:#16221C;margin:0 0 14px;letter-spacing:-0.03em;">${title}</h1>
+      <p style="font-size:15px;color:#3A473D;line-height:1.65;margin:0 0 22px;">${intro}</p>
+      ${bodyHtml}
+      <div style="text-align:center;margin:32px 0 4px;">
+        <a href="${base}/beskeder" style="display:inline-block;background:#2A7D4F;color:#fff;text-decoration:none;font-weight:700;font-size:15px;padding:14px 34px;border-radius:99px;">Se byttehandlen →</a>
+      </div>
+    </div>
+    <div style="background:#F6F2EA;padding:20px 40px;border-top:1px solid rgba(22,34,28,0.06);text-align:center;">
+      <p style="font-size:12px;color:#6B7570;margin:0;">byt&amp;leg &middot; <a href="https://bytogleg.dk" style="color:#2A7D4F;text-decoration:none;">bytogleg.dk</a></p>
+    </div>
+  </div>
+</body></html>`;
+}
+
+async function sendSwapDoneEmail(to, name, shipment, delivery) {
+  const greeting = name ? `Hej ${escapeHtml(String(name))},` : 'Hej,';
+  let box;
+  if (delivery === 'custom') {
+    box = `<div style="background:#E8F1EC;border:1px solid #CFE3D8;border-radius:14px;padding:18px 20px;">
+      <div style="font-weight:800;font-size:14px;color:#133F2B;margin-bottom:6px;">🤝 Aftalt levering</div>
+      <p style="font-size:13px;color:#3A473D;line-height:1.6;margin:0;">I har valgt selv at aftale leveringen — koordinér nærmere via beskeder på byt&amp;leg.</p>
+    </div>`;
+  } else if (shipment?.label_pdf_url) {
+    box = `<div style="background:#E8F1EC;border:1px solid #CFE3D8;border-radius:14px;padding:18px 20px;">
+      <div style="font-weight:800;font-size:14px;color:#133F2B;margin-bottom:6px;">📦 Din pakkemærkat er klar</div>
+      ${shipment.tracking_number ? `<p style="font-size:13px;color:#3A473D;line-height:1.6;margin:0 0 12px;">Tracking-nummer: <strong>${escapeHtml(String(shipment.tracking_number))}</strong></p>` : ''}
+      <a href="${escapeHtml(String(shipment.label_pdf_url))}" style="display:inline-block;background:#2A7D4F;color:#fff;text-decoration:none;font-weight:700;font-size:13px;padding:10px 22px;border-radius:99px;">Download pakkemærkat (PDF) →</a>
+    </div>`;
+  } else {
+    box = `<div style="background:#E8F1EC;border:1px solid #CFE3D8;border-radius:14px;padding:18px 20px;">
+      <div style="font-weight:800;font-size:14px;color:#133F2B;margin-bottom:6px;">📦 Pakkemærkat på vej</div>
+      <p style="font-size:13px;color:#3A473D;line-height:1.6;margin:0;">Din pakkemærkat gøres klar — du finder den i beskeder på byt&amp;leg.</p>
+    </div>`;
+  }
+  const html = swapEmailShell(
+    'Byttehandel gennemført! 🎉',
+    `${greeting}<br><br>Begge parter har betalt, og jeres byttehandel er nu gennemført.`,
+    box
+  );
+  await sendSwapEmail(to, '🎉 Din byttehandel er gennemført — byt&leg', html);
+}
+
+async function sendSwapNudgeEmail(to, name, deadline) {
+  const greeting = name ? `Hej ${escapeHtml(String(name))},` : 'Hej,';
+  const frist = deadline ? new Date(deadline).toLocaleString('da-DK', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }) : null;
+  const html = swapEmailShell(
+    'Det er din tur at betale 🔄',
+    `${greeting}<br><br>Den anden part har betalt sin andel af jeres byttehandel. Betal din andel for at gennemføre byttet${frist ? ` — inden <strong>${escapeHtml(frist)}</strong>` : ''}. Ellers annulleres handlen automatisk, og betalte beløb refunderes.`,
+    ''
+  );
+  await sendSwapEmail(to, 'Din byttehandel afventer din betaling — byt&leg', html);
+}
 
 function buyerOrderEmailHtml({ buyerName, groups, orderId, grandTotal }) {
   const base = process.env.NEXT_PUBLIC_BASE_URL || 'https://bytogleg.dk';

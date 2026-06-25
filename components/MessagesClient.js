@@ -235,7 +235,7 @@ function LoginInline({ onLogin }) {
 export default function MessagesClient() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const { selectedConvId, setSelectedConvId, setActiveListing, fetchUnread } = useApp();
+  const { selectedConvId, setSelectedConvId, setActiveListing, fetchUnread, addToCart } = useApp();
   const { isAdminView: ctxIsAdmin, adminInstName, institution: ctxInstitution, institutionId: ctxInstId, realUserId, userId: ctxUserId } = useActiveUser();
 
   const [userId,      setUserId]      = useState(null);
@@ -260,6 +260,13 @@ export default function MessagesClient() {
   const [composeTarget, setComposeTarget] = useState(null);
   const [composeMsg, setComposeMsg] = useState('');
   const [counterAmount,setCounterAmount] = useState('');
+  const [offersById,  setOffersById]  = useState({}); // tilbud i den aktive samtale, by id
+  const [proposalsById, setProposalsById] = useState({}); // bytteforslag i den aktive samtale, by id
+  const [swapShipmentsById, setSwapShipmentsById] = useState({}); // shipments for byttehandler, by shipment-id
+  const [rejectingOffer, setRejectingOffer] = useState(null);
+  const [offerRejectNote, setOfferRejectNote] = useState('');
+  const [counteringOffer, setCounteringOffer] = useState(null);
+  const [offerCounterAmount, setOfferCounterAmount] = useState('');
   const [swapPreview,  setSwapPreview]  = useState(null);
   const [shares,      setShares]      = useState([]);
   const [activeShare, setActiveShare] = useState(null);
@@ -304,6 +311,12 @@ export default function MessagesClient() {
   const bottomRef = useRef(null);
   const inputRef  = useRef(null);
   const fileInputRef = useRef(null);
+  // Skrive-indikator (flygtig, via realtime broadcast — ingen DB-skrivning).
+  const [otherTyping, setOtherTyping] = useState(false);
+  const channelRef = useRef(null);
+  const typingHideRef = useRef(null);
+  const lastTypingSentRef = useRef(0);
+  const [clientId] = useState(() => Math.random().toString(36).slice(2));
 
   // Tikker hvert minut så 24-timers nedtællingen på accepterede bud opdateres.
   useEffect(() => {
@@ -436,6 +449,20 @@ export default function MessagesClient() {
     setMsgLoad(true);
     const { data } = await db.from('chat_messages').select('*').eq('conversation_id', conv.id).order('created_at', { ascending: true });
     if (data) setMessages(data);
+    // Hent tilbud (offers) for samtalen — bruges til live status på tilbud-bobler.
+    db.from('offers').select('*').eq('conversation_id', conv.id)
+      .then(({ data: offerRows }) => setOffersById(Object.fromEntries((offerRows || []).map(o => [o.id, o]))));
+    // Hent bytteforslag (swap_proposals) — live status på forslag-bobler.
+    db.from('swap_proposals').select('*').eq('conversation_id', conv.id)
+      .then(({ data: propRows }) => {
+        setProposalsById(Object.fromEntries((propRows || []).map(p => [p.id, p])));
+        // Hent forsendelser for byttehandlerne, så completion-boblen kan vise pakkemærkat + tracking.
+        const shipIds = (propRows || []).flatMap(p => [p.initiator_shipment_id, p.owner_shipment_id]).filter(Boolean);
+        if (shipIds.length) {
+          db.from('shipments').select('id,tracking_number,tracking_url,label_pdf_url,status').in('id', shipIds)
+            .then(({ data: srows }) => setSwapShipmentsById(Object.fromEntries((srows || []).map(s => [s.id, s]))));
+        }
+      });
     setMsgLoad(false);
     setTimeout(() => bottomRef.current?.scrollIntoView({ behavior:'smooth' }), 60);
     inputRef.current?.focus();
@@ -470,8 +497,25 @@ export default function MessagesClient() {
         })
       .on('postgres_changes', { event:'UPDATE', schema:'public', table:'chat_messages', filter:`conversation_id=eq.${active.id}` },
         ({ new: m }) => { setMessages(prev => prev.map(x => x.id === m.id ? m : x)); })
+      // Hold tilbud-status synkron hos begge parter (accept/afvis/modbud), så
+      // boblens badge opdaterer i realtid uden at modparten skal genindlæse.
+      .on('postgres_changes', { event:'*', schema:'public', table:'offers', filter:`conversation_id=eq.${active.id}` },
+        ({ new: o }) => { if (o?.id) setOffersById(prev => ({ ...prev, [o.id]: { ...(prev[o.id] || {}), ...o } })); })
+      // Skrive-indikator: modpartens transiente "typing"-events (ikke vores egne).
+      .on('broadcast', { event:'typing' }, ({ payload }) => {
+        if (!payload || payload.from === clientId) return;
+        setOtherTyping(true);
+        if (typingHideRef.current) clearTimeout(typingHideRef.current);
+        typingHideRef.current = setTimeout(() => setOtherTyping(false), 3000);
+      })
       .subscribe();
-    return () => db.removeChannel(ch);
+    channelRef.current = ch;
+    return () => {
+      if (typingHideRef.current) clearTimeout(typingHideRef.current);
+      setOtherTyping(false);
+      channelRef.current = null;
+      db.removeChannel(ch);
+    };
   }, [active?.id]);
 
   useEffect(() => {
@@ -948,10 +992,11 @@ export default function MessagesClient() {
   async function handleBidPayment(checkoutMsg, selectedCarrier) {
     setGoingToPayment(checkoutMsg.id);
     const checkoutData = (() => { try { return JSON.parse(checkoutMsg.content); } catch { return {}; } })();
-    const so = checkoutData.shipping_options;
+    const canShip = checkoutData.can_ship || checkoutData.shipping_options?.allow_shipping;
+    const canPickup = checkoutData.shipping_options?.allow_pickup;
     let shippingMethod = 'custom';
-    if (so?.allow_shipping) shippingMethod = selectedCarrier || 'parcel_shop_gls';
-    else if (so?.allow_pickup) shippingMethod = 'pickup';
+    if (canShip) shippingMethod = selectedCarrier || 'parcel_shop_gls';
+    else if (canPickup) shippingMethod = 'pickup';
     try {
       const res = await authedFetch('/api/payments/create-intent', {
         method: 'POST',
@@ -960,7 +1005,8 @@ export default function MessagesClient() {
           buyerInstitutionId: ctxInstId || ctxInstitution?.id,
           conversationId: active.id,
           checkoutMessageId: checkoutMsg.id,
-          groups: [{ sellerName: active.owner_name, items: [{ listingId: checkoutData.listing_id, fromBid: true }], shippingMethod }],
+          ...(checkoutData.offer_id ? { offerId: checkoutData.offer_id } : {}),
+          groups: [{ sellerName: active.owner_name, items: [checkoutData.offer_id ? { listingId: checkoutData.listing_id, offerId: checkoutData.offer_id } : { listingId: checkoutData.listing_id, fromBid: true }], shippingMethod }],
         }),
       });
       const data = await res.json();
@@ -1014,6 +1060,95 @@ export default function MessagesClient() {
     setCounterBidMsg(null); setCounterAmount('');
   }
 
+  // Svar på et tilbud (offers): accept / afvis / modbud. Sælger svarer på
+  // køber-tilbud; køber svarer på sælgers modbud. Følgebeskeder (checkout,
+  // afvisning, modbud) indsættes server-side og dukker op via realtime.
+  async function handleOfferRespond(offer, action, extra = {}) {
+    if (!offer?.id) return;
+    try {
+      const res = await authedFetch('/api/offers/respond', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ offerId: offer.id, action, ...extra }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) { alert(data.error || 'Noget gik galt — prøv igen'); return; }
+      const newStatus = action === 'accept' ? 'accepted' : action === 'reject' ? 'rejected' : 'countered';
+      setOffersById(prev => ({
+        ...prev,
+        [offer.id]: { ...(prev[offer.id] || offer), status: newStatus },
+        ...(data.offer ? { [data.offer.id]: data.offer } : {}),
+      }));
+      // Genindlæs beskeder så server-side indsatte beskeder (fx checkout_pending) vises med det samme.
+      if (action === 'accept' && active?.id) {
+        const { data: fresh } = await db.from('chat_messages').select('*').eq('conversation_id', active.id).order('created_at', { ascending: true });
+        if (fresh) setMessages(fresh);
+      }
+      // Notificér modparten (e-mail + push) — fire-and-forget.
+      if (data.notify?.email) {
+        authedFetch('/api/notify-message', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            ownerEmail: data.notify.email,
+            ownerName: data.notify.name,
+            senderName: effectiveSenderName(),
+            listingTitle: active?.listing_title || '',
+            listingEmoji: active?.listing_emoji || '🧸',
+            convId: active?.id,
+            ...(data.notify.messageType ? { messageType: data.notify.messageType } : {}),
+          }),
+        }).catch(() => {});
+      }
+    } catch { alert('Noget gik galt — prøv igen'); }
+  }
+
+  // Svar på et bytteforslag (kun ejer-parten): accept / afvis.
+  async function handleSwapProposalRespond(proposal, action) {
+    if (!proposal?.id) return;
+    try {
+      const res = await authedFetch('/api/swaps/respond', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ proposalId: proposal.id, action }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) { alert(data.error || 'Noget gik galt — prøv igen'); return; }
+      setProposalsById(prev => ({
+        ...prev,
+        [proposal.id]: {
+          ...(prev[proposal.id] || proposal),
+          status: action === 'accept' ? 'accepted' : 'rejected',
+          escrow_status: action === 'accept' ? 'awaiting_both' : 'none',
+          payment_deadline: data.paymentDeadline || prev[proposal.id]?.payment_deadline || null,
+        },
+      }));
+      if (data.notify?.email) {
+        authedFetch('/api/notify-message', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            ownerEmail: data.notify.email, ownerName: data.notify.name,
+            senderName: effectiveSenderName(),
+            listingTitle: active?.listing_title || '', listingEmoji: active?.listing_emoji || '🔄',
+            convId: active?.id,
+          }),
+        }).catch(() => {});
+      }
+    } catch { alert('Noget gik galt — prøv igen'); }
+  }
+
+  // Betal egen andel af et bytteforslag (porto + beskyttelse + evt. kontant).
+  async function handleSwapProposalPay(proposal, deliveryMethod) {
+    setGoingToPayment(proposal.id);
+    try {
+      const res = await authedFetch('/api/payments/create-swap-intent', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ proposalId: proposal.id, deliveryMethod }),
+      });
+      const data = await res.json();
+      if (!res.ok) { alert(data.error || 'Noget gik galt — prøv igen'); setGoingToPayment(null); return; }
+      const bd = encodeURIComponent(JSON.stringify(data.breakdown));
+      router.push(`/betaling/${data.orderId}?cs=${encodeURIComponent(data.clientSecret)}&total=${data.grandTotal}&bd=${bd}`);
+    } catch { alert('Noget gik galt — prøv igen'); setGoingToPayment(null); }
+  }
+
   async function toggleReadUnread(conv, e) {
     e.stopPropagation();
     const isInit = amInitiator(conv);
@@ -1026,6 +1161,16 @@ export default function MessagesClient() {
   }
 
   function onKey(e) { if (e.key==='Enter' && !e.shiftKey) { e.preventDefault(); send(); } }
+
+  // Send et flygtigt "typing"-broadcast — throttlet til højst hvert 1,5. sekund.
+  function sendTyping() {
+    const ch = channelRef.current;
+    if (!ch) return;
+    const now = Date.now();
+    if (now - lastTypingSentRef.current < 1500) return;
+    lastTypingSentRef.current = now;
+    ch.send({ type: 'broadcast', event: 'typing', payload: { from: clientId } });
+  }
 
   async function openActiveListing() {
     if (!active?.listing_id) return;
@@ -1044,10 +1189,12 @@ export default function MessagesClient() {
   const myUnread = c => amInitiator(c) ? (c.initiator_unread||0) : (c.owner_unread||0);
   const otherName  = c => amInitiator(c) ? c.owner_name : c.initiator_name;
   const isArchived = c => amInitiator(c) ? (c.archived_by_initiator||false) : (c.archived_by_owner||false);
+  const isDeleted = c => amInitiator(c) ? (c.deleted_by_initiator||false) : (c.deleted_by_owner||false);
   const filtered = convs
+    .filter(c => !isDeleted(c))
     .filter(c => showArchived ? isArchived(c) : !isArchived(c))
     .filter(c => otherName(c).toLowerCase().includes(search.toLowerCase()) || c.listing_title.toLowerCase().includes(search.toLowerCase()));
-  const totalUnread = convs.filter(c => !isArchived(c)).reduce((s,c) => s + myUnread(c), 0);
+  const totalUnread = convs.filter(c => !isArchived(c) && !isDeleted(c)).reduce((s,c) => s + myUnread(c), 0);
 
   if (!authChecked) return <div style={{ minHeight:'100vh', background:PAPER }} />;
   if (!userId) return (
@@ -1394,18 +1541,35 @@ export default function MessagesClient() {
                           || (myInstId   && active.owner_institution_id === myInstId)
                           || (myInstName && active.owner_name?.toLowerCase() === myInstName?.toLowerCase());
                       let lastDate = null;
+                      const effUid = realUserId || userId;
+                      // Robust afsender-side: en 2-parts samtale har altid en initiator (køber)
+                      // og en owner (sælger). Vi afgør om en besked er "min" ud fra hvilken side
+                      // afsenderen tilhører + hvilken side jeg er på (isOwnerInConv) — det virker
+                      // også for server-indsatte beskeder hvor sender_id ≠ klientens realUserId.
+                      const isMine = (m) => {
+                        if (ctxIsAdmin && adminInstName) return m.sender_name === adminInstName;
+                        const sn = m.sender_name?.toLowerCase();
+                        const ownerSide = (active.owner_id && m.sender_id === active.owner_id)
+                          || (active.owner_name && sn === active.owner_name?.toLowerCase());
+                        const initiatorSide = (active.initiator_id && m.sender_id === active.initiator_id)
+                          || (active.initiator_name && sn === active.initiator_name?.toLowerCase());
+                        if (ownerSide || initiatorSide) return isOwnerInConv ? !!ownerSide : !!initiatorSide;
+                        // Fallback hvis afsenderen ikke kan matches til en samtale-part.
+                        return m.sender_id === effUid || (ctxInstitution?.name && sn === ctxInstitution.name?.toLowerCase());
+                      };
                       return messages.map((m, i) => {
-                        const effUid = realUserId || userId;
-                        const mine = ctxIsAdmin && adminInstName
-                          ? m.sender_name === adminInstName
-                          : m.sender_id === effUid;
+                        const mine = isMine(m);
                         const d = new Date(m.created_at);
                         const dateStr = d.toLocaleDateString('da-DK',{weekday:'long',day:'numeric',month:'long'});
                         const showDate = dateStr !== lastDate;
                         lastDate = dateStr;
-                        const prevMine = i>0 && (ctxIsAdmin && adminInstName ? messages[i-1].sender_name === adminInstName : messages[i-1].sender_id === userId);
-                        const grouped = mine === prevMine && !showDate && m.message_type !== 'bid' && messages[i-1]?.message_type !== 'bid' && m.message_type !== 'swap' && messages[i-1]?.message_type !== 'swap' && m.message_type !== 'bundle' && messages[i-1]?.message_type !== 'bundle' && m.message_type !== 'image' && messages[i-1]?.message_type !== 'image' && m.message_type !== 'buy_request' && messages[i-1]?.message_type !== 'buy_request' && m.message_type !== 'checkout_pending' && messages[i-1]?.message_type !== 'checkout_pending' && m.message_type !== 'shipment' && messages[i-1]?.message_type !== 'shipment' && m.message_type !== 'payment_confirmed' && messages[i-1]?.message_type !== 'payment_confirmed';
+                        const prevMine = i>0 && isMine(messages[i-1]);
+                        const grouped = mine === prevMine && !showDate && m.message_type !== 'bid' && messages[i-1]?.message_type !== 'bid' && m.message_type !== 'swap' && messages[i-1]?.message_type !== 'swap' && m.message_type !== 'bundle' && messages[i-1]?.message_type !== 'bundle' && m.message_type !== 'image' && messages[i-1]?.message_type !== 'image' && m.message_type !== 'buy_request' && messages[i-1]?.message_type !== 'buy_request' && m.message_type !== 'checkout_pending' && messages[i-1]?.message_type !== 'checkout_pending' && m.message_type !== 'shipment' && messages[i-1]?.message_type !== 'shipment' && m.message_type !== 'payment_confirmed' && messages[i-1]?.message_type !== 'payment_confirmed' && m.message_type !== 'offer' && messages[i-1]?.message_type !== 'offer';
                         const isBid = m.message_type === 'bid';
+                        const isOffer = m.message_type === 'offer';
+                        const offerData = isOffer ? (() => { try { return JSON.parse(m.content); } catch { return null; } })() : null;
+                        const isSwapProposal = m.message_type === 'swap_proposal';
+                        const proposalMsgData = isSwapProposal ? (() => { try { return JSON.parse(m.content); } catch { return null; } })() : null;
                         const isSwap = m.message_type === 'swap';
                         const isBundle = m.message_type === 'bundle';
                         const isImage = m.message_type === 'image';
@@ -1569,7 +1733,10 @@ export default function MessagesClient() {
                                     const hrs = Math.max(0, Math.floor(remaining / 3600000));
                                     const mins = Math.max(0, Math.floor((remaining % 3600000) / 60000));
                                     const deadlineStr = new Date(deadline).toLocaleString('da-DK', { day:'numeric', month:'long', hour:'2-digit', minute:'2-digit' });
-                                    const done = m.bid_status === 'checkout_done';
+                                    // Handlen er gennemført hvis checkout-beskeden er markeret,
+                                    // ELLER hvis samtalen som helhed er afsluttet (betaling bekræftet
+                                    // ad anden vej) — undgår falsk "Tilbuddet udløb"-tekst bagefter.
+                                    const done = m.bid_status === 'checkout_done' || !!active?.deal_completed;
                                     const paying = goingToPayment === m.id;
                                     return (
                                       <>
@@ -1577,10 +1744,10 @@ export default function MessagesClient() {
                                           <span style={{ fontSize:18 }}>{done ? '✅' : '🛍️'}</span>
                                           <div>
                                             <div style={{ fontFamily:FONT, fontWeight:800, fontSize:14, color:INK }}>
-                                              {done ? 'Handel gennemført!' : 'Dit bud er accepteret 🎉'}
+                                              {done ? 'Handel gennemført!' : checkoutData.deal_type === 'offer' ? 'Dit tilbud er accepteret 🎉' : 'Dit bud er accepteret 🎉'}
                                             </div>
                                             <div style={{ fontFamily:FONT, fontSize:12, color:INK3, marginTop:1 }}>
-                                              {checkoutData.listing_title} · {checkoutData.deal_type === 'byd' ? `${checkoutData.amount} kr.` : 'Bytte'}
+                                              {checkoutData.listing_title} · {(checkoutData.deal_type === 'byd' || checkoutData.deal_type === 'offer') ? `${checkoutData.amount} kr.` : 'Bytte'}
                                             </div>
                                           </div>
                                         </div>
@@ -1606,11 +1773,27 @@ export default function MessagesClient() {
                                               </div>
                                             </div>
                                             <button
-                                              onClick={()=>{
+                                              onClick={async ()=>{
                                                 if (paying) return;
-                                                const so = checkoutData?.shipping_options;
-                                                if (so?.allow_shipping) { setCarrierPickerMsg(m); }
-                                                else { handleBidPayment(m, so?.allow_pickup ? 'pickup' : 'custom'); }
+                                                // Hent hele opslaget så kurv-itemet får præcis samme form
+                                                // som et normalt køb — kun prisen overskrives med tilbudsbeløbet.
+                                                const { data: l } = await db.from('listings')
+                                                  .select('id, title, emoji, color, category, images, institution_name, user_id')
+                                                  .eq('id', checkoutData.listing_id).maybeSingle();
+                                                if (!l) { showToast('Opslaget kunne ikke hentes', 'error'); return; }
+                                                addToCart({
+                                                  listingId: l.id,
+                                                  listingTitle: l.title,
+                                                  listingEmoji: l.emoji || '🧸',
+                                                  listingColor: l.color,
+                                                  price: checkoutData.amount,
+                                                  category: l.category,
+                                                  images: l.images || [],
+                                                  ownerInstitutionName: l.institution_name,
+                                                  ownerId: l.user_id,
+                                                  offerId: checkoutData.offer_id,
+                                                });
+                                                router.push('/indkøbsvogn');
                                               }}
                                               disabled={paying}
                                               style={{ padding:'13px', borderRadius:99, background:paying?PAPER3:PRIMARY, border:'none', color:paying?INK3:'#fff', fontFamily:FONT, fontWeight:700, fontSize:14, cursor:paying?'default':'pointer' }}>
@@ -1873,7 +2056,169 @@ export default function MessagesClient() {
                                   <div style={{ fontSize:10, color:INK3, marginTop:3, textAlign:mine?'right':'left', fontFamily:FONT }}>{d.toLocaleTimeString('da-DK',{hour:'2-digit',minute:'2-digit'})}</div>
                                 </div>
                               </div>
-                            ) : isBid ? (
+                            ) : isSwapProposal ? (() => {
+                              const p = (proposalMsgData && proposalsById[proposalMsgData.proposal_id]) || null;
+                              const krp = n => `${Number(n || 0).toFixed(2).replace('.', ',')} kr.`;
+                              if (!p) return <div style={{ margin:'12px 0', fontFamily:FONT, fontSize:13, color:INK3 }}>🔄 Bytteforslag…</div>;
+                              const party = isOwnerInConv ? 'owner' : 'initiator';
+                              const myPaid = party === 'owner' ? p.owner_paid : p.initiator_paid;
+                              const otherPaid = party === 'owner' ? p.initiator_paid : p.owner_paid;
+                              const iAmCashPayer = Number(p.cash_adjustment) > 0 && p.cash_payer === party;
+                              const otherIsCashPayer = Number(p.cash_adjustment) > 0 && p.cash_payer && p.cash_payer !== party;
+                              const canRespond = p.status === 'pending' && isOwnerInConv;
+                              const inEscrow = p.status === 'accepted' && ['awaiting_both', 'awaiting_initiator', 'awaiting_owner'].includes(p.escrow_status);
+                              const completed = p.escrow_status === 'both_paid_released';
+                              const cancelled = p.escrow_status === 'cancelled_timeout' || p.status === 'cancelled' || p.status === 'rejected';
+                              const iGive = party === 'initiator' ? (p.offered_items || []) : (p.requested_items || []);
+                              const iGet  = party === 'initiator' ? (p.requested_items || []) : (p.offered_items || []);
+                              const paying = goingToPayment === p.id;
+                              const badge = completed ? ['Gennemført', PRIMARY, '#D1FAE5']
+                                : p.escrow_status === 'cancelled_timeout' ? ['Frist udløb', '#e11d48', '#FEE2E2']
+                                : p.status === 'rejected' ? ['Afvist', '#e11d48', '#FEE2E2']
+                                : p.status === 'accepted' ? ['Godkendt', '#B45309', '#FEF9C3'] : null;
+                              const cash = Number(p.cash_adjustment) || 0;
+                              const sumItems = arr => arr.reduce((s, it) => s + (Number(it.price) || 0), 0);
+                              const giveTotal = sumItems(iGive) + (iAmCashPayer ? cash : 0);
+                              const getTotal  = sumItems(iGet)  + (otherIsCashPayer ? cash : 0);
+                              // Én vare-række med rigtigt annoncebillede (falder tilbage på emoji/farve).
+                              const itemRow = (it, ix) => (
+                                <div key={ix} style={{ display:'flex', alignItems:'center', gap:10, background:'#fff', border:'1px solid rgba(22,34,28,0.1)', borderRadius:10, padding:'7px 9px', marginBottom:5 }}>
+                                  <div style={{ width:40, height:40, borderRadius:8, overflow:'hidden', flexShrink:0, background: it.image ? PAPER3 : (it.color || '#FFD166'), display:'flex', alignItems:'center', justifyContent:'center', fontSize:20 }}>
+                                    {it.image ? <img src={it.image} alt="" style={{ width:'100%', height:'100%', objectFit:'cover' }} /> : (it.emoji || '🧸')}
+                                  </div>
+                                  <div style={{ flex:1, minWidth:0, fontFamily:FONT, fontSize:13, fontWeight:600, color:INK, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{it.title}</div>
+                                  {Number(it.price) > 0 && <div style={{ fontFamily:FONT, fontSize:12, fontWeight:700, color:INK, flexShrink:0 }}>{krp(it.price)}</div>}
+                                </div>
+                              );
+                              const cashRow = (key) => (
+                                <div key={key} style={{ display:'flex', alignItems:'center', gap:10, background:'#fff', border:'1px solid rgba(22,34,28,0.1)', borderRadius:10, padding:'7px 9px', marginBottom:5 }}>
+                                  <div style={{ width:40, height:40, borderRadius:8, flexShrink:0, background:'#FEF9C3', display:'flex', alignItems:'center', justifyContent:'center', fontSize:20 }}>💰</div>
+                                  <div style={{ flex:1, minWidth:0, fontFamily:FONT, fontSize:13, fontWeight:600, color:INK }}>Kontant mellemlag</div>
+                                  <div style={{ fontFamily:FONT, fontSize:12, fontWeight:700, color:INK, flexShrink:0 }}>{krp(cash)}</div>
+                                </div>
+                              );
+                              const section = (label, items, hasCash, total) => (
+                                <div style={{ marginBottom:8 }}>
+                                  <div style={{ display:'flex', justifyContent:'space-between', alignItems:'baseline', marginBottom:5 }}>
+                                    <span style={{ fontFamily:FONT, fontSize:11, fontWeight:700, color:INK3, textTransform:'uppercase', letterSpacing:0.4 }}>{label}</span>
+                                    {(items.length > 0 || hasCash) && <span style={{ fontFamily:FONT, fontSize:13, fontWeight:800, color:INK }}>{krp(total)}</span>}
+                                  </div>
+                                  {(items.length > 0 || hasCash)
+                                    ? <>{items.map(itemRow)}{hasCash && cashRow(`${label}-cash`)}</>
+                                    : <div style={{ fontFamily:FONT, fontSize:12, color:INK3 }}>—</div>}
+                                </div>
+                              );
+                              return (
+                                <div style={{ margin:'12px 0' }}>
+                                  <div style={{ background: completed ? GREEN_TINT : cancelled ? '#FEF2F2' : '#fff', border:`2px solid ${completed ? PRIMARY : cancelled ? '#FCA5A5' : 'rgba(22,34,28,0.14)'}`, borderRadius:16, padding:'14px 16px' }}>
+                                    <div style={{ fontFamily:FONT, fontWeight:800, fontSize:14, color:INK, marginBottom:10, display:'flex', alignItems:'center', gap:8, flexWrap:'wrap' }}>
+                                      🔄 Bytteforslag
+                                      {badge && <span style={{ fontSize:11, fontWeight:700, color:badge[1], background:badge[2], padding:'2px 8px', borderRadius:99 }}>{badge[0]}</span>}
+                                    </div>
+                                    {section('Du giver', iGive, iAmCashPayer, giveTotal)}
+                                    {section('Du får', iGet, otherIsCashPayer, getTotal)}
+
+                                    {canRespond && (
+                                      <div style={{ display:'flex', gap:8, marginTop:12 }}>
+                                        <button onClick={()=>handleSwapProposalRespond(p,'accept')} style={{ padding:'9px 16px', borderRadius:99, background:PRIMARY, border:'none', color:'#fff', fontSize:13, fontWeight:700, cursor:'pointer', fontFamily:FONT }}>Godkend bytte</button>
+                                        <button onClick={()=>handleSwapProposalRespond(p,'reject')} style={{ padding:'9px 16px', borderRadius:99, background:'#FEF2F2', border:'1.5px solid #FCA5A5', color:'#e11d48', fontSize:13, fontWeight:700, cursor:'pointer', fontFamily:FONT }}>Afvis</button>
+                                      </div>
+                                    )}
+                                    {p.status === 'pending' && !isOwnerInConv && (
+                                      <div style={{ fontSize:12, color:INK3, fontWeight:600, fontFamily:FONT, marginTop:10 }}>Afventer modpartens svar…</div>
+                                    )}
+
+                                    {inEscrow && (
+                                      <div style={{ marginTop:12, borderTop:'1px solid rgba(22,34,28,0.1)', paddingTop:12 }}>
+                                        <div style={{ fontFamily:FONT, fontSize:12, color:INK2, marginBottom:8 }}>
+                                          Din andel: porto + {krp(p.protection_fee)} beskyttelse{iAmCashPayer ? ` + ${krp(p.cash_adjustment)} kontant` : ''}
+                                        </div>
+                                        {myPaid ? (
+                                          <div style={{ fontFamily:FONT, fontSize:13, fontWeight:700, color:PRIMARY }}>✓ Du har betalt{otherPaid ? '' : ' — afventer modpart'}</div>
+                                        ) : (
+                                          <>
+                                            {otherPaid && (
+                                              <div style={{ fontFamily:FONT, fontSize:13, fontWeight:700, color:PRIMARY, marginBottom:8 }}>✓ Modparten har betalt — det er din tur</div>
+                                            )}
+                                            <div style={{ display:'flex', gap:8, flexWrap:'wrap' }}>
+                                              <button disabled={paying} onClick={()=>router.push(`/bytte-betaling/${p.id}`)} style={{ padding:'9px 16px', borderRadius:99, background:PRIMARY, border:'none', color:'#fff', fontSize:13, fontWeight:700, cursor:paying?'default':'pointer', fontFamily:FONT, opacity:paying?0.6:1 }}>Betal — send med pakke</button>
+                                              <button disabled={paying} onClick={()=>handleSwapProposalPay(p,'custom')} style={{ padding:'9px 16px', borderRadius:99, background:'#fff', border:`1.5px solid ${PAPER3}`, color:INK, fontSize:13, fontWeight:700, cursor:paying?'default':'pointer', fontFamily:FONT, opacity:paying?0.6:1 }}>Aftalt levering</button>
+                                            </div>
+                                            {p.payment_deadline && (
+                                              <div style={{ fontFamily:FONT, fontSize:11, color:INK3, marginTop:6 }}>Betal inden {new Date(p.payment_deadline).toLocaleString('da-DK', { day:'numeric', month:'short', hour:'2-digit', minute:'2-digit' })}</div>
+                                            )}
+                                          </>
+                                        )}
+                                      </div>
+                                    )}
+
+                                    {completed && (() => {
+                                      const sh = swapShipmentsById[party === 'owner' ? p.owner_shipment_id : p.initiator_shipment_id];
+                                      return (
+                                        <div style={{ marginTop:12 }}>
+                                          <div style={{ fontFamily:FONT, fontSize:13, fontWeight:700, color:PRIMARY }}>🎉 Byttehandel gennemført{sh?.label_pdf_url ? ' — din pakkemærkat er klar.' : '.'}</div>
+                                          {sh && (
+                                            <div style={{ display:'flex', flexDirection:'column', gap:8, marginTop:10 }}>
+                                              {sh.label_pdf_url && <a href={sh.label_pdf_url} target="_blank" rel="noopener noreferrer" style={{ display:'block', textAlign:'center', padding:'10px', borderRadius:99, background:GREEN_TINT, color:PRIMARY, border:`1.5px solid ${PRIMARY}`, fontFamily:FONT, fontWeight:700, fontSize:13, textDecoration:'none' }}>🖨️ Download din pakkemærkat (PDF)</a>}
+                                              {sh.tracking_url && <a href={sh.tracking_url} target="_blank" rel="noopener noreferrer" style={{ display:'block', textAlign:'center', padding:'10px', borderRadius:99, background:PRIMARY, color:'#fff', fontFamily:FONT, fontWeight:700, fontSize:13, textDecoration:'none' }}>📦 Spor pakken</a>}
+                                              {sh.tracking_number && !sh.tracking_url && <div style={{ textAlign:'center', fontFamily:FONT, fontSize:11, color:INK3 }}>Tracking: {sh.tracking_number}</div>}
+                                            </div>
+                                          )}
+                                          <div style={{ display:'flex', gap:10, marginTop:10, flexWrap:'wrap' }}>
+                                            <button onClick={()=>router.push('/mine-opgaver')} style={{ background:'none', border:'none', color:PRIMARY, fontFamily:FONT, fontWeight:700, fontSize:12, cursor:'pointer', padding:0 }}>Se afsendelse →</button>
+                                            <button onClick={()=>router.push('/mine-ordrer')} style={{ background:'none', border:'none', color:PRIMARY, fontFamily:FONT, fontWeight:700, fontSize:12, cursor:'pointer', padding:0 }}>Følg det jeg modtager →</button>
+                                          </div>
+                                        </div>
+                                      );
+                                    })()}
+                                    {p.escrow_status === 'cancelled_timeout' && (
+                                      <div style={{ fontFamily:FONT, fontSize:12, color:'#e11d48', marginTop:12 }}>⏰ Annulleret — betalingsfristen udløb. Betalte beløb refunderes.</div>
+                                    )}
+                                  </div>
+                                  <div style={{ fontSize:10, color:INK3, marginTop:3, fontFamily:FONT }}>{d.toLocaleTimeString('da-DK',{hour:'2-digit',minute:'2-digit'})}</div>
+                                </div>
+                              );
+                            })() : isOffer ? (() => {
+                              const live = (offerData && offersById[offerData.offer_id]) || null;
+                              const status = live?.status || 'pending';
+                              const amount = (live?.amount ?? offerData?.amount) || 0;
+                              const proposedBy = live?.proposed_by || (offerData?.counter ? (mine ? 'seller' : 'buyer') : 'buyer');
+                              const canRespond = status === 'pending' && !!live &&
+                                ((proposedBy === 'buyer' && isOwnerInConv) || (proposedBy === 'seller' && !isOwnerInConv));
+                              const badge = status==='accepted' ? ['Accepteret', PRIMARY, '#D1FAE5']
+                                : status==='rejected' ? ['Afvist', '#e11d48', '#FEE2E2']
+                                : status==='countered' ? ['Modbud sendt', '#B45309', '#FEF9C3']
+                                : status==='cancelled' ? ['Erstattet', INK3, PAPER3]
+                                : status==='completed' ? ['Gennemført', PRIMARY, '#D1FAE5'] : null;
+                              const accepted = status==='accepted' || status==='completed';
+                              return (
+                                <div style={{ display:'flex', justifyContent:mine?'flex-end':'flex-start', marginTop:10 }}>
+                                  {!mine && <div style={{ width:30, height:30, borderRadius:'50%', background:GREEN_TINT, display:'flex', alignItems:'center', justifyContent:'center', fontSize:12, fontWeight:700, color:PRIMARY, flexShrink:0, marginRight:8, alignSelf:'flex-end', fontFamily:FONT }}>{(m.sender_name||'?').charAt(0).toUpperCase()}</div>}
+                                  <div style={{ maxWidth:'78%' }}>
+                                    {!mine && <div style={{ fontSize:11, fontWeight:700, color:INK3, marginBottom:3, marginLeft:2, fontFamily:FONT }}>{m.sender_name}</div>}
+                                    <div style={{ background: accepted ? GREEN_TINT : status==='rejected' ? '#FEF2F2' : mine ? '#EEF4FF' : PAPER3, border:`2px solid ${accepted ? PRIMARY : status==='rejected' ? '#FCA5A5' : mine ? '#93C5FD' : 'rgba(22,34,28,0.12)'}`, borderRadius:16, padding:'14px 16px' }}>
+                                      <div style={{ display:'flex', alignItems:'center', gap:8, flexWrap:'wrap' }}>
+                                        <span style={{ fontSize:18 }}>🏷️</span>
+                                        <span style={{ fontFamily:FONT, fontWeight:800, fontSize:17, color: status==='rejected' ? '#e11d48' : PRIMARY }}>{amount} kr.</span>
+                                        <span style={{ fontSize:12, color:INK3, fontWeight:600, fontFamily:FONT }}>{offerData?.counter ? 'modbud' : 'tilbud'}</span>
+                                        {badge && <span style={{ fontSize:11, fontWeight:700, color:badge[1], background:badge[2], padding:'2px 8px', borderRadius:99, fontFamily:FONT }}>{badge[0]}</span>}
+                                      </div>
+                                      {canRespond && (
+                                        <div style={{ display:'flex', gap:8, flexWrap:'wrap', marginTop:8 }}>
+                                          <button onClick={()=>handleOfferRespond(live,'accept')} style={{ padding:'8px 16px', borderRadius:99, background:PRIMARY, border:'none', color:'#fff', fontSize:12, fontWeight:700, cursor:'pointer', fontFamily:FONT }}>Accepter</button>
+                                          <button onClick={()=>{ setRejectingOffer(live); setOfferRejectNote(''); }} style={{ padding:'8px 16px', borderRadius:99, background:'#FEF2F2', border:'1.5px solid #FCA5A5', color:'#e11d48', fontSize:12, fontWeight:700, cursor:'pointer', fontFamily:FONT }}>Afvis</button>
+                                          <button onClick={()=>{ setCounteringOffer(live); setOfferCounterAmount(''); }} style={{ padding:'8px 16px', borderRadius:99, background:'#FFFBEB', border:'1.5px solid #FDE68A', color:'#B45309', fontSize:12, fontWeight:700, cursor:'pointer', fontFamily:FONT }}>Modbud</button>
+                                        </div>
+                                      )}
+                                      {status==='pending' && !canRespond && (
+                                        <div style={{ fontSize:12, color:INK3, fontWeight:600, fontFamily:FONT, marginTop:8 }}>Afventer svar…</div>
+                                      )}
+                                    </div>
+                                    <div style={{ fontSize:10, color:INK3, marginTop:3, textAlign:mine?'right':'left', fontFamily:FONT }}>{d.toLocaleTimeString('da-DK',{hour:'2-digit',minute:'2-digit'})}</div>
+                                  </div>
+                                </div>
+                              );
+                            })() : isBid ? (
                               <div style={{ display:'flex', justifyContent:mine?'flex-end':'flex-start', marginTop:10 }}>
                                 {!mine && <div style={{ width:30, height:30, borderRadius:'50%', background:GREEN_TINT, display:'flex', alignItems:'center', justifyContent:'center', fontSize:12, fontWeight:700, color:PRIMARY, flexShrink:0, marginRight:8, alignSelf:'flex-end', fontFamily:FONT }}>{m.sender_name.charAt(0).toUpperCase()}</div>}
                                 <div style={{ maxWidth:'78%' }}>
@@ -2038,6 +2383,16 @@ export default function MessagesClient() {
                         );
                       });
                     })()}
+                {otherTyping && (
+                  <div style={{ display:'flex', justifyContent:'flex-start', marginTop:10 }}>
+                    <div style={{ background:PAPER3, borderRadius:16, padding:'12px 16px', display:'flex', alignItems:'center', gap:5 }}>
+                      <style>{`@keyframes ltbTyping{0%,60%,100%{transform:translateY(0);opacity:0.4}30%{transform:translateY(-4px);opacity:1}}`}</style>
+                      {[0,1,2].map(i => (
+                        <span key={i} style={{ width:7, height:7, borderRadius:'50%', background:INK3, display:'inline-block', animation:`ltbTyping 1.2s infinite ${i*0.2}s` }} />
+                      ))}
+                    </div>
+                  </div>
+                )}
                 <div ref={bottomRef} />
               </div>
 
@@ -2098,6 +2453,30 @@ export default function MessagesClient() {
                 </div>
               )}
 
+              {/* Afvis tilbud-bar */}
+              {rejectingOffer && (
+                <div style={{ borderTop:`1px solid #FECACA`, background:'#FEF2F2', padding:'14px 16px' }}>
+                  <div style={{ fontSize:13, fontWeight:700, color:'#B91C1C', marginBottom:8, fontFamily:FONT }}>Afvis tilbud på {rejectingOffer.amount} kr.</div>
+                  <textarea value={offerRejectNote} onChange={e=>setOfferRejectNote(e.target.value)} placeholder="Evt. kommentar (valgfri)" rows={2} style={{ width:'100%', padding:'9px 12px', borderRadius:10, border:'1.5px solid #FCA5A5', fontSize:13, resize:'none', fontFamily:FONT, outline:'none', marginBottom:8 }} />
+                  <div style={{ display:'flex', gap:8 }}>
+                    <button onClick={()=>setRejectingOffer(null)} style={{ flex:1, padding:'8px', borderRadius:99, background:PAPER3, border:'none', fontWeight:700, fontSize:13, cursor:'pointer', fontFamily:FONT }}>Annuller</button>
+                    <button onClick={async()=>{ const o = rejectingOffer; setRejectingOffer(null); await handleOfferRespond(o, 'reject', { note: offerRejectNote }); setOfferRejectNote(''); }} style={{ flex:1, padding:'8px', borderRadius:99, background:'#e11d48', border:'none', color:'#fff', fontWeight:700, fontSize:13, cursor:'pointer', fontFamily:FONT }}>Bekræft afvisning</button>
+                  </div>
+                </div>
+              )}
+
+              {/* Modbud tilbud-bar */}
+              {counteringOffer && (
+                <div style={{ borderTop:`1px solid #FDE68A`, background:'#FFFBEB', padding:'14px 16px' }}>
+                  <div style={{ fontSize:13, fontWeight:700, color:'#7A5C00', marginBottom:8, fontFamily:FONT }}>Send modbud (nuværende tilbud: {counteringOffer.amount} kr.)</div>
+                  <div style={{ display:'flex', gap:8 }}>
+                    <input type="number" value={offerCounterAmount} onChange={e=>setOfferCounterAmount(e.target.value)} placeholder="Dit modbud (kr.)" style={{ flex:1, padding:'9px 12px', borderRadius:10, border:'1.5px solid #FDE68A', fontSize:14, fontWeight:700, outline:'none', fontFamily:FONT }} />
+                    <button onClick={()=>setCounteringOffer(null)} style={{ padding:'8px 14px', borderRadius:99, background:PAPER3, border:'none', fontWeight:700, fontSize:13, cursor:'pointer', fontFamily:FONT }}>✕</button>
+                    <button onClick={async()=>{ const a = Number(offerCounterAmount); if (a > 0) { const o = counteringOffer; setCounteringOffer(null); await handleOfferRespond(o, 'counter', { counterAmount: a }); setOfferCounterAmount(''); } }} disabled={!offerCounterAmount} style={{ padding:'8px 16px', borderRadius:99, background:offerCounterAmount?PRIMARY:PAPER3, border:'none', color:offerCounterAmount?'#fff':INK3, fontWeight:700, fontSize:13, cursor:offerCounterAmount?'pointer':'default', fontFamily:FONT }}>Send</button>
+                  </div>
+                </div>
+              )}
+
               {/* Input bar */}
               <div style={{ borderTop:`1px solid rgba(22,34,28,0.08)`, background: isMobile ? PAPER : PAPER2, position:'relative' }}>
                 {uploadError && (
@@ -2131,7 +2510,7 @@ export default function MessagesClient() {
                     style={{ background:'none', border:'none', cursor:'pointer', padding:'8px', borderRadius:10, flexShrink:0, color:chatImages.length>0?PRIMARY:INK3, lineHeight:1, height:44, display:'flex', alignItems:'center' }}>
                     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
                   </button>
-                  <textarea ref={inputRef} value={newMsg} onChange={e=>setNewMsg(e.target.value)} onKeyDown={onKey}
+                  <textarea ref={inputRef} value={newMsg} onChange={e=>{ setNewMsg(e.target.value); sendTyping(); }} onKeyDown={onKey}
                     placeholder="Skriv en besked…" rows={1}
                     style={{ flex:1, padding:'11px 14px', borderRadius:14, border:`1.5px solid ${PAPER3}`, fontSize:14, resize:'none', fontFamily:FONT, outline:'none', lineHeight:1.5, maxHeight:120, minHeight:44, overflowY:'auto', background:PAPER }}
                     onInput={e=>{ e.target.style.height='auto'; e.target.style.height=Math.min(e.target.scrollHeight,120)+'px'; }}

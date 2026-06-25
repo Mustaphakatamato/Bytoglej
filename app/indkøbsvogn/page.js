@@ -9,6 +9,7 @@ import { CATEGORIES } from '@/lib/categories';
 import { authedFetch } from '@/lib/authed-fetch';
 import CarrierLogo from '@/components/CarrierLogo';
 import PickupPointPicker from '@/components/PickupPointPicker';
+import { calcServiceFee } from '@/lib/pricing';
 
 // ── Helpers ────────────────────────────────────────────────────
 
@@ -101,7 +102,8 @@ export default function CartPage() {
     return Object.values(map);
   }, [cart]);
 
-  const [selected, setSelected] = useState({});
+  // Kun én sælger kan checkes ud ad gangen (radio). null = default til første gruppe.
+  const [selectedSeller, setSelectedSeller] = useState(null);
   const [notes, setNotes] = useState({});
   const [shippingOptions, setShippingOptions] = useState({});  // listingId → shipping_options row
   const [listingsCanShip, setListingsCanShip] = useState({});  // listingId → can_ship bool
@@ -211,8 +213,12 @@ export default function CartPage() {
       });
   }, [groups]);
 
-  function isSelected(name) { return name in selected ? selected[name] : true; }
-  function toggleSelected(name) { setSelected(p => ({ ...p, [name]: !isSelected(name) })); }
+  // Default til første gruppe hvis intet (gyldigt) valg er sat.
+  const effectiveSeller = (selectedSeller && groups.some(g => g.ownerInstitutionName === selectedSeller))
+    ? selectedSeller
+    : groups[0]?.ownerInstitutionName;
+  function isSelected(name) { return name === effectiveSeller; }
+  function selectSeller(name) { setSelectedSeller(name); }
 
   function setDeliveryMethod(sellerName, method, price) {
     setDeliveryState(p => ({ ...p, [sellerName]: { ...p[sellerName], method, price: price ?? null, pickupPoint: null } }));
@@ -313,10 +319,6 @@ export default function CartPage() {
     return s + (ds?.price || 0);
   }, 0);
 
-  function calcServiceFee(itemTotal) {
-    return Math.round((itemTotal * 0.05 + 5) * 100) / 100;
-  }
-
   function calcBundleDiscount(itemTotal, itemCount, discSettings) {
     if (!discSettings?.enabled || !discSettings?.tiers?.length) return 0;
     const sorted = [...discSettings.tiers].sort((a, b) => b.min_items - a.min_items);
@@ -385,6 +387,7 @@ export default function CartPage() {
             price: i.price,
             emoji: i.listingEmoji,
             category: i.category,
+            ...(i.offerId ? { offerId: i.offerId } : {}),
           })),
           shippingMethod: ds.method || null,
           shippingPrice: ds.price || 0,
@@ -471,10 +474,10 @@ export default function CartPage() {
               <div key={name} style={{ background: '#fff', borderRadius: 20, border: `1.5px solid ${PAPER3}`, marginBottom: 24, overflow: 'hidden' }}>
 
                 {/* Seller header */}
-                <div style={{ padding: '14px 20px', borderBottom: `1px solid ${PAPER2}`, display: 'flex', alignItems: 'center', gap: 10, cursor: groups.length > 1 ? 'pointer' : 'default' }} onClick={() => groups.length > 1 && toggleSelected(name)}>
+                <div style={{ padding: '14px 20px', borderBottom: `1px solid ${PAPER2}`, display: 'flex', alignItems: 'center', gap: 10, cursor: groups.length > 1 ? 'pointer' : 'default' }} onClick={() => groups.length > 1 && selectSeller(name)}>
                   {groups.length > 1 && (
-                    <div style={{ width: 20, height: 20, borderRadius: 5, border: `2px solid ${sel ? PRIMARY : PAPER3}`, background: sel ? PRIMARY : '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, transition: 'all 0.15s' }}>
-                      {sel && <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="3" strokeLinecap="round"><polyline points="20 6 9 17 4 12"/></svg>}
+                    <div style={{ width: 20, height: 20, borderRadius: '50%', border: `2px solid ${sel ? PRIMARY : PAPER3}`, background: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, transition: 'all 0.15s' }}>
+                      {sel && <div style={{ width: 10, height: 10, borderRadius: '50%', background: PRIMARY }} />}
                     </div>
                   )}
                   <div style={{ fontFamily: FONT, fontWeight: 700, fontSize: 14, color: INK, flex: 1 }}>{name}</div>
@@ -500,6 +503,11 @@ export default function CartPage() {
                         </div>
                         <div style={{ flex: 1, minWidth: 0 }}>
                           <div style={{ fontFamily: FONT, fontWeight: 700, fontSize: 14, color: INK, lineHeight: 1.3 }}>{item.listingTitle}</div>
+                          {item.offerId && (
+                            <div style={{ display: 'inline-flex', alignItems: 'center', gap: 4, marginTop: 4, background: '#FEF3C7', border: '1px solid #F59E0B', borderRadius: 99, padding: '2px 8px', fontFamily: FONT, fontSize: 11, fontWeight: 700, color: '#92400E' }}>
+                              ⏳ Reserveret til dig
+                            </div>
+                          )}
                           {cat && <div style={{ fontFamily: FONT, fontSize: 11, color: INK3, marginTop: 2 }}>{cat.emoji} {cat.label}</div>}
                         </div>
                         <span style={{ fontFamily: FONT, fontWeight: 800, fontSize: 16, color: PRIMARY, flexShrink: 0 }}>{item.price ? `${item.price} kr.` : '—'}</span>
@@ -675,10 +683,17 @@ export default function CartPage() {
             <div style={{ fontFamily: FONT, fontWeight: 800, fontSize: 17, color: INK, marginBottom: 20 }}>Prisoversigt</div>
 
             <div style={{ display: 'flex', flexDirection: 'column', gap: 12, marginBottom: 20 }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <span style={{ fontFamily: FONT, fontSize: 14, color: INK2 }}>Ordre</span>
-                <span style={{ fontFamily: FONT, fontWeight: 600, fontSize: 14, color: INK }}>{itemsTotal.toFixed(2).replace('.', ',')} kr.</span>
-              </div>
+              {selectedGroups.flatMap(g => g.items).map((item, i) => (
+                <div key={i} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 10 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 10, minWidth: 0 }}>
+                    <div style={{ width: 36, height: 36, borderRadius: 9, background: item.images?.[0] ? '#ddd' : (item.listingColor || GREEN_TINT), overflow: 'hidden', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 18 }}>
+                      {item.images?.[0] ? <img src={item.images[0]} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : (item.listingEmoji || '🧸')}
+                    </div>
+                    <span style={{ fontFamily: FONT, fontSize: 14, color: INK2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{item.listingTitle}</span>
+                  </div>
+                  <span style={{ fontFamily: FONT, fontWeight: 600, fontSize: 14, color: INK, flexShrink: 0 }}>{(item.price || 0).toFixed(2).replace('.', ',')} kr.</span>
+                </div>
+              ))}
 
               {discountTotal > 0 && (
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>

@@ -4,15 +4,11 @@ import { requireAuth, UNAUTHORIZED } from '@/lib/api-auth';
 import { createServerClient } from '@/lib/supabase-server';
 import { getShippingPrice } from '@/lib/shipping-rates';
 import { getPriceQuote } from '@/lib/shipmondo/client';
+import { calcServiceFee } from '@/lib/pricing';
 
 function getStripe() {
   if (!process.env.STRIPE_SECRET_KEY) throw new Error('STRIPE_SECRET_KEY er ikke sat');
   return new Stripe(process.env.STRIPE_SECRET_KEY);
-}
-
-// Service fee: 5% of item total + 5 kr flat (Vinted-model)
-function calcServiceFee(itemTotal) {
-  return Math.round((itemTotal * 0.05 + 5) * 100) / 100;
 }
 
 // Bundle discount: find highest applicable tier by item count
@@ -83,7 +79,7 @@ export async function POST(req) {
   const [{ data: listings }, { data: shipOpts }] = await Promise.all([
     supa
       .from('listings')
-      .select('id, title, price, emoji, category, type, user_id, institution_name, is_active, is_sold')
+      .select('id, title, price, emoji, category, type, user_id, institution_name, is_active, is_sold, reserved_until, reserved_for_institution_id')
       .in('id', allListingIds),
     supa
       .from('shipping_options')
@@ -99,6 +95,7 @@ export async function POST(req) {
   const orderGroups = [];
   let grandTotal = 0;
   let metaBidMsgId = '';
+  let metaOfferId = '';
   let metaConvId = body.conversationId || '';
   let metaDelivery = '';
 
@@ -124,11 +121,35 @@ export async function POST(req) {
         return NextResponse.json({ error: 'Du kan ikke købe dine egne opslag' }, { status: 400 });
       }
 
-      // Bid-mode: item price comes from an accepted bid in the conversation,
-      // not listing.price. Reservationen udløber 24 timer efter accept.
+      // Pris-kilde: et accepteret tilbud (offers) eller et accepteret bud
+      // (chat_messages), ellers opslagets pris. Reservationen håndhæves.
       let itemPrice = l.price || 0;
       const fromBid = i.fromBid || i.bidMessageId;
-      if (fromBid && body.conversationId) {
+      const offerId = i.offerId || (i.fromOffer ? body.offerId : null) || (groups.length === 1 ? body.offerId : null);
+
+      if (offerId) {
+        const { data: offer } = await supa
+          .from('offers')
+          .select('id, amount, status, listing_id, conversation_id, buyer_institution_id')
+          .eq('id', offerId)
+          .maybeSingle();
+        if (!offer || offer.status !== 'accepted') {
+          return NextResponse.json({ error: 'Tilbuddet er ikke fundet eller ikke accepteret' }, { status: 400 });
+        }
+        if (offer.listing_id !== l.id) {
+          return NextResponse.json({ error: 'Tilbuddet hører ikke til denne vare' }, { status: 400 });
+        }
+        // Hård reservation (beslutning 1.5): varen skal stadig være reserveret til køber.
+        if (l.reserved_until && new Date(l.reserved_until).getTime() < Date.now()) {
+          return NextResponse.json({ error: 'Reservationen er udløbet — tilbuddet er ikke længere gyldigt' }, { status: 409 });
+        }
+        if (l.reserved_for_institution_id && buyer?.id && l.reserved_for_institution_id !== buyer.id) {
+          return NextResponse.json({ error: 'Varen er reserveret til en anden køber' }, { status: 409 });
+        }
+        itemPrice = offer.amount || 0;
+        metaOfferId = metaOfferId || offer.id;
+        metaConvId = metaConvId || offer.conversation_id || '';
+      } else if (fromBid && body.conversationId) {
         const { data: bidMsg } = await supa
           .from('chat_messages')
           .select('id, bid_amount, bid_status')
@@ -171,7 +192,7 @@ export async function POST(req) {
         emoji: l.emoji,
         category: l.category,
         sizeCategory: shipOptMap.get(l.id)?.shipping_size_category || 'medium',
-        ...(fromBid ? { fromBid: true } : {}),
+        ...(offerId ? { fromOffer: true, offerId } : fromBid ? { fromBid: true } : {}),
       });
     }
 
@@ -274,6 +295,7 @@ export async function POST(req) {
         buyer_name: buyer?.name || '',
         group_count: String(groups.length),
         bid_message_id: metaBidMsgId,
+        offer_id: metaOfferId,
         conversation_id: metaConvId,
         delivery_method: metaDelivery,
       },

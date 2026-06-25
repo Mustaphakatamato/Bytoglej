@@ -74,7 +74,7 @@ function MobileListingCard({ l, isFav, onToggleFav, onOpen }) {
                 </div>
               );
             })()
-          : <div style={{ fontFamily: FONT, fontWeight: 700, fontSize: 12, color: CORAL }}>Byttes kun</div>}
+          : <div style={{ fontFamily: FONT, fontWeight: 700, fontSize: 12, color: CORAL }}>Byttes{l.estimated_value ? ` · ~${l.estimated_value} kr.` : ' kun'}</div>}
         {l.condition && <div style={{ fontSize: 11, color: INK3, marginTop: 2 }}>{l.condition}</div>}
         {(() => {
           const so = l.shipping_options?.[0];
@@ -461,7 +461,7 @@ const [saveSearchModal, setSaveSearchModal] = useState(false);
           <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', alignItems: 'center' }}>
             {!aiMode && (
               <div style={{ display: 'flex', gap: 4 }}>
-                {[{ key: 'alle', label: 'Alle' }, { key: 'køb', label: TYPE_CFG.køb.label }, { key: 'byd', label: TYPE_CFG.byd.label }, { key: 'byt', label: TYPE_CFG.byt.label }].map(({ key, label }) => {
+                {[{ key: 'alle', label: 'Alle' }, { key: 'køb', label: TYPE_CFG.køb.label }, { key: 'byt', label: TYPE_CFG.byt.label }, { key: 'søges', label: TYPE_CFG.søges.label }].map(({ key, label }) => {
                   const active = filter === key;
                   const tc = key !== 'alle' ? TYPE_CFG[key] : null;
                   return (

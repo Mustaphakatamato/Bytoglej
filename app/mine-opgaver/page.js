@@ -253,6 +253,42 @@ function ChatTaskCard({ conv, onAction, actionLoading }) {
   );
 }
 
+// ── Bytte: min udgående bundt (med pakkemærkat) ───────────────
+
+function SwapSendCard({ s, router }) {
+  const labelUrl = s.shipment?.label_pdf_url;
+  const ready = !!labelUrl;
+  return (
+    <div style={{ background:'#fff', borderRadius:16, border:`1px solid ${PAPER3}`, marginBottom:10, padding:'14px 16px' }}>
+      <div style={{ display:'flex', alignItems:'center', gap:10, marginBottom:10 }}>
+        <div style={{ width:44, height:44, borderRadius:10, background:GREEN_TINT, flexShrink:0, display:'flex', alignItems:'center', justifyContent:'center', fontSize:20 }}>{s.items[0]?.emoji || '🔄'}</div>
+        <div style={{ flex:1, minWidth:0 }}>
+          <div style={{ fontFamily:FONT, fontWeight:700, fontSize:14, color:INK }}>🔄 Bytte · til {s.otherName}</div>
+          <div style={{ fontFamily:FONT, fontSize:12, color:INK3, marginTop:1 }}>Du sender {s.items.length} vare(r)</div>
+        </div>
+        <span style={{ background: ready ? '#DBEAFE' : '#FEF9C3', color: ready ? '#1D4ED8' : '#92400E', borderRadius:99, fontSize:10, fontWeight:800, padding:'3px 8px', flexShrink:0 }}>
+          {ready ? 'PAKKEMÆRKAT KLAR' : 'AFVENTER BETALING'}
+        </span>
+      </div>
+      {s.items.map((it, i) => (
+        <div key={i} style={{ display:'flex', alignItems:'center', gap:8, marginBottom:4 }}>
+          <span style={{ fontSize:15 }}>{it.emoji || '🧸'}</span>
+          <span style={{ fontFamily:FONT, fontSize:13, color:INK }}>{it.title}</span>
+        </div>
+      ))}
+      <div style={{ marginTop:12, display:'flex', flexDirection:'column', gap:8 }}>
+        {ready ? (
+          <a href={labelUrl} target="_blank" rel="noopener noreferrer" style={{ display:'block', textAlign:'center', padding:'11px', borderRadius:99, background:PRIMARY, color:'#fff', fontFamily:FONT, fontWeight:700, fontSize:14, textDecoration:'none' }}>🖨️ Download pakkemærkat (PDF)</a>
+        ) : (
+          <div style={{ background:'#FEF9C3', borderRadius:12, padding:'10px 14px', fontFamily:FONT, fontSize:13, color:'#92400E' }}>Pakkemærkaten oprettes når begge parter har betalt deres del.</div>
+        )}
+        {s.shipment?.tracking_number && <div style={{ fontFamily:FONT, fontSize:12, color:INK3, textAlign:'center' }}>Tracking: {s.shipment.tracking_number}</div>}
+        <button onClick={() => router.push(s.conversation_id ? `/beskeder?conv=${s.conversation_id}` : '/beskeder')} style={{ padding:'11px', borderRadius:99, background:PAPER2, border:'none', fontFamily:FONT, fontWeight:600, fontSize:13, color:INK3, cursor:'pointer' }}>💬 Åbn byttehandel</button>
+      </div>
+    </div>
+  );
+}
+
 // ── Main page ─────────────────────────────────────────────────
 
 export default function MineOpgaverPage() {
@@ -263,6 +299,7 @@ export default function MineOpgaverPage() {
 
   const [stripeOrders, setStripeOrders] = useState([]);
   const [chatTasks, setChatTasks] = useState([]);
+  const [swapSends, setSwapSends] = useState([]);
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState('aktive');
   const [actionLoading, setActionLoading] = useState(null);
@@ -311,6 +348,38 @@ export default function MineOpgaverPage() {
       setChatTasks(data || []);
     }
 
+    // 3. Bytte — du sender (din udgående bundt + din pakkemærkat)
+    if (instId) {
+      const { data: props } = await db.from('swap_proposals')
+        .select('id, conversation_id, escrow_status, initiator_institution_id, owner_institution_id, offered_items, requested_items, initiator_shipment_id, owner_shipment_id')
+        .or(`initiator_institution_id.eq.${instId},owner_institution_id.eq.${instId}`)
+        .eq('status', 'accepted')
+        .order('created_at', { ascending: false });
+      if (props?.length) {
+        const myShipIds = props.map(p => p.initiator_institution_id === instId ? p.initiator_shipment_id : p.owner_shipment_id).filter(Boolean);
+        const otherIds = [...new Set(props.map(p => p.initiator_institution_id === instId ? p.owner_institution_id : p.initiator_institution_id).filter(Boolean))];
+        const [{ data: ships }, { data: insts }] = await Promise.all([
+          myShipIds.length ? db.from('shipments').select('id,label_pdf_url,tracking_number,tracking_url').in('id', myShipIds) : Promise.resolve({ data: [] }),
+          otherIds.length ? db.from('institutions').select('id,name').in('id', otherIds) : Promise.resolve({ data: [] }),
+        ]);
+        const shipById = Object.fromEntries((ships || []).map(x => [x.id, x]));
+        const nameById = Object.fromEntries((insts || []).map(x => [x.id, x.name]));
+        setSwapSends(props.map(p => {
+          const meInit = p.initiator_institution_id === instId;
+          return {
+            id: p.id,
+            conversation_id: p.conversation_id,
+            items: (meInit ? p.offered_items : p.requested_items) || [],
+            otherName: nameById[meInit ? p.owner_institution_id : p.initiator_institution_id] || 'Modpart',
+            shipment: shipById[meInit ? p.initiator_shipment_id : p.owner_shipment_id] || null,
+            completed: p.escrow_status === 'both_paid_released',
+          };
+        }).filter(s => s.items.length));
+      } else {
+        setSwapSends([]);
+      }
+    }
+
     setLoading(false);
   }, [effectiveInstitution?.id]);
 
@@ -356,7 +425,7 @@ export default function MineOpgaverPage() {
   const activeStripe    = stripeOrders.filter(o => o.status === 'paid' || o.status === 'shipped');
   const doneStripe      = stripeOrders.filter(o => o.status === 'delivered');
 
-  const totalActive  = activeStripe.length + activeChatTasks.length;
+  const totalActive  = activeStripe.length + activeChatTasks.length + swapSends.length;
   const totalDone    = doneStripe.length + doneChatTasks.length;
 
   return (
@@ -367,7 +436,7 @@ export default function MineOpgaverPage() {
           <button onClick={() => router.push('/profil')} style={{ background:'none', border:'none', cursor:'pointer', padding:6, display:'flex', alignItems:'center' }}>
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke={INK} strokeWidth="2.2" strokeLinecap="round"><line x1="19" y1="12" x2="5" y2="12"/><polyline points="12 19 5 12 12 5"/></svg>
           </button>
-          <h1 style={{ fontFamily:FONT, fontWeight:800, fontSize:18, color:INK, margin:0, flex:1 }}>Mine salg</h1>
+          <h1 style={{ fontFamily:FONT, fontWeight:800, fontSize:18, color:INK, margin:0, flex:1 }}>Skal sendes</h1>
           {totalActive > 0 && (
             <span style={{ background:'#FEF9C3', color:'#92400E', borderRadius:99, fontSize:12, fontWeight:700, padding:'4px 12px' }}>
               {totalActive} afventer
@@ -391,13 +460,14 @@ export default function MineOpgaverPage() {
             <>
               {filter === 'aktive' && (
                 <>
-                  {activeStripe.length === 0 && activeChatTasks.length === 0 && (
+                  {activeStripe.length === 0 && activeChatTasks.length === 0 && swapSends.length === 0 && (
                     <div style={{ padding:'60px 20px', textAlign:'center', background:'#fff', borderRadius:16 }}>
                       <div style={{ fontSize:48, marginBottom:12 }}>🎉</div>
-                      <div style={{ fontFamily:FONT, fontWeight:700, fontSize:16, color:INK, marginBottom:6 }}>Ingen aktive opgaver</div>
+                      <div style={{ fontFamily:FONT, fontWeight:700, fontSize:16, color:INK, marginBottom:6 }}>Intet at sende lige nu</div>
                       <div style={{ fontFamily:FONT, fontSize:13, color:INK3 }}>Alt er klaret, godt gået!</div>
                     </div>
                   )}
+                  {swapSends.map(s => <SwapSendCard key={s.id} s={s} router={router} />)}
                   {activeStripe.map(order =>
                     order.myGroups.map((g, gi) => (
                       <StripeOrderCard key={`${order.id}-${gi}`} order={order} myGroup={g}

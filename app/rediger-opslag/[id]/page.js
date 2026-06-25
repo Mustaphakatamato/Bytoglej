@@ -81,7 +81,7 @@ export default function RedigerOpslagPage() {
       setForm({
         title: l.title || '',
         type: l.type || 'køb',
-        price: l.price || '',
+        price: l.price || l.estimated_value || '',
         age_group: l.age_group || '3-6 år',
         description: l.description || '',
         condition: l.condition || 'God',
@@ -192,6 +192,7 @@ export default function RedigerOpslagPage() {
   async function handleSave() {
     if (!form.title.trim()) return;
     if (form.type === 'køb' && !String(form.price).trim()) { showToast('Angiv en pris for køb-opslag', 'error'); return; }
+    if (form.type === 'byt' && !String(form.price).trim()) { showToast('Angiv en anslået værdi for byt-opslag', 'error'); return; }
     if (!form.description.trim()) { showToast('Tilføj en beskrivelse', 'error'); return; }
     setSaving(true);
 
@@ -210,6 +211,7 @@ export default function RedigerOpslagPage() {
     const allImages = [...existingImgs, ...uploadedUrls];
 
     const newPrice = form.type === 'køb' ? Number(form.price) || null : null;
+    const newEstimatedValue = form.type === 'byt' ? Number(form.price) || null : null;
     const oldPrice = listing?.price || null;
     const storedOriginal = listing?.original_price || null;
     let originalPrice;
@@ -227,13 +229,14 @@ export default function RedigerOpslagPage() {
       title: form.title,
       type: form.type,
       price: newPrice,
+      estimated_value: newEstimatedValue,
       age_group: form.age_group,
       description: form.description,
       condition: form.condition,
       emoji: form.emoji,
       color: form.color,
       tags: form.tags || [],
-      min_bid: form.type === 'byd' && form.min_bid ? Number(form.min_bid) : null,
+      min_bid: null,
       category: form.category || null,
       subcategory: form.subcategory || null,
       brand: form.brand || null,
@@ -271,7 +274,7 @@ export default function RedigerOpslagPage() {
 
   const inputStyle = { width: '100%', padding: '12px 14px', borderRadius: 12, border: `1.5px solid ${PAPER3}`, fontSize: 14, outline: 'none', fontFamily: FONT, background: '#fff', color: INK, boxSizing: 'border-box' };
   const labelStyle = { display: 'block', fontSize: 13, fontWeight: 700, marginBottom: 7, fontFamily: FONT, color: INK2 };
-  const step1Valid = form.title.trim() && (form.type !== 'køb' || form.price);
+  const step1Valid = form.title.trim() && (form.type !== 'køb' && form.type !== 'byt' || form.price);
   const step2Valid = form.description.trim();
 
   if (loading) return (
@@ -323,7 +326,7 @@ export default function RedigerOpslagPage() {
               <div>
                 <label style={labelStyle}>Handelsform</label>
                 <div style={{ display: 'flex', gap: 8 }}>
-                  {['køb', 'byd', 'byt'].map(t => (
+                  {['køb', 'byt', 'søges'].map(t => (
                     <button key={t} onClick={() => setForm({ ...form, type: t })} style={{ flex: 1, padding: '12px 8px', borderRadius: 12, background: form.type === t ? TYPE_CFG[t].bg : PAPER2, color: form.type === t ? TYPE_CFG[t].color : INK3, fontFamily: FONT, fontWeight: 700, fontSize: 13, border: form.type === t ? `2px solid ${TYPE_CFG[t].color}` : '2px solid transparent', cursor: 'pointer', transition: 'all 0.15s' }}>
                       {TYPE_CFG[t].icon} {TYPE_CFG[t].label}
                     </button>
@@ -342,10 +345,11 @@ export default function RedigerOpslagPage() {
                   <input type="number" value={form.price} onChange={e => setForm({ ...form, price: e.target.value })} placeholder="Fx 250" min="1" style={{ ...inputStyle, border: `1.5px solid ${!form.price ? '#FCA5A5' : PAPER3}` }} />
                 </div>
               )}
-              {form.type === 'byd' && (
+              {form.type === 'byt' && (
                 <div>
-                  <label style={labelStyle}>Mindste bud (kr.) <span style={{ fontWeight: 400, color: INK3 }}>(valgfri)</span></label>
-                  <input type="number" value={form.min_bid || ''} onChange={e => setForm({ ...form, min_bid: e.target.value })} placeholder="Lad stå tom for intet minimum" min="1" style={inputStyle} />
+                  <label style={labelStyle}>Anslået værdi (kr.) <span style={{ color: '#e53e3e' }}>*</span></label>
+                  <input type="number" value={form.price} onChange={e => setForm({ ...form, price: e.target.value })} placeholder="Fx 250" min="1" style={{ ...inputStyle, border: `1.5px solid ${!form.price ? '#FCA5A5' : PAPER3}` }} />
+                  <div style={{ marginTop: 6, fontFamily: FONT, fontSize: 12, color: INK3 }}>Bruges til at sammenligne værdi i bytteforslag — vises ikke som salgspris.</div>
                 </div>
               )}
 

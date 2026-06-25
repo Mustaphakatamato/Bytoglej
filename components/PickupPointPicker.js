@@ -1,4 +1,5 @@
 'use client';
+import 'leaflet/dist/leaflet.css'; // bundles kort-CSS lokalt — uafhængigt af CDN
 import { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { PRIMARY, INK, INK2, INK3, PAPER2, PAPER3, GREEN_TINT, FONT } from '@/lib/constants';
@@ -44,6 +45,7 @@ export default function PickupPointPicker({ points, cheapestCarrier, buyerCoords
   const mapRef = useRef(null);
   const mapInstanceRef = useRef(null);
   const markersRef = useRef(null);
+  const resizeObsRef = useRef(null);
 
   useEffect(() => {
     setMounted(true);
@@ -58,12 +60,7 @@ export default function PickupPointPicker({ points, cheapestCarrier, buyerCoords
   // Init Leaflet-kort
   useEffect(() => {
     if (!mounted || typeof window === 'undefined' || !mapRef.current) return;
-    if (!document.getElementById('leaflet-css')) {
-      const link = document.createElement('link');
-      link.id = 'leaflet-css'; link.rel = 'stylesheet';
-      link.href = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.css';
-      document.head.appendChild(link);
-    }
+    // Leaflet-CSS'en bundles via top-level import — altid til stede ved mount.
     const L = require('leaflet');
     const valid = points.filter(p => p.lat != null && p.lng != null);
     const center = valid.length
@@ -72,22 +69,46 @@ export default function PickupPointPicker({ points, cheapestCarrier, buyerCoords
 
     if (!mapInstanceRef.current) {
       mapInstanceRef.current = L.map(mapRef.current, { center, zoom: 12, zoomControl: true, scrollWheelZoom: true });
-      L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
+      const tiles = L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
         attribution: '© OpenStreetMap © CARTO', maxZoom: 19,
       }).addTo(mapInstanceRef.current);
       markersRef.current = L.layerGroup().addTo(mapInstanceRef.current);
-      if (valid.length > 1) {
-        const b = L.latLngBounds(valid.map(p => [p.lat, p.lng]));
-        mapInstanceRef.current.fitBounds(b, { padding: [40, 40] });
-      }
-      // Tiles placeres forkert hvis containeren endnu ikke har sin endelige størrelse.
-      // Kald invalidateSize gentagne gange så animerede layouts nås.
-      const fix = () => mapInstanceRef.current?.invalidateSize();
+
+      // Genberegn størrelse + zoom til alle punkter, og tving tiles til at gentegne.
+      // Safari resolver ikke altid højden på et position:absolute element fra dets
+      // flex-forælder, så vi sætter eksplicit højde fra forælderens målte størrelse —
+      // ellers ser invalidateSize 0 og loader ingen tiles.
+      const fix = () => {
+        const map = mapInstanceRef.current;
+        const el = mapRef.current;
+        if (!map || !el) return;
+        const parent = el.parentElement;
+        if (parent) {
+          const h = parent.clientHeight, w = parent.clientWidth;
+          if (h > 0) el.style.height = h + 'px';
+          if (w > 0) el.style.width = w + 'px';
+        }
+        map.invalidateSize();
+        if (valid.length > 1) {
+          map.fitBounds(L.latLngBounds(valid.map(p => [p.lat, p.lng])), { padding: [40, 40] });
+        }
+        tiles.redraw();
+      };
       requestAnimationFrame(fix);
       setTimeout(fix, 150);
-      setTimeout(fix, 400);
+      setTimeout(fix, 500);
+
+      // Kortet ligger i en modal hvis flex-layout først har endelig størrelse
+      // efter mount. Observér forælder-wrapperen (konkret flex-størrelse) frem for
+      // det absolutte element, da Safari ikke pålideligt rapporterer sidstnævnte.
+      if (typeof ResizeObserver !== 'undefined' && mapRef.current?.parentElement) {
+        const ro = new ResizeObserver(() => fix());
+        ro.observe(mapRef.current.parentElement);
+        resizeObsRef.current = ro;
+      }
     }
     return () => {
+      if (resizeObsRef.current) { resizeObsRef.current.disconnect(); resizeObsRef.current = null; }
       if (mapInstanceRef.current) { mapInstanceRef.current.remove(); mapInstanceRef.current = null; }
     };
   }, [mounted]); // eslint-disable-line

@@ -20,6 +20,7 @@ export default function ChatBubble() {
   const [messages,   setMessages]   = useState([]);
   const [newMsg,     setNewMsg]     = useState('');
   const [sending,    setSending]    = useState(false);
+  const [swapProps,  setSwapProps]  = useState({}); // bytteforslag efter proposal_id
 
   const bottomRef    = useRef(null);
   const inputRef     = useRef(null);
@@ -163,6 +164,21 @@ export default function ChatBubble() {
     if (activeConv) setTimeout(() => inputRef.current?.focus(), 100);
   }, [activeConv?.id]);
 
+  // Hent bytteforslag for swap_proposal-bobler (håndterer både første load og realtime).
+  useEffect(() => {
+    const ids = messages
+      .filter(m => m.message_type === 'swap_proposal')
+      .map(m => { try { return JSON.parse(m.content)?.proposal_id; } catch { return null; } })
+      .filter(id => id && !swapProps[id]);
+    if (!ids.length) return;
+    let cancelled = false;
+    (async () => {
+      const { data } = await db.from('swap_proposals').select('*').in('id', [...new Set(ids)]);
+      if (!cancelled && data?.length) setSwapProps(p => ({ ...p, ...Object.fromEntries(data.map(x => [x.id, x])) }));
+    })();
+    return () => { cancelled = true; };
+  }, [messages, swapProps]);
+
   // ── message renderer ─────────────────────────────────────────────────────────
   function renderMsg(m, mine) {
     if (m.message_type === 'image') {
@@ -184,7 +200,67 @@ export default function ChatBubble() {
     }
     if (m.message_type === 'bundle') return <span style={{ fontSize: 12 }}>📦 Bundttilbud. Tryk for at se</span>;
     if (m.message_type === 'bid')    return <span style={{ fontSize: 12 }}>💰 Bud</span>;
+    if (m.message_type === 'offer') {
+      let d = null;
+      try { d = JSON.parse(m.content); } catch {}
+      return <span style={{ fontSize: 12 }}>🏷️ Tilbud: {d?.amount ?? '?'} kr.</span>;
+    }
     if (m.message_type === 'swap')   return <span style={{ fontSize: 12 }}>🔄 Bytteforslag</span>;
+    if (m.message_type === 'swap_proposal') {
+      let pid = null;
+      try { pid = JSON.parse(m.content)?.proposal_id; } catch {}
+      const p = pid ? swapProps[pid] : null;
+      if (!p) return <span style={{ fontSize: 12 }}>🔄 Bytteforslag…</span>;
+      const krp = n => `${(Number(n) || 0).toFixed(2).replace('.', ',')} kr.`;
+      const party = activeConv && amInit(activeConv) ? 'initiator' : 'owner';
+      const cash = Number(p.cash_adjustment) || 0;
+      const iGive = party === 'initiator' ? (p.offered_items || []) : (p.requested_items || []);
+      const iGet  = party === 'initiator' ? (p.requested_items || []) : (p.offered_items || []);
+      const iAmCash    = cash > 0 && p.cash_payer === party;
+      const otherIsCash = cash > 0 && p.cash_payer && p.cash_payer !== party;
+      const sum = arr => arr.reduce((s, it) => s + (Number(it.price) || 0), 0);
+      const badge = p.escrow_status === 'both_paid_released' ? ['Gennemført', PRIMARY, '#D1FAE5']
+        : p.escrow_status === 'cancelled_timeout' ? ['Frist udløb', '#e11d48', '#FEE2E2']
+        : p.status === 'rejected' ? ['Afvist', '#e11d48', '#FEE2E2']
+        : p.status === 'accepted' ? ['Godkendt', '#B45309', '#FEF9C3'] : null;
+      const itemRow = (it, ix) => (
+        <div key={ix} style={{ display: 'flex', alignItems: 'center', gap: 7, marginBottom: 4 }}>
+          <div style={{ width: 26, height: 26, borderRadius: 6, overflow: 'hidden', flexShrink: 0, background: it.image ? PAPER : (it.color || '#FFD166'), display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 14 }}>
+            {it.image ? <img src={it.image} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : (it.emoji || '🧸')}
+          </div>
+          <div style={{ flex: 1, minWidth: 0, fontSize: 12, fontWeight: 600, color: INK, fontFamily: FONT, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{it.title}</div>
+          {Number(it.price) > 0 && <span style={{ fontSize: 11, fontWeight: 700, color: INK, fontFamily: FONT, flexShrink: 0 }}>{krp(it.price)}</span>}
+        </div>
+      );
+      const cashRow = key => (
+        <div key={key} style={{ display: 'flex', alignItems: 'center', gap: 7, marginBottom: 4 }}>
+          <div style={{ width: 26, height: 26, borderRadius: 6, flexShrink: 0, background: '#FEF9C3', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 14 }}>💰</div>
+          <div style={{ flex: 1, minWidth: 0, fontSize: 12, fontWeight: 600, color: INK, fontFamily: FONT }}>Kontant mellemlag</div>
+          <span style={{ fontSize: 11, fontWeight: 700, color: INK, fontFamily: FONT, flexShrink: 0 }}>{krp(cash)}</span>
+        </div>
+      );
+      const section = (label, items, hasCash, total) => (
+        <div style={{ marginBottom: 6 }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 3 }}>
+            <span style={{ fontSize: 10, fontWeight: 700, color: INK3, textTransform: 'uppercase', letterSpacing: 0.4, fontFamily: FONT }}>{label}</span>
+            {(items.length > 0 || hasCash) && <span style={{ fontSize: 12, fontWeight: 800, color: INK, fontFamily: FONT }}>{krp(total)}</span>}
+          </div>
+          {(items.length > 0 || hasCash)
+            ? <>{items.map(itemRow)}{hasCash && cashRow(`${label}-c`)}</>
+            : <span style={{ fontSize: 11, color: INK3, fontFamily: FONT }}>—</span>}
+        </div>
+      );
+      return (
+        <div style={{ minWidth: 180 }}>
+          <div style={{ fontSize: 12, fontWeight: 800, color: INK, marginBottom: 8, display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap', fontFamily: FONT }}>
+            🔄 Bytteforslag
+            {badge && <span style={{ fontSize: 9, fontWeight: 700, color: badge[1], background: badge[2], padding: '1px 6px', borderRadius: 99 }}>{badge[0]}</span>}
+          </div>
+          {section('Du giver', iGive, iAmCash, sum(iGive) + (iAmCash ? cash : 0))}
+          {section('Du får', iGet, otherIsCash, sum(iGet) + (otherIsCash ? cash : 0))}
+        </div>
+      );
+    }
     if (m.message_type === 'buy_request') {
       let d = null;
       try { d = JSON.parse(m.content); } catch {}
@@ -299,7 +375,7 @@ export default function ChatBubble() {
               <div style={{ flex: 1, overflowY: 'auto', padding: '10px 12px', display: 'flex', flexDirection: 'column', gap: 5 }}>
                 {messages.map(m => {
                   const mine     = m.sender_id === userId;
-                  const special  = ['image', 'bundle', 'bid', 'swap', 'buy_request'].includes(m.message_type);
+                  const special  = ['image', 'bundle', 'bid', 'swap', 'swap_proposal', 'buy_request'].includes(m.message_type);
                   const isImg    = m.message_type === 'image';
                   return (
                     <div key={m.id} style={{ display: 'flex', justifyContent: mine ? 'flex-end' : 'flex-start' }}>

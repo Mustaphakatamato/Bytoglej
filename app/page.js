@@ -92,7 +92,7 @@ function MobileCard({ listing, onClick, favs, toggleFav }) {
                 </div>
               );
             })()
-          : <div style={{ fontFamily: FONT, fontWeight: 700, fontSize: 12, color: CORAL }}>Byttes kun</div>}
+          : <div style={{ fontFamily: FONT, fontWeight: 700, fontSize: 12, color: CORAL }}>Byttes{listing.estimated_value ? ` · ~${listing.estimated_value} kr.` : ' kun'}</div>}
         {listing.condition && <div style={{ fontSize: 11, color: INK3, marginTop: 2 }}>{listing.condition}</div>}
       </div>
     </div>
@@ -586,7 +586,7 @@ function TradeTypesStrip() {
           {[
             { key: 'køb', title: 'Køb', sub: 'Fastpris', desc: 'Se prisen og køb med det samme. Ingen forhandling, ingen ventetid.' },
             { key: 'byt', title: 'Byt', sub: 'Bytehandel', desc: 'Tilbyd et af jeres egne opslag i bytte. Find noget I begge mangler.' },
-            { key: 'byd', title: 'Byd', sub: 'Forhandl', desc: 'Send et bud og forhandl jer frem til en pris der passer begge.' },
+            { key: 'søges', title: 'Søges', sub: 'Efterlysning', desc: 'Efterlys legetøj I mangler. Få besked når det dukker op.' },
           ].map((t, i) => {
             const tc = TYPE_CFG[t.key];
             return (

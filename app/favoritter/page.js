@@ -8,8 +8,8 @@ import { useApp } from '@/providers/AppProvider';
 import { Spinner } from '@/components/ui';
 
 function ListingCard({ l, isFav, onToggle, onOpen }) {
-  const typeLabels = { køb:'Til salg', byt:'Byttes', byd:'Afgiv bud', søges:'Søges' };
-  const typeColors = { køb:{ bg:'#D1FAE5', color:'#065F46' }, byt:{ bg:'#DBEAFE', color:'#1E40AF' }, byd:{ bg:'#EDE9FE', color:'#5B21B6' }, søges:{ bg:'#FEF9C3', color:'#92400E' } };
+  const typeLabels = { køb:'Til salg', byt:'Byttes', søges:'Søges' };
+  const typeColors = { køb:{ bg:'#D1FAE5', color:'#065F46' }, byt:{ bg:'#DBEAFE', color:'#1E40AF' }, søges:{ bg:'#FEF9C3', color:'#92400E' } };
   const tc = typeColors[l.type] || { bg:PAPER3, color:INK3 };
 
   return (

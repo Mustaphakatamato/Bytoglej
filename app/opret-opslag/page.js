@@ -45,8 +45,7 @@ function PreviewCard({ form, imgPreview }) {
         <div style={{ marginTop:8 }}>
           {form.price && form.type === 'køb'
             ? <div style={{ fontFamily:FONT, fontWeight:800, fontSize:18, color:PRIMARY }}>{form.price} kr.</div>
-            : form.type === 'byt' ? <div style={{ fontSize:13, color:CORAL, fontWeight:700, fontFamily:FONT }}>Byttes kun</div>
-            : form.type === 'byd' ? <div style={{ fontSize:13, color:'#7C3AED', fontWeight:700, fontFamily:FONT }}>Afgiv bud</div>
+            : form.type === 'byt' ? <div style={{ fontSize:13, color:CORAL, fontWeight:700, fontFamily:FONT }}>Byttes{form.price ? ` · anslået værdi ${form.price} kr.` : ' kun'}</div>
             : null
           }
         </div>
@@ -163,7 +162,7 @@ export default function OpretOpslagPage() {
       setForm({
         title: data.title,
         type: data.type || 'køb',
-        price: data.price || '',
+        price: data.price || data.estimated_value || '',
         age_group: data.age_group || '3-6 år',
         description: data.description || '',
         condition: data.condition || 'God',
@@ -467,6 +466,7 @@ export default function OpretOpslagPage() {
   async function handleCreate() {
     if (!form.title.trim()) return;
     if (form.type === 'køb' && !String(form.price).trim()) { showToast('Angiv en pris for køb-opslag', 'error'); return; }
+    if (form.type === 'byt' && !String(form.price).trim()) { showToast('Angiv en anslået værdi for byt-opslag', 'error'); return; }
     if (!form.description.trim()) { showToast('Tilføj en beskrivelse', 'error'); return; }
     if (!form.category) { showToast('Vælg en kategori', 'error'); return; }
     const selectedCat = CATEGORIES.find(c => c.key === form.category);
@@ -497,6 +497,7 @@ export default function OpretOpslagPage() {
     const insertData = {
       title: form.title, type: form.type,
       price: (form.type==='køb' || isSøges) ? Number(form.price)||null : null,
+      estimated_value: form.type==='byt' ? Number(form.price)||null : null,
       age_group: form.age_group, description: form.description,
       condition: form.condition, city: inst?.city || '',
       institution_name: inst?.name || 'Min institution',
@@ -510,7 +511,6 @@ export default function OpretOpslagPage() {
       can_ship: delivery.shipping || false,
       image_description: aiVisual || aiScanData?.ai_description || null, // ren visuel beskrivelse — bruges til semantisk billedsøgning
     };
-    if (form.type==='byd' && form.min_bid) insertData.min_bid = Number(form.min_bid);
     const { data: listing, error } = await db.from('listings').insert(insertData).select().single();
     if (error) { console.error('Insert error:', error); showToast('Noget gik galt. Prøv igen', 'error'); setSaving(false); return; }
     // urgency: update separately so it fails silently if column doesn't exist yet
@@ -618,7 +618,7 @@ export default function OpretOpslagPage() {
 
   const deliveryValid = true;   // afhentning er altid muligt → levering er altid gyldig
   const _step1CatObj = CATEGORIES.find(c => c.key === form.category);
-  const step1Valid = !!(form.title.trim() && (form.type !== 'køb' || form.price) && deliveryValid && form.category && (!_step1CatObj?.sub?.length || form.subcategory) && form.brand !== null && form.brand !== undefined);
+  const step1Valid = !!(form.title.trim() && (form.type !== 'køb' && form.type !== 'byt' || form.price) && deliveryValid && form.category && (!_step1CatObj?.sub?.length || form.subcategory) && form.brand !== null && form.brand !== undefined);
   const needsImage = form.type !== 'søges';
   const step2Valid = form.description.trim() && (!needsImage || imgFiles.length > 0);
 
@@ -807,7 +807,7 @@ export default function OpretOpslagPage() {
                 <div>
                   <label style={labelStyle}>Opslagstype</label>
                   <div style={{ display:'flex', gap:8, flexWrap:'wrap' }}>
-                    {['køb','byd','byt','søges'].map(t => (
+                    {['køb','byt','søges'].map(t => (
                       <button key={t} onClick={()=>setForm({...form,type:t})} style={{ flex:'1 1 80px', padding:'12px 8px', borderRadius:12, background:form.type===t?TYPE_CFG[t].bg:PAPER2, color:form.type===t?TYPE_CFG[t].color:INK3, fontFamily:FONT, fontWeight:700, fontSize:13, border:form.type===t?`2px solid ${TYPE_CFG[t].color}`:'2px solid transparent', cursor:'pointer', transition:'all 0.15s' }}>
                         {TYPE_CFG[t].icon} {TYPE_CFG[t].label}
                       </button>
@@ -843,10 +843,11 @@ export default function OpretOpslagPage() {
                     )}
                   </div>
                 )}
-                {form.type === 'byd' && (
+                {form.type === 'byt' && (
                   <div>
-                    <label style={labelStyle}>Mindste bud (kr.) <span style={{ fontWeight:400, color:INK3 }}>(valgfri)</span></label>
-                    <input type="number" value={form.min_bid||''} onChange={e=>setForm({...form,min_bid:e.target.value})} placeholder="Lad stå tom for intet minimum" min="1" style={inputStyle} />
+                    <label style={labelStyle}>Anslået værdi (kr.) <span style={{ color:'#e53e3e' }}>*</span></label>
+                    <input type="number" value={form.price} onChange={e=>setForm({...form,price:e.target.value})} placeholder="Fx 250" min="1" style={{ ...inputStyle, border:`1.5px solid ${!form.price?'#FCA5A5':PAPER3}` }} />
+                    <div style={{ marginTop:6, fontFamily:FONT, fontSize:12, color:INK3 }}>Bruges til at sammenligne værdi i bytteforslag — vises ikke som salgspris.</div>
                   </div>
                 )}
                 {form.type === 'søges' && (

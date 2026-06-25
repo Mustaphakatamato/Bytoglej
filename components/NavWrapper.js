@@ -609,10 +609,26 @@ function CategoryStrip({ router }) {
 
 // ── Notification bell ─────────────────────────────────────────────────────────
 function NotificationBell({ institution, transparent, isMobile, onMobileClick }) {
+  const router = useRouter();
   const [open, setOpen] = useState(false);
   const [notes, setNotes] = useState([]);
   const [unread, setUnread] = useState(0);
   const ref = useRef(null);
+
+  // Naviger til den relevante side når en notifikation klikkes.
+  function goToNotification(n) {
+    setOpen(false);
+    const d = n?.data || {};
+    if (n?.type === 'swap_proposal_received' || n?.type === 'swap_payment_turn') {
+      router.push(d.conversation_id ? `/beskeder?conv=${d.conversation_id}` : '/beskeder');
+    } else if (n?.type === 'listing_review_approved' || n?.type === 'listing_review_rejected') {
+      router.push('/mine-opslag');
+    } else if (d.conversation_id) {
+      router.push(`/beskeder?conv=${d.conversation_id}`);
+    } else {
+      router.push('/beskeder');
+    }
+  }
 
   useEffect(() => {
     if (!institution?.name) return;
@@ -667,8 +683,8 @@ function NotificationBell({ institution, transparent, isMobile, onMobileClick })
       {notes.length === 0 ? (
         <div style={{ padding:'32px 16px', textAlign:'center', color:INK3, fontFamily:FONT, fontSize:13 }}>Ingen notifikationer endnu</div>
       ) : notes.map((n, i) => (
-        <div key={n.id} style={{ display:'flex', alignItems:'flex-start', gap:12, padding:'14px 16px', borderBottom: i < notes.length - 1 ? `1px solid ${PAPER2}` : 'none', background: n.read ? '#fff' : '#FFF7ED' }}>
-          <span style={{ fontSize:20, flexShrink:0, marginTop:1 }}>{n.type === 'listing_review_approved' ? '✅' : n.type === 'listing_review_rejected' ? '❌' : '📬'}</span>
+        <div key={n.id} onClick={() => goToNotification(n)} style={{ display:'flex', alignItems:'flex-start', gap:12, padding:'14px 16px', borderBottom: i < notes.length - 1 ? `1px solid ${PAPER2}` : 'none', background: n.read ? '#fff' : '#FFF7ED', cursor:'pointer' }}>
+          <span style={{ fontSize:20, flexShrink:0, marginTop:1 }}>{n.type === 'listing_review_approved' ? '✅' : n.type === 'listing_review_rejected' ? '❌' : (n.type === 'swap_payment_turn' || n.type === 'swap_proposal_received') ? '🔄' : '📬'}</span>
           <div style={{ flex:1, minWidth:0 }}>
             <div style={{ fontFamily:FONT, fontWeight: n.read ? 600 : 800, fontSize:14, color:INK, marginBottom:3 }}>{n.title}</div>
             <div style={{ fontFamily:FONT, fontSize:12, color:INK3, lineHeight:1.5 }}>{n.body}</div>
@@ -826,7 +842,7 @@ function Nav({ pathname, navigate, loggedIn, setLoggedIn, unreadTotal, instituti
                       <Link href="/mine-ordrer" style={{ display:'flex', alignItems:'center', gap:9, padding:'11px 14px', fontSize:13, fontWeight:600, color:INK2, textDecoration:'none', borderBottom:`1px solid ${PAPER2}`, fontFamily:FONT }}
                         onMouseEnter={e=>e.currentTarget.style.background=GREEN_TINT} onMouseLeave={e=>e.currentTarget.style.background='transparent'}>
                         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><circle cx="9" cy="21" r="1"/><circle cx="20" cy="21" r="1"/><path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"/></svg>
-                        Mine ordrer
+                        Mine køb
                       </Link>
                       <Link href="/profil" style={{ display:'flex', alignItems:'center', gap:9, padding:'11px 14px', fontSize:13, fontWeight:600, color:INK2, textDecoration:'none', borderBottom:`1px solid ${PAPER2}`, fontFamily:FONT }}
                         onMouseEnter={e=>e.currentTarget.style.background=GREEN_TINT} onMouseLeave={e=>e.currentTarget.style.background='transparent'}>
