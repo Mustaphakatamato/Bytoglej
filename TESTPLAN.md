@@ -18,7 +18,7 @@ Arbejd ovenfra og ned.
 | 7) Bundt-bytte — tosidet betaling | ✅ Gennemført (inkl. pakke-booking mod sandbox) |
 | 8) 48t auto-refusion | ✅ Gennemført (forslag cd666dfc) |
 | 9) Udfasning | ✅ Gennemført (rediger-opslag rettet: byd fjernet, søges tilføjet) |
-| 10) Regression | ⬜ Ikke testet |
+| 10) Regression | ✅ Gennemført (10.4 forældet — dashboard erstattet af IA-hub) |
 
 **Punkt 4 — verificeret (2026-06-24):** Accepteret tilbud → "Gå til betaling" → kurv (tilbudspris) → betaling
 med Stripe testkort gennemført. Bekræftet: `offers.status='completed'`, `listings.is_sold=true` +
@@ -230,12 +230,16 @@ Verificeret i koden (2026-06-25):
 
 **Resterende død kode (kosmetisk, ikke rettet):** `bidModal`/`handleBid`/`swapModal` i ListingDetailClient; døde `'byd'`-grene i opret-opslag (linje 49, 512, 843).
 
-## 10) Regression — må ikke være brækket
+## 10) Regression — ✅ Gennemført (2026-06-26)
 
-- [ ] Alm. køb: kurv → checkout → betal (uændret gebyr 5% + 5 kr.).
-- [ ] Historiske bud/bytter i gang: vises og kan håndteres i beskeder (accepter/afvis/betal).
-- [ ] Beskeder: billeder, tekst, betalingsbekræftelser renderer fint.
-- [ ] Dashboard: "Handler" + "Gennemførte handler" viser nye tilbud (som "Køb") og bytter (som "Bytte").
+- [x] **Alm. køb (gebyr uændret):** kurv → checkout → ordre oprettet med `serviceFee=6,10` (22 × 5% + 5) og total 93,74 = 22 + 6,10 + 65,64 porto. Gebyr + checkout-flow grønt. *(Ordren forblev `pending`, fordi test-webhooken nu bevidst peger på prod — `paid`-overgangen er uændret kode, verificeret i Punkt 4. Ikke en regression.)*
+- [x] **Historiske bud/bytter:** alle gamle samtaler renderer pænt i beskeder (tilbud-bobler, bytte-kort "DU GIVER/DU FÅR", kontant mellemlag, betalingsbekræftelser, system-beskeder, deep-links) — ingen rå JSON, korrekt højre/venstre. Verificeret visuelt.
+- [x] **Beskeder:** billede-upload (🖼️) + tekst + betalingsbekræftelser renderer fint. Verificeret visuelt.
+- [~] **Dashboard 10.4 — FORÆLDET:** Det gamle "Gennemførte handler"-dashboard er fjernet i IA-ombygningen (`/dashboard` → redirect til `/profil`; `DashboardClient.js` importeres ikke længere = **død kode**). Trades lever nu retningsopdelt i **"Mine køb"** (3, det jeg modtager) + **"Skal sendes"**. Køb/Bytte-label-logikken er bevaret i koden men ikke længere linket. **Beslutning:** testpunkt forældet, verificeret via "Mine køb"-tæller (3 = de 3 gennemførte bytter modtaget).
+
+**Fund under regression (rettet):** Checkout-kortet viste falsk "⏰ Tilbuddet udløb" på en betalt handel → bruger nu også `conversation.deal_completed` (`components/MessagesClient.js:1736`).
+
+**Oprydning til senere (død kode):** `components/DashboardClient.js` er forældet efter IA-ombygningen og kan slettes.
 
 ---
 
