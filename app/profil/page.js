@@ -234,9 +234,20 @@ export default function ProfilPage() {
         const cuid = au?.id || uid;
         const cemail = inst?.email || au?.email;
 
+        // Favoritter: præcis samme logik som /favoritter — gyldige (aktive, usolgte)
+        // fav-ids fra DB (primær) eller localStorage (fallback). Forældede tæller ikke.
+        let favIds = [];
         if (cuid) {
-          db.from('listing_favorites').select('id', { count:'exact', head:true }).eq('user_id', cuid)
-            .then(({ count }) => { if (!cancelled) setFavCount(count ?? 0); });
+          const { data: favRows } = await db.from('listing_favorites').select('listing_id').eq('user_id', cuid);
+          if (favRows?.length) favIds = favRows.map(r => r.listing_id);
+        }
+        if (!favIds.length && favs?.length) favIds = favs;
+        if (favIds.length) {
+          const { data: ls } = await db.from('listings').select('id').in('id', favIds).eq('is_active', true).eq('is_sold', false);
+          if (!cancelled) setFavCount(new Set((ls || []).map(l => l.id)).size);
+        } else if (!cancelled) setFavCount(0);
+
+        if (cuid) {
           Promise.all([
             db.from('orders').select('order_groups').eq('buyer_id', cuid).not('status', 'in', '("pending","failed","cancelled")'),
             db.from('swap_proposals').select('id', { count:'exact', head:true }).or(`initiator_institution_id.eq.${instId},owner_institution_id.eq.${instId}`).eq('status', 'accepted'),
@@ -245,7 +256,7 @@ export default function ProfilPage() {
             const kob = (ord.data || []).filter(o => !String(o.order_groups?.[0]?.sellerName || '').startsWith('Byttehandel')).length;
             setBuyCount(kob + (sw.count ?? 0));
           });
-        } else { setFavCount(0); setBuyCount(0); }
+        } else { setBuyCount(0); }
 
         if (cemail) {
           db.from('saved_searches').select('id', { count:'exact', head:true }).ilike('email', cemail)
@@ -525,7 +536,7 @@ export default function ProfilPage() {
               icon="❤️"
               label="Favoritter"
               sublabel="Gemte annoncer"
-              value={Math.max(favCount ?? 0, favs?.length || 0)}
+              value={favCount ?? '—'}
               onClick={() => router.push('/favoritter')}
             />
           </div>
