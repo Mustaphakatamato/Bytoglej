@@ -5,7 +5,7 @@ Arbejd ovenfra og ned.
 
 ---
 
-## Status (opdateret 2026-06-24)
+## Status (opdateret 2026-06-25)
 
 | Punkt | Status |
 |-------|--------|
@@ -57,6 +57,41 @@ håndhæver `reserved_until` korrekt — mulig UI-forbedring, ikke en blokerende
 
 **Kendte/parkerede:**
 - 🅿️ Leaflet-kort (afhentningssted) virker i Chrome, men tiles vises grå i Safari — parkeret til senere
+
+---
+
+## SESSION 2 (2026-06-25) — bytte-forsendelse, IA-ombygning & nye features
+
+### ⚠️ Miljø-tilstand (KRITISK for ny session)
+- **Stripe TEST-webhook peger MIDLERTIDIGT på preview** (ikke prod), med Vercel Protection-Bypass-secret i endpoint-URL'en. Nødvendigt fordi Punkt 7-8's escrow/forsendelse/refusion lever i branch-webhooken, og prod-webhooken ikke kender `swap_proposals`. **SKAL sættes tilbage til produktions-URL efter Punkt 8.** Se [[stripe-webhook-peger-paa-preview]].
+- **Shipmondo:** Preview-scope env sat til **sandbox** (`SHIPMONDO_BASE_URL` + sandbox `API_USER`/`API_KEY`), så pakke-booking virker uden rigtig saldo. Production-nøgler urørt.
+- **`STRIPE_SECRET_KEY`** manglede på Preview (kun Production) — tilføjet til Preview.
+- Vercel "Redeploy" fra dashboard tager IKKE altid nye env-vars med → trig frisk deploy via git-push.
+
+### DB-migrationer anvendt (begge i `supabase/migrations/`)
+- `20260624_listing_estimated_value.sql` — `listings.estimated_value` (anslået værdi på byt-opslag).
+- `20260625_swap_received_flags.sql` — `swap_proposals.initiator_received` / `owner_received` (modtaget-bekræftelse).
+
+### Bytte-forsendelse (Punkt 7 fuldført)
+- Ny side **`/bytte-betaling/[proposalId]`**: betaleren vælger udleveringssted (genbruger `PickupPointPicker`) — fikser GLS 422 "service point required". Gemmes på `*_pickup`, bruges ved booking. "Betal — send med pakke" i boblen router hertil.
+- Verificeret ende-til-ende mod sandbox: begge pakker booket (tracking + mærkater).
+
+### Ny IA — opdelt efter RETNING (efter UX-vurdering)
+- **"Skal sendes"** (`/mine-opgaver`, tidl. "Mine salg") = alt jeg sender (køb-salg + min bytte-udgående bundt). **Eneste sted med pakkemærkat.**
+- **"Mine køb"** (`/mine-ordrer`, tidl. "Mine ordrer") = alt jeg modtager (køb + modpartens bytte-bundt). Tracking + **"✅ Marker som modtaget"** (via `/api/swaps/mark-received`). Bytte-afsend-ordrer ekskluderet herfra.
+- **"Byttehandler"-kortet FJERNET** (redundant; bytte lever i Beskeder + Skal sendes + Mine køb). Ruten `/mine-handeler` findes stadig men er ikke linket.
+- Profil-hub: tællere på alle kort (Mine køb/Favoritter/Gemte søgninger/Skal sendes), 2-kolonne-grid, favorit-tæller = samme logik som `/favoritter`.
+- Besked-boble: deep-links "Se afsendelse →" / "Følg det jeg modtager →" + partens egen pakkemærkat/tracking.
+
+### Notifikationer
+- **In-app notifikationer** ved nyt bytteforslag (`swap_proposal_received`) og "din tur at betale" (`swap_payment_turn`). Klokke-notifikationer er nu **klikbare** → fører til samtale/opslag.
+- Bug rettet: `.catch()` på Supabase-builder kastede TypeError (`supa.from().insert().catch` findes ikke) → notifikations-insert væltede `swaps/create`. Nu try/catch.
+
+### Øvrige rettelser
+- Kontant mellemlag vises som synlig linje på betalingssiden.
+- Reserverede varer (låst i anden handel) kan ikke vælges i nyt bytteforslag (begge sider + server).
+- Completion-besked degraderer pænt ("Aftal levering indbyrdes") hvis ingen pakke blev booket.
+- Markedsplads ryddet: 40 seed-opslag (bruger 8dac847e) slettet permanent.
 
 ---
 
