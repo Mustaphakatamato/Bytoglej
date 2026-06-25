@@ -720,12 +720,15 @@ function ListingsTab({ allInstitutions = [], isMobile }) {
   const [expanded, setExpanded] = useState(null);
   const [confirm, setConfirm] = useState(null);
   const [editModalListing, setEditModalListing] = useState(null);
+  const [reportActing, setReportActing] = useState(null);   // report.id mens handling kører
+  const [reportDeleteTarget, setReportDeleteTarget] = useState(null); // report.id med åbent slet-felt
+  const [reportDeleteMsg, setReportDeleteMsg] = useState('');
 
   const fetchAll = useCallback(async () => {
     setLoading(true);
     const [{ data: l }, { data: r }, { data: pr }] = await Promise.all([
       db.from('listings').select('*').order('created_at', { ascending: false }).limit(300),
-      db.from('listing_reports').select('*, listings(title, institution_name)').eq('status', 'pending').order('created_at', { ascending: false }),
+      db.from('listing_reports').select('*, listings(*)').eq('status', 'pending').order('created_at', { ascending: false }),
       db.from('listings').select('*').eq('review_status', 'pending').order('review_requested_at', { ascending: true }),
     ]);
     setListings(l || []);
@@ -808,6 +811,31 @@ function ListingsTab({ allInstitutions = [], isMobile }) {
     setReports(prev => prev.filter(r => r.id !== id));
   }
 
+  // Gør inaktivt eller slet det rapporterede opslag — med besked til sælger.
+  async function reportAction(report, action, message = '') {
+    setReportActing(report.id + action);
+    const { data: { session } } = await db.auth.getSession();
+    const res = await fetch('/api/admin/report-action', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session?.access_token || ''}` },
+      body: JSON.stringify({ report_id: report.id, action, message }),
+    });
+    setReportActing(null);
+    if (!res.ok) {
+      const j = await res.json().catch(() => ({}));
+      alert(j.error || 'Handlingen kunne ikke gennemføres');
+      return;
+    }
+    setReportDeleteTarget(null);
+    setReportDeleteMsg('');
+    setReports(prev => prev.filter(r => r.id !== report.id));
+    if (action === 'deactivate') {
+      setListings(prev => prev.map(x => x.id === report.listing_id ? { ...x, is_active: false } : x));
+    } else {
+      setListings(prev => prev.filter(x => x.id !== report.listing_id));
+    }
+  }
+
   const filtered = listings.filter(l => {
     if (filterType && l.type !== filterType) return false;
     if (filterStatus === 'active' && !l.is_active) return false;
@@ -830,24 +858,55 @@ function ListingsTab({ allInstitutions = [], isMobile }) {
       {subTab === 'reports' ? (
         loading ? <Spinner /> : reports.length === 0 ? <Empty text="Ingen afventende rapporter" /> : (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-            {reports.map(r => (
+            {reports.map(r => {
+              const lst = r.listings;
+              const busy = !!reportActing;
+              return (
               <div key={r.id} style={{ background: '#fff', border: `1px solid ${PAPER3}`, borderRadius: 14, padding: '16px 18px' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}>
+                <div style={{ display: 'flex', gap: 14, flexWrap: isMobile ? 'wrap' : 'nowrap' }}>
+                  {lst && Array.isArray(lst.images) && lst.images[0] && (
+                    <img src={lst.images[0]} alt="" style={{ width: 72, height: 72, objectFit: 'cover', borderRadius: 10, flexShrink: 0 }} />
+                  )}
                   <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ fontFamily: FONT, fontWeight: 800, fontSize: 14, color: INK }}>{r.listings?.title || 'Slettet opslag'}</div>
-                    <div style={{ fontFamily: FONT, fontSize: 12, color: INK3, marginTop: 2 }}>{r.listings?.institution_name || '—'}</div>
+                    <div style={{ fontFamily: FONT, fontWeight: 800, fontSize: 14, color: INK }}>{lst?.title || 'Slettet opslag'}</div>
+                    <div style={{ fontFamily: FONT, fontSize: 12, color: INK3, marginTop: 2 }}>
+                      {lst?.institution_name || '—'}
+                      {lst && lst.is_active === false && <span style={{ marginLeft: 8, color: '#DC2626', fontWeight: 700 }}>· Inaktiv</span>}
+                    </div>
+                    {lst?.description && <div style={{ fontFamily: FONT, fontSize: 12, color: INK2, marginTop: 6, lineHeight: 1.5, display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>{lst.description}</div>}
                     <div style={{ fontFamily: FONT, fontSize: 13, color: CORAL, fontWeight: 700, marginTop: 8 }}>Årsag: {r.reason}</div>
                     {r.details && <div style={{ fontFamily: FONT, fontSize: 13, color: INK2, marginTop: 4, whiteSpace: 'pre-wrap' }}>{r.details}</div>}
                     <div style={{ fontFamily: FONT, fontSize: 11, color: INK3, marginTop: 8 }}>Rapporteret af {r.reporter_institution_name || r.reporter_email || 'ukendt'} · {fmtDate(r.created_at)}</div>
                   </div>
                 </div>
+
                 <div style={{ display: 'flex', gap: 8, marginTop: 12, flexWrap: 'wrap' }}>
-                  <button onClick={() => setReportStatus(r.id, 'reviewed')} style={{ padding: '7px 14px', borderRadius: 10, border: `1.5px solid ${PAPER3}`, background: '#fff', color: INK, fontFamily: FONT, fontWeight: 700, fontSize: 12, cursor: 'pointer' }}>Gennemgået</button>
-                  <button onClick={() => setReportStatus(r.id, 'removed')} style={{ padding: '7px 14px', borderRadius: 10, border: 'none', background: '#FEF2F2', color: '#DC2626', fontFamily: FONT, fontWeight: 700, fontSize: 12, cursor: 'pointer' }}>Marker fjernet</button>
-                  <button onClick={() => setReportStatus(r.id, 'dismissed')} style={{ padding: '7px 14px', borderRadius: 10, border: `1.5px solid ${PAPER3}`, background: PAPER2, color: INK3, fontFamily: FONT, fontWeight: 700, fontSize: 12, cursor: 'pointer' }}>Afvis</button>
+                  {lst && (
+                    <button onClick={() => setEditModalListing(lst)} disabled={busy} style={{ padding: '7px 14px', borderRadius: 10, border: `1.5px solid ${PRIMARY}`, background: GREEN_TINT, color: PRIMARY, fontFamily: FONT, fontWeight: 700, fontSize: 12, cursor: busy ? 'default' : 'pointer' }}>👁 Se opslag</button>
+                  )}
+                  {lst && lst.is_active !== false && (
+                    <button onClick={() => reportAction(r, 'deactivate')} disabled={busy} style={{ padding: '7px 14px', borderRadius: 10, border: '1.5px solid #F59E0B', background: '#FFFBEB', color: '#92400E', fontFamily: FONT, fontWeight: 700, fontSize: 12, cursor: busy ? 'default' : 'pointer' }}>{reportActing === r.id + 'deactivate' ? '…' : '🚫 Gør inaktiv'}</button>
+                  )}
+                  {lst && (
+                    <button onClick={() => { setReportDeleteTarget(r.id); setReportDeleteMsg(''); }} disabled={busy} style={{ padding: '7px 14px', borderRadius: 10, border: 'none', background: '#FEF2F2', color: '#DC2626', fontFamily: FONT, fontWeight: 700, fontSize: 12, cursor: busy ? 'default' : 'pointer' }}>🗑 Slet opslag</button>
+                  )}
+                  <button onClick={() => setReportStatus(r.id, 'dismissed')} disabled={busy} style={{ padding: '7px 14px', borderRadius: 10, border: `1.5px solid ${PAPER3}`, background: PAPER2, color: INK3, fontFamily: FONT, fontWeight: 700, fontSize: 12, cursor: busy ? 'default' : 'pointer' }}>Afvis rapport</button>
                 </div>
+
+                {reportDeleteTarget === r.id && (
+                  <div style={{ marginTop: 12, background: '#FEF2F2', borderRadius: 12, padding: '14px 16px' }}>
+                    <div style={{ fontFamily: FONT, fontWeight: 600, fontSize: 13, color: '#DC2626', marginBottom: 8 }}>Begrundelse (sendes til sælger)</div>
+                    <textarea value={reportDeleteMsg} onChange={e => setReportDeleteMsg(e.target.value)} rows={3} placeholder="Beskriv hvorfor opslaget fjernes…"
+                      style={{ width: '100%', padding: '8px 12px', borderRadius: 8, border: '1.5px solid #FCA5A5', fontSize: 13, fontFamily: FONT, resize: 'none', outline: 'none', boxSizing: 'border-box', background: '#fff' }} />
+                    <div style={{ display: 'flex', gap: 8, marginTop: 10, justifyContent: 'flex-end' }}>
+                      <button onClick={() => { setReportDeleteTarget(null); setReportDeleteMsg(''); }} style={{ padding: '8px 16px', borderRadius: 8, border: `1px solid ${PAPER3}`, background: '#fff', fontFamily: FONT, fontSize: 13, cursor: 'pointer', color: INK3 }}>Annuller</button>
+                      <button onClick={() => reportAction(r, 'delete', reportDeleteMsg)} disabled={!reportDeleteMsg.trim() || busy} style={{ padding: '8px 16px', borderRadius: 8, border: 'none', background: '#DC2626', color: '#fff', fontFamily: FONT, fontWeight: 700, fontSize: 13, cursor: !reportDeleteMsg.trim() ? 'not-allowed' : 'pointer', opacity: !reportDeleteMsg.trim() ? 0.6 : 1 }}>{reportActing === r.id + 'delete' ? '…' : 'Bekræft sletning'}</button>
+                    </div>
+                  </div>
+                )}
               </div>
-            ))}
+              );
+            })}
           </div>
         )
       ) : subTab === 'review' ? (
