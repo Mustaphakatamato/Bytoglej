@@ -140,13 +140,15 @@ export default function OpretOpslagPage() {
     'other':               { pickup:true, shipping:false                   },
   };
 
+  // Forud-vælg en passende pakkevægt ud fra kategorien, så vægten er rigtig hvis
+  // sælgeren selv slår forsendelse til. Selve "sendes"-valget rører vi ALDRIG —
+  // det styrer sælgeren manuelt (ellers blev forsendelse tændt automatisk ved kategorivalg).
   useEffect(() => {
     if (!form.category || deliveryDefaultApplied) return;
     const d = CATEGORY_DELIVERY[form.category];
     if (!d) return;
     setDelivery(prev => ({
       ...prev,
-      shipping: d.shipping ?? prev.shipping,
       weight_g: d.weight_g ?? prev.weight_g,
     }));
     setDeliveryDefaultApplied(true);
@@ -833,7 +835,7 @@ export default function OpretOpslagPage() {
                 {form.type === 'køb' && (
                   <div>
                     <label style={labelStyle}>Pris (kr.) <span style={{ color:'#e53e3e' }}>*</span></label>
-                    <input type="number" value={form.price} onChange={e=>setForm({...form,price:e.target.value})} placeholder="Fx 250" min="1" style={{ ...inputStyle, border:`1.5px solid ${!form.price?'#FCA5A5':PAPER3}` }} />
+                    <input type="text" inputMode="numeric" value={form.price} onChange={e=>setForm({...form,price:e.target.value.replace(/[^0-9]/g,'')})} placeholder="Fx 250" style={{ ...inputStyle, border:`1.5px solid ${!form.price?'#FCA5A5':PAPER3}` }} />
                     {priceSuggestion?.suggested_min != null && (
                       <div style={{ marginTop:6, display:'flex', alignItems:'center', gap:6, fontFamily:FONT, fontSize:12, color:INK3 }}>
                         <span>✨</span>
@@ -846,14 +848,14 @@ export default function OpretOpslagPage() {
                 {form.type === 'byt' && (
                   <div>
                     <label style={labelStyle}>Anslået værdi (kr.) <span style={{ color:'#e53e3e' }}>*</span></label>
-                    <input type="number" value={form.price} onChange={e=>setForm({...form,price:e.target.value})} placeholder="Fx 250" min="1" style={{ ...inputStyle, border:`1.5px solid ${!form.price?'#FCA5A5':PAPER3}` }} />
+                    <input type="text" inputMode="numeric" value={form.price} onChange={e=>setForm({...form,price:e.target.value.replace(/[^0-9]/g,'')})} placeholder="Fx 250" style={{ ...inputStyle, border:`1.5px solid ${!form.price?'#FCA5A5':PAPER3}` }} />
                     <div style={{ marginTop:6, fontFamily:FONT, fontSize:12, color:INK3 }}>Bruges til at sammenligne værdi i bytteforslag — vises ikke som salgspris.</div>
                   </div>
                 )}
                 {form.type === 'søges' && (
                   <div>
                     <label style={labelStyle}>Budget (kr.) <span style={{ fontWeight:400, color:INK3 }}>(valgfri, lad stå tom hvis byt)</span></label>
-                    <input type="number" value={form.price} onChange={e=>setForm({...form,price:e.target.value})} placeholder="Fx 200" min="0" style={inputStyle} />
+                    <input type="text" inputMode="numeric" value={form.price} onChange={e=>setForm({...form,price:e.target.value.replace(/[^0-9]/g,'')})} placeholder="Fx 200" style={inputStyle} />
                   </div>
                 )}
 

@@ -143,8 +143,8 @@ function ListingDetail({ l, likers, offers, isMobile, onBack, onOpenBid, onToggl
               Sæt ny pris {l.price ? `(nu: ${l.price} kr)` : ''}
             </div>
             <div style={{ display:'flex', gap:8, alignItems:'center' }}>
-              <input type="number" value={newPrice} onChange={e => setNewPrice(e.target.value)}
-                onKeyDown={e => e.key === 'Enter' && savePrice()} placeholder={l.price ? `Under ${l.price}` : 'Ny pris'} min="1" autoFocus
+              <input type="text" inputMode="numeric" value={newPrice} onChange={e => setNewPrice(e.target.value.replace(/[^0-9]/g, ''))}
+                onKeyDown={e => e.key === 'Enter' && savePrice()} placeholder={l.price ? `Under ${l.price}` : 'Ny pris'} autoFocus
                 style={{ flex:1, padding:'9px 12px', borderRadius:10, border:'1.5px solid #FCD34D', fontSize:14, outline:'none', fontFamily:FONT, background:'#fff', color:INK, boxSizing:'border-box' }} />
               <span style={{ fontFamily:FONT, fontSize:13, color:INK3, flexShrink:0 }}>kr.</span>
               <button onClick={savePrice} disabled={savingPrice || !newPrice || Number(newPrice) <= 0}

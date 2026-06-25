@@ -7,6 +7,7 @@ import { Spinner } from '@/components/ui';
 import { db } from '@/lib/supabase';
 import { useApp } from '@/providers/AppProvider';
 import { LogoLockup } from '@/components/Logo';
+import { isValidEmail, suggestEmailFix } from '@/lib/email-validation';
 
 const TRUST_POINTS = [
   'CVR-verificerede institutioner',
@@ -26,6 +27,7 @@ export default function LoginPage() {
   const [checking,  setChecking]  = useState(false);
   const [loading,   setLoading]   = useState(false);
   const [error,     setError]     = useState(null);
+  const [emailFix,  setEmailFix]  = useState(null);
   const [showPass,  setShowPass]  = useState(false);
   const passRef = useRef(null);
 
@@ -46,12 +48,12 @@ export default function LoginPage() {
     if (step === 'password') setTimeout(() => passRef.current?.focus(), 80);
   }, [step]);
 
-  function isValidEmail(v) { return /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(v.trim()); }
-
   async function handleEmailSubmit(e) {
     e.preventDefault();
     if (!email.trim()) return;
     if (!isValidEmail(email)) { setError('Skriv en gyldig e-mail (fx navn@institution.dk)'); return; }
+    const fix = suggestEmailFix(email);
+    if (fix && fix !== email.trim().toLowerCase()) { setEmailFix(fix); return; }
     setChecking(true);
     setError(null);
     const emailLower = email.trim().toLowerCase();
@@ -98,11 +100,16 @@ export default function LoginPage() {
             <div>
               <label style={{ display: 'block', fontFamily: FONT, fontWeight: 700, fontSize: 13, color: INK2, marginBottom: 6 }}>E-mail</label>
               <input
-                type="email" value={email} onChange={e => { setEmail(e.target.value); setError(null); }}
+                type="email" value={email} onChange={e => { setEmail(e.target.value); setError(null); setEmailFix(null); }}
                 placeholder="navn@institution.dk" autoFocus required
                 style={inputStyle}
               />
             </div>
+            {emailFix && (
+              <div style={{ background: '#FFFBEB', borderLeft: '3px solid #F59E0B', borderRadius: 12, padding: '12px 16px', fontSize: 13, color: '#92400E', fontFamily: FONT }}>
+                Mente du <button type="button" onClick={() => { setEmail(emailFix); setEmailFix(null); }} style={{ background: 'none', border: 'none', padding: 0, color: '#92400E', fontWeight: 800, textDecoration: 'underline', cursor: 'pointer', fontFamily: FONT, fontSize: 13 }}>{emailFix}</button>?
+              </div>
+            )}
             {error && (
               <div style={{ background: '#FEF2F2', borderLeft: '3px solid #EF4444', borderRadius: 12, padding: '12px 16px', fontSize: 13, color: '#B91C1C', fontFamily: FONT }}>
                 {error}
