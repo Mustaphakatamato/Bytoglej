@@ -84,6 +84,9 @@ export default function ProfilPage() {
   const [activeListingCount, setActiveListingCount] = useState(null);
   const [pendingCount, setPendingCount] = useState(0);
   const [sentCount, setSentCount] = useState(null);
+  const [favCount, setFavCount] = useState(null);
+  const [savedCount, setSavedCount] = useState(null);
+  const [buyCount, setBuyCount] = useState(null);
   const [notifPermission, setNotifPermission] = useState('default');
   const [notifLoading, setNotifLoading] = useState(false);
 
@@ -222,6 +225,23 @@ export default function ProfilPage() {
             (c.is_handled && c.handled_action === 'order_confirmed' && !c.deal_completed)
           ).length);
         });
+
+      // Tællere til hub-kortene (konsistent med Mine opslag)
+      db.from('listing_favorites').select('id', { count:'exact', head:true }).eq('user_id', uid)
+        .then(({ count }) => { if (!cancelled) setFavCount(count ?? 0); });
+      if (inst?.email) {
+        db.from('saved_searches').select('id', { count:'exact', head:true }).ilike('email', inst.email)
+          .then(({ count }) => { if (!cancelled) setSavedCount(count ?? 0); });
+      } else { setSavedCount(0); }
+      // Mine køb = ikke-bytte køb-ordrer + bytter hvor jeg er part (modtager)
+      Promise.all([
+        db.from('orders').select('order_groups').eq('buyer_id', uid).not('status', 'in', '("pending","failed","cancelled")'),
+        db.from('swap_proposals').select('id', { count:'exact', head:true }).or(`initiator_institution_id.eq.${instId},owner_institution_id.eq.${instId}`).eq('status', 'accepted'),
+      ]).then(([ord, sw]) => {
+        if (cancelled) return;
+        const kob = (ord.data || []).filter(o => !String(o.order_groups?.[0]?.sellerName || '').startsWith('Byttehandel')).length;
+        setBuyCount(kob + (sw.count ?? 0));
+      });
     }
 
     boot();
@@ -474,7 +494,7 @@ export default function ProfilPage() {
               icon="📋"
               label="Skal sendes"
               sublabel="Pak & send med mærkat"
-              value={pendingCount || null}
+              value={pendingCount}
               badge={pendingCount}
               highlight={pendingCount > 0}
               onClick={() => router.push('/mine-opgaver')}
@@ -488,14 +508,14 @@ export default function ProfilPage() {
               icon="🛍️"
               label="Mine køb"
               sublabel="Følg & modtag"
-              value={null}
+              value={buyCount ?? '—'}
               onClick={() => router.push('/mine-ordrer')}
             />
             <ActivityCard
               icon="❤️"
               label="Favoritter"
               sublabel="Gemte annoncer"
-              value={null}
+              value={favCount ?? '—'}
               onClick={() => router.push('/favoritter')}
             />
           </div>
@@ -507,7 +527,7 @@ export default function ProfilPage() {
               icon="🔍"
               label="Gemte søgninger"
               sublabel="Søge-notifikationer"
-              value={null}
+              value={savedCount ?? '—'}
               onClick={() => router.push('/gemte-soegninger')}
             />
             <ActivityCard
