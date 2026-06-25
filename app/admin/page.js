@@ -723,12 +723,14 @@ function ListingsTab({ allInstitutions = [], isMobile }) {
   const [reportActing, setReportActing] = useState(null);   // report.id mens handling kører
   const [reportDeleteTarget, setReportDeleteTarget] = useState(null); // report.id med åbent slet-felt
   const [reportDeleteMsg, setReportDeleteMsg] = useState('');
+  const [reportFilter, setReportFilter] = useState('pending'); // 'pending' | 'handled'
 
   const fetchAll = useCallback(async () => {
     setLoading(true);
     const [{ data: l }, { data: r }, { data: pr }] = await Promise.all([
       db.from('listings').select('*').order('created_at', { ascending: false }).limit(300),
-      db.from('listing_reports').select('*, listings(*)').eq('status', 'pending').order('created_at', { ascending: false }),
+      // Hent ALLE rapporter (også behandlede) så vi har historik
+      db.from('listing_reports').select('*, listings(*)').order('created_at', { ascending: false }).limit(300),
       db.from('listings').select('*').eq('review_status', 'pending').order('review_requested_at', { ascending: true }),
     ]);
     setListings(l || []);
@@ -774,52 +776,35 @@ function ListingsTab({ allInstitutions = [], isMobile }) {
     setListings(prev => prev.filter(l => l.id !== id));
     setConfirm(null);
   }
-  function startEdit(l) {
-    setEditing(l.id);
-    setEditForm({
-      title: l.title || '',
-      description: l.description || '',
-      price: l.price ?? '',
-      condition: l.condition || '',
-      age_group: l.age_group || '',
-      city: l.city || '',
-      category: l.category || '',
-      type: l.type || '',
-    });
-  }
-  async function saveEdit(l) {
-    setSavingEdit(true);
-    const patch = {
-      title: (editForm.title || '').trim(),
-      description: editForm.description || null,
-      price: editForm.price === '' || editForm.price == null ? null : Number(editForm.price),
-      condition: editForm.condition || null,
-      age_group: editForm.age_group || null,
-      city: editForm.city || null,
-      category: editForm.category || null,
-      type: editForm.type || null,
-    };
-    const { error } = await db.from('listings').update(patch).eq('id', l.id);
-    setSavingEdit(false);
-    if (error) { alert('Kunne ikke gemme ændringer: ' + error.message); return; }
-    setListings(prev => prev.map(x => x.id === l.id ? { ...x, ...patch } : x));
-    setEditing(null);
-  }
-  async function setReportStatus(id, status) {
+  // Ren status-ændring på rapporten (færdigbehandlet / afvist / genåbn) — rører ikke opslaget.
+  async function setReportStatus(report, status) {
+    setReportActing(report.id + status);
     const { data: { session } } = await db.auth.getSession();
-    await db.from('listing_reports').update({ status, reviewed_by: session?.user?.email, reviewed_at: new Date().toISOString() }).eq('id', id);
-    setReports(prev => prev.filter(r => r.id !== id));
+    const patch = status === 'pending'
+      ? { status: 'pending', reviewed_by: null, reviewed_at: null }
+      : { status, reviewed_by: session?.user?.email, reviewed_at: new Date().toISOString() };
+    const { error } = await db.from('listing_reports').update(patch).eq('id', report.id);
+    setReportActing(null);
+    if (error) { alert('Kunne ikke opdatere: ' + error.message); return; }
+    await fetchAll();
   }
 
-  // Gør inaktivt eller slet det rapporterede opslag — med besked til sælger.
+  // Aktivér/inaktivér eller slet det rapporterede opslag — sender besked + e-mail til sælger.
   async function reportAction(report, action, message = '') {
     setReportActing(report.id + action);
     const { data: { session } } = await db.auth.getSession();
-    const res = await fetch('/api/admin/report-action', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session?.access_token || ''}` },
-      body: JSON.stringify({ report_id: report.id, action, message }),
-    });
+    let res;
+    try {
+      res = await fetch('/api/admin/report-action', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session?.access_token || ''}` },
+        body: JSON.stringify({ report_id: report.id, action, message }),
+      });
+    } catch {
+      setReportActing(null);
+      alert('Netværksfejl — prøv igen.');
+      return;
+    }
     setReportActing(null);
     if (!res.ok) {
       const j = await res.json().catch(() => ({}));
@@ -828,12 +813,7 @@ function ListingsTab({ allInstitutions = [], isMobile }) {
     }
     setReportDeleteTarget(null);
     setReportDeleteMsg('');
-    setReports(prev => prev.filter(r => r.id !== report.id));
-    if (action === 'deactivate') {
-      setListings(prev => prev.map(x => x.id === report.listing_id ? { ...x, is_active: false } : x));
-    } else {
-      setListings(prev => prev.filter(x => x.id !== report.listing_id));
-    }
+    await fetchAll();
   }
 
   const filtered = listings.filter(l => {
@@ -847,36 +827,58 @@ function ListingsTab({ allInstitutions = [], isMobile }) {
     return true;
   });
 
+  const pendingReports = reports.filter(r => r.status === 'pending');
+  const handledReports = reports.filter(r => r.status !== 'pending');
+  const shownReports = reportFilter === 'pending' ? pendingReports : handledReports;
+  const REPORT_STATUS_LABEL = { reviewed: 'Færdigbehandlet', removed: 'Opslag fjernet', dismissed: 'Afvist' };
+
   return (
     <div>
       <div style={{ display: 'flex', gap: 8, marginBottom: 16, flexWrap: 'wrap' }}>
-        {[['listings', `Alle opslag (${listings.length})`], ['reports', `Rapporterede (${reports.length})`], ['review', `Til gennemgang${pendingReviews.length > 0 ? ` (${pendingReviews.length})` : ''}`]].map(([k, l]) => (
+        {[['listings', `Alle opslag (${listings.length})`], ['reports', `Rapporterede${pendingReports.length > 0 ? ` (${pendingReports.length})` : ''}`], ['review', `Til gennemgang${pendingReviews.length > 0 ? ` (${pendingReviews.length})` : ''}`]].map(([k, l]) => (
           <button key={k} onClick={() => setSubTab(k)} style={{ padding: '7px 16px', borderRadius: 99, border: `1.5px solid ${subTab === k ? (k === 'review' ? '#F59E0B' : PRIMARY) : PAPER3}`, background: subTab === k ? (k === 'review' ? '#FEF3C7' : GREEN_TINT) : PAPER2, color: subTab === k ? (k === 'review' ? '#92400E' : PRIMARY) : INK3, fontFamily: FONT, fontWeight: 700, fontSize: 13, cursor: 'pointer' }}>{l}</button>
         ))}
       </div>
 
       {subTab === 'reports' ? (
-        loading ? <Spinner /> : reports.length === 0 ? <Empty text="Ingen afventende rapporter" /> : (
+        loading ? <Spinner /> : (
+          <div>
+            <div style={{ display: 'flex', gap: 8, marginBottom: 14, flexWrap: 'wrap' }}>
+              {[['pending', `Afventer (${pendingReports.length})`], ['handled', `Behandlet (${handledReports.length})`]].map(([k, l]) => (
+                <button key={k} onClick={() => setReportFilter(k)} style={{ padding: '6px 14px', borderRadius: 99, border: `1.5px solid ${reportFilter === k ? PRIMARY : PAPER3}`, background: reportFilter === k ? GREEN_TINT : PAPER2, color: reportFilter === k ? PRIMARY : INK3, fontFamily: FONT, fontWeight: 700, fontSize: 12, cursor: 'pointer' }}>{l}</button>
+              ))}
+            </div>
+            {shownReports.length === 0 ? <Empty text={reportFilter === 'pending' ? 'Ingen afventende rapporter' : 'Ingen behandlede rapporter endnu'} /> : (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-            {reports.map(r => {
+            {shownReports.map(r => {
               const lst = r.listings;
               const busy = !!reportActing;
+              const isHandled = r.status !== 'pending';
+              const title = lst?.title || r.listing_title || 'Slettet opslag';
+              const inst = lst?.institution_name || r.listing_institution_name || '—';
               return (
-              <div key={r.id} style={{ background: '#fff', border: `1px solid ${PAPER3}`, borderRadius: 14, padding: '16px 18px' }}>
+              <div key={r.id} style={{ background: '#fff', border: `1px solid ${PAPER3}`, borderRadius: 14, padding: '16px 18px', opacity: isHandled ? 0.92 : 1 }}>
                 <div style={{ display: 'flex', gap: 14, flexWrap: isMobile ? 'wrap' : 'nowrap' }}>
                   {lst && Array.isArray(lst.images) && lst.images[0] && (
                     <img src={lst.images[0]} alt="" style={{ width: 72, height: 72, objectFit: 'cover', borderRadius: 10, flexShrink: 0 }} />
                   )}
                   <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ fontFamily: FONT, fontWeight: 800, fontSize: 14, color: INK }}>{lst?.title || 'Slettet opslag'}</div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                      <span style={{ fontFamily: FONT, fontWeight: 800, fontSize: 14, color: INK }}>{title}</span>
+                      {isHandled && <span style={{ fontFamily: FONT, fontSize: 11, fontWeight: 700, color: INK3, background: PAPER2, border: `1px solid ${PAPER3}`, borderRadius: 99, padding: '2px 8px' }}>{REPORT_STATUS_LABEL[r.status] || r.status}</span>}
+                    </div>
                     <div style={{ fontFamily: FONT, fontSize: 12, color: INK3, marginTop: 2 }}>
-                      {lst?.institution_name || '—'}
+                      {inst}
                       {lst && lst.is_active === false && <span style={{ marginLeft: 8, color: '#DC2626', fontWeight: 700 }}>· Inaktiv</span>}
+                      {!lst && <span style={{ marginLeft: 8, color: INK3, fontStyle: 'italic' }}>· opslag slettet</span>}
                     </div>
                     {lst?.description && <div style={{ fontFamily: FONT, fontSize: 12, color: INK2, marginTop: 6, lineHeight: 1.5, display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>{lst.description}</div>}
                     <div style={{ fontFamily: FONT, fontSize: 13, color: CORAL, fontWeight: 700, marginTop: 8 }}>Årsag: {r.reason}</div>
                     {r.details && <div style={{ fontFamily: FONT, fontSize: 13, color: INK2, marginTop: 4, whiteSpace: 'pre-wrap' }}>{r.details}</div>}
-                    <div style={{ fontFamily: FONT, fontSize: 11, color: INK3, marginTop: 8 }}>Rapporteret af {r.reporter_institution_name || r.reporter_email || 'ukendt'} · {fmtDate(r.created_at)}</div>
+                    <div style={{ fontFamily: FONT, fontSize: 11, color: INK3, marginTop: 8 }}>
+                      Rapporteret af {r.reporter_institution_name || r.reporter_email || 'ukendt'} · {fmtDate(r.created_at)}
+                      {isHandled && r.reviewed_by && <> · behandlet af {r.reviewed_by}{r.reviewed_at ? ` ${fmtDate(r.reviewed_at)}` : ''}</>}
+                    </div>
                   </div>
                 </div>
 
@@ -887,15 +889,26 @@ function ListingsTab({ allInstitutions = [], isMobile }) {
                   {lst && lst.is_active !== false && (
                     <button onClick={() => reportAction(r, 'deactivate')} disabled={busy} style={{ padding: '7px 14px', borderRadius: 10, border: '1.5px solid #F59E0B', background: '#FFFBEB', color: '#92400E', fontFamily: FONT, fontWeight: 700, fontSize: 12, cursor: busy ? 'default' : 'pointer' }}>{reportActing === r.id + 'deactivate' ? '…' : '🚫 Gør inaktiv'}</button>
                   )}
+                  {lst && lst.is_active === false && (
+                    <button onClick={() => reportAction(r, 'activate')} disabled={busy} style={{ padding: '7px 14px', borderRadius: 10, border: '1.5px solid #16A34A', background: '#F0FDF4', color: '#15803D', fontFamily: FONT, fontWeight: 700, fontSize: 12, cursor: busy ? 'default' : 'pointer' }}>{reportActing === r.id + 'activate' ? '…' : '✓ Genaktivér'}</button>
+                  )}
                   {lst && (
                     <button onClick={() => { setReportDeleteTarget(r.id); setReportDeleteMsg(''); }} disabled={busy} style={{ padding: '7px 14px', borderRadius: 10, border: 'none', background: '#FEF2F2', color: '#DC2626', fontFamily: FONT, fontWeight: 700, fontSize: 12, cursor: busy ? 'default' : 'pointer' }}>🗑 Slet opslag</button>
                   )}
-                  <button onClick={() => setReportStatus(r.id, 'dismissed')} disabled={busy} style={{ padding: '7px 14px', borderRadius: 10, border: `1.5px solid ${PAPER3}`, background: PAPER2, color: INK3, fontFamily: FONT, fontWeight: 700, fontSize: 12, cursor: busy ? 'default' : 'pointer' }}>Afvis rapport</button>
+                  {!isHandled && (
+                    <>
+                      <button onClick={() => setReportStatus(r, 'reviewed')} disabled={busy} style={{ padding: '7px 14px', borderRadius: 10, border: `1.5px solid ${PRIMARY}`, background: '#fff', color: PRIMARY, fontFamily: FONT, fontWeight: 700, fontSize: 12, cursor: busy ? 'default' : 'pointer' }}>{reportActing === r.id + 'reviewed' ? '…' : '✓ Færdigbehandlet'}</button>
+                      <button onClick={() => setReportStatus(r, 'dismissed')} disabled={busy} style={{ padding: '7px 14px', borderRadius: 10, border: `1.5px solid ${PAPER3}`, background: PAPER2, color: INK3, fontFamily: FONT, fontWeight: 700, fontSize: 12, cursor: busy ? 'default' : 'pointer' }}>Afvis rapport</button>
+                    </>
+                  )}
+                  {isHandled && (
+                    <button onClick={() => setReportStatus(r, 'pending')} disabled={busy} style={{ padding: '7px 14px', borderRadius: 10, border: `1.5px solid ${PAPER3}`, background: '#fff', color: INK, fontFamily: FONT, fontWeight: 700, fontSize: 12, cursor: busy ? 'default' : 'pointer' }}>{reportActing === r.id + 'pending' ? '…' : '↩ Genåbn'}</button>
+                  )}
                 </div>
 
                 {reportDeleteTarget === r.id && (
                   <div style={{ marginTop: 12, background: '#FEF2F2', borderRadius: 12, padding: '14px 16px' }}>
-                    <div style={{ fontFamily: FONT, fontWeight: 600, fontSize: 13, color: '#DC2626', marginBottom: 8 }}>Begrundelse (sendes til sælger)</div>
+                    <div style={{ fontFamily: FONT, fontWeight: 600, fontSize: 13, color: '#DC2626', marginBottom: 8 }}>Begrundelse (sendes til sælger på mail)</div>
                     <textarea value={reportDeleteMsg} onChange={e => setReportDeleteMsg(e.target.value)} rows={3} placeholder="Beskriv hvorfor opslaget fjernes…"
                       style={{ width: '100%', padding: '8px 12px', borderRadius: 8, border: '1.5px solid #FCA5A5', fontSize: 13, fontFamily: FONT, resize: 'none', outline: 'none', boxSizing: 'border-box', background: '#fff' }} />
                     <div style={{ display: 'flex', gap: 8, marginTop: 10, justifyContent: 'flex-end' }}>
@@ -907,6 +920,8 @@ function ListingsTab({ allInstitutions = [], isMobile }) {
               </div>
               );
             })}
+          </div>
+            )}
           </div>
         )
       ) : subTab === 'review' ? (
@@ -1060,6 +1075,7 @@ function ListingsTab({ allInstitutions = [], isMobile }) {
           onClose={() => setEditModalListing(null)}
           onSaved={(updated) => {
             setListings(prev => prev.map(x => x.id === updated.id ? updated : x));
+            setReports(prev => prev.map(r => r.listing_id === updated.id ? { ...r, listings: { ...r.listings, ...updated } } : r));
             setEditModalListing(null);
           }}
         />
