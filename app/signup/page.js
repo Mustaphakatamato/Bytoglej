@@ -8,6 +8,7 @@ import { useApp } from '@/providers/AppProvider';
 import { geocodeAddress, useDebounce } from '@/lib/hooks';
 import { LogoLockup } from '@/components/Logo';
 import { authedFetch } from '@/lib/authed-fetch';
+import { isValidEmail, suggestEmailFix } from '@/lib/email-validation';
 const CORAL = '#E8593D';
 
 function SField({ label, hint, children }) {
@@ -74,8 +75,15 @@ function SChoiceGroup({ value, onChange, options, primary }) {
   );
 }
 
-function isValidEmail(e) {
-  return /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(e.trim());
+
+function EmailTypoHint({ value, onAccept }) {
+  const fix = suggestEmailFix(value);
+  if (!fix || fix === String(value || '').trim().toLowerCase()) return null;
+  return (
+    <div style={{ background: '#FFFBEB', borderLeft: '3px solid #F59E0B', borderRadius: 12, padding: '10px 14px', fontSize: 13, color: '#92400E', fontFamily: FONT, marginTop: 8 }}>
+      Mente du <button type="button" onClick={() => onAccept(fix)} style={{ background: 'none', border: 'none', padding: 0, color: '#92400E', fontWeight: 800, textDecoration: 'underline', cursor: 'pointer', fontFamily: FONT, fontSize: 13 }}>{fix}</button>?
+    </div>
+  );
 }
 
 function pwStrength(p) {
@@ -329,11 +337,13 @@ export default function SignupPage() {
     if (!form.leader_name.trim()) return 'Udfyld institutionslederens navn';
     if (!form.leader_phone.trim()) return 'Udfyld telefonnummer';
     if (!isValidEmail(form.leader_email)) return 'Udfyld en gyldig e-mail (fx navn@institution.dk)';
+    { const fix = suggestEmailFix(form.leader_email); if (fix) return `E-mailen ser forkert ud. Mente du ${fix}?`; }
     return null;
   }
   function validateStep4() {
     if (!form.contact_name.trim()) return 'Udfyld dit navn';
     if (!isValidEmail(form.email)) return 'Udfyld en gyldig e-mail (fx navn@institution.dk)';
+    { const fix = suggestEmailFix(form.email); if (fix) return `E-mailen ser forkert ud. Mente du ${fix}?`; }
     const s = pwStrength(form.pass);
     if (!s.length || !s.upper || !s.number || !s.special) return 'Adgangskoden opfylder ikke kravene';
     return null;
@@ -606,6 +616,7 @@ export default function SignupPage() {
                 <SField label="Telefon"><SInput value={form.leader_phone} type="tel" onChange={e => set('leader_phone', e.target.value.replace(/[^+\d\s]/g, ''))} placeholder="+45 12 34 56 78" /></SField>
                 <SField label="E-mail"><SInput value={form.leader_email} onChange={e => set('leader_email', e.target.value)} type="email" placeholder="leder@institution.dk" /></SField>
               </div>
+              <EmailTypoHint value={form.leader_email} onAccept={v => set('leader_email', v)} />
               {authError && (
                 <div style={{ background: '#FEF2F2', borderLeft: '3px solid #EF4444', borderRadius: 12, padding: '12px 16px', fontSize: 13, color: '#B91C1C', fontFamily: FONT }}>
                   {authError}
@@ -625,6 +636,7 @@ export default function SignupPage() {
               </div>
               <SField label="Dit fulde navn"><SInput value={form.contact_name} onChange={e => set('contact_name', e.target.value)} placeholder="Fornavn Efternavn" /></SField>
               <SField label="E-mail (bruges til login)"><SInput value={form.email} onChange={e => { set('email', e.target.value); setAlreadyExists(false); setAuthError(null); }} type="email" placeholder="din@email.dk" /></SField>
+              <EmailTypoHint value={form.email} onAccept={v => { set('email', v); setAlreadyExists(false); setAuthError(null); }} />
               <SField label="Adgangskode">
                 <PasswordField value={form.pass} onChange={e => set('pass', e.target.value)} placeholder="••••••••" />
               </SField>

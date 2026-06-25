@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { Resend } from 'resend';
 import { requireAuth, UNAUTHORIZED } from '@/lib/api-auth';
+import { createServerClient } from '@/lib/supabase-server';
 import { escapeHtml } from '@/lib/escape-html';
 
 const ADMIN_NOTIFICATION_EMAIL = process.env.ADMIN_NOTIFICATION_EMAIL || 'admin@bytogleg.dk';
@@ -10,14 +11,33 @@ export async function POST(req) {
   if (!user) return UNAUTHORIZED();
 
   try {
-    const resend = new Resend(process.env.RESEND_API_KEY);
     const body = await req.json();
-    const listingId = escapeHtml(String(body.listingId || '').slice(0, 100));
+    // Rå værdier til DB-insert (escapes kun til email-HTML nedenfor)
+    const rawListingId = String(body.listingId || '').slice(0, 100);
+    const rawReason = String(body.reason || '').slice(0, 200);
+    const rawNote = String(body.note || '').slice(0, 2000);
+    const rawReporterEmail = String(body.reporterEmail || user.email || '').slice(0, 200);
+    const rawReporterInstitution = String(body.reporterInstitution || '').slice(0, 200);
+    if (!rawListingId || !rawReason) return NextResponse.json({ error: 'Mangler data' }, { status: 400 });
+
+    // 1) Gem i DB først, så rapporten dukker op i admin — uanset om email lykkes
+    const db = createServerClient();
+    const { error: dbErr } = await db.from('listing_reports').insert({
+      listing_id: rawListingId,
+      reporter_email: rawReporterEmail || null,
+      reporter_institution_name: rawReporterInstitution || null,
+      reason: rawReason,
+      details: rawNote || null,
+    });
+    if (dbErr) console.error('[report-listing] DB insert fejl:', dbErr.message);
+
+    // 2) Send notifikations-email til admin
+    const resend = new Resend(process.env.RESEND_API_KEY);
+    const listingId = escapeHtml(rawListingId);
     const listingTitle = escapeHtml(String(body.listingTitle || '').slice(0, 200));
-    const reason = escapeHtml(String(body.reason || '').slice(0, 200));
-    const note = escapeHtml(String(body.note || '').slice(0, 2000));
-    const reporterName = escapeHtml(String(body.reporterName || '').slice(0, 200));
-    if (!listingId || !reason) return NextResponse.json({ error: 'Mangler data' }, { status: 400 });
+    const reason = escapeHtml(rawReason);
+    const note = escapeHtml(rawNote);
+    const reporterName = escapeHtml(rawReporterInstitution || rawReporterEmail || 'Ukendt');
 
     await resend.emails.send({
       from: 'byt&leg <noreply@bytogleg.dk>',

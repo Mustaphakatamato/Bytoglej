@@ -771,8 +771,8 @@ export default function ListingDetailClient() {
               </button>
             </div>
             {!isOwn && (
-              <button onClick={()=>setReportModal(true)} style={{ background:'none', border:'none', fontSize:12, color:INK3, cursor:'pointer', fontFamily:FONT, padding:'4px 0', textDecoration:'underline', textDecorationColor:PAPER3, marginBottom:4 }}>
-                Rapportér opslag
+              <button onClick={()=>setReportModal(true)} style={{ display:'inline-flex', alignItems:'center', gap:6, alignSelf:'flex-start', background:'#fff', border:`1.5px solid ${PAPER3}`, borderRadius:12, fontSize:12, fontWeight:700, color:INK3, cursor:'pointer', fontFamily:FONT, padding:'8px 14px', marginBottom:6 }}>
+                <span aria-hidden="true">🚩</span> Rapportér opslag
               </button>
             )}
 
@@ -940,7 +940,7 @@ export default function ListingDetailClient() {
             const { data:{ user } } = await db.auth.getUser();
             const { data: inst } = user ? await db.from('institutions').select('name').ilike('email', user.email).maybeSingle() : { data: null };
             await fetch('/api/report-listing', { method:'POST', headers:{'Content-Type':'application/json'},
-              body: JSON.stringify({ listingId:listing.id, listingTitle:listing.title, reason:reportReason, note:reportNote, reporterName:inst?.name||user?.email||'Ukendt' }) });
+              body: JSON.stringify({ listingId:listing.id, listingTitle:listing.title, reason:reportReason, note:reportNote, reporterEmail:user?.email||'', reporterInstitution:inst?.name||'' }) });
           } catch {}
           setReportSending(false); setReportModal(false); setReportReason(''); setReportNote('');
           showToast('Tak! Vi kigger på det hurtigst muligt');

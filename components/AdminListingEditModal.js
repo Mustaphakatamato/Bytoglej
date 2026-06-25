@@ -214,7 +214,7 @@ export default function AdminListingEditModal({ listing, onClose, onSaved }) {
           {form.type === 'køb' && (
             <div>
               <label style={labelStyle}>Pris (kr.)</label>
-              <input type="number" value={form.price} onChange={e => setForm({ ...form, price: e.target.value })} min="1" style={inputStyle} />
+              <input type="text" inputMode="numeric" value={form.price} onChange={e => setForm({ ...form, price: e.target.value.replace(/[^0-9]/g, '') })} style={inputStyle} />
             </div>
           )}
 
