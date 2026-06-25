@@ -483,7 +483,7 @@ export default function ProfilPage() {
 
           {/* Jeg køber */}
           <div style={{ fontFamily:FONT, fontWeight:700, fontSize:12, color:INK3, textTransform:'uppercase', letterSpacing:'0.08em', marginBottom:10 }}>Jeg køber</div>
-          <div style={{ display:'grid', gridTemplateColumns:'repeat(3, 1fr)', gap:14, marginBottom:28 }}>
+          <div style={{ display:'grid', gridTemplateColumns:'repeat(2, 1fr)', gap:14, marginBottom:28 }}>
             <ActivityCard
               icon="🛍️"
               label="Mine køb"
