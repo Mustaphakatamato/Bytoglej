@@ -50,6 +50,7 @@ Returner KUN et JSON-objekt med følgende felter:
 - condition: vælg ÉN: "Ny", "God stand", "Brugt", "Slidte"
 - age_group: vælg ÉN: "0-2 år", "3-6 år", "6-10 år", "10+ år", "Alle aldre"
 - description: 2-3 sætninger på dansk om genstanden (stand, indhold, egnethed — bedste gæt ved usikre billeder)
+- visual_description: 1-2 sætninger der KUN beskriver hvad man ser på billedet — genstandstype, hovedfarve(r), materiale, form og evt. tekst/logo/mærke samt distinkte træk. Ingen vurdering af stand, alder eller egnethed. Intet salgssprog.
 - price_min: laveste rimelige BRUGTPRIS i danske kroner (heltal)
 - price_max: højeste rimelige brugtpris i danske kroner (heltal), skal være ≥ price_min
 
@@ -59,7 +60,7 @@ Ingen markdown, ingen forklaring — kun JSON.`;
 
     const completion = await groq.chat.completions.create({
       model: 'meta-llama/llama-4-scout-17b-16e-instruct',
-      max_tokens: 300,
+      max_tokens: 420,
       messages: [{
         role: 'user',
         content: [
@@ -71,7 +72,7 @@ Ingen markdown, ingen forklaring — kun JSON.`;
 
     const text = completion.choices[0].message.content.trim();
     const jsonMatch = text.match(/\{[\s\S]*\}/);
-    if (!jsonMatch) return NextResponse.json({ error: 'Ugyldigt AI-svar — prøv igen' }, { status: 500 });
+    if (!jsonMatch) return NextResponse.json({ error: 'Ugyldigt AI-svar. Prøv igen' }, { status: 500 });
 
     const parsed = JSON.parse(jsonMatch[0]);
 
@@ -133,6 +134,6 @@ Ingen markdown, ingen forklaring — kun JSON.`;
     return NextResponse.json({ ...parsed, price, needs_review: needsReview, reject_reason: rejectReason });
   } catch (e) {
     console.error('scan-toy error:', e.message);
-    return NextResponse.json({ error: 'Noget gik galt — prøv igen' }, { status: 500 });
+    return NextResponse.json({ error: 'Noget gik galt. Prøv igen' }, { status: 500 });
   }
 }

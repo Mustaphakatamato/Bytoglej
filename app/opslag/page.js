@@ -8,6 +8,7 @@ import { useWindowWidth, useFeedListings } from '@/lib/hooks';
 import { Btn, SkeletonCard, SkeletonMobileCard } from '@/components/ui';
 import ListingCard, { calcServiceFee, BuyerProtectionPopup } from '@/components/ListingCard';
 import PullToRefresh from '@/components/PullToRefresh';
+import ImageSearchModal from '@/components/ImageSearchModal';
 import { useApp } from '@/providers/AppProvider';
 import { db } from '@/lib/supabase';
 import { authedFetch } from '@/lib/authed-fetch';
@@ -205,7 +206,7 @@ function SøgesCard({ l, onContact }) {
 function OpslagInner() {
   const router = useRouter();
   const urlParams = useSearchParams();
-  const { listings: allListings, loadingListings: loading, fetchListings, refreshSeed, setActiveListing, favs, toggleFav, showToast, loggedIn, realUserId, institution, loadMoreListings, hasMore, loadingMore } = useApp();
+  const { listings: allListings, loadingListings: loading, fetchListings, refreshSeed, setActiveListing, favs, toggleFav, showToast, loggedIn, realUserId, institution, loadMoreListings, hasMore, loadingMore, imgSearchOpen, setImgSearchOpen } = useApp();
   const sentinelRef = useRef(null);
   useEffect(() => {
     if (!sentinelRef.current) return;
@@ -236,6 +237,8 @@ const [saveSearchModal, setSaveSearchModal] = useState(false);
   const [aiSearching, setAiSearching] = useState(false);
   const [aiResults, setAiResults] = useState(null);
   const [aiExplanation, setAiExplanation] = useState('');
+  const [aiKind, setAiKind] = useState('text'); // 'text' | 'image'
+  const [imgSearching, setImgSearching] = useState(false);
   const aiInputRef = useRef(null);
   const [followedNames, setFollowedNames] = useState(null);
   const [showFollowed, setShowFollowed] = useState(false);
@@ -342,8 +345,8 @@ const [saveSearchModal, setSaveSearchModal] = useState(false);
       });
       const json = await res.json();
       if (json.error) { showToast(json.error, 'error'); }
-      else { setAiResults(json.listings || []); setAiExplanation(json.explanation || ''); }
-    } catch { showToast('AI-søgning mislykkedes — prøv igen', 'error'); }
+      else { setAiKind('text'); setAiResults(json.listings || []); setAiExplanation(json.explanation || ''); }
+    } catch { showToast('AI-søgning mislykkedes. Prøv igen', 'error'); }
     setAiSearching(false);
   }
 
@@ -354,13 +357,38 @@ const [saveSearchModal, setSaveSearchModal] = useState(false);
     setAiExplanation('');
   }
 
+  async function runImageSearch(blob) {
+    if (imgSearching) return;
+    setImgSearching(true);
+    setAiResults(null);
+    setAiQuery('');
+    try {
+      const fd = new FormData();
+      fd.append('image', blob, 'soegning.jpg');
+      const res = await authedFetch('/api/ai-image-search', { method: 'POST', body: fd });
+      const json = await res.json();
+      if (json.error) { showToast(json.error, 'error'); }
+      else { setAiKind('image'); setAiResults(json.listings || []); setImgSearchOpen(false); }
+    } catch { showToast('Billedsøgning mislykkedes. Prøv igen', 'error'); }
+    setImgSearching(false);
+  }
+
   const noFilters = !category && !search && filter === 'alle';
-  const showCategoryBrowser    = isMobile && noFilters && !pendingCategory && !aiMode && !browserDismissed;
-  const showSubcategoryBrowser = isMobile && noFilters && !!pendingCategory && !aiMode;
+  // aiResults === null: ellers skjuler kategori-browseren billed-/AI-resultater på mobil
+  const showCategoryBrowser    = isMobile && noFilters && !pendingCategory && !aiMode && !browserDismissed && aiResults === null;
+  const showSubcategoryBrowser = isMobile && noFilters && !!pendingCategory && !aiMode && aiResults === null;
 
   return (
     <PullToRefresh onRefresh={fetchListings}>
     <div style={{ minHeight: '100vh', background: PAPER }}>
+
+      {imgSearchOpen && (
+        <ImageSearchModal
+          onClose={() => { if (!imgSearching) setImgSearchOpen(false); }}
+          onSearch={runImageSearch}
+          searching={imgSearching}
+        />
+      )}
 
       {/* ── Desktop header only ── */}
       {!isMobile && (
@@ -400,17 +428,6 @@ const [saveSearchModal, setSaveSearchModal] = useState(false);
         padding: '12px 24px',
       }}>
         <div style={{ maxWidth: 1140, margin: '0 auto', display: 'flex', flexDirection: 'column', gap: 8 }}>
-          <div style={{ display: 'flex', gap: 8 }}>
-            <div style={{ flex: 1, background: PAPER2, borderRadius: 99, display: 'flex', alignItems: 'center', padding: '9px 16px', gap: 10, border: `1.5px solid ${PAPER3}` }}>
-              <svg width="14" height="14" viewBox="0 0 14 14" fill="none" style={{ flexShrink: 0, opacity: 0.4 }}>
-                <circle cx="6" cy="6" r="5" stroke={INK} strokeWidth="1.5"/>
-                <path d="M10 10L13 13" stroke={INK} strokeWidth="1.5" strokeLinecap="round"/>
-              </svg>
-              <input value={search} readOnly placeholder="Brug søgefeltet ovenfor..."
-                style={{ border: 'none', background: 'transparent', outline: 'none', fontSize: 13, fontFamily: FONT, flex: 1, minWidth: 0, color: INK }} />
-              {search && <span style={{ fontSize: 13, color: INK2, fontFamily: FONT, fontWeight: 600 }}>"{search}"</span>}
-            </div>
-          </div>
           {category && (
             <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, fontWeight: 600, color: PRIMARY, fontFamily: FONT }}>
               {(() => { const catObj = CATEGORIES.find(c => c.key === category); return catObj ? <><span>{catObj.emoji} {catObj.label}</span>{subcategory && <><span style={{ opacity: 0.5 }}>›</span><span>{subcategory}</span></>}</> : null; })()}
@@ -477,7 +494,7 @@ const [saveSearchModal, setSaveSearchModal] = useState(false);
               onClick={() => { if (aiMode) clearAiSearch(); else { setAiMode(true); setTimeout(() => aiInputRef.current?.focus(), 50); } }}
               style={{ padding: '7px 16px', borderRadius: 99, border: aiMode ? 'none' : `1.5px solid ${PAPER3}`, background: aiMode ? PRIMARY : PAPER2, color: aiMode ? '#fff' : INK2, fontSize: 13, fontWeight: 700, fontFamily: FONT, cursor: 'pointer', whiteSpace: 'nowrap', display: 'flex', alignItems: 'center', gap: 5, transition: 'all 0.15s', marginLeft: 'auto' }}
             >
-              ✨ Søg med AI
+              ✨ AI tekst søgning
             </button>
           </div>
         </div>
@@ -494,16 +511,24 @@ const [saveSearchModal, setSaveSearchModal] = useState(false);
             {key === 'søges' && <span style={{ marginRight:5 }}>🔍</span>}{label}
           </button>
         ))}
-        {/* Mobile AI search */}
-        {isMobile && (
+      </div>
+      {/* Mobile: dedikeret søge-række (AI tekst + billede) — egen linje så den er tydelig */}
+      {isMobile && (
+        <div style={{ maxWidth: 1140, margin: '0 auto', padding: '8px 16px 0', display: 'flex', gap: 8 }}>
           <button
             onClick={() => { if (aiMode) clearAiSearch(); else { setAiMode(true); setTimeout(() => aiInputRef.current?.focus(), 50); } }}
-            style={{ padding: '8px 16px', borderRadius: 99, border: 'none', background: aiMode ? PRIMARY : PAPER2, color: aiMode ? '#fff' : INK2, fontFamily: FONT, fontWeight: 700, fontSize: 13, cursor: 'pointer', transition: 'all 0.15s', display: 'flex', alignItems: 'center', gap: 4 }}
+            style={{ flex: 1, justifyContent: 'center', padding: '10px 16px', borderRadius: 99, border: 'none', background: aiMode ? PRIMARY : PAPER2, color: aiMode ? '#fff' : INK2, fontFamily: FONT, fontWeight: 700, fontSize: 13, cursor: 'pointer', transition: 'all 0.15s', display: 'flex', alignItems: 'center', gap: 5 }}
           >
-            ✨ AI
+            ✨ AI tekst søgning
           </button>
-        )}
-      </div>
+          <button
+            onClick={() => setImgSearchOpen(true)}
+            style={{ flex: 1, justifyContent: 'center', padding: '10px 16px', borderRadius: 99, border: 'none', background: PAPER2, color: INK2, fontFamily: FONT, fontWeight: 700, fontSize: 13, cursor: 'pointer', transition: 'all 0.15s', display: 'flex', alignItems: 'center', gap: 5 }}
+          >
+            📷 Søg med billede
+          </button>
+        </div>
+      )}
       {/* Mobile AI search bar */}
       {isMobile && aiMode && (
         <div style={{ maxWidth: 1140, margin: '0 auto', padding: '8px 16px 0' }}>
@@ -607,16 +632,22 @@ const [saveSearchModal, setSaveSearchModal] = useState(false);
           </div>
         )}
 
-        {/* AI results banner */}
+        {/* Resultat-banner */}
         {aiResults !== null && (
           <div style={{ marginBottom: 14, background: `${PRIMARY}11`, border: `1.5px solid ${PRIMARY}33`, borderRadius: 12, padding: '10px 16px', display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
-            <span style={{ fontSize: 18 }}>✨</span>
+            <span style={{ fontSize: 18 }}>{aiKind === 'image' ? '📷' : '✨'}</span>
             <div style={{ flex: 1, minWidth: 0 }}>
-              <span style={{ fontFamily: FONT, fontWeight: 700, fontSize: 13, color: PRIMARY }}>{aiExplanation}</span>
-              <span style={{ fontFamily: FONT, fontSize: 12, color: INK3, marginLeft: 8 }}>— {aiResults.length} opslag fundet</span>
+              {aiKind === 'image' ? (
+                <span style={{ fontFamily: FONT, fontWeight: 700, fontSize: 13, color: PRIMARY }}>Lignende opslag</span>
+              ) : (
+                <>
+                  <span style={{ fontFamily: FONT, fontWeight: 700, fontSize: 13, color: PRIMARY }}>{aiExplanation}</span>
+                  <span style={{ fontFamily: FONT, fontSize: 12, color: INK3, marginLeft: 8 }}>{aiResults.length} opslag fundet</span>
+                </>
+              )}
             </div>
             <button onClick={clearAiSearch} style={{ background: 'none', border: `1.5px solid ${PRIMARY}44`, borderRadius: 99, padding: '4px 12px', fontSize: 12, fontWeight: 700, color: PRIMARY, fontFamily: FONT, cursor: 'pointer', whiteSpace: 'nowrap' }}>
-              × Ryd AI-søgning
+              × Ryd
             </button>
           </div>
         )}

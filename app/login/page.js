@@ -72,7 +72,7 @@ export default function LoginPage() {
     setLoading(true); setError(null);
     const { data: authData, error } = await db.auth.signInWithPassword({ email, password: pass });
     setLoading(false);
-    if (error) { setError('Forkert adgangskode — prøv igen'); return; }
+    if (error) { setError('Forkert adgangskode. Prøv igen'); return; }
     setLoggedIn(true);
     router.push('/dashboard');
   }

@@ -78,7 +78,7 @@ export default function AdminListingEditModal({ listing, onClose, onSaved }) {
     const valid = [];
     for (const f of files) {
       if (!ALLOWED_IMAGE_TYPES.includes(f.type)) { setError(`"${f.name}" er ikke et understøttet format`); continue; }
-      if (f.size > MAX_IMAGE_SIZE) { setError(`"${f.name}" er for stor — maks 10 MB`); continue; }
+      if (f.size > MAX_IMAGE_SIZE) { setError(`"${f.name}" er for stor. Maks 10 MB`); continue; }
       valid.push(f);
     }
     const remaining = 6 - totalImgs;
@@ -158,7 +158,7 @@ export default function AdminListingEditModal({ listing, onClose, onSaved }) {
     };
 
     const { error: updErr } = await db.from('listings').update(patch).eq('id', listing.id);
-    if (updErr) { setSaving(false); setError('Noget gik galt — ' + updErr.message); return; }
+    if (updErr) { setSaving(false); setError('Noget gik galt: ' + updErr.message); return; }
 
     await db.from('shipping_options').upsert({
       listing_id: listing.id,

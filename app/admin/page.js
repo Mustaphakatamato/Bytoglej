@@ -413,7 +413,7 @@ function OverviewTab({ isMobile, onGoTo }) {
 
       {stats.shipFailed > 0 && (
         <div onClick={() => onGoTo('shipping')} style={{ background: '#FEE2E2', border: '1px solid #FCA5A5', borderRadius: 12, padding: '12px 16px', marginBottom: 24, color: '#991B1B', fontFamily: FONT, fontSize: 13, fontWeight: 700, cursor: 'pointer' }}>
-          ⚠️ {stats.shipFailed} fejlede forsendelse{stats.shipFailed !== 1 ? 'r' : ''} — klik for at se
+          ⚠️ {stats.shipFailed} fejlede forsendelse{stats.shipFailed !== 1 ? 'r' : ''}, klik for at se
         </div>
       )}
 
@@ -452,7 +452,7 @@ function OverviewTab({ isMobile, onGoTo }) {
       <SectionHead title="Systemstatus" />
       <div style={{ background: PAPER2, border: `1px solid rgba(22,34,28,0.08)`, borderRadius: 14, padding: '14px 18px', display: 'flex', flexDirection: 'column', gap: 10 }}>
         <StatusDot ok={supaOk} label="Supabase" detail={supaOk ? 'Online' : 'Fejl'} />
-        <StatusDot ok={null} label="Shipmondo" detail="Kontrolleres ikke automatisk — se Forsendelser fanen" />
+        <StatusDot ok={null} label="Shipmondo" detail="Kontrolleres ikke automatisk. Se Forsendelser fanen" />
         <StatusDot ok={null} label="Anthropic" detail="Kontrolleres ikke automatisk" />
       </div>
     </div>
@@ -546,7 +546,7 @@ function ApprovalsTab({ isMobile, onCountChange }) {
           </div>
           {rejectTarget?.id === inst.id && (
             <div style={{ marginTop: 16, padding: '14px 16px', background: '#FEF2F2', borderRadius: 12 }}>
-              <div style={{ fontFamily: FONT, fontWeight: 600, fontSize: 13, color: '#DC2626', marginBottom: 8 }}>Begrundelse (valgfri — sendes til institutionen)</div>
+              <div style={{ fontFamily: FONT, fontWeight: 600, fontSize: 13, color: '#DC2626', marginBottom: 8 }}>Begrundelse (valgfri, sendes til institutionen)</div>
               <textarea value={rejectNote} onChange={e => setRejectNote(e.target.value)} rows={3} placeholder="Evt. forklaring til institutionen…"
                 style={{ width: '100%', padding: '8px 12px', borderRadius: 8, border: '1.5px solid #FCA5A5', fontSize: 13, fontFamily: FONT, resize: 'none', outline: 'none', boxSizing: 'border-box', background: '#fff' }} />
               <div style={{ display: 'flex', gap: 8, marginTop: 10, justifyContent: 'flex-end' }}>
@@ -1695,12 +1695,12 @@ function AiBotTab({ isMobile }) {
 
       {showRejections ? (
         <>
-          <SectionHead title="Afviste billeder — persondetektering" />
+          <SectionHead title="Afviste billeder: persondetektering" />
           <ScanRejectionLogsSection isMobile={isMobile} />
         </>
       ) : (
       <>
-      <SectionHead title="AI Bot — seneste 30 dage" />
+      <SectionHead title="AI Bot: seneste 30 dage" />
 
       {loading ? <Spinner /> : !stats ? <Empty text="Ingen data endnu" /> : (
         <>

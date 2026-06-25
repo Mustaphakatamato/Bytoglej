@@ -35,6 +35,15 @@ html, body { max-width: 100vw; }
 @keyframes pulse       { 0%,100%{ transform:scale(1); opacity:0.7; } 50%{ transform:scale(1.4); opacity:1; } }
 @keyframes scanBar     { 0%{ left:-40%; } 100%{ left:100%; } }
 @keyframes favPop      { 0%{transform:scale(1)} 40%{transform:scale(1.45)} 70%{transform:scale(0.9)} 100%{transform:scale(1)} }
+@keyframes blobDrift   { 0%,100%{ transform:translate(0,0) scale(1); } 50%{ transform:translate(20px,-26px) scale(1.05); } }
+@keyframes blobDrift2  { 0%,100%{ transform:translate(0,0) scale(1); } 50%{ transform:translate(-24px,18px) scale(1.06); } }
+
+/* Ambient, blødt svævende baggrunds-blobs */
+.blob-float   { animation: blobDrift 16s ease-in-out infinite; will-change: transform; }
+.blob-float-2 { animation: blobDrift2 21s ease-in-out infinite; will-change: transform; }
+@media (prefers-reduced-motion: reduce) {
+  .blob-float, .blob-float-2 { animation: none !important; }
+}
 
 .page-enter { animation: fadeSlideIn 0.35s ease both; }
 

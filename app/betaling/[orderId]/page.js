@@ -26,7 +26,7 @@ function PaymentForm({ orderId, grandTotal, breakdown }) {
     // resettes knappen automatisk efter 60 sekunder med en fejlbesked.
     const timeoutId = setTimeout(() => {
       setPaying(false);
-      setError('Betalingen tog for lang tid — prøv igen.');
+      setError('Betalingen tog for lang tid. Prøv igen.');
     }, 60000);
 
     try {
@@ -46,7 +46,7 @@ function PaymentForm({ orderId, grandTotal, breakdown }) {
       // If no error: Stripe redirects — nothing more to do here
     } catch (err) {
       clearTimeout(timeoutId);
-      setError('Der skete en teknisk fejl — prøv igen.');
+      setError('Der skete en teknisk fejl. Prøv igen.');
       setPaying(false);
     }
   }
@@ -125,7 +125,7 @@ export default function BetalingPage() {
     <div style={{ minHeight: '100vh', background: PAPER, paddingTop: 84, paddingBottom: 60 }}>
       <div style={{ maxWidth: 560, margin: '0 auto', padding: '0 20px' }}>
         <h1 style={{ fontFamily: FONT, fontWeight: 800, fontSize: 26, color: INK, letterSpacing: '-0.03em', marginBottom: 6 }}>Betal</h1>
-        <p style={{ fontFamily: FONT, fontSize: 13, color: INK3, marginBottom: 28 }}>Dine penge er i sikre hænder — betaling sker via Stripe.</p>
+        <p style={{ fontFamily: FONT, fontSize: 13, color: INK3, marginBottom: 28 }}>Dine penge er i sikre hænder. Betaling sker via Stripe.</p>
 
         {/* Order summary */}
         <div style={{ background: '#fff', borderRadius: 20, border: `1.5px solid ${PAPER3}`, padding: 20, marginBottom: 24 }}>

@@ -410,7 +410,7 @@ export default function ListingDetailClient() {
         setSøgesModal(false); setSøgesOffer(''); setSøgesSelectedId(null);
         setSelectedConvId(convId); router.push('/beskeder');
       }
-    } catch (e) { showToast('Noget gik galt — prøv igen', 'error'); }
+    } catch (e) { showToast('Noget gik galt. Prøv igen', 'error'); }
     setSaving(false);
   }
 
@@ -679,7 +679,7 @@ export default function ListingDetailClient() {
               <div style={{ display:'flex', flexDirection:'column', gap:10, marginBottom:20 }}>
                 {isReservedForOther && (
                   <div style={{ background:'#FEF3C7', border:'1.5px solid #F59E0B', borderRadius:14, padding:'12px 16px', fontSize:13, fontFamily:FONT, color:'#92400E', fontWeight:600 }}>
-                    ⏳ Varen er reserveret til en anden køber og kan ikke købes eller bydes på lige nu.
+                    ⏳ Varen er reserveret til en anden køber og kan ikke købes lige nu.
                   </div>
                 )}
                 {isReservedForMe && (
@@ -688,7 +688,7 @@ export default function ListingDetailClient() {
                     🎉 Du har et accepteret tilbud på denne vare — gå til beskeder for at betale →
                   </button>
                 )}
-                {listing.type==='køb' && !reservedActive && <Btn variant="primary" color={PRIMARY} radius={22} onClick={handleAddToCart} style={{ justifyContent:'center', padding:'15px', fontSize:16 }}>{inCart ? '🛒 Gå til kurv →' : (() => { const so = listing.shipping_options?.[0]; const canShip = so?.allow_shipping || (!so && listing.can_ship); const tag = canShip ? (so?.shipping_included_in_price ? ' inkl. fragt' : ' + fragt') : ''; return `🛒 Læg i kurv — ${listing.price} kr.${tag}`; })()}</Btn>}
+                {listing.type==='køb' && !reservedActive && <Btn variant="primary" color={PRIMARY} radius={22} onClick={handleAddToCart} style={{ justifyContent:'center', padding:'15px', fontSize:16 }}>{inCart ? '🛒 Gå til kurv →' : (() => { const so = listing.shipping_options?.[0]; const canShip = so?.allow_shipping || (!so && listing.can_ship); const tag = canShip ? (so?.shipping_included_in_price ? ' inkl. fragt' : ' + fragt') : ''; const total = listing.price + calcServiceFee(listing.price); return `🛒 Læg i kurv (${total.toFixed(2).replace('.',',')} kr.${tag})`; })()}</Btn>}
                 {listing.type==='køb' && !reservedActive && <Btn variant="outline" radius={22} onClick={()=>{ if(!loggedIn){ router.push('/login'); return; } setOfferModal(true); }} style={{ justifyContent:'center', padding:'13px', fontSize:15 }}>🏷️ Giv et tilbud</Btn>}
                 {listing.type==='byt' && !reservedActive && <Btn variant="primary" color={ACCENT} radius={22} onClick={()=>{ if(!loggedIn){ router.push('/login'); return; } setSwapProposalModal(true); }} style={{ justifyContent:'center', padding:'15px', fontSize:16 }}>🔄 Foreslå bytte</Btn>}
                 {listing.type==='søges' && <button onClick={()=>setSøgesModal(true)}
@@ -943,7 +943,7 @@ export default function ListingDetailClient() {
               body: JSON.stringify({ listingId:listing.id, listingTitle:listing.title, reason:reportReason, note:reportNote, reporterName:inst?.name||user?.email||'Ukendt' }) });
           } catch {}
           setReportSending(false); setReportModal(false); setReportReason(''); setReportNote('');
-          showToast('Tak — vi kigger på det hurtigst muligt');
+          showToast('Tak! Vi kigger på det hurtigst muligt');
         }} disabled={reportSending||!reportReason} style={{ justifyContent:'center', padding:'13px', fontSize:14 }}>
           {reportSending ? <><Spinner/>Sender…</> : 'Send rapport'}
         </Btn>
@@ -1002,7 +1002,7 @@ export default function ListingDetailClient() {
         <div onClick={e => e.stopPropagation()} style={{ background:'#fff', borderRadius:20, padding:32, maxWidth:520, width:'100%', boxShadow:'0 20px 60px rgba(22,34,28,0.2)' }}>
           <div style={{ fontFamily:FONT, fontWeight:800, fontSize:20, color:INK, marginBottom:20 }}>Rediger opslag <span style={{ fontSize:14, color:'#B45309', fontWeight:600 }}>(admin)</span></div>
           <div style={{ display:'flex', flexDirection:'column', gap:14 }}>
-            {[['TITEL','title','text'],['BESKRIVELSE','description','textarea'],['PRIS (KR.) — TOM = INGEN PRIS','price','number'],['STAND','condition','text']].map(([label, field, type]) => (
+            {[['TITEL','title','text'],['BESKRIVELSE','description','textarea'],['PRIS (KR.), TOM = INGEN PRIS','price','number'],['STAND','condition','text']].map(([label, field, type]) => (
               <div key={field}>
                 <label style={{ display:'block', fontFamily:FONT, fontWeight:700, fontSize:12, color:'#6B7570', marginBottom:6 }}>{label}</label>
                 {type === 'textarea'

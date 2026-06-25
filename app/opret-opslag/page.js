@@ -77,6 +77,7 @@ export default function OpretOpslagPage() {
   const [aiFilledFields, setAiFilledFields] = useState({ title: false, description: false });
   const [priceSuggestion, setPriceSuggestion] = useState(null); // { basis, comparable_count, suggested_min, suggested_max, suggested_price }
   const [aiScanData, setAiScanData] = useState(null); // AI-forslag gemt til log ved submit
+  const [aiVisual, setAiVisual] = useState(null);     // ren visuel billedbeskrivelse til billedsøgning
   const [scanRejected, setScanRejected] = useState(false); // AI afviste billede → vis "send til gennemgang"
   const [rejectionLogId, setRejectionLogId] = useState(null); // person detection → "AI tog fejl" knap
   const [step1Attempted, setStep1Attempted] = useState(false);
@@ -196,11 +197,11 @@ export default function OpretOpslagPage() {
     const validFiles = [];
     for (const f of files) {
       if (!ALLOWED_IMAGE_TYPES.includes(f.type)) {
-        showToast(`"${f.name}" er ikke et understøttet format — brug JPG, PNG, WEBP eller GIF`, 'error');
+        showToast(`"${f.name}" er ikke et understøttet format. Brug JPG, PNG, WEBP eller GIF`, 'error');
         continue;
       }
       if (f.size > MAX_IMAGE_SIZE) {
-        showToast(`"${f.name}" er for stor — maks 10 MB per billede`, 'error');
+        showToast(`"${f.name}" er for stor. Maks 10 MB per billede`, 'error');
         continue;
       }
       validFiles.push(f);
@@ -214,7 +215,7 @@ export default function OpretOpslagPage() {
     setCheckingImages(false);
     const safe = candidates.filter((_, i) => results[i]);
     const rejected = candidates.length - safe.length;
-    if (rejected > 0) showToast(`${rejected} billede${rejected > 1 ? 'r' : ''} afvist — indeholder personer`, 'error');
+    if (rejected > 0) showToast(`${rejected} billede${rejected > 1 ? 'r' : ''} afvist (indeholder personer)`, 'error');
     if (!safe.length) { e.target.value = ''; return; }
     const newPreviews = safe.map(f => URL.createObjectURL(f));
     setImgFiles(prev => [...prev, ...safe]);
@@ -294,9 +295,9 @@ export default function OpretOpslagPage() {
         body: JSON.stringify({ title: form.title, description: form.description, type: form.type, condition: form.condition, age_group: form.age_group, tags: form.tags }),
       });
       const json = await res.json();
-      if (json.error) { showToast('AI-forbedring mislykkedes — prøv igen', 'error'); }
+      if (json.error) { showToast('AI-forbedring mislykkedes. Prøv igen', 'error'); }
       else { setAiSuggestion(json); setAiApply({ title: true, description: true }); }
-    } catch { showToast('AI-forbedring mislykkedes — prøv igen', 'error'); }
+    } catch { showToast('AI-forbedring mislykkedes. Prøv igen', 'error'); }
     setAiImproving(false);
   }
 
@@ -373,7 +374,7 @@ export default function OpretOpslagPage() {
       const res = await authedFetch('/api/scan-toy', { method: 'POST', body: fd });
       const json = await res.json();
       if (json.error) {
-        setScanError('Scan mislykkedes — prøv igen');
+        setScanError('Scan mislykkedes. Prøv igen');
         setScanning(false);
         return;
       }
@@ -390,6 +391,7 @@ export default function OpretOpslagPage() {
       setScanRejected(!!json.needs_review);
       setAiFilledFields({ title: !!json.title, description: !!json.description });
       setPriceSuggestion(json.price || null);
+      setAiVisual(json.visual_description || null);
       setAiScanData({
         scan_type: 'scan-toy',
         model_used: 'meta-llama/llama-4-scout-17b-16e-instruct',
@@ -409,8 +411,8 @@ export default function OpretOpslagPage() {
       setImgFiles(prev => prev.length < 6 ? [file, ...prev] : prev);
       setImgPreviews(prev => prev.length < 6 ? [preview, ...prev] : prev);
       setImgError(false);
-      showToast(json.needs_review ? 'AI har udfyldt felterne — opslaget sendes til gennemgang 🔍' : 'AI har udfyldt felterne — tjek og juster 🎉');
-    } catch { setScanError('Scan mislykkedes — prøv igen'); }
+      showToast(json.needs_review ? 'AI har udfyldt felterne. Opslaget sendes til gennemgang 🔍' : 'AI har udfyldt felterne. Tjek og juster 🎉');
+    } catch { setScanError('Scan mislykkedes. Prøv igen'); }
     setScanning(false);
   }
 
@@ -424,7 +426,7 @@ export default function OpretOpslagPage() {
         body: JSON.stringify({ query: søgesQuery }),
       });
       const json = await res.json();
-      if (json.error) { showToast('AI kunne ikke udfylde — prøv igen', 'error'); }
+      if (json.error) { showToast('AI kunne ikke udfylde. Prøv igen', 'error'); }
       else {
         setForm(f => ({
           ...f,
@@ -448,7 +450,7 @@ export default function OpretOpslagPage() {
         });
         setSøgesFilled(true);
       }
-    } catch { showToast('AI kunne ikke udfylde — prøv igen', 'error'); }
+    } catch { showToast('AI kunne ikke udfylde. Prøv igen', 'error'); }
     setSøgesFilling(false);
   }
 
@@ -486,7 +488,7 @@ export default function OpretOpslagPage() {
         .eq('institution_name', instName)
         .eq('review_status', 'pending');
       if ((pendingCount || 0) >= 10) {
-        showToast('I har allerede 10 opslag til manuel gennemgang — vent på svar inden du sender flere', 'error');
+        showToast('I har allerede 10 opslag til manuel gennemgang. Vent på svar inden du sender flere', 'error');
         setSaving(false);
         return;
       }
@@ -507,9 +509,10 @@ export default function OpretOpslagPage() {
       review_requested_at: scanRejected ? new Date().toISOString() : null,
       category: form.category || null, subcategory: form.subcategory || null, brand: form.brand || null,
       can_ship: delivery.shipping || false,
+      image_description: aiVisual || aiScanData?.ai_description || null, // ren visuel beskrivelse — bruges til semantisk billedsøgning
     };
     const { data: listing, error } = await db.from('listings').insert(insertData).select().single();
-    if (error) { console.error('Insert error:', error); showToast('Noget gik galt — prøv igen', 'error'); setSaving(false); return; }
+    if (error) { console.error('Insert error:', error); showToast('Noget gik galt. Prøv igen', 'error'); setSaving(false); return; }
     // urgency: update separately so it fails silently if column doesn't exist yet
     if (isSøges && listing?.id) {
       await db.from('listings').update({ urgency: form.urgency || 'ingen' }).eq('id', listing.id).then(() => {});
@@ -537,6 +540,15 @@ export default function OpretOpslagPage() {
       }
       if (urls.length) await db.from('listings').update({ images: urls }).eq('id', listing.id);
     }
+    // Fire-and-forget: semantisk embedding til AI-billedsøgning (kun ikke-søges opslag indgår i søgning)
+    if (listing?.id && !isSøges) {
+      const descText = aiVisual || aiScanData?.ai_description || `${form.title}. ${form.description}`;
+      authedFetch('/api/embed-listing', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ listingId: listing.id, text: descText }),
+      }).then(() => {}).catch(() => {});
+    }
+
     // Fire-and-forget: log AI-scan kun ved faktisk submit
     if (aiScanData) {
       const finalPrice = form.price ? Number(form.price) : null;
@@ -589,7 +601,7 @@ export default function OpretOpslagPage() {
     router.push('/profil');
     } catch (e) {
       console.error('handleCreate error:', e);
-      showToast('Noget gik galt — prøv igen', 'error');
+      showToast('Noget gik galt. Prøv igen', 'error');
     } finally {
       setSaving(false);
     }
@@ -624,7 +636,7 @@ export default function OpretOpslagPage() {
             ← Tilbage til dashboard
           </button>
           <h1 style={{ fontFamily:FONT, fontWeight:800, fontSize:isMobile?26:36, color:'#fff', letterSpacing:'-0.04em', marginBottom:8, lineHeight:1.1 }}>{copiedFrom ? 'Opret lignende opslag' : 'Opret nyt opslag'}</h1>
-          <p style={{ fontSize:14, color:'rgba(255,255,255,0.6)', fontFamily:FONT, margin:0 }}>{copiedFrom ? 'Oplysningerne er udfyldt fra dit tidligere opslag — tilpas og publicer' : 'Udfyld oplysningerne nedenfor — det tager kun 2 minutter'}</p>
+          <p style={{ fontSize:14, color:'rgba(255,255,255,0.6)', fontFamily:FONT, margin:0 }}>{copiedFrom ? 'Oplysningerne er udfyldt fra dit tidligere opslag. Tilpas og publicer' : 'Udfyld oplysningerne nedenfor. Det tager kun 2 minutter'}</p>
           {copiedFrom && (
             <div style={{ marginTop:12, display:'inline-flex', alignItems:'center', gap:8, background:'rgba(255,255,255,0.15)', borderRadius:99, padding:'6px 14px' }}>
               <span style={{ fontSize:14 }}>📋</span>
@@ -694,7 +706,7 @@ export default function OpretOpslagPage() {
                       <div style={{ marginTop:10, display:'flex', alignItems:'center', justifyContent:'space-between', gap:8 }}>
                         <div style={{ display:'flex', alignItems:'center', gap:6, fontSize:13, fontWeight:700, color:'#059669', fontFamily:FONT }}>
                           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
-                          Felterne er udfyldt — tjek og juster nedenfor
+                          Felterne er udfyldt. Tjek og juster nedenfor
                         </div>
                         <button type="button" onClick={() => { setSøgesFilled(false); handleFillSøges(); }}
                           style={{ fontSize:12, fontWeight:700, color:'#7C3AED', background:'rgba(124,58,237,0.1)', border:'none', borderRadius:99, padding:'5px 12px', cursor:'pointer', fontFamily:FONT }}>
@@ -738,7 +750,7 @@ export default function OpretOpslagPage() {
                         <>
                           <div style={{ width:40, height:40, borderRadius:'50%', background:GREEN_TINT, display:'flex', alignItems:'center', justifyContent:'center', fontSize:22 }}>📷</div>
                           <div style={{ fontFamily:FONT, fontWeight:700, fontSize:14, color:INK }}>Scan legetøj med AI</div>
-                          <div style={{ fontSize:12, color:INK3, fontFamily:FONT }}>Tag et billede — AI udfylder titel, kategori, stand og beskrivelse automatisk</div>
+                          <div style={{ fontSize:12, color:INK3, fontFamily:FONT }}>Tag et billede, så udfylder AI titel, kategori, stand og beskrivelse automatisk</div>
                         </>
                       )}
                     </div>
@@ -764,7 +776,7 @@ export default function OpretOpslagPage() {
                                   } catch {}
                                   setRejectionLogId(null);
                                   setScanError(null);
-                                  showToast('Feedback sendt — tak! Du kan prøve med et nyt billede.');
+                                  showToast('Feedback sendt. Tak! Du kan prøve med et nyt billede.');
                                 }}
                                 style={{ background:'transparent', color:'#B91C1C', border:'1.5px solid #B91C1C', borderRadius:8, padding:'6px 14px', fontSize:12, fontWeight:700, fontFamily:FONT, cursor:'pointer' }}
                               >
@@ -780,7 +792,7 @@ export default function OpretOpslagPage() {
                         <span style={{ fontSize:20, flexShrink:0 }}>🔍</span>
                         <div>
                           <div style={{ fontFamily:FONT, fontWeight:700, fontSize:13, color:'#92400E', marginBottom:4 }}>Send til manuel gennemgang</div>
-                          <div style={{ fontFamily:FONT, fontSize:12, color:'#78350F', lineHeight:1.5 }}>AI kan ikke bekræfte billedet. Udfyld opslaget og send det til godkendelse — vi vender tilbage inden for 1–2 hverdage.</div>
+                          <div style={{ fontFamily:FONT, fontSize:12, color:'#78350F', lineHeight:1.5 }}>AI kan ikke bekræfte billedet. Udfyld opslaget og send det til godkendelse, så vender vi tilbage inden for 1–2 hverdage.</div>
                         </div>
                       </div>
                     )}
@@ -813,7 +825,7 @@ export default function OpretOpslagPage() {
                   <input value={form.title} onChange={e=>{ setForm({...form,title:e.target.value}); setAiFilledFields(f=>({...f,title:false})); }} placeholder="Fx: LEGO Duplo stor kasse, 120 klodser" style={inputStyle} />
                   {aiFilledFields.title && (
                     <div style={{ fontSize:11, color:'#7C3AED', fontFamily:FONT, marginTop:5, display:'flex', alignItems:'center', gap:4 }}>
-                      ✨ AI-forslag — tjek og tilpas teksten efter behov
+                      ✨ AI-forslag: tjek og tilpas teksten efter behov
                     </div>
                   )}
                 </div>
@@ -840,7 +852,7 @@ export default function OpretOpslagPage() {
                 )}
                 {form.type === 'søges' && (
                   <div>
-                    <label style={labelStyle}>Budget (kr.) <span style={{ fontWeight:400, color:INK3 }}>— valgfri, lad stå tom hvis byt</span></label>
+                    <label style={labelStyle}>Budget (kr.) <span style={{ fontWeight:400, color:INK3 }}>(valgfri, lad stå tom hvis byt)</span></label>
                     <input type="number" value={form.price} onChange={e=>setForm({...form,price:e.target.value})} placeholder="Fx 200" min="0" style={inputStyle} />
                   </div>
                 )}
@@ -856,7 +868,7 @@ export default function OpretOpslagPage() {
                   <div>
                     <label style={labelStyle}>Levering</label>
                     <div style={{ background:GREEN_TINT, border:`1px solid ${GREEN_SOFT}`, borderRadius:12, padding:'11px 14px', marginBottom:10, fontFamily:FONT, fontSize:13, color:INK2, lineHeight:1.5 }}>
-                      📍 Køber kan <strong>hente selv hos jer</strong> — det aftaler I direkte. Vil du også tilbyde forsendelse, så slå det til nedenfor.
+                      📍 Køber kan <strong>hente selv hos jer</strong>, det aftaler I direkte. Vil du også tilbyde forsendelse, så slå det til nedenfor.
                     </div>
                     <div style={{ display:'flex', flexDirection:'column', gap:10 }}>
 
@@ -869,7 +881,7 @@ export default function OpretOpslagPage() {
                           </div>
                           <div style={{ flex:1 }}>
                             <div style={{ fontFamily:FONT, fontWeight:700, fontSize:14, color: delivery.shipping ? '#2563EB' : INK }}>📦 Vi kan sende med pakke</div>
-                            <div style={{ fontSize:12, color:INK3, marginTop:1 }}>PostNord, DAO eller GLS — porto betales af køber eller inkluderet</div>
+                            <div style={{ fontSize:12, color:INK3, marginTop:1 }}>PostNord, DAO eller GLS. Porto betales af køber eller inkluderet</div>
                           </div>
                         </button>
                         {delivery.shipping && (
@@ -900,7 +912,7 @@ export default function OpretOpslagPage() {
                               </div>
                             </div>
                             <div style={{ background:'#EFF6FF', borderRadius:10, padding:'10px 14px', fontSize:13, color:'#1D4ED8', fontFamily:FONT, fontWeight:600 }}>
-                              ℹ️ Prisen du har sat er ekskl. porto — køber betaler den billigste porto oveni ved checkout.
+                              ℹ️ Prisen du har sat er ekskl. porto. Køber betaler den billigste porto oveni ved checkout.
                             </div>
                           </div>
                         )}
@@ -975,7 +987,7 @@ export default function OpretOpslagPage() {
                     rows={4} style={{ ...inputStyle, resize:'vertical', minHeight:100 }} />
                   {aiFilledFields.description && (
                     <div style={{ fontSize:11, color:'#7C3AED', fontFamily:FONT, marginTop:5, display:'flex', alignItems:'center', gap:4 }}>
-                      ✨ AI-forslag — tjek og tilpas teksten efter behov
+                      ✨ AI-forslag: tjek og tilpas teksten efter behov
                     </div>
                   )}
                 </div>

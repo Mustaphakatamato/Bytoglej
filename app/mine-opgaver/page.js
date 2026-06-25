@@ -60,7 +60,7 @@ function StripeOrderCard({ order, myGroup, onMarkedSent }) {
         )}
         {isShipped && (
           <span style={{ background:'#DBEAFE', color:'#1D4ED8', borderRadius:99, fontSize:10, fontWeight:800, padding:'3px 8px', flexShrink:0 }}>
-            LABEL KLAR — AFSEND
+            LABEL KLAR: AFSEND
           </span>
         )}
         {isDone && (
@@ -95,7 +95,7 @@ function StripeOrderCard({ order, myGroup, onMarkedSent }) {
               </a>
             ) : (isPaid || isShipped) ? (
               <div style={{ background:'#FEF9C3', borderRadius:12, padding:'10px 14px', fontFamily:FONT, fontSize:13, color:'#92400E' }}>
-                📧 Pakkemærkaten genereres og sendes til institutionens e-mail — tjek indbakke og spam.
+                📧 Pakkemærkaten genereres og sendes til institutionens e-mail. Tjek indbakke og spam.
               </div>
             ) : null}
 
@@ -464,7 +464,7 @@ export default function MineOpgaverPage() {
                     <div style={{ padding:'60px 20px', textAlign:'center', background:'#fff', borderRadius:16 }}>
                       <div style={{ fontSize:48, marginBottom:12 }}>🎉</div>
                       <div style={{ fontFamily:FONT, fontWeight:700, fontSize:16, color:INK, marginBottom:6 }}>Intet at sende lige nu</div>
-                      <div style={{ fontFamily:FONT, fontSize:13, color:INK3 }}>Alt er klaret — godt gået!</div>
+                      <div style={{ fontFamily:FONT, fontSize:13, color:INK3 }}>Alt er klaret, godt gået!</div>
                     </div>
                   )}
                   {swapSends.map(s => <SwapSendCard key={s.id} s={s} router={router} />)}

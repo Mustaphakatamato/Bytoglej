@@ -98,7 +98,7 @@ export function TradeProtectionPopup({ fee = SWAP_PROTECTION_FEE, porto, onClose
           </div>
         )}
         <div style={{ marginTop:20, marginBottom:20, fontFamily:FONT, fontSize:13, color:'#666', lineHeight:1.6 }}>
-          Ved en byttehandel betaler <strong>begge parter</strong> et fast gebyr på {kr(fee)} for byttebeskyttelse. Beskyttelsen dækker jer hvis den modtagne vare ikke ankommer eller ikke matcher beskrivelsen. Begge pakkemærkater frigives først når <strong>begge parter har betalt</strong> — så ingen sender uden at modparten også har forpligtet sig.
+          Ved en byttehandel betaler <strong>begge parter</strong> et fast gebyr på {kr(fee)} for byttebeskyttelse. Beskyttelsen dækker jer hvis den modtagne vare ikke ankommer eller ikke matcher beskrivelsen. Begge pakkemærkater frigives først når <strong>begge parter har betalt</strong>, så ingen sender uden at modparten også har forpligtet sig.
         </div>
         <div style={{ background:'#f5f5f5', borderRadius:12, padding:'14px 16px', marginBottom:24, display:'flex', justifyContent:'space-between', alignItems:'center' }}>
           <span style={{ fontFamily:FONT, fontWeight:700, fontSize:15, color:'#111' }}>{hasPorto ? 'Du betaler i alt' : 'Du betaler'}</span>

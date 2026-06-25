@@ -69,6 +69,7 @@ export function AppProvider({ children }) {
   const [activeInstName,  setActiveInstName]  = useState(null);
   const [favs,            setFavs]            = useState([]);
   const [cart,            setCart]            = useState([]);
+  const [imgSearchOpen,   setImgSearchOpen]   = useState(false);
 
   const effectiveInstitution = adminInst || institution;
 
@@ -351,6 +352,7 @@ export function AppProvider({ children }) {
     favs, toggleFav, setFavs,
     cart, addToCart, removeFromCart, clearCart,
     effectiveInstitution,
+    imgSearchOpen, setImgSearchOpen,
   };
 
   const pathname = usePathname();

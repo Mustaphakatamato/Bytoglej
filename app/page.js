@@ -2,7 +2,7 @@
 // v2
 import { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
-import { PRIMARY, GREEN_DEEP, GREEN_SOFT, GREEN_TINT, PAPER, PAPER2, PAPER3, INK, INK2, INK3, CORAL, SKY, TYPE_CFG, FONT } from '@/lib/constants';
+import { PRIMARY, GREEN_DEEP, GREEN_SOFT, GREEN_TINT, PAPER, PAPER2, PAPER3, INK, INK2, INK3, CORAL, BUTTER, SKY, TYPE_CFG, FONT } from '@/lib/constants';
 import { useWindowWidth, useDebounce, useFeedListings } from '@/lib/hooks';
 import { SkeletonCard } from '@/components/ui';
 import ListingCard, { calcServiceFee, BuyerProtectionPopup } from '@/components/ListingCard';
@@ -11,6 +11,7 @@ import { useApp } from '@/providers/AppProvider';
 import { db } from '@/lib/supabase';
 import { getCO2Comparison } from '@/lib/co2/calculator';
 import { LogoLockup } from '@/components/Logo';
+import Reveal, { useReducedMotion } from '@/components/Reveal';
 import { STATS_CONFIG } from '@/lib/stats-config';
 
 /* ── Compact mobile listing card (Vinted-style) ───────────── */
@@ -129,6 +130,59 @@ function HeroSection({ stats }) {
   const heroImageUrl = process.env.NEXT_PUBLIC_HERO_IMAGE_URL || null;
   const hasImage = !!heroImageUrl;
 
+  /* ── bløde entrance-animationer (respekterer reduceret bevægelse) ── */
+  const reduced = useReducedMotion();
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => {
+    const r = requestAnimationFrame(() => setMounted(true));
+    return () => cancelAnimationFrame(r);
+  }, []);
+  const rise = (i = 0) => reduced ? undefined : {
+    opacity: mounted ? 1 : 0,
+    transform: mounted ? 'none' : 'translateY(30px)',
+    transition: `opacity 1s cubic-bezier(0.16,1,0.3,1) ${i * 130}ms, transform 1.05s cubic-bezier(0.16,1,0.3,1) ${i * 130}ms`,
+  };
+
+  /* ── svævende opslag-kort der ligger hen over fotorammen ── */
+  const chipEl = (c, key) => (
+    <div key={key} style={{
+      position: 'absolute', ...c.pos, zIndex: 3,
+      ...(reduced ? {} : {
+        opacity: mounted ? 1 : 0,
+        transform: mounted ? 'none' : 'translateY(14px)',
+        transition: `opacity 0.7s ease ${c.delay}ms, transform 0.7s cubic-bezier(0.16,1,0.3,1) ${c.delay}ms`,
+      }),
+    }}>
+      <div style={{
+        animation: reduced ? 'none' : `${c.drift} ${c.dur}s ease-in-out infinite`,
+        animationDelay: `${c.adelay}s`,
+        background: c.badge ? PRIMARY : '#fff',
+        borderRadius: 16, padding: c.badge ? '9px 14px' : '10px 13px',
+        boxShadow: '0 14px 34px rgba(19,63,43,0.16)',
+        display: 'flex', alignItems: 'center', gap: 9,
+        border: c.badge ? 'none' : `1px solid ${PAPER3}`, whiteSpace: 'nowrap',
+      }}>
+        <span aria-hidden="true" style={{ fontSize: c.badge ? 16 : 20 }}>{c.emoji}</span>
+        <div>
+          <div style={{ fontFamily: FONT, fontWeight: 800, fontSize: c.badge ? 12.5 : 13, color: c.badge ? '#fff' : INK, letterSpacing: '-0.01em', lineHeight: 1.1 }}>{c.title}</div>
+          {c.tag && <div style={{ fontFamily: FONT, fontWeight: 700, fontSize: 10.5, color: c.tagColor, marginTop: 2 }}>{c.tag}</div>}
+        </div>
+      </div>
+    </div>
+  );
+
+  /* ── fotoramme med blød blob bagved + accent-prik ── */
+  const renderFrame = (frameWidth, chips, center) => (
+    <div style={{ position: 'relative', width: frameWidth, maxWidth: '100%', margin: center ? '0 auto' : undefined, ...rise(2) }}>
+      <div aria-hidden="true" style={{ position: 'absolute', inset: '-7% -9% -11% -5%', background: GREEN_SOFT, opacity: 0.5, borderRadius: '46% 54% 52% 48% / 52% 48% 52% 48%', animation: reduced ? 'none' : 'float2 9s ease-in-out infinite' }} />
+      <div aria-hidden="true" style={{ position: 'absolute', top: '-3%', right: '14%', width: 16, height: 16, borderRadius: '50%', background: BUTTER, zIndex: 4 }} />
+      <div style={{ position: 'relative', aspectRatio: '5 / 6', borderRadius: 30, overflow: 'hidden', border: '6px solid #fff', boxShadow: '0 34px 80px rgba(19,63,43,0.20)', zIndex: 2 }}>
+        <img src={heroImageUrl} alt="Børn der leger med genbrugt legetøj" style={{ width: '100%', height: '100%', objectFit: 'cover', objectPosition: 'center', display: 'block' }} />
+      </div>
+      {chips.map((c, i) => chipEl(c, i))}
+    </div>
+  );
+
   /* ── shared content pieces ── */
   const pill = (
     <div style={{
@@ -164,7 +218,7 @@ function HeroSection({ stats }) {
       lineHeight: 1.65,
       marginBottom: 28,
     }}>
-      Den første markedsplads hvor børnehaver, skoler og SFO'er køber, sælger og bytter legetøj direkte med hinanden — sikkert og bæredygtigt.
+      Den første markedsplads hvor børnehaver, skoler og SFO'er køber, sælger og bytter legetøj direkte med hinanden, sikkert og bæredygtigt.
     </p>
   );
 
@@ -246,7 +300,7 @@ function HeroSection({ stats }) {
           {pill}
           {headline}
           <p style={{ fontSize: isMobile ? 15 : 18, color: 'rgba(255,255,255,0.68)', lineHeight: 1.65, maxWidth: 520, margin: '0 auto 36px' }}>
-            Den første markedsplads hvor børnehaver, skoler og SFO'er køber, sælger og bytter legetøj direkte med hinanden — sikkert og bæredygtigt.
+            Den første markedsplads hvor børnehaver, skoler og SFO'er køber, sælger og bytter legetøj direkte med hinanden, sikkert og bæredygtigt.
           </p>
           <div style={{ display: 'flex', gap: 12, justifyContent: 'center', flexWrap: 'wrap', marginBottom: 56 }}>
             <button onClick={() => router.push('/signup')} style={{
@@ -300,125 +354,86 @@ function HeroSection({ stats }) {
     );
   }
 
-  /* ── WITH IMAGE ── */
+  /* ── WITH IMAGE — split-layout (Direction A): tekst + fotoramme med svævende opslag ── */
 
-  /* Mobile: image fills background with dark overlay, centered white text */
+  const heroPill = (
+    <div style={{ display: 'inline-block', background: GREEN_TINT, borderRadius: 999, padding: '6px 18px', fontSize: 12, fontWeight: 600, color: PRIMARY, letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: 20, fontFamily: FONT }}>
+      Markedsplads for institutioner
+    </div>
+  );
+  const heroHeadline = (isMobile2) => (
+    <h1 style={{ fontFamily: FONT, fontWeight: 800, fontSize: isMobile2 ? 38 : 56, letterSpacing: '-0.045em', lineHeight: 1.0, color: INK, marginBottom: 18 }}>
+      Legetøj til glæde<br /><span style={{ color: PRIMARY }}>for alle.</span>
+    </h1>
+  );
+  const heroSub = (isMobile2) => (
+    <p style={{ fontSize: isMobile2 ? 15 : 17, color: INK3, lineHeight: 1.65, marginBottom: 28, maxWidth: 440, marginLeft: isMobile2 ? 'auto' : 0, marginRight: isMobile2 ? 'auto' : 0 }}>
+      Den første markedsplads hvor børnehaver, skoler og SFO&apos;er køber, sælger og bytter legetøj direkte med hinanden. Sikkert og bæredygtigt.
+    </p>
+  );
+  const heroCtas = (isMobile2) => (
+    <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', marginBottom: 24, justifyContent: isMobile2 ? 'center' : 'flex-start' }}>
+      <button onClick={() => router.push('/signup')} style={{ background: PRIMARY, color: '#fff', border: 'none', borderRadius: 999, padding: isMobile2 ? '13px 28px' : '14px 32px', fontSize: 15, fontWeight: 700, fontFamily: FONT, cursor: 'pointer', letterSpacing: '-0.01em' }}>
+        Tilmeld institution
+      </button>
+      <button onClick={() => router.push('/opslag')} style={{ background: 'transparent', color: INK2, border: `1.5px solid ${PAPER3}`, borderRadius: 999, padding: isMobile2 ? '13px 24px' : '14px 28px', fontSize: 15, fontWeight: 600, fontFamily: FONT, cursor: 'pointer', letterSpacing: '-0.01em' }}>
+        Se markedspladsen →
+      </button>
+    </div>
+  );
+  const trustLine = (isMobile2) => (
+    <div style={{ display: 'flex', alignItems: 'center', gap: 8, color: INK3, fontFamily: FONT, fontSize: 13, fontWeight: 600, justifyContent: isMobile2 ? 'center' : 'flex-start', marginBottom: anyStatVisible ? 24 : 0 }}>
+      <span aria-hidden="true" style={{ color: PRIMARY }}>✓</span> Kun verificerede institutioner med CVR-nummer
+    </div>
+  );
+
+  const mobileChips = [
+    { emoji: '🚲', title: 'Ladcykel', tag: 'Byttes', tagColor: CORAL, pos: { top: '6%', left: '-3%' }, drift: 'float', dur: 6, adelay: 0, delay: 480 },
+    { emoji: '🌱', title: '12 kg CO₂ sparet', badge: true, pos: { bottom: '7%', right: '-3%' }, drift: 'float2', dur: 7, adelay: 0.5, delay: 640 },
+  ];
+  const desktopChips = [
+    { emoji: '🚲', title: 'Ladcykel', tag: 'Byttes', tagColor: CORAL, pos: { top: '7%', left: '-14%' }, drift: 'float', dur: 6, adelay: 0, delay: 520 },
+    { emoji: '🌱', title: '12 kg CO₂ sparet', badge: true, pos: { top: '46%', left: '-16%' }, drift: 'float2', dur: 7.5, adelay: 0.6, delay: 700 },
+    { emoji: '🧱', title: 'Kasse LEGO', tag: '120 kr', tagColor: PRIMARY, pos: { bottom: '9%', right: '-8%' }, drift: 'float', dur: 6.5, adelay: 0.3, delay: 620 },
+  ];
+
+  /* Mobile: stak — tekst først, derefter fotoramme */
   if (isMobile) {
     return (
-      <section style={{
-        position: 'relative', overflow: 'hidden',
-        paddingTop: 100, paddingBottom: 60,
-        minHeight: '75vh',
-        display: 'flex', alignItems: 'center',
-      }}>
-        {/* Background image */}
-        <img src={heroImageUrl} alt="" style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover', objectPosition: 'center', display: 'block' }} />
-        {/* Dark overlay */}
-        <div style={{ position: 'absolute', inset: 0, background: 'rgba(10,24,16,0.58)' }} />
-
-        <div style={{ position: 'relative', zIndex: 1, width: '100%', padding: '0 24px', textAlign: 'center' }}>
-          <div style={{ display: 'inline-block', background: 'rgba(255,255,255,0.15)', borderRadius: 999, padding: '6px 18px', fontSize: 12, fontWeight: 600, color: 'rgba(255,255,255,0.85)', letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: 20, fontFamily: FONT }}>
-            Markedsplads for institutioner
+      <section style={{ background: PAPER, position: 'relative', overflow: 'hidden', paddingTop: 96, paddingBottom: 64 }}>
+        <div aria-hidden="true" className="blob-float" style={{ position: 'absolute', top: '-12%', right: '-22%', width: 320, height: 320, borderRadius: '50%', background: GREEN_TINT, opacity: 0.6, pointerEvents: 'none' }} />
+        <div style={{ position: 'relative', padding: '0 24px', textAlign: 'center', maxWidth: 520, margin: '0 auto' }}>
+          <div style={rise(0)}>{heroPill}</div>
+          <div style={rise(1)}>{heroHeadline(true)}</div>
+          <div style={rise(2)}>{heroSub(true)}</div>
+          <div style={rise(3)}>{heroCtas(true)}</div>
+          <div style={{ marginTop: 36, marginBottom: anyStatVisible ? 36 : 0 }}>
+            {renderFrame('min(320px, 80vw)', mobileChips, true)}
           </div>
-          <h1 style={{ fontFamily: FONT, fontWeight: 800, fontSize: 36, letterSpacing: '-0.04em', lineHeight: 1.0, color: '#fff', marginBottom: 18 }}>
-            Legetøj til glæde<br /><span style={{ color: GREEN_SOFT }}>for alle.</span>
-          </h1>
-          <p style={{ fontSize: 14, color: 'rgba(255,255,255,0.75)', lineHeight: 1.65, marginBottom: 28 }}>
-            Den første markedsplads hvor børnehaver, skoler og SFO'er køber, sælger og bytter legetøj direkte med hinanden — sikkert og bæredygtigt.
-          </p>
-          <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', marginBottom: 32, justifyContent: 'center' }}>
-            <button onClick={() => router.push('/signup')} style={{ background: PAPER, color: PRIMARY, border: 'none', borderRadius: 999, padding: '12px 24px', fontSize: 14, fontWeight: 700, fontFamily: FONT, cursor: 'pointer' }}>
-              Tilmeld institution
-            </button>
-            <button onClick={() => router.push('/opslag')} style={{ background: 'transparent', color: 'rgba(255,255,255,0.88)', border: '1.5px solid rgba(255,255,255,0.35)', borderRadius: 999, padding: '12px 20px', fontSize: 14, fontWeight: 600, fontFamily: FONT, cursor: 'pointer' }}>
-              Se markedspladsen →
-            </button>
-          </div>
-          {statsRow}
+          <div style={rise(5)}>{statsRow}</div>
         </div>
-
-        {/* Wave into next section */}
-        <svg viewBox="0 0 1440 72" style={{ position: 'absolute', bottom: -1, left: 0, right: 0, width: '100%', display: 'block' }} preserveAspectRatio="none">
-          <path d="M0,36 C360,72 1080,0 1440,36 L1440,72 L0,72 Z" fill={PAPER} />
-        </svg>
       </section>
     );
   }
 
-  /* Desktop: image fills right side, white floating card on left */
+  /* Desktop: tekst venstre, fotoramme højre */
   return (
-    <section style={{
-      position: 'relative', overflow: 'hidden',
-      minHeight: '88vh',
-      display: 'flex', alignItems: 'stretch',
-    }}>
-      {/* Right: hero image */}
-      <div style={{ position: 'absolute', inset: 0 }}>
-        <img src={heroImageUrl} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover', objectPosition: '65% center', display: 'block' }} />
-        {/* subtle right-to-left fade so card blends in */}
-        <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(to right, rgba(255,255,255,0.88) 0%, rgba(255,255,255,0.50) 42%, rgba(255,255,255,0) 65%)' }} />
-      </div>
-
-      {/* Left: floating white card */}
-      <div style={{ position: 'relative', zIndex: 1, display: 'flex', alignItems: 'center', padding: '120px 0 100px', maxWidth: 1200, margin: '0 auto', width: '100%', paddingLeft: 64, paddingRight: 64 }}>
-        <div style={{
-          background: 'rgba(255,255,255,0.97)',
-          borderRadius: 24,
-          padding: '52px 48px',
-          maxWidth: 480,
-          boxShadow: '0 24px 80px rgba(10,24,16,0.13), 0 2px 8px rgba(10,24,16,0.06)',
-          backdropFilter: 'blur(8px)',
-        }}>
-          <div style={{ display: 'inline-block', background: GREEN_TINT, borderRadius: 999, padding: '6px 18px', fontSize: 12, fontWeight: 600, color: PRIMARY, letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: 20, fontFamily: FONT }}>
-            Markedsplads for institutioner
-          </div>
-          <h1 style={{ fontFamily: FONT, fontWeight: 800, fontSize: 52, letterSpacing: '-0.04em', lineHeight: 1.0, color: INK, marginBottom: 18 }}>
-            Legetøj til glæde<br /><span style={{ color: PRIMARY }}>for alle.</span>
-          </h1>
-          <p style={{ fontSize: 16, color: INK3, lineHeight: 1.65, marginBottom: 28 }}>
-            Den første markedsplads hvor børnehaver, skoler og SFO'er køber, sælger og bytter legetøj direkte med hinanden — sikkert og bæredygtigt.
-          </p>
-          <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', marginBottom: 36 }}>
-            <button onClick={() => router.push('/signup')} style={{ background: PRIMARY, color: '#fff', border: 'none', borderRadius: 999, padding: '13px 30px', fontSize: 15, fontWeight: 700, fontFamily: FONT, cursor: 'pointer' }}>
-              Tilmeld institution
-            </button>
-            <button onClick={() => router.push('/opslag')} style={{ background: 'transparent', color: INK2, border: `1.5px solid ${PAPER3}`, borderRadius: 999, padding: '13px 26px', fontSize: 15, fontWeight: 600, fontFamily: FONT, cursor: 'pointer' }}>
-              Se markedspladsen →
-            </button>
-          </div>
-          {anyStatVisible ? (
-            <div style={{ display: 'flex', gap: 32, flexWrap: 'wrap' }}>
-              {showStat('institutions', stats.institutions) && (
-                <div>
-                  <div style={{ fontFamily: FONT, fontWeight: 800, fontSize: 28, color: INK, letterSpacing: '-0.04em', lineHeight: 1 }}>{stats.institutions}</div>
-                  <div style={{ fontSize: 11, color: INK3, marginTop: 3, fontFamily: FONT, letterSpacing: '0.02em' }}>institutioner tilmeldt</div>
-                </div>
-              )}
-              {showStat('listings', stats.listings) && (
-                <div>
-                  <div style={{ fontFamily: FONT, fontWeight: 800, fontSize: 28, color: INK, letterSpacing: '-0.04em', lineHeight: 1 }}>{stats.listings}</div>
-                  <div style={{ fontSize: 11, color: INK3, marginTop: 3, fontFamily: FONT, letterSpacing: '0.02em' }}>aktive opslag</div>
-                </div>
-              )}
-              {showStat('trades', stats.deals) && (
-                <div>
-                  <div style={{ fontFamily: FONT, fontWeight: 800, fontSize: 28, color: INK, letterSpacing: '-0.04em', lineHeight: 1 }}>{stats.deals}</div>
-                  <div style={{ fontSize: 11, color: INK3, marginTop: 3, fontFamily: FONT, letterSpacing: '0.02em' }}>handler gennemført</div>
-                </div>
-              )}
-            </div>
-          ) : STATS_CONFIG.startupMessage ? (
-            <div style={{ fontSize: 12, color: INK3, fontFamily: FONT, fontStyle: 'italic' }}>
-              {STATS_CONFIG.startupMessage}
-            </div>
-          ) : null}
+    <section style={{ background: PAPER, position: 'relative', overflow: 'hidden', paddingTop: 124, paddingBottom: 104 }}>
+      <div aria-hidden="true" className="blob-float" style={{ position: 'absolute', top: '-18%', right: '-8%', width: 560, height: 560, borderRadius: '50%', background: GREEN_TINT, opacity: 0.55, pointerEvents: 'none' }} />
+      <div aria-hidden="true" className="blob-float-2" style={{ position: 'absolute', bottom: '-24%', left: '-10%', width: 460, height: 460, borderRadius: '50%', background: PAPER2, opacity: 0.5, pointerEvents: 'none' }} />
+      <div style={{ position: 'relative', maxWidth: 1180, margin: '0 auto', padding: '0 clamp(24px, 5vw, 64px)', display: 'flex', alignItems: 'center', gap: 'clamp(40px, 6vw, 88px)' }}>
+        <div style={{ flex: '1 1 0', minWidth: 0, maxWidth: 560 }}>
+          <div style={rise(0)}>{heroPill}</div>
+          <div style={rise(1)}>{heroHeadline(false)}</div>
+          <div style={rise(2)}>{heroSub(false)}</div>
+          <div style={rise(3)}>{heroCtas(false)}</div>
+          <div style={rise(4)}>{trustLine(false)}</div>
+          <div style={rise(5)}>{statsRow}</div>
+        </div>
+        <div style={{ flex: '0 0 auto', width: 'clamp(340px, 40vw, 470px)' }}>
+          {renderFrame('100%', desktopChips, false)}
         </div>
       </div>
-
-      {/* Wave into next section */}
-      <svg viewBox="0 0 1440 72" style={{ position: 'absolute', bottom: -1, left: 0, right: 0, width: '100%', display: 'block' }} preserveAspectRatio="none">
-        <path d="M0,36 C360,72 1080,0 1440,36 L1440,72 L0,72 Z" fill={PAPER} />
-      </svg>
     </section>
   );
 }
@@ -427,8 +442,8 @@ function HeroSection({ stats }) {
 const JOURNEY_STEPS = [
   { emoji: '🧸', bg: '#FFFBEB', accent: '#D97706', n: '01', title: 'Legetøjet samler støv', desc: 'Du har cykler, puslespil eller møbler der ikke bruges. Et andet sted vil de gøre børn glade.' },
   { emoji: '📸', bg: '#F0FDF4', accent: '#16A34A', n: '02', title: 'Opret et opslag på 2 min.', desc: 'Tag ét billede. AI udfylder titel, kategori og beskrivelse automatisk. Nemmere end en brugtannonce.' },
-  { emoji: '💬', bg: '#EFF6FF', accent: '#2563EB', n: '03', title: 'Institutioner byder og skriver', desc: 'Verificerede børnehaver og skoler kontakter dig direkte. Byd, byt eller sælg — du bestemmer.' },
-  { emoji: '🚀', bg: '#FDF4FF', accent: '#9333EA', n: '04', title: 'Nyt hjem, ny glæde', desc: 'I aftaler pris og afhentning. Legetøjet giver glæde et nyt sted — og du har skabt plads.' },
+  { emoji: '💬', bg: '#EFF6FF', accent: '#2563EB', n: '03', title: 'Institutioner byder og skriver', desc: 'Verificerede børnehaver og skoler kontakter dig direkte. Byd, byt eller sælg. Du bestemmer.' },
+  { emoji: '🚀', bg: '#FDF4FF', accent: '#9333EA', n: '04', title: 'Nyt hjem, ny glæde', desc: 'I aftaler pris og afhentning. Legetøjet giver glæde et nyt sted, og du har skabt plads.' },
 ];
 
 /* ── How steps — shared grid, works on both mobile and desktop ── */
@@ -454,26 +469,33 @@ function HowStepsSection() {
     <section style={{ background: PAPER, padding: isMobile ? '60px 20px 80px' : '80px 24px 100px', position: 'relative', overflow: 'hidden' }}>
       <style>{`
         @keyframes how-fade-up {
-          from { opacity: 0; transform: translateY(32px); }
-          to   { opacity: 1; transform: translateY(0); }
+          from { opacity: 0; transform: translateY(46px) scale(0.96); }
+          to   { opacity: 1; transform: translateY(0) scale(1); }
         }
         .how-card-visible {
-          animation: how-fade-up 0.6s cubic-bezier(0.22,1,0.36,1) forwards;
+          animation: how-fade-up 0.95s cubic-bezier(0.16,1,0.3,1) forwards;
         }
         .how-card-hidden {
           opacity: 0;
         }
+        @media (prefers-reduced-motion: reduce) {
+          .how-card-visible { animation: none; }
+          .how-card-hidden { opacity: 1; }
+        }
       `}</style>
 
       {/* Section header */}
-      <div style={{ textAlign: 'center', marginBottom: isMobile ? 40 : 56 }}>
-        <div style={{ display: 'inline-block', background: GREEN_TINT, borderRadius: 999, padding: '5px 16px', fontSize: 11, fontWeight: 700, color: PRIMARY, letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: 14, fontFamily: FONT }}>
+      <Reveal variant="up" style={{ textAlign: 'center', marginBottom: isMobile ? 44 : 60 }}>
+        <div style={{ display: 'inline-block', background: `${PRIMARY}1a`, borderRadius: 999, padding: '6px 16px', fontSize: 11, fontWeight: 700, color: PRIMARY, letterSpacing: '0.1em', textTransform: 'uppercase', marginBottom: 16, fontFamily: FONT }}>
           Sådan virker det
         </div>
-        <h2 style={{ fontFamily: FONT, fontWeight: 800, fontSize: isMobile ? 30 : 42, color: INK, letterSpacing: '-0.04em', lineHeight: 1.1, margin: 0 }}>
+        <h2 style={{ fontFamily: FONT, fontWeight: 800, fontSize: isMobile ? 30 : 44, color: INK, letterSpacing: '-0.04em', lineHeight: 1.05, margin: '0 0 14px' }}>
           Fra støv til glæde
         </h2>
-      </div>
+        <p style={{ color: INK3, fontSize: isMobile ? 15 : 17, maxWidth: 440, margin: '0 auto', fontFamily: FONT, lineHeight: 1.65 }}>
+          Fire enkle trin fra ubrugt legetøj til glæde et nyt sted.
+        </p>
+      </Reveal>
 
       {/* 4-card grid: 2×2 on mobile, 1×4 on desktop */}
       <div style={{
@@ -488,19 +510,20 @@ function HowStepsSection() {
             ref={el => cardRefs.current[i] = el}
             className={visible.has(i) ? 'how-card-visible' : 'how-card-hidden'}
             style={{
-              animationDelay: `${i * 0.1}s`,
+              animationDelay: `${i * 0.14}s`,
               background: '#fff',
               borderRadius: 20,
-              padding: isMobile ? '24px 20px' : '32px 28px',
-              boxShadow: '0 2px 16px rgba(22,34,28,0.07), 0 1px 4px rgba(22,34,28,0.04)',
+              padding: isMobile ? '24px 20px' : '30px 26px',
+              boxShadow: '0 4px 30px rgba(0,0,0,0.06)',
               border: '1px solid rgba(22,34,28,0.06)',
+              borderTop: `3px solid ${step.accent}`,
               position: 'relative',
               overflow: 'hidden',
             }}
           >
             {/* Big step number watermark */}
             <div style={{
-              position: 'absolute', top: 8, right: 14,
+              position: 'absolute', top: 6, right: 14,
               fontFamily: FONT, fontWeight: 800,
               fontSize: isMobile ? 56 : 72,
               color: step.accent,
@@ -512,18 +535,18 @@ function HowStepsSection() {
               {step.n}
             </div>
 
-            {/* Emoji */}
-            <div style={{ fontSize: isMobile ? 36 : 48, marginBottom: isMobile ? 14 : 20, lineHeight: 1 }}>
-              {step.emoji}
+            {/* Emoji tile */}
+            <div style={{ width: isMobile ? 44 : 52, height: isMobile ? 44 : 52, borderRadius: 14, background: `${step.accent}1a`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: isMobile ? 24 : 28, marginBottom: isMobile ? 14 : 18 }}>
+              <span aria-hidden="true">{step.emoji}</span>
             </div>
 
             {/* Title */}
-            <div style={{ fontFamily: FONT, fontWeight: 800, fontSize: isMobile ? 14 : 16, color: INK, marginBottom: 8, lineHeight: 1.3 }}>
+            <div style={{ fontFamily: FONT, fontWeight: 800, fontSize: isMobile ? 14.5 : 17, color: INK, marginBottom: 8, lineHeight: 1.25, letterSpacing: '-0.02em' }}>
               {step.title}
             </div>
 
             {/* Description */}
-            <p style={{ fontSize: isMobile ? 12 : 13, color: INK3, lineHeight: 1.65, margin: 0 }}>
+            <p style={{ fontSize: isMobile ? 12.5 : 13.5, color: INK3, lineHeight: 1.65, margin: 0 }}>
               {step.desc}
             </p>
           </div>
@@ -544,34 +567,46 @@ function TradeTypesStrip() {
   const isMobile = w < 640;
 
   return (
-    <section style={{ background: GREEN_TINT, padding: isMobile ? '40px 20px' : '48px 24px', position: 'relative', overflow: 'hidden' }}>
-      <div style={{ maxWidth: 900, margin: '0 auto', display: 'grid', gridTemplateColumns: isMobile ? '1fr' : 'repeat(3,1fr)', gap: isMobile ? 16 : 0 }}>
-        {[
-          { key: 'køb', title: 'Køb', sub: 'Fastpris', desc: 'Se prisen og køb med det samme — eller giv et tilbud.' },
-          { key: 'byt', title: 'Byt', sub: 'Bytehandel', desc: 'Tilbyd et af jeres egne opslag i bytte.' },
-          { key: 'søges', title: 'Søges', sub: 'Efterlysning', desc: 'Efterlys legetøj I mangler — få besked når det dukker op.' },
-        ].map((t, i) => {
-          const tc = TYPE_CFG[t.key];
-          return (
-            <div key={i} style={{
-              padding: isMobile ? '20px 24px' : '28px 32px',
-              borderRight: !isMobile && i < 2 ? `1px solid ${GREEN_SOFT}` : 'none',
-              textAlign: isMobile ? 'left' : 'center',
-              display: 'flex', flexDirection: isMobile ? 'row' : 'column',
-              alignItems: isMobile ? 'center' : 'initial',
-              gap: isMobile ? 16 : 0,
-            }}>
-              <div style={{ width: 44, height: 44, borderRadius: '50%', background: tc.bg, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, margin: isMobile ? 0 : '0 auto 14px' }}>
-                <div style={{ width: 12, height: 12, borderRadius: '50%', background: tc.color }} />
-              </div>
-              <div>
-                <div style={{ fontFamily: FONT, fontWeight: 800, fontSize: 18, color: INK, marginBottom: 2 }}>{t.title}</div>
-                <div style={{ fontSize: 11, fontWeight: 600, color: tc.color, textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 6, fontFamily: FONT }}>{t.sub}</div>
-                <p style={{ fontSize: 13, color: INK3, lineHeight: 1.6, margin: 0 }}>{t.desc}</p>
-              </div>
-            </div>
-          );
-        })}
+    <section style={{ background: GREEN_TINT, padding: isMobile ? '64px 20px 80px' : '92px 24px 110px', position: 'relative', overflow: 'hidden' }}>
+      <div aria-hidden="true" className="blob-float-2" style={{ position: 'absolute', top: '-20%', left: '-12%', width: 420, height: 420, borderRadius: '50%', background: GREEN_SOFT, opacity: 0.35, pointerEvents: 'none' }} />
+      <div style={{ maxWidth: 940, margin: '0 auto', position: 'relative' }}>
+        <Reveal variant="up" style={{ textAlign: 'center', marginBottom: isMobile ? 36 : 52 }}>
+          <div style={{ display: 'inline-block', background: '#fff', borderRadius: 999, padding: '6px 16px', fontSize: 11, fontWeight: 700, color: PRIMARY, letterSpacing: '0.1em', textTransform: 'uppercase', marginBottom: 16, fontFamily: FONT }}>
+            Handelstyper
+          </div>
+          <h2 style={{ fontFamily: FONT, fontWeight: 800, fontSize: isMobile ? 28 : 42, color: INK, letterSpacing: '-0.04em', lineHeight: 1.05, margin: '0 0 14px' }}>
+            Tre måder at handle på
+          </h2>
+          <p style={{ color: INK3, fontSize: isMobile ? 15 : 17, maxWidth: 420, margin: '0 auto', fontFamily: FONT, lineHeight: 1.65 }}>
+            Vælg den model der passer til jer og situationen.
+          </p>
+        </Reveal>
+
+        <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : 'repeat(3,1fr)', gap: isMobile ? 14 : 20 }}>
+          {[
+            { key: 'køb', title: 'Køb', sub: 'Fastpris', desc: 'Se prisen og køb med det samme. Ingen forhandling, ingen ventetid.' },
+            { key: 'byt', title: 'Byt', sub: 'Bytehandel', desc: 'Tilbyd et af jeres egne opslag i bytte. Find noget I begge mangler.' },
+            { key: 'søges', title: 'Søges', sub: 'Efterlysning', desc: 'Efterlys legetøj I mangler. Få besked når det dukker op.' },
+          ].map((t, i) => {
+            const tc = TYPE_CFG[t.key];
+            return (
+              <Reveal key={i} variant="up" delay={i * 100}>
+                <div className="card" style={{
+                  background: '#fff', borderRadius: 22, padding: isMobile ? '24px 22px' : '30px 26px',
+                  border: `1px solid ${GREEN_SOFT}`, borderTop: `3px solid ${tc.color}`, height: '100%',
+                  boxShadow: '0 4px 30px rgba(0,0,0,0.05)',
+                }}>
+                  <div style={{ width: 52, height: 52, borderRadius: 15, background: `${tc.color}1a`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 26, marginBottom: 16 }}>
+                    <span aria-hidden="true">{tc.icon}</span>
+                  </div>
+                  <div style={{ fontFamily: FONT, fontWeight: 800, fontSize: 21, color: INK, marginBottom: 3, letterSpacing: '-0.03em' }}>{t.title}</div>
+                  <div style={{ fontSize: 11, fontWeight: 700, color: tc.color, textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 12, fontFamily: FONT }}>{t.sub}</div>
+                  <p style={{ fontSize: 14, color: INK3, lineHeight: 1.65, margin: 0, fontFamily: FONT }}>{t.desc}</p>
+                </div>
+              </Reveal>
+            );
+          })}
+        </div>
       </div>
 
       {/* Wave into MissionSection (GREEN_DEEP) */}
@@ -596,16 +631,20 @@ function ListingsPreview({ listings, loading, goToInstitution }) {
   }, [listings, filter]);
 
   return (
-    <section style={{ background: PAPER2, padding: isMobile ? '48px 16px 72px' : '64px 24px 96px', position: 'relative', overflow: 'hidden' }}>
-      <div style={{ maxWidth: 1140, margin: '0 auto' }}>
+    <section style={{ background: PAPER2, padding: isMobile ? '64px 16px 80px' : '88px 24px 104px', position: 'relative', overflow: 'hidden' }}>
+      <div aria-hidden="true" className="blob-float" style={{ position: 'absolute', top: '-16%', right: '-10%', width: 440, height: 440, borderRadius: '50%', background: GREEN_TINT, opacity: 0.5, pointerEvents: 'none' }} />
+      <div style={{ maxWidth: 1140, margin: '0 auto', position: 'relative' }}>
 
         {/* Header row */}
-        <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', marginBottom: 24, flexWrap: 'wrap', gap: 12 }}>
+        <Reveal variant="up" as="div" style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', marginBottom: 28, flexWrap: 'wrap', gap: 12 }}>
           <div>
-            <div style={{ fontFamily: FONT, fontWeight: 800, fontSize: isMobile ? 26 : 38, color: INK, letterSpacing: '-0.04em', lineHeight: 1.05, marginBottom: 4 }}>
+            <div style={{ display: 'inline-block', background: `${PRIMARY}1a`, borderRadius: 999, padding: '6px 16px', fontSize: 11, fontWeight: 700, color: PRIMARY, letterSpacing: '0.1em', textTransform: 'uppercase', marginBottom: 14, fontFamily: FONT }}>
+              Markedspladsen
+            </div>
+            <div style={{ fontFamily: FONT, fontWeight: 800, fontSize: isMobile ? 28 : 40, color: INK, letterSpacing: '-0.04em', lineHeight: 1.03, marginBottom: 6 }}>
               Nye opslag
             </div>
-            <p style={{ color: INK3, fontSize: 14, fontFamily: FONT }}>Fra verificerede institutioner i hele Danmark</p>
+            <p style={{ color: INK3, fontSize: 15, fontFamily: FONT }}>Fra verificerede institutioner i hele Danmark</p>
           </div>
           <button onClick={() => router.push('/opslag')} style={{
             background: 'none', border: `1.5px solid ${PRIMARY}`, color: PRIMARY,
@@ -614,7 +653,7 @@ function ListingsPreview({ listings, loading, goToInstitution }) {
           }}>
             Se alle annoncer →
           </button>
-        </div>
+        </Reveal>
 
         {/* Type pills */}
         <div style={{ display: 'flex', gap: 6, marginBottom: 28, flexWrap: 'wrap' }}>
@@ -638,11 +677,13 @@ function ListingsPreview({ listings, loading, goToInstitution }) {
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(250px,1fr))', gap: 18 }}>
           {loading
             ? [1,2,3,4].map(i => <SkeletonCard key={i} />)
-            : shown.map(l => (
-                <ListingCard key={l.id} listing={l} favs={favs} toggleFav={toggleFav}
-                  onClick={() => { setActiveListing(l); router.push('/opslag/detail'); }}
-                  onInstitutionClick={goToInstitution}
-                />
+            : shown.map((l, i) => (
+                <Reveal key={l.id} variant="up" delay={Math.min(i, 7) * 80} duration={850}>
+                  <ListingCard listing={l} favs={favs} toggleFav={toggleFav}
+                    onClick={() => { setActiveListing(l); router.push('/opslag/detail'); }}
+                    onInstitutionClick={goToInstitution}
+                  />
+                </Reveal>
               ))
           }
         </div>
@@ -685,30 +726,34 @@ function MissionSection() {
       <div style={{ position: 'absolute', inset: 0, backgroundImage: `radial-gradient(circle at 15% 50%, rgba(42,125,79,0.4) 0%, transparent 55%), radial-gradient(circle at 85% 20%, rgba(207,227,216,0.06) 0%, transparent 50%)`, pointerEvents: 'none' }} />
 
       <div style={{ maxWidth: 900, margin: '0 auto', position: 'relative' }}>
-        <div style={{ textAlign: 'center', marginBottom: isMobile ? 48 : 72 }}>
-          <div style={{ display: 'inline-block', background: 'rgba(255,255,255,0.08)', borderRadius: 999, padding: '5px 16px', fontSize: 11, fontWeight: 600, color: 'rgba(255,255,255,0.6)', letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: 16, fontFamily: FONT }}>
+        <Reveal variant="up" style={{ textAlign: 'center', marginBottom: isMobile ? 48 : 72 }}>
+          <div style={{ display: 'inline-block', background: 'rgba(255,255,255,0.1)', borderRadius: 999, padding: '6px 16px', fontSize: 11, fontWeight: 700, color: 'rgba(255,255,255,0.7)', letterSpacing: '0.1em', textTransform: 'uppercase', marginBottom: 16, fontFamily: FONT }}>
             Vores mission
           </div>
           <h2 style={{ fontFamily: FONT, fontWeight: 800, fontSize: isMobile ? 28 : 44, letterSpacing: '-0.04em', color: '#fff', lineHeight: 1.05, marginBottom: 16 }}>
             Vi tror på at legetøj<br />fortjener flere liv.
           </h2>
-          <p style={{ color: 'rgba(255,255,255,0.55)', fontSize: 16, lineHeight: 1.65, maxWidth: 460, margin: '0 auto' }}>
+          <p style={{ color: 'rgba(255,255,255,0.6)', fontSize: isMobile ? 15 : 17, lineHeight: 1.65, maxWidth: 460, margin: '0 auto', fontFamily: FONT }}>
             byt&amp;leg forbinder danske institutioner i et fællesskab, hvor ressourcer deles og miljøet passes på.
           </p>
-        </div>
+        </Reveal>
 
         <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : 'repeat(2,1fr)', gap: isMobile ? 16 : 20 }}>
           {points.map((p, i) => (
-            <div key={i} style={{
-              background: 'rgba(255,255,255,0.06)',
-              border: '1px solid rgba(255,255,255,0.1)',
-              borderRadius: 20, padding: '28px 28px',
-              backdropFilter: 'blur(10px)',
-            }}>
-              <div style={{ width: 8, height: 8, borderRadius: '50%', background: GREEN_SOFT, marginBottom: 16 }} />
-              <div style={{ fontFamily: FONT, fontWeight: 800, fontSize: 17, color: '#fff', marginBottom: 6 }}>{p.title}</div>
-              <p style={{ fontSize: 14, color: 'rgba(255,255,255,0.55)', lineHeight: 1.65, margin: 0 }}>{p.desc}</p>
-            </div>
+            <Reveal key={i} variant="up" delay={i * 90}>
+              <div style={{
+                background: 'rgba(255,255,255,0.06)',
+                border: '1px solid rgba(255,255,255,0.1)',
+                borderRadius: 20, padding: '26px 28px',
+                backdropFilter: 'blur(10px)', height: '100%',
+              }}>
+                <div style={{ width: 38, height: 38, borderRadius: 11, background: 'rgba(207,227,216,0.16)', display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: 16, color: GREEN_SOFT, fontSize: 17, fontWeight: 800 }}>
+                  <span aria-hidden="true">✓</span>
+                </div>
+                <div style={{ fontFamily: FONT, fontWeight: 800, fontSize: 17, color: '#fff', marginBottom: 6, letterSpacing: '-0.02em' }}>{p.title}</div>
+                <p style={{ fontSize: 14, color: 'rgba(255,255,255,0.6)', lineHeight: 1.65, margin: 0, fontFamily: FONT }}>{p.desc}</p>
+              </div>
+            </Reveal>
           ))}
         </div>
       </div>
@@ -748,26 +793,55 @@ function PlatformCO2Stat() {
   const comparison  = totalKg ? getCO2Comparison(totalKg) : null;
 
   return (
-    <section style={{ background: GREEN_TINT, padding: isMobile ? '56px 20px' : '80px 24px', textAlign: 'center', borderTop: `1px solid ${GREEN_SOFT}` }}>
-      <div style={{ maxWidth: 600, margin: '0 auto' }}>
-        <div style={{ fontFamily: "'Sora',sans-serif", fontWeight: 700, fontSize: 12, letterSpacing: '0.1em', textTransform: 'uppercase', color: PRIMARY, marginBottom: 14, opacity: 0.7 }}>
-          Fællesskabets miljøindsats
-        </div>
-        <h2 style={{ fontFamily: "'Sora',sans-serif", fontWeight: 800, fontSize: isMobile ? 32 : 52, color: PRIMARY, letterSpacing: '-0.04em', lineHeight: 1, margin: '0 0 8px' }}>
-          🌱 ≈ {displayVal} CO₂e
-        </h2>
-        <p style={{ fontSize: 15, color: '#3A473D', fontFamily: "'Sora',sans-serif", marginBottom: 6 }}>
-          estimeret sparet af byt&amp;leg-fællesskabet
-          {tradeCount ? ` på tværs af ${tradeCount} handler` : ''}
-        </p>
-        {comparison && <p style={{ fontSize: 13, color: PRIMARY, fontFamily: "'Sora',sans-serif", marginBottom: 0, opacity: 0.8 }}>{comparison}</p>}
-        <button onClick={() => router.push('/baeredygtighed/metode')}
-          style={{ marginTop: 18, background: 'none', border: `1.5px solid ${PRIMARY}`, borderRadius: 99, padding: '7px 18px', fontSize: 12, fontWeight: 700, color: PRIMARY, cursor: 'pointer', fontFamily: "'Sora',sans-serif" }}>
-          Sådan beregner vi det →
-        </button>
-        <p style={{ fontSize: 10, color: PRIMARY, opacity: 0.5, fontFamily: "'Sora',sans-serif", marginTop: 10 }}>
-          Alle tal er estimater baseret på publiceret LCA-litteratur. Se metode-siden for fuld dokumentation.
-        </p>
+    <section style={{ background: GREEN_TINT, padding: isMobile ? '72px 20px' : '104px 24px', textAlign: 'center', position: 'relative', overflow: 'hidden' }}>
+      <div aria-hidden="true" className="blob-float-2" style={{ position: 'absolute', bottom: '-22%', right: '-12%', width: 460, height: 460, borderRadius: '50%', background: GREEN_SOFT, opacity: 0.3, pointerEvents: 'none' }} />
+      <div style={{ maxWidth: 640, margin: '0 auto', position: 'relative' }}>
+        <Reveal variant="up">
+          <div style={{ display: 'inline-block', background: '#fff', borderRadius: 999, padding: '6px 16px', fontSize: 11, fontWeight: 700, letterSpacing: '0.1em', textTransform: 'uppercase', color: PRIMARY, marginBottom: 16, fontFamily: FONT }}>
+            Bæredygtighed
+          </div>
+        </Reveal>
+        <Reveal variant="up" delay={60}>
+          <h2 style={{ fontFamily: FONT, fontWeight: 800, fontSize: isMobile ? 28 : 42, color: INK, letterSpacing: '-0.04em', lineHeight: 1.05, margin: '0 0 14px' }}>
+            Fællesskabets klimagevinst
+          </h2>
+        </Reveal>
+        <Reveal variant="up" delay={120}>
+          <p style={{ fontSize: isMobile ? 15 : 17, color: INK3, fontFamily: FONT, lineHeight: 1.65, margin: '0 auto 36px', maxWidth: 460 }}>
+            Hver genbrugt ting sparer CO₂. Her er hvad byt&amp;leg-fællesskabet har sparet tilsammen.
+          </p>
+        </Reveal>
+
+        <Reveal variant="scale" delay={120}>
+          <div style={{ display: 'inline-flex', alignItems: 'center', gap: isMobile ? 16 : 26, background: '#fff', borderRadius: 24, padding: isMobile ? '22px 26px' : '28px 44px', boxShadow: '0 18px 50px rgba(19,63,43,0.12)', border: `1px solid ${GREEN_SOFT}`, textAlign: 'left' }}>
+            <div style={{ fontSize: isMobile ? 44 : 56 }}><span aria-hidden="true">🌱</span></div>
+            <div>
+              <div style={{ fontFamily: FONT, fontWeight: 800, fontSize: isMobile ? 34 : 50, color: PRIMARY, letterSpacing: '-0.04em', lineHeight: 1 }}>
+                ≈ {displayVal}
+              </div>
+              <div style={{ fontFamily: FONT, fontSize: 13, color: INK3, fontWeight: 600, marginTop: 6 }}>
+                CO₂e sparet{tradeCount ? ` · ${tradeCount} handler` : ''}
+              </div>
+            </div>
+          </div>
+        </Reveal>
+
+        {comparison && (
+          <Reveal variant="up" delay={160}>
+            <p style={{ fontSize: 14, color: PRIMARY, fontFamily: FONT, margin: '20px 0 0', fontWeight: 600 }}>{comparison}</p>
+          </Reveal>
+        )}
+        <Reveal variant="up" delay={200}>
+          <div>
+            <button onClick={() => router.push('/baeredygtighed/metode')}
+              style={{ marginTop: 22, background: 'none', border: `1.5px solid ${PRIMARY}`, borderRadius: 999, padding: '10px 22px', fontSize: 13, fontWeight: 700, color: PRIMARY, cursor: 'pointer', fontFamily: FONT }}>
+              Sådan beregner vi det →
+            </button>
+            <p style={{ fontSize: 11, color: INK3, fontFamily: FONT, marginTop: 14, fontStyle: 'italic' }}>
+              Alle tal er estimater baseret på publiceret LCA-litteratur. Se metode-siden for fuld dokumentation.
+            </p>
+          </div>
+        </Reveal>
       </div>
     </section>
   );
@@ -786,7 +860,7 @@ function CtaBanner() {
       textAlign: 'center', position: 'relative', overflow: 'hidden',
     }}>
       <div style={{ position: 'absolute', inset: 0, backgroundImage: `radial-gradient(circle at 70% 30%, rgba(241,196,75,0.07) 0%, transparent 50%)`, pointerEvents: 'none' }} />
-      <div style={{ position: 'relative', maxWidth: 520, margin: '0 auto' }}>
+      <Reveal variant="up" style={{ position: 'relative', maxWidth: 520, margin: '0 auto' }}>
         <h2 style={{ fontFamily: FONT, fontWeight: 800, fontSize: isMobile ? 30 : 46, letterSpacing: '-0.04em', color: '#fff', marginBottom: 14, lineHeight: 1.05 }}>
           Klar til at komme i gang?
         </h2>
@@ -808,7 +882,7 @@ function CtaBanner() {
             Se markedspladsen →
           </button>
         </div>
-      </div>
+      </Reveal>
     </section>
   );
 }

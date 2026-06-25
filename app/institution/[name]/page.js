@@ -128,11 +128,11 @@ export default function InstitutionPage() {
       const { data: { user } } = await db.auth.getUser();
       if (!user) { router.push('/login'); setSendingBundle(false); return; }
       const ownerInst = inst;
-      if (!ownerInst) { showToast('Kunne ikke finde institutionen — prøv igen', 'error'); setSendingBundle(false); return; }
+      if (!ownerInst) { showToast('Kunne ikke finde institutionen. Prøv igen', 'error'); setSendingBundle(false); return; }
       const myInstId = myInst?.id || null;
       const userName = myInst?.name || user.email;
 
-      const bundleTitle = selected.length === 1 ? selected[0].title : `Bundttilbud — ${selected.length} opslag`;
+      const bundleTitle = selected.length === 1 ? selected[0].title : `Bundttilbud: ${selected.length} opslag`;
       const { data: conv, error: convErr } = await db.from('conversations').insert({
         listing_id: null,
         listing_title: bundleTitle,
@@ -299,7 +299,7 @@ export default function InstitutionPage() {
           </div>
           {selectMode && (
             <div style={{ marginTop:12, padding:'10px 14px', background:GREEN_TINT, borderRadius:12, fontSize:13, color:PRIMARY, fontFamily:FONT, fontWeight:600 }}>
-              Vælg de opslag du vil have — klik på dem for at markere
+              Vælg de opslag du vil have. Klik på dem for at markere
             </div>
           )}
         </div>
@@ -433,7 +433,7 @@ export default function InstitutionPage() {
                 <div style={{ marginBottom:20 }}>
                   <div style={{ display:'flex', alignItems:'baseline', justifyContent:'space-between', marginBottom:8 }}>
                     <div style={{ fontSize:11, fontWeight:700, color:INK3, textTransform:'uppercase', letterSpacing:'0.07em', fontFamily:FONT }}>
-                      Du tilbyder {offerSelected.length > 0 ? `(${offerSelected.length})` : ''} <span style={{ fontWeight:400, color:INK3, textTransform:'none', letterSpacing:0 }}>— valgfri</span>
+                      Du tilbyder {offerSelected.length > 0 ? `(${offerSelected.length})` : ''} <span style={{ fontWeight:400, color:INK3, textTransform:'none', letterSpacing:0 }}>(valgfri)</span>
                     </div>
                     {offerTotal > 0
                       ? <div style={{ fontFamily:FONT, fontWeight:800, fontSize:15, color:CORAL }}>{offerTotal.toLocaleString('da-DK')} kr.{offerPriced.length < offerSelected.length ? <span style={{ fontSize:11, fontWeight:400, color:INK3 }}> + {offerSelected.length - offerPriced.length} uden pris</span> : ''}</div>
@@ -468,7 +468,7 @@ export default function InstitutionPage() {
             {/* Note */}
             <div style={{ marginBottom:22 }}>
               <div style={{ fontSize:11, fontWeight:700, color:INK3, textTransform:'uppercase', letterSpacing:'0.07em', fontFamily:FONT, marginBottom:8 }}>Tilføj en note <span style={{ fontWeight:400 }}>(valgfri)</span></div>
-              <textarea value={bundleNote} onChange={e=>setBundleNote(e.target.value)} placeholder="Fx: Vi er meget interesserede i disse — kan vi aftale en pris?" rows={2} style={{ width:'100%', padding:'12px 14px', borderRadius:12, border:`1.5px solid ${PAPER3}`, fontSize:13, fontFamily:FONT, resize:'none', outline:'none', boxSizing:'border-box', color:INK }} />
+              <textarea value={bundleNote} onChange={e=>setBundleNote(e.target.value)} placeholder="Fx: Vi er meget interesserede i disse. Kan vi aftale en pris?" rows={2} style={{ width:'100%', padding:'12px 14px', borderRadius:12, border:`1.5px solid ${PAPER3}`, fontSize:13, fontFamily:FONT, resize:'none', outline:'none', boxSizing:'border-box', color:INK }} />
             </div>
 
             {/* Value summary */}

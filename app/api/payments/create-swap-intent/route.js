@@ -148,15 +148,15 @@ export async function POST(req) {
         size_category: String(sizeCategory),
         buyer_id: user.id,
       },
-      description: `Bytogleg byttehandel — ${conv.listing_title || ''}`,
+      description: `Bytogleg byttehandel: ${conv.listing_title || ''}`,
     });
   } catch (err) {
     console.error('[create-swap-intent] Stripe fejl:', err.message);
-    return NextResponse.json({ error: 'Betalingen kunne ikke oprettes — prøv igen' }, { status: 502 });
+    return NextResponse.json({ error: 'Betalingen kunne ikke oprettes. Prøv igen' }, { status: 502 });
   }
 
   const breakdown = [{
-    sellerName: deliveryMethod === 'shipping' ? 'Byttehandel — forsendelse af din vare' : 'Byttehandel — aftalt levering',
+    sellerName: deliveryMethod === 'shipping' ? 'Byttehandel: forsendelse af din vare' : 'Byttehandel: aftalt levering',
     items: [],
     shippingTotal: porto,
     serviceFee: SWAP_PROTECTION_FEE,

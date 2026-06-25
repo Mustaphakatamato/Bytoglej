@@ -1,341 +1,582 @@
 'use client';
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { PRIMARY, GREEN_DEEP, GREEN_SOFT, GREEN_TINT, INK, INK2, INK3, PAPER, PAPER2, PAPER3, FONT } from '@/lib/constants';
+import { PRIMARY, GREEN_DEEP, GREEN_SOFT, GREEN_TINT, INK, INK2, INK3, PAPER, PAPER2, PAPER3, CORAL, BUTTER, SKY, FONT } from '@/lib/constants';
 import { useWindowWidth } from '@/lib/hooks';
+import Reveal, { useReducedMotion } from '@/components/Reveal';
+import { Mark09 } from '@/components/Logo';
 
-const STEPS = [
-  {
-    emoji: '🧸',
-    bg: '#FFFBEB',
-    accent: '#D97706',
-    label: '01',
-    title: 'Legetøjet samler støv',
-    desc: 'Du har cykler, puslespil eller møbler der ikke bruges. Et andet sted vil de gøre børn glade — men de fylder bare hos jer.',
-    points: ['Legetøj der ikke bruges', 'Møbler der er gået ud af mode', 'Cykler og udstyr der er for store', 'Materialer fra afsluttede projekter'],
-  },
-  {
-    emoji: '📸',
-    bg: '#F0FDF4',
-    accent: '#16A34A',
-    label: '02',
-    title: 'Opret et opslag på 2 min.',
-    desc: 'Tag ét billede. Vores AI scanner det og udfylder automatisk titel, kategori, stand og beskrivelse. Du vælger selv pris eller byt.',
-    points: ['AI udfylder titel og beskrivelse', 'Vælg køb, byt eller byd', 'Synlig for alle verificerede institutioner', 'Ingen annonceringsomkostninger'],
-  },
-  {
-    emoji: '💬',
-    bg: '#EFF6FF',
-    accent: '#2563EB',
-    label: '03',
-    title: 'Institutioner byder og skriver',
-    desc: 'Verificerede børnehaver og skoler kontakter dig direkte. Forhandl, send modbud, tilbyd et bytte — du bestemmer.',
-    points: ['Direkte beskeder i platformen', 'Modtag bud og forhandl', 'Byttetilbud fra andre institutioner', 'Notifikationsmail på alle nye beskeder'],
-  },
-  {
-    emoji: '🚀',
-    bg: '#FDF4FF',
-    accent: '#9333EA',
-    label: '04',
-    title: 'Nyt hjem, ny glæde',
-    desc: 'I aftaler pris og afhentning. Legetøjet giver glæde et nyt sted — og platformen beregner automatisk CO₂-besparelsen.',
-    points: ['Aftaler pris og afhentning direkte', 'Pengene går til jer', 'Handlen registreres på platformen', 'CO₂-besparelse beregnes automatisk'],
-  },
-];
+/* ────────────────────────────────────────────────────────────
+   "Sådan virker det": komplet visuelt redesign (Blød Eng-tema)
+   Hvert workflow forklares som et blødt, visuelt trin-for-trin.
+   ──────────────────────────────────────────────────────────── */
 
-const AI_FEATURES = [
-  {
-    emoji: '📸',
-    color: '#16A34A',
-    bg: '#F0FDF4',
-    title: 'Billedscanning',
-    desc: 'Tag et foto af dit legetøj og lad AI udfylde titel, beskrivelse, kategori, aldersgruppe og stand på få sekunder. Ingen manuel indtastning.',
-  },
-  {
-    emoji: '✍️',
-    color: '#7C3AED',
-    bg: '#F5F3FF',
-    title: 'Søges-assistent',
-    desc: 'Skriv frit hvad du leder efter — fx "Vi mangler cykler til 5-årige" — og AI oversætter det til et struktureret søges-opslag klar til publicering.',
-  },
-  {
-    emoji: '🔍',
-    color: '#2563EB',
-    bg: '#EFF6FF',
-    title: 'Intelligent søgning',
-    desc: 'Skriv naturligt hvad du leder efter. AI forstår kategorier og aldersgrupper og finder de mest relevante opslag — ikke kun dem med præcis samme ord.',
-  },
-  {
-    emoji: '📝',
-    color: '#D97706',
-    bg: '#FFFBEB',
-    title: 'Beskrivelsesforbedring',
-    desc: 'Har du en kort eller upræcis beskrivelse? AI kan udvide og forbedre den så opslaget fremstår mere professionelt og tiltrækker flere henvendelser.',
-  },
-];
+const PURPLE = '#7C3AED';
 
-const PLATFORM_FEATURES = [
-  { emoji: '💌', title: 'E-mailnotifikationer', desc: 'Får du en ny besked? Vi sender dig straks en mail — så du aldrig går glip af en handelsmulighed.' },
-  { emoji: '🤝', title: 'Bud og modbud', desc: 'Modtag bud under udbudsprisen, send et modbud eller acceptér direkte. Hele forhandlingen sker i chatten.' },
-  { emoji: '🔄', title: 'Byttetilbud', desc: 'Tilbyd et af jeres egne opslag som betaling. Klik "Jeg har noget der matcher" og vælg fra jeres egne listings.' },
-{ emoji: '📊', title: 'Mit dashboard', desc: 'Overblik over alle dine opslag, aktive handler, beskeder og statistik. Rediger, deaktiver eller sæt til "Reserveret" med ét klik.' },
-  { emoji: '♻️', title: 'CO₂-beregner', desc: 'Platformen beregner automatisk CO₂-besparelsen ved hver handel baseret på afstand og produkttype.' },
-  { emoji: '🔎', title: 'Søges-opslag', desc: 'Mangler I noget bestemt? Opret et søges-opslag og lad andre institutioner komme til jer med tilbud der matcher.' },
-  { emoji: '🔔', title: 'Kurv og ønskeliste', desc: 'Gem interessante opslag i kurven og vend tilbage til dem. Del opslag direkte med kolleger via link.' },
-  { emoji: '🛡️', title: 'Kun verificerede institutioner', desc: 'Alle brugere verificeres via CVR- eller P-nummer. Ingen private — kun rigtige institutioner.' },
-];
+/* ── Genbrugelige byggesten ─────────────────────────────────── */
 
-function JourneySection({ isMobile }) {
-  const cardRefs = useRef([]);
+function Wave({ fill, position = 'bottom' }) {
+  const isTop = position === 'top';
+  return (
+    <svg viewBox="0 0 1440 80" preserveAspectRatio="none" aria-hidden="true"
+      style={{ position: 'absolute', left: 0, right: 0, width: '100%', display: 'block', zIndex: 1,
+        [isTop ? 'top' : 'bottom']: -1, transform: isTop ? 'rotate(180deg)' : 'none' }}>
+      <path d="M0,40 C360,80 1080,0 1440,40 L1440,80 L0,80 Z" fill={fill} />
+    </svg>
+  );
+}
+
+function Eyebrow({ children, accent = PRIMARY, dark = false }) {
+  return (
+    <div style={{
+      display: 'inline-block',
+      background: dark ? 'rgba(255,255,255,0.1)' : `${accent}1a`,
+      borderRadius: 999, padding: '6px 16px',
+      fontSize: 11, fontWeight: 700,
+      color: dark ? 'rgba(255,255,255,0.75)' : accent,
+      letterSpacing: '0.1em', textTransform: 'uppercase',
+      marginBottom: 18, fontFamily: FONT,
+    }}>
+      {children}
+    </div>
+  );
+}
+
+function SectionHead({ eyebrow, title, sub, accent = PRIMARY, dark = false, isMobile, maxWidth = 460 }) {
+  return (
+    <div style={{ textAlign: 'center', marginBottom: isMobile ? 44 : 64, padding: '0 4px' }}>
+      <Reveal variant="up"><Eyebrow accent={accent} dark={dark}>{eyebrow}</Eyebrow></Reveal>
+      <Reveal variant="up" delay={60}>
+        <h2 style={{ fontFamily: FONT, fontWeight: 800, fontSize: isMobile ? 28 : 44, letterSpacing: '-0.04em',
+          color: dark ? '#fff' : INK, margin: '0 0 14px', lineHeight: 1.05 }}>
+          {title}
+        </h2>
+      </Reveal>
+      <Reveal variant="up" delay={120}>
+        <p style={{ color: dark ? 'rgba(255,255,255,0.6)' : INK3, fontSize: isMobile ? 15 : 17,
+          maxWidth, margin: '0 auto', fontFamily: FONT, lineHeight: 1.65 }}>
+          {sub}
+        </p>
+      </Reveal>
+    </div>
+  );
+}
+
+/* Blødt tællende tal, springer til slutværdi ved reduceret bevægelse */
+function CountUp({ to, suffix = '', duration = 1600, decimals = 0 }) {
+  const reduced = useReducedMotion();
+  const [val, setVal] = useState(0);
+  const ref = useRef(null);
+  const started = useRef(false);
 
   useEffect(() => {
-    const observers = cardRefs.current.map((el, i) => {
-      if (!el) return null;
-      const isEven = i % 2 === 0;
-      const resetTransform = isMobile
-        ? 'translateY(88px) scale(0.93)'
-        : `translateX(${isEven ? '-80px' : '80px'}) scale(0.94)`;
+    if (reduced) { setVal(to); return; }
+    const el = ref.current;
+    if (!el) return;
+    const io = new IntersectionObserver(([e]) => {
+      if (e.isIntersecting && !started.current) {
+        started.current = true;
+        const t0 = performance.now();
+        const tick = now => {
+          const p = Math.min(1, (now - t0) / duration);
+          const eased = 1 - Math.pow(1 - p, 3);
+          setVal(to * eased);
+          if (p < 1) requestAnimationFrame(tick);
+        };
+        requestAnimationFrame(tick);
+        io.disconnect();
+      }
+    }, { threshold: 0.4 });
+    io.observe(el);
+    return () => io.disconnect();
+  }, [to, duration, reduced]);
 
-      const io = new IntersectionObserver(
-        ([entry]) => {
-          if (entry.isIntersecting) {
-            el.style.opacity = '1';
-            el.style.transform = 'translateY(0) translateX(0) scale(1)';
-          } else if (entry.boundingClientRect.top > 0) {
-            el.style.opacity = '0';
-            el.style.transform = resetTransform;
-          }
-        },
-        { threshold: 0.1, rootMargin: '0px 0px -56px 0px' }
-      );
-      io.observe(el);
-      return io;
-    });
-    return () => observers.forEach(io => io?.disconnect());
-  }, [isMobile]);
+  return <span ref={ref}>{val.toLocaleString('da-DK', { minimumFractionDigits: decimals, maximumFractionDigits: decimals })}{suffix}</span>;
+}
 
-  function CardContent({ step, isMobile, isLeft }) {
-    return (
-      <>
-        <div style={{ position:'absolute', top:-6, right:isLeft?'auto':14, left:isLeft?14:'auto', fontFamily:FONT, fontWeight:800, fontSize:isMobile?72:96, color:step.accent, opacity:0.07, lineHeight:1, userSelect:'none', pointerEvents:'none', letterSpacing:'-0.05em' }}>
-          {step.label}
-        </div>
-        <div style={{ fontFamily:FONT, fontWeight:700, fontSize:10, color:step.accent, letterSpacing:'0.1em', textTransform:'uppercase', marginBottom:8 }}>
-          Trin {step.label}
-        </div>
-        <h3 style={{ fontFamily:FONT, fontWeight:800, fontSize:isMobile?18:22, color:INK, letterSpacing:'-0.03em', margin:'0 0 10px', lineHeight:1.15 }}>
-          {step.title}
-        </h3>
-        <p style={{ fontSize:isMobile?13:14, color:INK3, lineHeight:1.7, fontFamily:FONT, margin:'0 0 16px' }}>
-          {step.desc}
-        </p>
-        <div style={{ display:'flex', flexDirection:'column', gap:6 }}>
-          {step.points.map((p, j) => (
-            <div key={j} style={{ display:'flex', alignItems:'center', gap:9 }}>
-              <div style={{ width:5, height:5, borderRadius:'50%', background:step.accent, flexShrink:0 }} />
-              <span style={{ fontSize:isMobile?12:13, color:INK2, fontFamily:FONT, fontWeight:600 }}>{p}</span>
-            </div>
-          ))}
-        </div>
-      </>
-    );
-  }
+/* ── AI-scanner-mockup: foto scannes → felter udfyldes ──────── */
+function AiMockup({ isMobile }) {
+  const reduced = useReducedMotion();
+  const [active, setActive] = useState(false);
+  const [filled, setFilled] = useState(0);
+  const ref = useRef(null);
+
+  const fields = [
+    { label: 'Titel', value: 'Trælegetøj, togbane' },
+    { label: 'Kategori', value: 'Byggeleg · Motorik' },
+    { label: 'Aldersgruppe', value: '3–6 år' },
+    { label: 'Stand', value: 'Meget god' },
+  ];
+
+  useEffect(() => {
+    if (reduced) { setFilled(fields.length); return; }
+    const el = ref.current;
+    if (!el) return;
+    const io = new IntersectionObserver(([e]) => {
+      if (e.isIntersecting) { setActive(true); io.disconnect(); }
+    }, { threshold: 0.4 });
+    io.observe(el);
+    return () => io.disconnect();
+  }, [reduced]);
+
+  useEffect(() => {
+    if (!active || reduced) return;
+    const timers = fields.map((_, i) => setTimeout(() => setFilled(f => Math.max(f, i + 1)), 700 + i * 360));
+    return () => timers.forEach(clearTimeout);
+  }, [active, reduced]);
 
   return (
-    <div style={{ background:PAPER, padding:isMobile?'72px 0 88px':'100px 0 120px' }}>
-      <div style={{ textAlign:'center', marginBottom:isMobile?64:88, padding:'0 24px' }}>
-        <div style={{ display:'inline-block', background:GREEN_TINT, borderRadius:999, padding:'5px 16px', fontSize:11, fontWeight:700, color:PRIMARY, letterSpacing:'0.08em', textTransform:'uppercase', marginBottom:16, fontFamily:FONT }}>
-          Sådan virker det
-        </div>
-        <h2 style={{ fontFamily:FONT, fontWeight:800, fontSize:isMobile?30:48, letterSpacing:'-0.04em', color:INK, margin:'0 0 14px', lineHeight:1.05 }}>
-          Rejsen fra støv til glæde
-        </h2>
-        <p style={{ color:INK3, fontSize:isMobile?15:17, maxWidth:400, margin:'0 auto', fontFamily:FONT, lineHeight:1.65 }}>
-          Fire trin. Ingen gebyrer. Bare legetøj der finder et nyt hjem.
-        </p>
-      </div>
-
-      {isMobile ? (
-        <div style={{ maxWidth:520, margin:'0 auto', padding:'0 20px', position:'relative' }}>
-          <div style={{ position:'absolute', left:43, top:24, bottom:24, width:2, background:PAPER3, borderRadius:1 }} />
-          <div style={{ display:'flex', flexDirection:'column', gap:36 }}>
-            {STEPS.map((step, i) => (
-              <div key={i} style={{ display:'flex', gap:20, alignItems:'flex-start' }}>
-                <div style={{ flexShrink:0, width:48, height:48, borderRadius:'50%', background:'#fff', border:`2px solid ${step.accent}`, display:'flex', alignItems:'center', justifyContent:'center', fontSize:22, boxShadow:`0 6px 24px ${step.accent}55`, position:'relative', zIndex:2 }}>
-                  {step.emoji}
-                </div>
-                <div ref={el => cardRefs.current[i] = el} style={{ flex:1, background:'#fff', borderRadius:16, padding:'18px 20px', boxShadow:'0 4px 32px rgba(0,0,0,0.09), 0 0 0 1px rgba(0,0,0,0.04)', borderLeft:`3px solid ${step.accent}`, position:'relative', overflow:'hidden', opacity:0, transform:'translateY(88px) scale(0.93)', transition:'opacity 0.7s cubic-bezier(0.16,1,0.3,1), transform 0.7s cubic-bezier(0.16,1,0.3,1)' }}>
-                  <CardContent step={step} isMobile={true} isLeft={false} />
-                </div>
-              </div>
-            ))}
+    <div ref={ref} style={{ display: 'flex', justifyContent: 'center', perspective: 1000 }}>
+      <div style={{
+        width: isMobile ? 248 : 280, borderRadius: 34, padding: 12,
+        background: 'linear-gradient(160deg, #2a3a30, #16221c)',
+        boxShadow: '0 30px 70px rgba(19,63,43,0.32), 0 0 0 1px rgba(255,255,255,0.04)',
+      }}>
+        {/* skærm */}
+        <div style={{ background: PAPER, borderRadius: 24, overflow: 'hidden' }}>
+          {/* foto-område med scan */}
+          <div style={{ position: 'relative', height: isMobile ? 150 : 168,
+            background: `radial-gradient(circle at 50% 40%, ${GREEN_SOFT}, ${GREEN_TINT})`,
+            display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden' }}>
+            <span aria-hidden="true" style={{ fontSize: isMobile ? 66 : 76, filter: 'drop-shadow(0 8px 14px rgba(0,0,0,0.12))' }}>🚂</span>
+            {!reduced && active && (
+              <div style={{ position: 'absolute', top: 0, bottom: 0, width: '45%',
+                background: 'linear-gradient(90deg, transparent, rgba(42,125,79,0.32), transparent)',
+                animation: 'scanBar 2.1s ease-in-out infinite' }} />
+            )}
+            <div style={{ position: 'absolute', top: 12, left: 12, display: 'flex', alignItems: 'center', gap: 6,
+              background: 'rgba(22,34,28,0.78)', color: '#fff', borderRadius: 999, padding: '5px 11px',
+              fontSize: 10.5, fontWeight: 700, fontFamily: FONT, letterSpacing: '0.02em' }}>
+              <span style={{ width: 6, height: 6, borderRadius: '50%', background: BUTTER,
+                animation: reduced ? 'none' : 'pulse 1.4s infinite' }} />
+              AI scanner…
+            </div>
           </div>
-        </div>
-      ) : (
-        <div style={{ maxWidth:960, margin:'0 auto', padding:'0 40px', position:'relative' }}>
-          <div style={{ position:'absolute', left:'50%', transform:'translateX(-50%)', top:28, bottom:28, width:2, background:PAPER3, borderRadius:1 }} />
-          <div style={{ display:'flex', flexDirection:'column', gap:56 }}>
-            {STEPS.map((step, i) => {
-              const isEven = i % 2 === 0;
+          {/* auto-udfyldte felter */}
+          <div style={{ padding: '14px 14px 18px', display: 'flex', flexDirection: 'column', gap: 9 }}>
+            {fields.map((f, i) => {
+              const on = i < filled;
               return (
-                <div key={i} style={{ display:'grid', gridTemplateColumns:'1fr 80px 1fr', alignItems:'flex-start' }}>
-                  <div style={{ paddingRight:40, display:'flex', justifyContent:'flex-end' }}>
-                    {isEven && (
-                      <div ref={el => cardRefs.current[i] = el} style={{ width:'100%', maxWidth:400, background:'#fff', borderRadius:20, padding:'28px 32px', boxShadow:'0 4px 40px rgba(0,0,0,0.09), 0 0 0 1px rgba(0,0,0,0.04)', borderRight:`3px solid ${step.accent}`, position:'relative', overflow:'hidden', opacity:0, transform:'translateX(-80px) scale(0.94)', transition:'opacity 0.75s cubic-bezier(0.16,1,0.3,1), transform 0.75s cubic-bezier(0.16,1,0.3,1)' }}>
-                        <CardContent step={step} isMobile={false} isLeft={true} />
-                      </div>
-                    )}
-                  </div>
-                  <div style={{ display:'flex', justifyContent:'center', paddingTop:10, position:'relative', zIndex:2 }}>
-                    <div style={{ width:56, height:56, borderRadius:'50%', background:'#fff', border:`2.5px solid ${step.accent}`, display:'flex', alignItems:'center', justifyContent:'center', fontSize:24, boxShadow:`0 6px 28px ${step.accent}55` }}>
-                      {step.emoji}
-                    </div>
-                  </div>
-                  <div style={{ paddingLeft:40 }}>
-                    {!isEven && (
-                      <div ref={el => cardRefs.current[i] = el} style={{ width:'100%', maxWidth:400, background:'#fff', borderRadius:20, padding:'28px 32px', boxShadow:'0 4px 40px rgba(0,0,0,0.09), 0 0 0 1px rgba(0,0,0,0.04)', borderLeft:`3px solid ${step.accent}`, position:'relative', overflow:'hidden', opacity:0, transform:'translateX(80px) scale(0.94)', transition:'opacity 0.75s cubic-bezier(0.16,1,0.3,1), transform 0.75s cubic-bezier(0.16,1,0.3,1)' }}>
-                        <CardContent step={step} isMobile={false} isLeft={false} />
-                      </div>
-                    )}
+                <div key={i} style={{
+                  background: '#fff', border: `1px solid ${on ? GREEN_SOFT : PAPER3}`, borderRadius: 11,
+                  padding: '9px 12px',
+                  opacity: on ? 1 : 0.45,
+                  transform: on ? 'translateY(0)' : 'translateY(6px)',
+                  transition: 'all 0.5s cubic-bezier(0.16,1,0.3,1)',
+                }}>
+                  <div style={{ fontSize: 9, fontWeight: 700, color: INK3, letterSpacing: '0.08em',
+                    textTransform: 'uppercase', fontFamily: FONT, marginBottom: 3 }}>{f.label}</div>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
+                    <span style={{ fontSize: 13, fontWeight: 600, color: on ? INK : INK3, fontFamily: FONT }}>
+                      {on ? f.value : '· · ·'}
+                    </span>
+                    {on && <span aria-hidden="true" style={{ color: PRIMARY, fontSize: 13 }}>✓</span>}
                   </div>
                 </div>
               );
             })}
           </div>
         </div>
-      )}
+      </div>
     </div>
   );
 }
 
+/* ── Leverings-rute: to prikker, pakke der rejser ───────────── */
+function DeliveryRoute({ isMobile }) {
+  const reduced = useReducedMotion();
+  return (
+    <div style={{ position: 'relative', maxWidth: 560, margin: '0 auto', padding: isMobile ? '8px 0 4px' : '8px 0' }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
+        <Node emoji="🏫" label="Sælger sender" sub="Pakker og afsender selv" accent={PRIMARY} isMobile={isMobile} />
+        <div style={{ flex: 1, position: 'relative', height: 60, margin: '0 -4px' }}>
+          <svg viewBox="0 0 200 60" preserveAspectRatio="none" style={{ position: 'absolute', inset: 0, width: '100%', height: '100%' }} aria-hidden="true">
+            <path d="M4,30 C60,4 140,56 196,30" fill="none" stroke={SKY} strokeWidth="2.5"
+              strokeDasharray="6 7" strokeLinecap="round" opacity="0.65" />
+          </svg>
+          <div aria-hidden="true" style={{ position: 'absolute', top: '50%', left: 0,
+            transform: 'translateY(-50%)', fontSize: 26, filter: 'drop-shadow(0 4px 8px rgba(0,0,0,0.18))',
+            animation: reduced ? 'none' : 'pkgMove 4.5s ease-in-out infinite' }}>📦</div>
+        </div>
+        <Node emoji="🧸" label="Køber modtager" sub="Henter eller får leveret" accent={CORAL} isMobile={isMobile} />
+      </div>
+    </div>
+  );
+}
+function Node({ emoji, label, sub, accent, isMobile }) {
+  return (
+    <div style={{ textAlign: 'center', flexShrink: 0, width: isMobile ? 92 : 120 }}>
+      <div style={{ width: isMobile ? 54 : 64, height: isMobile ? 54 : 64, borderRadius: '50%', margin: '0 auto 10px',
+        background: '#fff', border: `2px solid ${accent}`, display: 'flex', alignItems: 'center', justifyContent: 'center',
+        fontSize: isMobile ? 26 : 30, boxShadow: `0 8px 26px ${accent}40` }}>
+        <span aria-hidden="true">{emoji}</span>
+      </div>
+      <div style={{ fontFamily: FONT, fontWeight: 800, fontSize: isMobile ? 12.5 : 14, color: INK, letterSpacing: '-0.02em', marginBottom: 2 }}>{label}</div>
+      <div style={{ fontFamily: FONT, fontSize: isMobile ? 10.5 : 12, color: INK3, lineHeight: 1.35 }}>{sub}</div>
+    </div>
+  );
+}
+
+/* ── Byt-diagram ────────────────────────────────────────────── */
+function SwapDiagram({ isMobile }) {
+  const card = (emoji, who, accent) => (
+    <div style={{ flex: 1, minWidth: 0, background: '#fff', borderRadius: 18, padding: isMobile ? '18px 14px' : '22px 18px',
+      border: `1px solid ${PAPER3}`, textAlign: 'center', boxShadow: '0 4px 28px rgba(0,0,0,0.06)' }}>
+      <div style={{ width: 50, height: 50, borderRadius: 14, margin: '0 auto 10px', background: `${accent}14`,
+        display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 26 }}><span aria-hidden="true">{emoji}</span></div>
+      <div style={{ fontFamily: FONT, fontWeight: 800, fontSize: 14, color: INK, marginBottom: 4 }}>{who}</div>
+      <div style={{ fontFamily: FONT, fontSize: 12, color: INK3, lineHeight: 1.5 }}>sender sin pakke</div>
+    </div>
+  );
+  return (
+    <div style={{ maxWidth: 480, margin: '0 auto', display: 'flex', alignItems: 'stretch',
+      flexDirection: isMobile ? 'column' : 'row', gap: isMobile ? 14 : 0 }}>
+      {card('🧸', 'Institution A', PURPLE)}
+      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
+        padding: isMobile ? '2px 0' : '0 14px', gap: 8 }}>
+        <div style={{ width: 64, height: 64, borderRadius: '50%', background: '#fff',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          boxShadow: `0 8px 26px ${PURPLE}3a`, border: `1px solid ${PAPER3}` }}>
+          <Mark09 size={38} />
+        </div>
+        <div style={{ fontFamily: FONT, fontSize: 11, fontWeight: 700, color: PURPLE, letterSpacing: '0.02em' }}>holder balancen</div>
+      </div>
+      {card('🚲', 'Institution B', PURPLE)}
+    </div>
+  );
+}
+
+/* ── Data ───────────────────────────────────────────────────── */
+
+const CREATE_STEPS = [
+  { n: '1', emoji: '📸', title: 'Tag ét billede', desc: 'Fotografér legetøjet med telefonen. Det er alt du skal gøre for at starte.' },
+  { n: '2', emoji: '✨', title: 'AI udfylder resten', desc: 'På få sekunder foreslår vores AI titel, kategori, aldersgruppe, stand og beskrivelse.' },
+  { n: '3', emoji: '🏷️', title: 'Vælg køb, byd eller byt', desc: 'Sæt en fast pris, åbn for bud, eller tilbyd det som bytte. Du bestemmer.' },
+  { n: '4', emoji: '🚀', title: 'Publicér', desc: 'Opslaget er straks synligt for alle verificerede institutioner i hele landet.' },
+];
+
+const TRADE_TYPES = [
+  { emoji: '🏷️', label: 'Køb', sub: 'Fastpris', color: PRIMARY,
+    desc: 'Se prisen og køb med det samme. Læg i kurv og betal trygt, så er handlen på plads.',
+    points: ['Ingen forhandling', 'Køberbeskyttelse på alle køb'] },
+  { emoji: '💰', label: 'Byd', sub: 'Forhandl', color: BUTTER,
+    desc: 'Send et bud under udbudsprisen og forhandl via chat med modbud. Når begge siger ja, reserveres varen til dig i 24 timer.',
+    points: ['Modbud frem og tilbage', 'Accepteret bud reserveres i 24 t'] },
+  { emoji: '🔄', label: 'Byt', sub: 'Bytehandel', color: PURPLE,
+    desc: 'Tilbyd et af jeres egne opslag som betaling. Find noget I begge mangler, helt uden penge imellem jer.',
+    points: ['Bundt for bundt', 'Begge sender en pakke, trygt og beskyttet'] },
+];
+
+const AI_FEATURES = [
+  { emoji: '📸', title: 'Billedscanning', desc: 'Tag et foto og lad AI udfylde titel, beskrivelse, kategori, aldersgruppe og stand på sekunder.' },
+  { emoji: '✍️', title: 'Søges-assistent', desc: 'Skriv frit hvad I mangler, fx "cykler til 5-årige", og AI laver et færdigt søges-opslag.' },
+  { emoji: '🔍', title: 'Intelligent søgning', desc: 'Skriv naturligt. AI forstår kategorier og aldersgrupper og finder de mest relevante opslag.' },
+  { emoji: '📝', title: 'Beskrivelsesforbedring', desc: 'AI kan udvide og forfine en kort beskrivelse, så opslaget tiltrækker flere henvendelser.' },
+  { emoji: '🚫', title: 'Automatisk billedtjek', desc: 'AI opdager automatisk hvis der er mennesker eller børn på et billede, og afviser opslaget. Sådan holder vi platformen sikker og privatlivet beskyttet.' },
+];
+
+/* ── Side ───────────────────────────────────────────────────── */
+
 export default function HowItWorksPage() {
   const router = useRouter();
+  const reduced = useReducedMotion();
   const w = useWindowWidth();
   const isMobile = w < 768;
 
+  const HERO_TOYS = ['🧸', '🚲', '🧩', '🎨', '🚂', '⚽'];
+
   return (
-    <div style={{ background:PAPER, minHeight:'100vh', overflowX:'hidden' }}>
+    <div style={{ background: PAPER, minHeight: '100vh', overflowX: 'hidden' }}>
+      <style>{`
+        @keyframes pkgMove { 0%,100% { left:0; transform:translateY(-50%) rotate(-4deg); } 50% { left:calc(100% - 26px); transform:translateY(-90%) rotate(4deg); } }
+        @keyframes drift1 { 0%,100% { transform:translateY(0) rotate(-3deg); } 50% { transform:translateY(-22px) rotate(3deg); } }
+        @keyframes drift2 { 0%,100% { transform:translateY(0) rotate(2deg); } 50% { transform:translateY(-16px) rotate(-2deg); } }
+      `}</style>
 
-      {/* Hero */}
-      <div style={{ background:`linear-gradient(160deg, ${GREEN_DEEP} 0%, ${PRIMARY} 100%)`, paddingTop:140, paddingBottom:isMobile?80:120, textAlign:'center', position:'relative', overflow:'hidden' }}>
-        <div style={{ position:'absolute', inset:0, display:'flex', alignItems:'center', justifyContent:'center', pointerEvents:'none', userSelect:'none' }}>
-          <span style={{ fontFamily:FONT, fontWeight:800, fontSize:isMobile?200:340, color:'rgba(255,255,255,0.04)', lineHeight:1, letterSpacing:'-0.05em' }}>?</span>
+      {/* ── Hero ── */}
+      <div style={{ background: `linear-gradient(160deg, ${GREEN_DEEP} 0%, ${PRIMARY} 100%)`,
+        paddingTop: 140, paddingBottom: isMobile ? 96 : 130, textAlign: 'center', position: 'relative', overflow: 'hidden' }}>
+        {/* bløde lys-blobs */}
+        <div aria-hidden="true" style={{ position: 'absolute', inset: 0, pointerEvents: 'none',
+          backgroundImage: 'radial-gradient(circle at 18% 30%, rgba(255,255,255,0.10) 0%, transparent 45%), radial-gradient(circle at 85% 75%, rgba(207,227,216,0.10) 0%, transparent 45%)' }} />
+        {/* svævende legetøj */}
+        {!isMobile && HERO_TOYS.map((t, i) => {
+          const pos = [{ top: '22%', left: '8%' }, { top: '64%', left: '14%' }, { top: '30%', left: '88%' },
+            { top: '70%', left: '84%' }, { top: '16%', left: '70%' }, { top: '78%', left: '50%' }][i];
+          return (
+            <span key={i} aria-hidden="true" style={{ position: 'absolute', ...pos, fontSize: 34, opacity: 0.22,
+              filter: 'drop-shadow(0 6px 12px rgba(0,0,0,0.2))',
+              animation: reduced ? 'none' : `${i % 2 ? 'drift2' : 'drift1'} ${5 + i}s ease-in-out infinite`,
+              animationDelay: `${i * 0.4}s` }}>{t}</span>
+          );
+        })}
+        <div style={{ position: 'relative', maxWidth: 660, margin: '0 auto', padding: '0 24px', zIndex: 2 }}>
+          <Reveal variant="up">
+            <div style={{ display: 'inline-block', background: 'rgba(255,255,255,0.12)', borderRadius: 999,
+              padding: '6px 18px', fontSize: 12, fontWeight: 600, color: 'rgba(255,255,255,0.85)',
+              letterSpacing: '0.1em', textTransform: 'uppercase', marginBottom: 24, fontFamily: FONT }}>
+              Sådan virker det
+            </div>
+          </Reveal>
+          <Reveal variant="up" delay={80}>
+            <h1 style={{ fontFamily: FONT, fontWeight: 800, fontSize: isMobile ? 40 : 64, letterSpacing: '-0.045em',
+              lineHeight: 1.0, color: '#fff', marginBottom: 22 }}>
+              Fra hylde<br />til hjerte
+            </h1>
+          </Reveal>
+          <Reveal variant="up" delay={160}>
+            <p style={{ fontSize: isMobile ? 16 : 19, color: 'rgba(255,255,255,0.75)', lineHeight: 1.6,
+              maxWidth: 500, margin: '0 auto', fontFamily: FONT }}>
+              Opret, køb, byd eller byt på få minutter. Vi guider dig gennem hvert skridt,
+              fra det første foto til pakken er fremme.
+            </p>
+          </Reveal>
         </div>
-        <div style={{ position:'relative', maxWidth:640, margin:'0 auto', padding:'0 24px' }}>
-          <div style={{ display:'inline-block', background:'rgba(255,255,255,0.12)', borderRadius:999, padding:'6px 18px', fontSize:12, fontWeight:600, color:'rgba(255,255,255,0.8)', letterSpacing:'0.08em', textTransform:'uppercase', marginBottom:24, fontFamily:FONT }}>
-            Sådan virker det
-          </div>
-          <h1 style={{ fontFamily:FONT, fontWeight:800, fontSize:isMobile?36:56, letterSpacing:'-0.04em', lineHeight:1.0, color:'#fff', marginBottom:20 }}>
-            Fra støv<br />til glæde
-          </h1>
-          <p style={{ fontSize:isMobile?15:17, color:'rgba(255,255,255,0.72)', lineHeight:1.65, maxWidth:480, margin:'0 auto', fontFamily:FONT }}>
-            Danmarks første markedsplads for institutioner. AI-drevet, bæredygtig og gratis.
-          </p>
-        </div>
-        <svg viewBox="0 0 1440 80" style={{ position:'absolute', bottom:-1, left:0, right:0, width:'100%', display:'block' }} preserveAspectRatio="none">
-          <path d="M0,40 C360,80 1080,0 1440,40 L1440,80 L0,80 Z" fill={PAPER} />
-        </svg>
+        <Wave fill={PAPER} position="bottom" />
       </div>
 
-      {/* Journey timeline */}
-      <JourneySection isMobile={isMobile} />
-
-      {/* AI features */}
-      <div style={{ background:GREEN_DEEP, padding:isMobile?'64px 20px':'100px 40px', position:'relative', overflow:'hidden' }}>
-        <div style={{ position:'absolute', inset:0, backgroundImage:`radial-gradient(circle at 15% 60%, rgba(42,125,79,0.5) 0%, transparent 55%), radial-gradient(circle at 85% 20%, rgba(207,227,216,0.07) 0%, transparent 50%)`, pointerEvents:'none' }} />
-        <div style={{ maxWidth:920, margin:'0 auto', position:'relative' }}>
-          <div style={{ textAlign:'center', marginBottom:isMobile?40:60 }}>
-            <div style={{ display:'inline-block', background:'rgba(255,255,255,0.1)', borderRadius:999, padding:'5px 16px', fontSize:11, fontWeight:700, color:'rgba(255,255,255,0.7)', letterSpacing:'0.08em', textTransform:'uppercase', marginBottom:16, fontFamily:FONT }}>
-              Kunstig intelligens
+      {/* ── 1. Opret et opslag ── */}
+      <div style={{ background: PAPER, padding: isMobile ? '72px 20px 80px' : '110px 40px' }}>
+        <div style={{ maxWidth: 1000, margin: '0 auto' }}>
+          <SectionHead isMobile={isMobile} eyebrow="Kom i gang" accent={PRIMARY}
+            title="Opret et opslag på 2 minutter"
+            sub="Et enkelt foto er nok. AI klarer det kedelige, så du kan koncentrere dig om det vigtige." />
+          <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1.05fr',
+            gap: isMobile ? 40 : 56, alignItems: 'center' }}>
+            <Reveal variant={isMobile ? 'up' : 'left'}><AiMockup isMobile={isMobile} /></Reveal>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: isMobile ? 14 : 18 }}>
+              {CREATE_STEPS.map((s, i) => (
+                <Reveal key={i} variant={isMobile ? 'up' : 'right'} delay={i * 90}>
+                  <div style={{ display: 'flex', gap: 16, alignItems: 'flex-start' }}>
+                    <div style={{ flexShrink: 0, width: 44, height: 44, borderRadius: 13, background: GREEN_TINT,
+                      display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 21 }}>
+                      <span aria-hidden="true">{s.emoji}</span>
+                    </div>
+                    <div>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
+                        <span style={{ fontFamily: FONT, fontWeight: 800, fontSize: 12, color: PRIMARY }}>{s.n}</span>
+                        <h3 style={{ fontFamily: FONT, fontWeight: 800, fontSize: isMobile ? 16 : 18, color: INK,
+                          letterSpacing: '-0.02em', margin: 0 }}>{s.title}</h3>
+                      </div>
+                      <p style={{ fontSize: isMobile ? 13.5 : 14.5, color: INK3, lineHeight: 1.65, fontFamily: FONT, margin: 0 }}>{s.desc}</p>
+                    </div>
+                  </div>
+                </Reveal>
+              ))}
             </div>
-            <h2 style={{ fontFamily:FONT, fontWeight:800, fontSize:isMobile?28:44, letterSpacing:'-0.04em', color:'#fff', marginBottom:12, lineHeight:1.05 }}>
-              AI gør det nemt
-            </h2>
-            <p style={{ color:'rgba(255,255,255,0.55)', fontSize:isMobile?14:16, fontFamily:FONT, maxWidth:420, margin:'0 auto', lineHeight:1.65 }}>
-              Vi bruger AI til at spare dig for tid — fra billede til færdigt opslag på sekunder.
-            </p>
           </div>
-          <div style={{ display:'grid', gridTemplateColumns:isMobile?'1fr':'repeat(2,1fr)', gap:isMobile?16:20 }}>
-            {AI_FEATURES.map((f, i) => (
-              <div key={i} style={{ background:'rgba(255,255,255,0.06)', border:'1px solid rgba(255,255,255,0.1)', borderRadius:20, padding:'28px 28px', backdropFilter:'blur(10px)' }}>
-                <div style={{ display:'flex', alignItems:'center', gap:14, marginBottom:14 }}>
-                  <div style={{ width:48, height:48, borderRadius:14, background:f.bg, display:'flex', alignItems:'center', justifyContent:'center', fontSize:22, flexShrink:0 }}>{f.emoji}</div>
-                  <div style={{ fontFamily:FONT, fontWeight:800, fontSize:17, color:'#fff', letterSpacing:'-0.02em' }}>{f.title}</div>
+        </div>
+      </div>
+
+      {/* ── 2. Tre måder at handle på ── */}
+      <div style={{ background: PAPER2, padding: isMobile ? '72px 20px 80px' : '110px 40px' }}>
+        <div style={{ maxWidth: 980, margin: '0 auto' }}>
+          <SectionHead isMobile={isMobile} eyebrow="Handelstyper" accent={PRIMARY}
+            title="Tre måder at handle på"
+            sub="Vælg den model der passer til jer og situationen. Det hele sker trygt inde på platformen." />
+          <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : 'repeat(3,1fr)', gap: isMobile ? 16 : 22 }}>
+            {TRADE_TYPES.map((t, i) => (
+              <Reveal key={i} variant="up" delay={i * 110}>
+                <div className="card" style={{ background: '#fff', border: `1px solid ${PAPER3}`, borderRadius: 22,
+                  padding: isMobile ? '26px 22px' : '30px 26px', borderTop: `3px solid ${t.color}`, height: '100%',
+                  boxShadow: '0 4px 30px rgba(0,0,0,0.05)' }}>
+                  <div style={{ width: 52, height: 52, borderRadius: 15, background: `${t.color}1a`,
+                    display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 26, marginBottom: 16 }}>
+                    <span aria-hidden="true">{t.emoji}</span>
+                  </div>
+                  <div style={{ fontFamily: FONT, fontWeight: 800, fontSize: 21, color: INK, marginBottom: 3, letterSpacing: '-0.03em' }}>{t.label}</div>
+                  <div style={{ fontSize: 11, fontWeight: 700, color: t.color, textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 14, fontFamily: FONT }}>{t.sub}</div>
+                  <p style={{ fontSize: 14, color: INK3, lineHeight: 1.65, fontFamily: FONT, margin: '0 0 16px' }}>{t.desc}</p>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 8, borderTop: `1px solid ${PAPER2}`, paddingTop: 14 }}>
+                    {t.points.map((p, j) => (
+                      <div key={j} style={{ display: 'flex', alignItems: 'flex-start', gap: 9 }}>
+                        <span aria-hidden="true" style={{ color: t.color, fontSize: 13, lineHeight: 1.5, flexShrink: 0 }}>✓</span>
+                        <span style={{ fontSize: 12.5, color: INK2, fontFamily: FONT, fontWeight: 600, lineHeight: 1.5 }}>{p}</span>
+                      </div>
+                    ))}
+                  </div>
                 </div>
-                <p style={{ fontSize:14, color:'rgba(255,255,255,0.6)', lineHeight:1.7, fontFamily:FONT, margin:0 }}>{f.desc}</p>
-              </div>
+              </Reveal>
             ))}
           </div>
         </div>
       </div>
 
-      {/* Trade types */}
-      <div style={{ background:PAPER2, padding:isMobile?'64px 20px':'100px 40px' }}>
-        <div style={{ maxWidth:860, margin:'0 auto' }}>
-          <div style={{ textAlign:'center', marginBottom:isMobile?40:60 }}>
-            <div style={{ display:'inline-block', background:GREEN_TINT, borderRadius:999, padding:'5px 16px', fontSize:11, fontWeight:700, color:PRIMARY, letterSpacing:'0.08em', textTransform:'uppercase', marginBottom:16, fontFamily:FONT }}>
-              Handelstyper
-            </div>
-            <h2 style={{ fontFamily:FONT, fontWeight:800, fontSize:isMobile?28:44, letterSpacing:'-0.04em', color:INK, marginBottom:12, lineHeight:1.05 }}>
-              Tre måder at handle på
-            </h2>
-            <p style={{ color:INK3, fontSize:isMobile?14:16, fontFamily:FONT, maxWidth:400, margin:'0 auto', lineHeight:1.65 }}>
-              Vælg den model der passer til jer og situationen.
-            </p>
-          </div>
-          <div style={{ display:'grid', gridTemplateColumns:isMobile?'1fr':'repeat(3,1fr)', gap:isMobile?14:20 }}>
+      {/* ── 3. Byt i dybden ── */}
+      <div style={{ background: GREEN_TINT, padding: isMobile ? '72px 20px 80px' : '110px 40px' }}>
+        <div style={{ maxWidth: 760, margin: '0 auto' }}>
+          <SectionHead isMobile={isMobile} eyebrow="Bytehandel" accent={PURPLE}
+            title="Byt uden penge imellem jer"
+            sub="To institutioner bytter bundt for bundt. Begge sender hver sin pakke, og byt&leg holder hånden under handlen, så ingen kommer i klemme." />
+          <Reveal variant="scale"><SwapDiagram isMobile={isMobile} /></Reveal>
+          <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : 'repeat(3,1fr)', gap: isMobile ? 12 : 16, marginTop: isMobile ? 32 : 44 }}>
             {[
-              { emoji:'🏷️', label:'Køb', sub:'Fastpris', desc:'Se prisen — køb med det samme. Ingen forhandling, ingen ventetid. Ideelt når begge parter ved hvad tingen er værd.', color:PRIMARY },
-              { emoji:'💰', label:'Byd', sub:'Forhandl', desc:'Send et bud under udbudsprisen og forhandl via chat med modbud. Handlen er på plads når begge accepterer.', color:'#D97706' },
-              { emoji:'🔄', label:'Byt', sub:'Bytehandel', desc:'Tilbyd et af jeres egne opslag som betaling. Penge er ikke nødvendigt — find noget I begge mangler.', color:'#7C3AED' },
-            ].map((t, i) => (
-              <div key={i} style={{ background:'#fff', border:`1px solid ${PAPER3}`, borderRadius:20, padding:'28px 24px', borderTop:`3px solid ${t.color}` }}>
-                <div style={{ fontSize:28, marginBottom:12 }}>{t.emoji}</div>
-                <div style={{ fontFamily:FONT, fontWeight:800, fontSize:20, color:INK, marginBottom:4, letterSpacing:'-0.03em' }}>{t.label}</div>
-                <div style={{ fontSize:11, fontWeight:700, color:t.color, textTransform:'uppercase', letterSpacing:'0.08em', marginBottom:14, fontFamily:FONT }}>{t.sub}</div>
-                <p style={{ fontSize:14, color:INK3, lineHeight:1.65, fontFamily:FONT, margin:0 }}>{t.desc}</p>
-              </div>
+              { emoji: '🤝', t: 'I bliver enige', d: 'Find et bytte I begge er glade for, og godkend handlen i chatten.' },
+              { emoji: '📦', t: 'Begge sender', d: 'I sender hver jeres pakke samtidig, så ingen venter på den anden.' },
+              { emoji: '🛡️', t: 'Tryg byttehandel', d: 'En byttebeskyttelse på 10 kr pr. part sikrer en tryg handel for begge.' },
+            ].map((s, i) => (
+              <Reveal key={i} variant="up" delay={i * 90}>
+                <div style={{ background: '#fff', borderRadius: 16, padding: '20px 20px', border: `1px solid ${GREEN_SOFT}`, height: '100%' }}>
+                  <div style={{ fontSize: 24, marginBottom: 10 }}><span aria-hidden="true">{s.emoji}</span></div>
+                  <div style={{ fontFamily: FONT, fontWeight: 800, fontSize: 15, color: INK, marginBottom: 6, letterSpacing: '-0.02em' }}>{s.t}</div>
+                  <p style={{ fontSize: 13, color: INK3, lineHeight: 1.6, fontFamily: FONT, margin: 0 }}>{s.d}</p>
+                </div>
+              </Reveal>
             ))}
           </div>
         </div>
       </div>
 
-      {/* Platform features grid */}
-      <div style={{ background:PAPER, padding:isMobile?'64px 20px':'100px 40px' }}>
-        <div style={{ maxWidth:960, margin:'0 auto' }}>
-          <div style={{ textAlign:'center', marginBottom:isMobile?40:60 }}>
-            <div style={{ display:'inline-block', background:GREEN_TINT, borderRadius:999, padding:'5px 16px', fontSize:11, fontWeight:700, color:PRIMARY, letterSpacing:'0.08em', textTransform:'uppercase', marginBottom:16, fontFamily:FONT }}>
-              Platform
+      {/* ── 4. Levering ── */}
+      <div style={{ background: PAPER, padding: isMobile ? '72px 20px 80px' : '110px 40px' }}>
+        <div style={{ maxWidth: 920, margin: '0 auto' }}>
+          <SectionHead isMobile={isMobile} eyebrow="Levering" accent={SKY}
+            title="Send pakken som I plejer"
+            sub="Institutionerne sender selv pakkerne til hinanden. Pakkerne kan sendes med PostNord, DAO eller GLS. Bor I tæt på hinanden, kan I også aftale at hente direkte." maxWidth={520} />
+          <Reveal variant="up"><DeliveryRoute isMobile={isMobile} /></Reveal>
+        </div>
+      </div>
+
+      {/* ── 5. Tryg betaling & beskyttelse (mørk trust-sektion) ── */}
+      <div style={{ background: GREEN_DEEP, padding: isMobile ? '88px 20px 96px' : '128px 40px', position: 'relative', overflow: 'hidden' }}>
+        <Wave fill={PAPER} position="top" />
+        <div aria-hidden="true" style={{ position: 'absolute', inset: 0, pointerEvents: 'none',
+          backgroundImage: 'radial-gradient(circle at 20% 40%, rgba(42,125,79,0.45) 0%, transparent 55%), radial-gradient(circle at 82% 70%, rgba(207,227,216,0.07) 0%, transparent 50%)' }} />
+        <div style={{ maxWidth: 900, margin: '0 auto', position: 'relative', zIndex: 2 }}>
+          <SectionHead isMobile={isMobile} dark eyebrow="Tryghed"
+            title="Beskyttet hele vejen"
+            sub="Pengene frigives først når handlen går som den skal. Det gælder både køb og bytte." />
+          <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr', gap: isMobile ? 16 : 22 }}>
+            {[
+              { emoji: '🛡️', t: 'Køberbeskyttelse', tag: '5% + 5 kr', d: 'På alle køb og bud. Ankommer varen ikke, eller passer den slet ikke med opslaget, får du pengene tilbage.' },
+              { emoji: '🔄', t: 'Byttebeskyttelse', tag: '10 kr pr. part', d: 'Ved bytte er begge parter dækket. byt&leg holder handlen i balance, til begge pakker er sendt.' },
+            ].map((c, i) => (
+              <Reveal key={i} variant="up" delay={i * 110}>
+                <div style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.1)',
+                  borderRadius: 22, padding: isMobile ? '26px 24px' : '32px 30px', backdropFilter: 'blur(10px)', height: '100%' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 14, marginBottom: 14 }}>
+                    <div style={{ width: 50, height: 50, borderRadius: 14, background: 'rgba(255,255,255,0.1)',
+                      display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 24, flexShrink: 0 }}>
+                      <span aria-hidden="true">{c.emoji}</span>
+                    </div>
+                    <div>
+                      <div style={{ fontFamily: FONT, fontWeight: 800, fontSize: 18, color: '#fff', letterSpacing: '-0.02em' }}>{c.t}</div>
+                      <div style={{ fontFamily: FONT, fontWeight: 700, fontSize: 12, color: GREEN_SOFT, marginTop: 2 }}>{c.tag}</div>
+                    </div>
+                  </div>
+                  <p style={{ fontSize: 14, color: 'rgba(255,255,255,0.6)', lineHeight: 1.7, fontFamily: FONT, margin: 0 }}>{c.d}</p>
+                </div>
+              </Reveal>
+            ))}
+          </div>
+          <Reveal variant="up" delay={120}>
+            <div style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'center', gap: isMobile ? 10 : 16,
+              marginTop: isMobile ? 28 : 40 }}>
+              {['Kun verificerede institutioner', 'Sikker betaling med Stripe', 'Ingen skjulte gebyrer'].map((p, i) => (
+                <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 8, color: 'rgba(255,255,255,0.7)',
+                  fontFamily: FONT, fontSize: 13, fontWeight: 600 }}>
+                  <span aria-hidden="true" style={{ color: GREEN_SOFT }}>✓</span>{p}
+                </div>
+              ))}
             </div>
-            <h2 style={{ fontFamily:FONT, fontWeight:800, fontSize:isMobile?28:44, letterSpacing:'-0.04em', color:INK, marginBottom:12, lineHeight:1.05 }}>
-              Alt hvad I behøver
+          </Reveal>
+        </div>
+        <Wave fill={GREEN_TINT} position="bottom" />
+      </div>
+
+      {/* ── 6. CO₂-besparelse ── */}
+      <div style={{ background: GREEN_TINT, padding: isMobile ? '80px 20px' : '120px 40px' }}>
+        <div style={{ maxWidth: 760, margin: '0 auto', textAlign: 'center' }}>
+          <Reveal variant="up"><Eyebrow accent={PRIMARY}>Bæredygtighed</Eyebrow></Reveal>
+          <Reveal variant="up" delay={60}>
+            <h2 style={{ fontFamily: FONT, fontWeight: 800, fontSize: isMobile ? 28 : 44, letterSpacing: '-0.04em',
+              color: INK, margin: '0 0 14px', lineHeight: 1.05 }}>
+              Se din klimagevinst<br />ved hver handel
             </h2>
-            <p style={{ color:INK3, fontSize:isMobile?14:16, fontFamily:FONT, maxWidth:420, margin:'0 auto', lineHeight:1.65 }}>
-              byt&amp;leg er bygget specielt til institutioner — ikke en generisk markedsplads.
+          </Reveal>
+          <Reveal variant="up" delay={120}>
+            <p style={{ color: INK3, fontSize: isMobile ? 15 : 17, maxWidth: 480, margin: '0 auto 40px', fontFamily: FONT, lineHeight: 1.65 }}>
+              Hver gang legetøj genbruges i stedet for at blive købt nyt, sparer I CO₂.
+              Platformen beregner det automatisk ud fra produkttype og afstand.
             </p>
-          </div>
-          <div style={{ display:'grid', gridTemplateColumns:isMobile?'1fr':'repeat(3,1fr)', gap:isMobile?12:16 }}>
-            {PLATFORM_FEATURES.map((f, i) => (
-              <div key={i} style={{ background:'#fff', border:`1px solid ${PAPER3}`, borderRadius:16, padding:'20px 20px' }}>
-                <div style={{ fontSize:24, marginBottom:10 }}>{f.emoji}</div>
-                <div style={{ fontFamily:FONT, fontWeight:800, fontSize:15, color:INK, marginBottom:6, letterSpacing:'-0.02em' }}>{f.title}</div>
-                <p style={{ fontSize:13, color:INK3, lineHeight:1.65, fontFamily:FONT, margin:0 }}>{f.desc}</p>
+          </Reveal>
+          <Reveal variant="scale" delay={120}>
+            <div style={{ display: 'inline-flex', alignItems: 'center', gap: isMobile ? 16 : 28,
+              background: '#fff', borderRadius: 24, padding: isMobile ? '22px 26px' : '28px 44px',
+              boxShadow: '0 18px 50px rgba(19,63,43,0.12)', border: `1px solid ${GREEN_SOFT}` }}>
+              <div style={{ fontSize: isMobile ? 44 : 58 }}><span aria-hidden="true">🌱</span></div>
+              <div style={{ textAlign: 'left' }}>
+                <div style={{ fontFamily: FONT, fontWeight: 800, fontSize: isMobile ? 40 : 58, color: PRIMARY,
+                  letterSpacing: '-0.04em', lineHeight: 1 }}>
+                  <CountUp to={12.4} decimals={1} /> kg
+                </div>
+                <div style={{ fontFamily: FONT, fontSize: 13, color: INK3, fontWeight: 600, marginTop: 4 }}>
+                  CO₂ sparet, typisk pr. handel*
+                </div>
               </div>
+            </div>
+          </Reveal>
+          <Reveal variant="up" delay={200}>
+            <p style={{ color: INK3, fontSize: 12, marginTop: 20, fontFamily: FONT, fontStyle: 'italic' }}>
+              *Illustrativt eksempel. Din faktiske besparelse beregnes for hver enkelt handel.
+            </p>
+          </Reveal>
+        </div>
+      </div>
+
+      {/* ── 7. AI gør det nemt (mørk) ── */}
+      <div style={{ background: GREEN_DEEP, padding: isMobile ? '88px 20px 96px' : '120px 40px', position: 'relative', overflow: 'hidden' }}>
+        <Wave fill={GREEN_TINT} position="top" />
+        <div aria-hidden="true" style={{ position: 'absolute', inset: 0, pointerEvents: 'none',
+          backgroundImage: 'radial-gradient(circle at 15% 60%, rgba(42,125,79,0.5) 0%, transparent 55%), radial-gradient(circle at 85% 20%, rgba(207,227,216,0.07) 0%, transparent 50%)' }} />
+        <div style={{ maxWidth: 920, margin: '0 auto', position: 'relative', zIndex: 2 }}>
+          <SectionHead isMobile={isMobile} dark eyebrow="Kunstig intelligens"
+            title="AI gør det nemt"
+            sub="Vi bruger AI til at spare jer tid, fra billede til færdigt opslag på sekunder." />
+          <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : 'repeat(2,1fr)', gap: isMobile ? 16 : 20 }}>
+            {AI_FEATURES.map((f, i) => (
+              <Reveal key={i} variant="up" delay={i * 90}
+                style={{ gridColumn: (!isMobile && i === AI_FEATURES.length - 1 && AI_FEATURES.length % 2 === 1) ? '1 / -1' : undefined }}>
+                <div style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.1)',
+                  borderRadius: 20, padding: '26px 26px', backdropFilter: 'blur(10px)', height: '100%' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 14, marginBottom: 12 }}>
+                    <div style={{ width: 46, height: 46, borderRadius: 13, background: 'rgba(255,255,255,0.1)',
+                      display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 22, flexShrink: 0 }}>
+                      <span aria-hidden="true">{f.emoji}</span>
+                    </div>
+                    <div style={{ fontFamily: FONT, fontWeight: 800, fontSize: 17, color: '#fff', letterSpacing: '-0.02em' }}>{f.title}</div>
+                  </div>
+                  <p style={{ fontSize: 14, color: 'rgba(255,255,255,0.6)', lineHeight: 1.7, fontFamily: FONT, margin: 0 }}>{f.desc}</p>
+                </div>
+              </Reveal>
             ))}
           </div>
         </div>
       </div>
 
-      {/* CTA */}
-      <div style={{ background:`linear-gradient(135deg, ${PRIMARY} 0%, ${GREEN_DEEP} 100%)`, padding:isMobile?'64px 24px':'100px 40px', textAlign:'center', position:'relative', overflow:'hidden' }}>
-        <div style={{ position:'relative', maxWidth:520, margin:'0 auto' }}>
-          <h2 style={{ fontFamily:FONT, fontWeight:800, fontSize:isMobile?30:46, letterSpacing:'-0.04em', color:'#fff', marginBottom:16, lineHeight:1.05 }}>Klar til at komme i gang?</h2>
-          <p style={{ color:'rgba(255,255,255,0.65)', fontSize:16, lineHeight:1.65, marginBottom:36, fontFamily:FONT }}>Tilmeld din institution i dag — det tager under 5 minutter og er gratis.</p>
-          <div style={{ display:'flex', gap:12, justifyContent:'center', flexWrap:'wrap' }}>
-            <button onClick={()=>router.push('/signup')} style={{ background:PAPER, color:PRIMARY, border:'none', borderRadius:999, padding:'14px 32px', fontSize:15, fontWeight:700, fontFamily:FONT, cursor:'pointer' }}>Tilmeld institution</button>
-            <button onClick={()=>router.push('/opslag')} style={{ background:'transparent', color:'rgba(255,255,255,0.85)', border:'1.5px solid rgba(255,255,255,0.3)', borderRadius:999, padding:'14px 32px', fontSize:15, fontWeight:600, fontFamily:FONT, cursor:'pointer' }}>Se markedspladsen →</button>
+      {/* ── CTA ── */}
+      <div style={{ background: `linear-gradient(135deg, ${PRIMARY} 0%, ${GREEN_DEEP} 100%)`,
+        padding: isMobile ? '80px 24px' : '120px 40px', textAlign: 'center', position: 'relative', overflow: 'hidden' }}>
+        <div aria-hidden="true" style={{ position: 'absolute', inset: 0, pointerEvents: 'none',
+          backgroundImage: 'radial-gradient(circle at 70% 30%, rgba(207,227,216,0.08) 0%, transparent 50%)' }} />
+        <Reveal variant="up" style={{ position: 'relative', maxWidth: 540, margin: '0 auto' }}>
+          <h2 style={{ fontFamily: FONT, fontWeight: 800, fontSize: isMobile ? 30 : 46, letterSpacing: '-0.04em',
+            color: '#fff', marginBottom: 16, lineHeight: 1.05 }}>Klar til at komme i gang?</h2>
+          <p style={{ color: 'rgba(255,255,255,0.7)', fontSize: 16, lineHeight: 1.65, marginBottom: 36, fontFamily: FONT }}>
+            Tilmeld din institution i dag. Det tager under 5 minutter og er gratis.
+          </p>
+          <div style={{ display: 'flex', gap: 12, justifyContent: 'center', flexWrap: 'wrap' }}>
+            <button onClick={() => router.push('/signup')} style={{ background: PAPER, color: PRIMARY, border: 'none',
+              borderRadius: 999, padding: '15px 34px', fontSize: 15, fontWeight: 700, fontFamily: FONT, cursor: 'pointer' }}>
+              Tilmeld institution
+            </button>
+            <button onClick={() => router.push('/opslag')} style={{ background: 'transparent', color: 'rgba(255,255,255,0.9)',
+              border: '1.5px solid rgba(255,255,255,0.35)', borderRadius: 999, padding: '15px 34px', fontSize: 15,
+              fontWeight: 600, fontFamily: FONT, cursor: 'pointer' }}>
+              Se markedspladsen →
+            </button>
           </div>
-        </div>
+        </Reveal>
       </div>
 
     </div>

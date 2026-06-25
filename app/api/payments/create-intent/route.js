@@ -172,7 +172,7 @@ export async function POST(req) {
           if (coMsg) {
             const deadline = new Date(coMsg.created_at).getTime() + 24 * 60 * 60 * 1000;
             if (Date.now() > deadline) {
-              return NextResponse.json({ error: 'Tilbuddet er udløbet — buddet er ikke længere reserveret' }, { status: 409 });
+              return NextResponse.json({ error: 'Tilbuddet er udløbet. Buddet er ikke længere reserveret' }, { status: 409 });
             }
           }
         }
@@ -299,11 +299,11 @@ export async function POST(req) {
         conversation_id: metaConvId,
         delivery_method: metaDelivery,
       },
-      description: `Bytogleg ordre — ${orderGroups.map(g => g.sellerName).join(', ')}`,
+      description: `Bytogleg ordre: ${orderGroups.map(g => g.sellerName).join(', ')}`,
     });
   } catch (err) {
     console.error('[create-intent] Stripe fejl:', err.message);
-    return NextResponse.json({ error: 'Betalingen kunne ikke oprettes — prøv igen' }, { status: 502 });
+    return NextResponse.json({ error: 'Betalingen kunne ikke oprettes. Prøv igen' }, { status: 502 });
   }
 
   // Insert order record
