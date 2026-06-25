@@ -2137,6 +2137,10 @@ export default function MessagesClient() {
                                               {sh.tracking_number && !sh.tracking_url && <div style={{ textAlign:'center', fontFamily:FONT, fontSize:11, color:INK3 }}>Tracking: {sh.tracking_number}</div>}
                                             </div>
                                           )}
+                                          <div style={{ display:'flex', gap:10, marginTop:10, flexWrap:'wrap' }}>
+                                            <button onClick={()=>router.push('/mine-opgaver')} style={{ background:'none', border:'none', color:PRIMARY, fontFamily:FONT, fontWeight:700, fontSize:12, cursor:'pointer', padding:0 }}>Se afsendelse →</button>
+                                            <button onClick={()=>router.push('/mine-ordrer')} style={{ background:'none', border:'none', color:PRIMARY, fontFamily:FONT, fontWeight:700, fontSize:12, cursor:'pointer', padding:0 }}>Følg det jeg modtager →</button>
+                                          </div>
                                         </div>
                                       );
                                     })()}

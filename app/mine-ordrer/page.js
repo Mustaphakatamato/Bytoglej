@@ -2,8 +2,46 @@
 import { useState, useEffect, useRef, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { db } from '@/lib/supabase';
+import { useActiveUser } from '@/providers/AppProvider';
 import { PRIMARY, GREEN_TINT, INK, INK2, INK3, PAPER, PAPER2, PAPER3, FONT, CORAL } from '@/lib/constants';
 import CarrierLogo from '@/components/CarrierLogo';
+
+// Et bytte hvor JEG modtager modpartens varer (indgående). Tracking, ingen mærkat.
+function SwapReceiveCard({ r, router }) {
+  const sh = r.shipment;
+  const status = r.completed
+    ? (sh ? '🚚 På vej til dig' : '🤝 Aftalt levering')
+    : '⏳ Afventer betaling';
+  return (
+    <div style={{ background: '#fff', borderRadius: 16, border: `1.5px solid ${PAPER3}`, padding: '16px 18px', marginBottom: 12 }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
+        <span style={{ fontFamily: FONT, fontWeight: 800, fontSize: 13, color: INK }}>🔄 Bytte · fra {r.otherName}</span>
+        <span style={{ marginLeft: 'auto', fontFamily: FONT, fontSize: 11, fontWeight: 700, color: INK3 }}>{status}</span>
+      </div>
+      {r.items.map((it, i) => (
+        <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
+          <span style={{ fontSize: 16 }}>{it.emoji || '🧸'}</span>
+          <span style={{ fontFamily: FONT, fontSize: 13, color: INK }}>{it.title}</span>
+        </div>
+      ))}
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginTop: 12 }}>
+        {sh?.tracking_url && (
+          <a href={sh.tracking_url} target="_blank" rel="noopener noreferrer" style={{ display: 'block', textAlign: 'center', padding: '11px', borderRadius: 99, background: PRIMARY, color: '#fff', fontFamily: FONT, fontWeight: 700, fontSize: 13, textDecoration: 'none' }}>📦 Spor pakken</a>
+        )}
+        {sh?.tracking_number && !sh?.tracking_url && (
+          <div style={{ textAlign: 'center', fontFamily: FONT, fontSize: 12, color: INK3 }}>Tracking: {sh.tracking_number}</div>
+        )}
+        {r.completed && !sh && (
+          <div style={{ textAlign: 'center', fontFamily: FONT, fontSize: 12, color: INK3 }}>I aftaler selv afhentning/levering.</div>
+        )}
+        {!r.completed && (
+          <div style={{ textAlign: 'center', fontFamily: FONT, fontSize: 12, color: INK3 }}>Pakken bookes når begge parter har betalt.</div>
+        )}
+        <button onClick={() => router.push(r.conversation_id ? `/beskeder?conv=${r.conversation_id}` : '/beskeder')} style={{ padding: '11px', borderRadius: 99, background: PAPER2, border: 'none', fontFamily: FONT, fontWeight: 600, fontSize: 13, color: INK3, cursor: 'pointer' }}>💬 Åbn byttehandel</button>
+      </div>
+    </div>
+  );
+}
 
 const STATUS_CFG = {
   pending:   { label: '⏳ Afventer',   color: INK3,     bg: PAPER2 },
@@ -97,7 +135,6 @@ function OrderCard({ order, onUpdate, autoOpen }) {
   const grandTotal = order.grand_total ?? groups.reduce((s, g) => s + (g.itemTotal || 0) + (g.shippingTotal || 0) + (g.serviceFee || 0), 0);
   const trackingUrl = order.tracking_url || groups.find(g => g.tracking_url)?.tracking_url;
   const trackingNumber = order.tracking_number || groups.find(g => g.tracking_number)?.tracking_number;
-  const labelUrl = order.label_pdf_url || groups.find(g => g.label_pdf_url)?.label_pdf_url;
   const isShipping = groups.some(g => g.shippingMethod && g.shippingMethod !== 'pickup' && g.shippingMethod !== 'custom');
 
   async function handleConfirmReceived() {
@@ -192,15 +229,6 @@ function OrderCard({ order, onUpdate, autoOpen }) {
                 📦 Spor pakken
               </a>
             )}
-            {labelUrl && (
-              <a href={labelUrl} target="_blank" rel="noopener noreferrer" style={{
-                display: 'block', textAlign: 'center', padding: '11px', borderRadius: 99,
-                background: GREEN_TINT, color: PRIMARY, border: `1.5px solid ${PRIMARY}`,
-                fontFamily: FONT, fontWeight: 700, fontSize: 13, textDecoration: 'none',
-              }}>
-                🖨️ Download pakkemærkat (PDF)
-              </a>
-            )}
             {trackingNumber && !trackingUrl && (
               <div style={{ textAlign: 'center', fontFamily: FONT, fontSize: 12, color: INK3 }}>
                 Tracking: {trackingNumber}
@@ -238,7 +266,9 @@ function MineOrdrerContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const highlightId = searchParams.get('order');
+  const { institutionId } = useActiveUser();
   const [orders, setOrders] = useState([]);
+  const [swapReceives, setSwapReceives] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
@@ -256,7 +286,9 @@ function MineOrdrerContent() {
           .order('created_at', { ascending: false });
         if (cancelled) return;
         if (dbErr) { setError('Kunne ikke hente ordrer.'); setLoading(false); return; }
-        setOrders(data || []);
+        // Bytte-afsend-ordrer (porto for det DU sender) hører til "Skal sendes", ikke køb.
+        const kob = (data || []).filter(o => !String(o.order_groups?.[0]?.sellerName || '').startsWith('Byttehandel'));
+        setOrders(kob);
       } catch {
         if (!cancelled) setError('Noget gik galt. Prøv igen.');
       } finally {
@@ -267,14 +299,49 @@ function MineOrdrerContent() {
     return () => { cancelled = true; };
   }, []);
 
+  // Bytte — du modtager (modpartens indgående bundt + tracking)
+  useEffect(() => {
+    if (!institutionId) return;
+    let cancelled = false;
+    (async () => {
+      const { data: props } = await db.from('swap_proposals')
+        .select('id, conversation_id, escrow_status, initiator_institution_id, owner_institution_id, offered_items, requested_items, initiator_shipment_id, owner_shipment_id')
+        .or(`initiator_institution_id.eq.${institutionId},owner_institution_id.eq.${institutionId}`)
+        .eq('status', 'accepted')
+        .order('created_at', { ascending: false });
+      if (cancelled || !props?.length) return;
+      const incomingShipIds = props.map(p => p.initiator_institution_id === institutionId ? p.owner_shipment_id : p.initiator_shipment_id).filter(Boolean);
+      const otherIds = [...new Set(props.map(p => p.initiator_institution_id === institutionId ? p.owner_institution_id : p.initiator_institution_id).filter(Boolean))];
+      const [{ data: ships }, { data: insts }] = await Promise.all([
+        incomingShipIds.length ? db.from('shipments').select('id,tracking_number,tracking_url,status').in('id', incomingShipIds) : Promise.resolve({ data: [] }),
+        otherIds.length ? db.from('institutions').select('id,name').in('id', otherIds) : Promise.resolve({ data: [] }),
+      ]);
+      const shipById = Object.fromEntries((ships || []).map(s => [s.id, s]));
+      const nameById = Object.fromEntries((insts || []).map(i => [i.id, i.name]));
+      const receives = props.map(p => {
+        const meInit = p.initiator_institution_id === institutionId;
+        return {
+          id: p.id,
+          conversation_id: p.conversation_id,
+          items: (meInit ? p.requested_items : p.offered_items) || [],
+          otherName: nameById[meInit ? p.owner_institution_id : p.initiator_institution_id] || 'Modpart',
+          shipment: shipById[meInit ? p.owner_shipment_id : p.initiator_shipment_id] || null,
+          completed: p.escrow_status === 'both_paid_released',
+        };
+      }).filter(r => r.items.length);
+      if (!cancelled) setSwapReceives(receives);
+    })();
+    return () => { cancelled = true; };
+  }, [institutionId]);
+
   return (
     <div style={{ minHeight: '100vh', background: PAPER, paddingTop: 84, paddingBottom: 60 }}>
       <div style={{ maxWidth: 640, margin: '0 auto', padding: '0 20px' }}>
         <button onClick={() => router.back()} style={{ background: 'none', border: 'none', fontFamily: FONT, fontSize: 13, color: INK3, cursor: 'pointer', padding: '0 0 20px', fontWeight: 600 }}>
           Tilbage
         </button>
-        <h1 style={{ fontFamily: FONT, fontWeight: 800, fontSize: 26, color: INK, letterSpacing: '-0.03em', marginBottom: 6 }}>Mine ordrer</h1>
-        <p style={{ fontFamily: FONT, fontSize: 13, color: INK3, marginBottom: 28 }}>Oversigt over dine k&#248;b p&#229; byt&amp;leg.</p>
+        <h1 style={{ fontFamily: FONT, fontWeight: 800, fontSize: 26, color: INK, letterSpacing: '-0.03em', marginBottom: 6 }}>Mine køb</h1>
+        <p style={{ fontFamily: FONT, fontSize: 13, color: INK3, marginBottom: 28 }}>Følg og modtag det du har købt og byttet dig til.</p>
 
         {loading && (
           <div style={{ textAlign: 'center', padding: 40 }}>
@@ -288,12 +355,12 @@ function MineOrdrerContent() {
           </div>
         )}
 
-        {!loading && !error && orders.length === 0 && (
+        {!loading && !error && orders.length === 0 && swapReceives.length === 0 && (
           <div style={{ textAlign: 'center', padding: '60px 0' }}>
             <div style={{ fontSize: 48, marginBottom: 16 }}>&#128717;</div>
-            <div style={{ fontFamily: FONT, fontWeight: 700, fontSize: 16, color: INK, marginBottom: 8 }}>Du har ingen ordrer endnu</div>
+            <div style={{ fontFamily: FONT, fontWeight: 700, fontSize: 16, color: INK, marginBottom: 8 }}>Du har ingen køb endnu</div>
             <div style={{ fontFamily: FONT, fontSize: 13, color: INK3, marginBottom: 24 }}>
-              N&#229;r du k&#248;ber noget p&#229; byt&amp;leg, vises dine ordrer her.
+              N&#229;r du k&#248;ber eller bytter dig til noget, vises det her.
             </div>
             <button onClick={() => router.push('/opslag')} style={{ background: PRIMARY, color: '#fff', border: 'none', borderRadius: 99, padding: '12px 28px', fontFamily: FONT, fontWeight: 700, fontSize: 14, cursor: 'pointer' }}>
               Udforsk opslag &#8594;
@@ -301,10 +368,22 @@ function MineOrdrerContent() {
           </div>
         )}
 
-        {!loading && orders.map(order => (
-          <OrderCard key={order.id} order={order} autoOpen={highlightId === order.id}
-            onUpdate={(id, status) => setOrders(os => os.map(o => o.id === id ? { ...o, status } : o))} />
-        ))}
+        {!loading && orders.length > 0 && (
+          <>
+            {swapReceives.length > 0 && <div style={{ fontFamily: FONT, fontWeight: 800, fontSize: 13, color: INK2, margin: '0 0 12px' }}>Køb</div>}
+            {orders.map(order => (
+              <OrderCard key={order.id} order={order} autoOpen={highlightId === order.id}
+                onUpdate={(id, status) => setOrders(os => os.map(o => o.id === id ? { ...o, status } : o))} />
+            ))}
+          </>
+        )}
+
+        {!loading && swapReceives.length > 0 && (
+          <>
+            <div style={{ fontFamily: FONT, fontWeight: 800, fontSize: 13, color: INK2, margin: `${orders.length > 0 ? '24px' : '0'} 0 12px` }}>Bytte — på vej til dig</div>
+            {swapReceives.map(r => <SwapReceiveCard key={r.id} r={r} router={router} />)}
+          </>
+        )}
       </div>
     </div>
   );

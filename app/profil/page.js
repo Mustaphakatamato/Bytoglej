@@ -279,11 +279,11 @@ export default function ProfilPage() {
             <div style={{ fontFamily:FONT, fontWeight:700, fontSize:11, color:INK3, textTransform:'uppercase', letterSpacing:'0.08em', padding:'4px 20px 0' }}>Jeg sælger</div>
             <MenuSection>
               <MenuItem icon="🏷️" label="Mine opslag" value={activeListingCount !== null ? `${activeListingCount} aktive` : undefined} onClick={() => router.push('/mine-opslag')} />
-              <MenuItem icon="📋" label="Mine salg" badge={pendingCount} onClick={() => router.push('/mine-opgaver')} />
+              <MenuItem icon="📋" label="Skal sendes" badge={pendingCount} onClick={() => router.push('/mine-opgaver')} />
             </MenuSection>
             <div style={{ fontFamily:FONT, fontWeight:700, fontSize:11, color:INK3, textTransform:'uppercase', letterSpacing:'0.08em', padding:'4px 20px 0' }}>Jeg køber</div>
             <MenuSection>
-              <MenuItem icon="🛍️" label="Mine ordrer" onClick={() => router.push('/mine-ordrer')} />
+              <MenuItem icon="🛍️" label="Mine køb" onClick={() => router.push('/mine-ordrer')} />
               <MenuItem icon="🔄" label="Byttehandler" onClick={() => router.push('/mine-handeler')} />
               <MenuItem icon="❤️" label="Favoritter" onClick={() => router.push('/favoritter')} />
               <MenuItem icon="🔍" label="Gemte søgninger" onClick={() => router.push('/gemte-soegninger')} />
@@ -473,8 +473,8 @@ export default function ProfilPage() {
             />
             <ActivityCard
               icon="📋"
-              label="Mine salg"
-              sublabel="Ordrer & opgaver"
+              label="Skal sendes"
+              sublabel="Pak & send med mærkat"
               value={pendingCount || null}
               badge={pendingCount}
               highlight={pendingCount > 0}
@@ -487,8 +487,8 @@ export default function ProfilPage() {
           <div style={{ display:'grid', gridTemplateColumns:'repeat(3, 1fr)', gap:14, marginBottom:28 }}>
             <ActivityCard
               icon="🛍️"
-              label="Mine ordrer"
-              sublabel="Stripe-betalte køb"
+              label="Mine køb"
+              sublabel="Følg & modtag"
               value={null}
               onClick={() => router.push('/mine-ordrer')}
             />
