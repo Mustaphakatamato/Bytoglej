@@ -8,7 +8,7 @@ import { useApp } from '@/providers/AppProvider';
 import { geocodeAddress, useDebounce } from '@/lib/hooks';
 import { LogoLockup } from '@/components/Logo';
 import { authedFetch } from '@/lib/authed-fetch';
-import { isValidEmail, suggestEmailFix } from '@/lib/email-validation';
+import { isValidEmail, suggestEmailFix, hasValidTld } from '@/lib/email-validation';
 const CORAL = '#E8593D';
 
 function SField({ label, hint, children }) {
@@ -338,12 +338,14 @@ export default function SignupPage() {
     if (!form.leader_phone.trim()) return 'Udfyld telefonnummer';
     if (!isValidEmail(form.leader_email)) return 'Udfyld en gyldig e-mail (fx navn@institution.dk)';
     { const fix = suggestEmailFix(form.leader_email); if (fix) return `E-mailen ser forkert ud. Mente du ${fix}?`; }
+    if (!hasValidTld(form.leader_email)) return 'E-mailen ser ikke ud til at være gyldig. Tjek at den er skrevet rigtigt.';
     return null;
   }
   function validateStep4() {
     if (!form.contact_name.trim()) return 'Udfyld dit navn';
     if (!isValidEmail(form.email)) return 'Udfyld en gyldig e-mail (fx navn@institution.dk)';
     { const fix = suggestEmailFix(form.email); if (fix) return `E-mailen ser forkert ud. Mente du ${fix}?`; }
+    if (!hasValidTld(form.email)) return 'E-mailen ser ikke ud til at være gyldig. Tjek at den er skrevet rigtigt.';
     const s = pwStrength(form.pass);
     if (!s.length || !s.upper || !s.number || !s.special) return 'Adgangskoden opfylder ikke kravene';
     return null;

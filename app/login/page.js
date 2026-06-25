@@ -7,7 +7,7 @@ import { Spinner } from '@/components/ui';
 import { db } from '@/lib/supabase';
 import { useApp } from '@/providers/AppProvider';
 import { LogoLockup } from '@/components/Logo';
-import { isValidEmail, suggestEmailFix } from '@/lib/email-validation';
+import { isValidEmail, suggestEmailFix, hasValidTld } from '@/lib/email-validation';
 
 const TRUST_POINTS = [
   'CVR-verificerede institutioner',
@@ -54,6 +54,7 @@ export default function LoginPage() {
     if (!isValidEmail(email)) { setError('Skriv en gyldig e-mail (fx navn@institution.dk)'); return; }
     const fix = suggestEmailFix(email);
     if (fix && fix !== email.trim().toLowerCase()) { setEmailFix(fix); return; }
+    if (!hasValidTld(email)) { setError('E-mailen ser ikke ud til at være gyldig. Tjek at den er skrevet rigtigt.'); return; }
     setChecking(true);
     setError(null);
     const emailLower = email.trim().toLowerCase();
