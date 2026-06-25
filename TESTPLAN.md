@@ -16,7 +16,7 @@ Arbejd ovenfra og ned.
 | 5) Bundt-bytte — opret | ✅ Gennemført (+ obligatorisk anslået værdi, søges-filter, kort-visning) |
 | 6) Bundt-bytte — accept & escrow | ✅ Gennemført |
 | 7) Bundt-bytte — tosidet betaling | ✅ Gennemført (inkl. pakke-booking mod sandbox) |
-| 8) 48t auto-refusion | ⬜ Ikke testet |
+| 8) 48t auto-refusion | ✅ Gennemført (forslag cd666dfc) |
 | 9) Udfasning | 🟡 Delvist (køb håndterer bud; QuickView er død kode) |
 | 10) Regression | ⬜ Ikke testet |
 
@@ -62,9 +62,10 @@ håndhæver `reserved_until` korrekt — mulig UI-forbedring, ikke en blokerende
 
 ## SESSION 2 (2026-06-25) — bytte-forsendelse, IA-ombygning & nye features
 
-### ⚠️ Miljø-tilstand (KRITISK for ny session)
-- **Stripe TEST-webhook peger MIDLERTIDIGT på preview** (ikke prod), med Vercel Protection-Bypass-secret i endpoint-URL'en. Nødvendigt fordi Punkt 7-8's escrow/forsendelse/refusion lever i branch-webhooken, og prod-webhooken ikke kender `swap_proposals`. **SKAL sættes tilbage til produktions-URL efter Punkt 8.** Se [[stripe-webhook-peger-paa-preview]].
-- **Shipmondo:** Preview-scope env sat til **sandbox** (`SHIPMONDO_BASE_URL` + sandbox `API_USER`/`API_KEY`), så pakke-booking virker uden rigtig saldo. Production-nøgler urørt.
+### ⚠️ Miljø-tilstand (opdateret 2026-06-25 efter Punkt 8)
+- **Stripe TEST-webhook sat TILBAGE til produktion** (`https://bytogleg.dk/api/webhooks/stripe`, uden protection-bypass) den 2026-06-25 efter Punkt 8. Pegede midlertidigt på preview under Punkt 7-8.
+- **CRON_SECRET roteret** 2026-06-25 (gammel var write-only i Vercel). Ny værdi sat på alle scopes.
+- **Shipmondo:** Preview-scope env bevidst på **sandbox** (`SHIPMONDO_BASE_URL` + sandbox `API_USER`/`API_KEY`), så preview-test aldrig booker rigtige pakker. Production-nøgler urørt. (Behold på sandbox for fremtidig preview-test.)
 - **`STRIPE_SECRET_KEY`** manglede på Preview (kun Production) — tilføjet til Preview.
 - Vercel "Redeploy" fra dashboard tager IKKE altid nye env-vars med → trig frisk deploy via git-push.
 
@@ -206,12 +207,17 @@ håndhæver `reserved_until` korrekt — mulig UI-forbedring, ikke en blokerende
 - [ ] Owner: samme → vælg udleveringssted → betal. Tjek **begge `*_shipment_id` ≠ null**, varer solgt, escrow frigivet, completion-mails m. pakkemærkat.
 - [ ] Test også **"Aftalt levering"** for den ene part → ingen label, handlen fuldføres.
 
-## 8) 48t auto-refusion (Trin 4e)
+## 8) 48t auto-refusion (Trin 4e) — ✅
 
-- [ ] Lav bytte hvor **kun A betaler**.
-- [ ] Sæt `swap_proposals.payment_deadline` i fortiden i Supabase.
-- [ ] Kald: `GET /api/cron/sweep-swap-deadlines` med header `Authorization: Bearer <CRON_SECRET>`.
-- [ ] Forventet: `escrow_status='cancelled_timeout'`, `status='cancelled'`, **A refunderes** (Stripe-dashboard), `reserved_until` ryddes, besked i samtalen.
+**Verificeret (2026-06-25) på forslag cd666dfc** (Tricycle mod Trælegetøj-Puslespil, kun A betalte):
+- [x] Bytte hvor **kun A betaler** (`escrow_status='awaiting_owner'`, ægte betalt ordre `pi_3TmKbjDudCgBYS3n07DtIOTW`).
+- [x] `payment_deadline` sat i fortiden i Supabase.
+- [x] `GET /api/cron/sweep-swap-deadlines` (Bearer CRON_SECRET, mod preview m. protection-bypass) → svar `{"ok":true,"cancelled":1,"refunded":1}`.
+- [x] Resultat: `status='cancelled'`, `escrow_status='cancelled_timeout'`, **A refunderet** (Stripe-kald lykkedes), begge varers `reserved_until`/`reserved_for` ryddet, system-besked postet i samtalen.
+
+**CRON_SECRET roteret** under test (gammel var write-only/usynlig i Vercel). Ny værdi sat på alle scopes; begge cron-jobs (sweep + generate-shipping-invoices) bruger automatisk den nye.
+
+**Observation (ikke blokerende):** cron'en laver Stripe-refusionen men opdaterer ikke `orders.status` til `refunded` (forbliver `paid`). Pengene er refunderet, men ordre-historik kan vise misvisende. Mulig lille forbedring.
 
 ## 9) Udfasning (Trin 6)
 

@@ -43,6 +43,10 @@ export async function GET(req) {
       if (o?.payment_intent_id && o.status === 'paid') {
         try {
           await stripe.refunds.create({ payment_intent: o.payment_intent_id });
+          // Markér ordren som refunded med det samme — afhæng ikke af at
+          // charge.refunded-webhooken er abonneret/når frem. Idempotent med
+          // webhook-handleren (begge sætter 'refunded').
+          await supa.from('orders').update({ status: 'refunded' }).eq('id', orderId);
           refunded++;
         } catch (e) {
           console.error('[sweep-swap-deadlines] refusion fejl:', e.message);
