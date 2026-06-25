@@ -2073,8 +2073,38 @@ export default function MessagesClient() {
                                 : p.escrow_status === 'cancelled_timeout' ? ['Frist udløb', '#e11d48', '#FEE2E2']
                                 : p.status === 'rejected' ? ['Afvist', '#e11d48', '#FEE2E2']
                                 : p.status === 'accepted' ? ['Godkendt', '#B45309', '#FEF9C3'] : null;
-                              const chip = { display:'inline-flex', alignItems:'center', gap:4, background:'#fff', border:'1px solid rgba(22,34,28,0.12)', borderRadius:8, padding:'3px 8px', fontSize:12, fontFamily:FONT, fontWeight:600, color:INK, margin:'2px 4px 2px 0' };
-                              const chips = (arr) => arr.length ? arr.map((it, ix) => <span key={ix} style={chip}>{it.emoji || '🧸'} {it.title}</span>) : <span style={{ fontSize:12, color:INK3, fontFamily:FONT }}>—</span>;
+                              const cash = Number(p.cash_adjustment) || 0;
+                              const sumItems = arr => arr.reduce((s, it) => s + (Number(it.price) || 0), 0);
+                              const giveTotal = sumItems(iGive) + (iAmCashPayer ? cash : 0);
+                              const getTotal  = sumItems(iGet)  + (otherIsCashPayer ? cash : 0);
+                              // Én vare-række med rigtigt annoncebillede (falder tilbage på emoji/farve).
+                              const itemRow = (it, ix) => (
+                                <div key={ix} style={{ display:'flex', alignItems:'center', gap:10, background:'#fff', border:'1px solid rgba(22,34,28,0.1)', borderRadius:10, padding:'7px 9px', marginBottom:5 }}>
+                                  <div style={{ width:40, height:40, borderRadius:8, overflow:'hidden', flexShrink:0, background: it.image ? PAPER3 : (it.color || '#FFD166'), display:'flex', alignItems:'center', justifyContent:'center', fontSize:20 }}>
+                                    {it.image ? <img src={it.image} alt="" style={{ width:'100%', height:'100%', objectFit:'cover' }} /> : (it.emoji || '🧸')}
+                                  </div>
+                                  <div style={{ flex:1, minWidth:0, fontFamily:FONT, fontSize:13, fontWeight:600, color:INK, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{it.title}</div>
+                                  {Number(it.price) > 0 && <div style={{ fontFamily:FONT, fontSize:12, fontWeight:700, color:INK, flexShrink:0 }}>{krp(it.price)}</div>}
+                                </div>
+                              );
+                              const cashRow = (key) => (
+                                <div key={key} style={{ display:'flex', alignItems:'center', gap:10, background:'#fff', border:'1px solid rgba(22,34,28,0.1)', borderRadius:10, padding:'7px 9px', marginBottom:5 }}>
+                                  <div style={{ width:40, height:40, borderRadius:8, flexShrink:0, background:'#FEF9C3', display:'flex', alignItems:'center', justifyContent:'center', fontSize:20 }}>💰</div>
+                                  <div style={{ flex:1, minWidth:0, fontFamily:FONT, fontSize:13, fontWeight:600, color:INK }}>Kontant mellemlag</div>
+                                  <div style={{ fontFamily:FONT, fontSize:12, fontWeight:700, color:INK, flexShrink:0 }}>{krp(cash)}</div>
+                                </div>
+                              );
+                              const section = (label, items, hasCash, total) => (
+                                <div style={{ marginBottom:8 }}>
+                                  <div style={{ display:'flex', justifyContent:'space-between', alignItems:'baseline', marginBottom:5 }}>
+                                    <span style={{ fontFamily:FONT, fontSize:11, fontWeight:700, color:INK3, textTransform:'uppercase', letterSpacing:0.4 }}>{label}</span>
+                                    {(items.length > 0 || hasCash) && <span style={{ fontFamily:FONT, fontSize:13, fontWeight:800, color:INK }}>{krp(total)}</span>}
+                                  </div>
+                                  {(items.length > 0 || hasCash)
+                                    ? <>{items.map(itemRow)}{hasCash && cashRow(`${label}-cash`)}</>
+                                    : <div style={{ fontFamily:FONT, fontSize:12, color:INK3 }}>—</div>}
+                                </div>
+                              );
                               return (
                                 <div style={{ margin:'12px 0' }}>
                                   <div style={{ background: completed ? GREEN_TINT : cancelled ? '#FEF2F2' : '#fff', border:`2px solid ${completed ? PRIMARY : cancelled ? '#FCA5A5' : 'rgba(22,34,28,0.14)'}`, borderRadius:16, padding:'14px 16px' }}>
@@ -2082,14 +2112,8 @@ export default function MessagesClient() {
                                       🔄 Bytteforslag
                                       {badge && <span style={{ fontSize:11, fontWeight:700, color:badge[1], background:badge[2], padding:'2px 8px', borderRadius:99 }}>{badge[0]}</span>}
                                     </div>
-                                    <div style={{ marginBottom:6 }}>
-                                      <div style={{ fontFamily:FONT, fontSize:11, fontWeight:700, color:INK3, marginBottom:2 }}>Du giver</div>
-                                      <div>{chips(iGive)}{iAmCashPayer && <span style={chip}>💰 {krp(p.cash_adjustment)}</span>}</div>
-                                    </div>
-                                    <div>
-                                      <div style={{ fontFamily:FONT, fontSize:11, fontWeight:700, color:INK3, marginBottom:2 }}>Du får</div>
-                                      <div>{chips(iGet)}{otherIsCashPayer && <span style={chip}>💰 {krp(p.cash_adjustment)}</span>}</div>
-                                    </div>
+                                    {section('Du giver', iGive, iAmCashPayer, giveTotal)}
+                                    {section('Du får', iGet, otherIsCashPayer, getTotal)}
 
                                     {canRespond && (
                                       <div style={{ display:'flex', gap:8, marginTop:12 }}>
