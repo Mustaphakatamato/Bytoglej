@@ -444,7 +444,7 @@ const [saveSearchModal, setSaveSearchModal] = useState(false);
           <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', alignItems: 'center' }}>
             {!aiMode && (
               <div style={{ display: 'flex', gap: 4 }}>
-                {[{ key: 'alle', label: 'Alle' }, { key: 'køb', label: TYPE_CFG.køb.label }, { key: 'byd', label: TYPE_CFG.byd.label }, { key: 'byt', label: TYPE_CFG.byt.label }].map(({ key, label }) => {
+                {[{ key: 'alle', label: 'Alle' }, { key: 'køb', label: TYPE_CFG.køb.label }, { key: 'byt', label: TYPE_CFG.byt.label }, { key: 'søges', label: TYPE_CFG.søges.label }].map(({ key, label }) => {
                   const active = filter === key;
                   const tc = key !== 'alle' ? TYPE_CFG[key] : null;
                   return (

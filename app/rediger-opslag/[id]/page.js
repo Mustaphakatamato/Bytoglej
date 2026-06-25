@@ -236,7 +236,7 @@ export default function RedigerOpslagPage() {
       emoji: form.emoji,
       color: form.color,
       tags: form.tags || [],
-      min_bid: form.type === 'byd' && form.min_bid ? Number(form.min_bid) : null,
+      min_bid: null,
       category: form.category || null,
       subcategory: form.subcategory || null,
       brand: form.brand || null,
@@ -350,12 +350,6 @@ export default function RedigerOpslagPage() {
                   <label style={labelStyle}>Anslået værdi (kr.) <span style={{ color: '#e53e3e' }}>*</span></label>
                   <input type="number" value={form.price} onChange={e => setForm({ ...form, price: e.target.value })} placeholder="Fx 250" min="1" style={{ ...inputStyle, border: `1.5px solid ${!form.price ? '#FCA5A5' : PAPER3}` }} />
                   <div style={{ marginTop: 6, fontFamily: FONT, fontSize: 12, color: INK3 }}>Bruges til at sammenligne værdi i bytteforslag — vises ikke som salgspris.</div>
-                </div>
-              )}
-              {form.type === 'byd' && (
-                <div>
-                  <label style={labelStyle}>Mindste bud (kr.) <span style={{ fontWeight: 400, color: INK3 }}>— valgfri</span></label>
-                  <input type="number" value={form.min_bid || ''} onChange={e => setForm({ ...form, min_bid: e.target.value })} placeholder="Lad stå tom for intet minimum" min="1" style={inputStyle} />
                 </div>
               )}
 

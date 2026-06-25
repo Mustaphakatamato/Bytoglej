@@ -547,9 +547,9 @@ function TradeTypesStrip() {
     <section style={{ background: GREEN_TINT, padding: isMobile ? '40px 20px' : '48px 24px', position: 'relative', overflow: 'hidden' }}>
       <div style={{ maxWidth: 900, margin: '0 auto', display: 'grid', gridTemplateColumns: isMobile ? '1fr' : 'repeat(3,1fr)', gap: isMobile ? 16 : 0 }}>
         {[
-          { key: 'køb', title: 'Køb', sub: 'Fastpris', desc: 'Se prisen og køb med det samme.' },
+          { key: 'køb', title: 'Køb', sub: 'Fastpris', desc: 'Se prisen og køb med det samme — eller giv et tilbud.' },
           { key: 'byt', title: 'Byt', sub: 'Bytehandel', desc: 'Tilbyd et af jeres egne opslag i bytte.' },
-          { key: 'byd', title: 'Byd', sub: 'Forhandl', desc: 'Send et bud og aftal en pris der passer begge.' },
+          { key: 'søges', title: 'Søges', sub: 'Efterlysning', desc: 'Efterlys legetøj I mangler — få besked når det dukker op.' },
         ].map((t, i) => {
           const tc = TYPE_CFG[t.key];
           return (

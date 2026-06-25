@@ -46,7 +46,6 @@ function PreviewCard({ form, imgPreview }) {
           {form.price && form.type === 'køb'
             ? <div style={{ fontFamily:FONT, fontWeight:800, fontSize:18, color:PRIMARY }}>{form.price} kr.</div>
             : form.type === 'byt' ? <div style={{ fontSize:13, color:CORAL, fontWeight:700, fontFamily:FONT }}>Byttes{form.price ? ` · anslået værdi ${form.price} kr.` : ' kun'}</div>
-            : form.type === 'byd' ? <div style={{ fontSize:13, color:'#7C3AED', fontWeight:700, fontFamily:FONT }}>Afgiv bud</div>
             : null
           }
         </div>
@@ -509,7 +508,6 @@ export default function OpretOpslagPage() {
       category: form.category || null, subcategory: form.subcategory || null, brand: form.brand || null,
       can_ship: delivery.shipping || false,
     };
-    if (form.type==='byd' && form.min_bid) insertData.min_bid = Number(form.min_bid);
     const { data: listing, error } = await db.from('listings').insert(insertData).select().single();
     if (error) { console.error('Insert error:', error); showToast('Noget gik galt — prøv igen', 'error'); setSaving(false); return; }
     // urgency: update separately so it fails silently if column doesn't exist yet
@@ -838,12 +836,6 @@ export default function OpretOpslagPage() {
                     <label style={labelStyle}>Anslået værdi (kr.) <span style={{ color:'#e53e3e' }}>*</span></label>
                     <input type="number" value={form.price} onChange={e=>setForm({...form,price:e.target.value})} placeholder="Fx 250" min="1" style={{ ...inputStyle, border:`1.5px solid ${!form.price?'#FCA5A5':PAPER3}` }} />
                     <div style={{ marginTop:6, fontFamily:FONT, fontSize:12, color:INK3 }}>Bruges til at sammenligne værdi i bytteforslag — vises ikke som salgspris.</div>
-                  </div>
-                )}
-                {form.type === 'byd' && (
-                  <div>
-                    <label style={labelStyle}>Mindste bud (kr.) <span style={{ fontWeight:400, color:INK3 }}>— valgfri</span></label>
-                    <input type="number" value={form.min_bid||''} onChange={e=>setForm({...form,min_bid:e.target.value})} placeholder="Lad stå tom for intet minimum" min="1" style={inputStyle} />
                   </div>
                 )}
                 {form.type === 'søges' && (

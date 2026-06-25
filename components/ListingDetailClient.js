@@ -85,14 +85,8 @@ export default function ListingDetailClient() {
   const isMobile = ww < 768;
 
   const inCart = cart?.some(c => c.listingId === listing?.id);
-  const [bidModal,  setBidModal]  = useState(false);
   const [offerModal, setOfferModal] = useState(false);
-  const [swapModal, setSwapModal] = useState(false);
   const [swapProposalModal, setSwapProposalModal] = useState(false);
-  const [bidAmount, setBidAmount] = useState('');
-  const [swapOffer, setSwapOffer] = useState('');
-  const [selectedSwapId, setSelectedSwapId] = useState(null);
-  const [bidCount,  setBidCount]  = useState(listing?.bid_count||0);
   const [saving,    setSaving]    = useState(false);
   const [currentUserId, setCurrentUserId] = useState(null);
   const [currentUserEmail, setCurrentUserEmail] = useState(null);
@@ -109,7 +103,6 @@ export default function ListingDetailClient() {
   const [shareNote, setShareNote] = useState('');
   const [shareSending, setShareSending] = useState(false);
   const [myInstName, setMyInstName] = useState(null);
-  const [existingBid, setExistingBid] = useState(null);
   const [instListings, setInstListings] = useState([]);
   const [similarListings, setSimilarListings] = useState([]);
   const [instListingsLoaded, setInstListingsLoaded] = useState(false);
@@ -177,13 +170,6 @@ export default function ListingDetailClient() {
           const adminEntry = { id: 'admin', email: mem.institutions.email, role: 'admin' };
           setTeamMembers([adminEntry, ...(mems||[])]);
         }
-      }
-      const { data: liveList } = await db.from('listings').select('bid_count').eq('id', listing.id).maybeSingle();
-      if (liveList) setBidCount(liveList.bid_count || 0);
-      const { data: existingConv } = await db.from('conversations').select('id').eq('listing_id', listing.id).eq('initiator_id', user.id).maybeSingle();
-      if (existingConv) {
-        const { data: pendingBid } = await db.from('chat_messages').select('*').eq('conversation_id', existingConv.id).eq('message_type', 'bid').eq('bid_status', 'pending').order('created_at', { ascending: false }).limit(1).maybeSingle();
-        if (pendingBid) setExistingBid(pendingBid);
       }
     });
   }, []);
@@ -447,165 +433,6 @@ export default function ListingDetailClient() {
     router.push('/indkøbsvogn');
   }
 
-  async function handleBid() {
-    if (!bidAmount) return;
-    if (!currentUserId) { showToast('Log ind for at byde', 'error'); return; }
-    if (listing.min_bid && Number(bidAmount) < listing.min_bid) {
-      showToast(`Mindste bud er ${listing.min_bid} kr.`, 'error'); return;
-    }
-    setSaving(true);
-    const newCount = bidCount + 1;
-    try {
-      const { data: { user } } = await db.auth.getUser();
-      const { data: inst } = await db.from('institutions').select('id,name').ilike('email', user.email).maybeSingle();
-      const userName = inst?.name || user.email;
-      const bidderInstId = inst?.id || ctxInstId || null;
-      const { data: ownerInst } = await db.from('institutions').select('id,email,name').eq('name', listing.institution_name).maybeSingle();
-      const ownerInstId = ownerInst?.id || null;
-      let convId = null; let ownerUnread = 0;
-      const orFind = bidderInstId
-        ? `initiator_institution_id.eq.${bidderInstId},initiator_id.eq.${currentUserId}`
-        : `initiator_id.eq.${currentUserId}`;
-      const { data: existing } = await db.from('conversations').select('id,owner_unread').eq('listing_id', listing.id).or(orFind).maybeSingle();
-      if (existing) { convId = existing.id; ownerUnread = existing.owner_unread || 0; }
-      else {
-        const { data: conv } = await db.from('conversations').insert({
-          listing_id: listing.id, listing_title: listing.title,
-          listing_emoji: listing.emoji, listing_color: listing.color,
-          listing_image: listing.images?.[0] || null,
-          initiator_id: currentUserId, initiator_name: userName,
-          initiator_institution_id: bidderInstId,
-          owner_id: listing.user_id, owner_name: listing.institution_name,
-          owner_institution_id: ownerInstId,
-        }).select().single();
-        convId = conv?.id;
-      }
-      if (convId) {
-        const bidMsg = `Bud: ${bidAmount} kr.`;
-        const { data: newBidMsg } = await db.from('chat_messages').insert({
-          conversation_id: convId, sender_id: currentUserId, sender_name: userName,
-          content: bidMsg, message_type: 'bid', bid_amount: Number(bidAmount), bid_status: 'pending',
-        }).select().single();
-        await db.from('conversations').update({ last_message: bidMsg, last_message_at: new Date().toISOString(), owner_unread: ownerUnread+1 }).eq('id', convId);
-        await db.from('listings').update({ bid_count: newCount }).eq('id', listing.id);
-        setBidCount(newCount); setBidModal(false); setSaving(false);
-        if (newBidMsg) setExistingBid(newBidMsg);
-        showToast(`Bud på ${bidAmount} kr. afsendt! 🎉`);
-        if (!existing && ownerInst?.email && ownerInst.email.toLowerCase() !== currentUserEmail?.toLowerCase()) {
-          authedFetch('/api/notify-message', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ ownerEmail: ownerInst.email, ownerName: ownerInst.name, senderName: userName, listingTitle: listing.title, listingEmoji: listing.emoji || '🧸', convId }),
-          }).catch(() => {});
-        }
-        if (setSelectedConvId) setSelectedConvId(convId);
-        router.push('/beskeder'); return;
-      }
-    } catch(err) { console.error(err); }
-    setSaving(false); setBidModal(false);
-  }
-
-  async function handleWithdrawBid() {
-    if (!existingBid) return;
-    if (!window.confirm('Træk dit bud tilbage?')) return;
-    await db.from('chat_messages').update({ bid_status: 'withdrawn' }).eq('id', existingBid.id);
-    const newCount = Math.max(0, bidCount - 1);
-    await db.from('listings').update({ bid_count: newCount }).eq('id', listing.id);
-    setBidCount(newCount); setExistingBid(null);
-    showToast('Bud trukket tilbage');
-  }
-
-  // Live prisoversigt i bud-modalen: bud + estimeret porto + køberbeskyttelse.
-  // Porto er et "fra"-estimat (billigste pakkeshop for opslagets størrelse); den
-  // præcise pris vælges ved betaling. Køberbeskyttelse beregnes eksakt (5% + 5 kr).
-  function bidPriceSummary(amount) {
-    const bid = Number(amount);
-    if (!bid || bid <= 0) return null;
-    const so = listing.shipping_options?.[0];
-    const canShip = so?.allow_shipping || (!so && listing.can_ship);
-    const portoIncluded = so?.shipping_included_in_price;
-    const portoFrom = canShip && !portoIncluded ? getShippingPrice('parcel_shop_gls', so?.shipping_size_category) : 0;
-    const protection = calcServiceFee(bid);
-    const totalCa = bid + portoFrom + protection;
-    const kr = n => `${n.toFixed(2).replace('.', ',')} kr.`;
-    const row = (label, value, extra) => (
-      <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', fontFamily:FONT, fontSize:13 }}>
-        <span style={{ color:INK3 }}>{label}</span>
-        <span style={{ color:INK2, fontWeight:600 }}>{extra}{value}</span>
-      </div>
-    );
-    return (
-      <div style={{ background:GREEN_TINT, border:`1px solid ${GREEN_SOFT}`, borderRadius:12, padding:'12px 14px', display:'flex', flexDirection:'column', gap:7 }}>
-        {row('Dit bud', kr(bid))}
-        {canShip && !portoIncluded && row('Porto (fra)', kr(portoFrom), '~')}
-        {portoIncluded && row('Porto', 'inkluderet')}
-        {row('Køberbeskyttelse', kr(protection))}
-        <div style={{ borderTop:`1px solid ${GREEN_SOFT}`, marginTop:2, paddingTop:8, display:'flex', justifyContent:'space-between', alignItems:'center' }}>
-          <span style={{ fontFamily:FONT, fontWeight:800, fontSize:14, color:INK }}>Du betaler ca.</span>
-          <span style={{ fontFamily:FONT, fontWeight:800, fontSize:16, color:PRIMARY }}>{kr(totalCa)}</span>
-        </div>
-        {canShip && !portoIncluded && (
-          <div style={{ fontFamily:FONT, fontSize:11, color:INK3, lineHeight:1.5 }}>Porto beregnes præcist ved betaling, når du vælger leveringsmetode.</div>
-        )}
-      </div>
-    );
-  }
-
-  async function handleSwap() {
-    const chosen = ownListings.find(l => l.id === selectedSwapId);
-    if (!chosen && !swapOffer.trim()) return;
-    setSaving(true);
-    const offerText = chosen ? `Bytteforslag: "${chosen.title}"` : `Bytteforslag: ${swapOffer}`;
-    try {
-      const { data:{ user } } = await db.auth.getUser();
-      if (user) {
-        const { data: inst } = await db.from('institutions').select('id,name').eq('email', user.email).maybeSingle();
-        const userName = inst?.name || user.email;
-        const swapperInstId = inst?.id || ctxInstId || null;
-        const { data: swapOwnerInst } = await db.from('institutions').select('id').eq('name', listing.institution_name).maybeSingle();
-        const swapOwnerInstId = swapOwnerInst?.id || null;
-        const orSwapFind = swapperInstId
-          ? `initiator_institution_id.eq.${swapperInstId},initiator_id.eq.${user.id}`
-          : `initiator_id.eq.${user.id}`;
-        const { data: existing } = await db.from('conversations')
-          .select('id,owner_unread').eq('listing_id', listing.id).or(orSwapFind).maybeSingle();
-        let convId = existing?.id;
-        if (!convId) {
-          const { data: conv } = await db.from('conversations').insert({
-            listing_id: listing.id, listing_title: listing.title,
-            listing_emoji: listing.emoji, listing_color: listing.color,
-            listing_image: listing.images?.[0] || null,
-            initiator_id: user.id, initiator_name: userName,
-            initiator_institution_id: swapperInstId,
-            owner_id: listing.user_id, owner_name: listing.institution_name,
-            owner_institution_id: swapOwnerInstId,
-          }).select().single();
-          convId = conv?.id;
-        }
-        if (convId) {
-          const swapContent = JSON.stringify({
-            swap_listing_id: chosen?.id || null,
-            swap_title: chosen?.title || null,
-            swap_emoji: chosen?.emoji || null,
-            swap_color: chosen?.color || null,
-            swap_image: chosen?.images?.[0] || null,
-            note: swapOffer.trim() || null,
-          });
-          const lastMsg = chosen ? `🔄 Bytteforslag: "${chosen.title}"` : `🔄 Bytteforslag: ${swapOffer}`;
-          await db.from('chat_messages').insert({ conversation_id: convId, sender_id: user.id, sender_name: userName, content: swapContent, message_type: 'swap' });
-          await db.from('conversations').update({ last_message: lastMsg, last_message_at: new Date().toISOString(), owner_unread: (existing?.owner_unread||0)+1 }).eq('id', convId);
-          setSaving(false); setSwapModal(false); setSelectedSwapId(null); setSwapOffer('');
-          showToast('Bytteforslag sendt!');
-          if (setSelectedConvId) setSelectedConvId(convId);
-          router.push('/beskeder');
-          return;
-        }
-      }
-    } catch {}
-    setSaving(false); setSwapModal(false); setSelectedSwapId(null); setSwapOffer('');
-    showToast('Bytteforslag sendt!');
-  }
-
   // Relaterede opslag: sælgers andre opslag, ellers lignende fra samme kategori.
   // På desktop placeres sektionen i venstre kolonne under billedet (fylder tomrummet
   // ved siden af den høje info-kolonne); på mobil i bunden i fuld bredde.
@@ -844,9 +671,7 @@ export default function ListingDetailClient() {
                     );
                   })()
                 : listing.type === 'byt' ? <div style={{ fontSize:20, color:CORAL, fontWeight:800, fontFamily:FONT }}>Byttes{listing.estimated_value ? <span style={{ fontSize:14, fontWeight:700 }}> · anslået værdi {listing.estimated_value} kr.</span> : ' kun'}</div>
-                : <div style={{ fontSize:20, color:ACCENT2, fontWeight:800, fontFamily:FONT }}>Afgiv bud</div>}
-              {bidCount > 0 && <div style={{ color:INK3, fontSize:12, fontFamily:FONT, marginTop:4 }}>{bidCount} bud afgivet</div>}
-              {listing.type === 'byd' && listing.min_bid && <div style={{ color:INK3, fontSize:12, fontFamily:FONT }}>Mindstebud: {listing.min_bid} kr.</div>}
+                : null}
             </div>
 
             {/* Action buttons */}
@@ -865,7 +690,6 @@ export default function ListingDetailClient() {
                 )}
                 {listing.type==='køb' && !reservedActive && <Btn variant="primary" color={PRIMARY} radius={22} onClick={handleAddToCart} style={{ justifyContent:'center', padding:'15px', fontSize:16 }}>{inCart ? '🛒 Gå til kurv →' : (() => { const so = listing.shipping_options?.[0]; const canShip = so?.allow_shipping || (!so && listing.can_ship); const tag = canShip ? (so?.shipping_included_in_price ? ' inkl. fragt' : ' + fragt') : ''; return `🛒 Læg i kurv — ${listing.price} kr.${tag}`; })()}</Btn>}
                 {listing.type==='køb' && !reservedActive && <Btn variant="outline" radius={22} onClick={()=>{ if(!loggedIn){ router.push('/login'); return; } setOfferModal(true); }} style={{ justifyContent:'center', padding:'13px', fontSize:15 }}>🏷️ Giv et tilbud</Btn>}
-                {listing.type==='byd' && !reservedActive && <Btn variant="primary" color={PRIMARY} radius={22} onClick={()=>{ if(!loggedIn){ router.push('/login'); return; } setOfferModal(true); }} style={{ justifyContent:'center', padding:'15px', fontSize:16 }}>🏷️ Giv et tilbud</Btn>}
                 {listing.type==='byt' && !reservedActive && <Btn variant="primary" color={ACCENT} radius={22} onClick={()=>{ if(!loggedIn){ router.push('/login'); return; } setSwapProposalModal(true); }} style={{ justifyContent:'center', padding:'15px', fontSize:16 }}>🔄 Foreslå bytte</Btn>}
                 {listing.type==='søges' && <button onClick={()=>setSøgesModal(true)}
                   style={{ width:'100%', padding:'15px', borderRadius:22, border:'none', background:'#7C3AED', color:'#fff', fontSize:15, fontWeight:700, cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center', gap:8, fontFamily:FONT, transition:'all 0.2s' }}>
@@ -1038,96 +862,6 @@ export default function ListingDetailClient() {
 
         </div>
       </div>
-
-      <Modal open={bidModal} onClose={()=>setBidModal(false)} title="Afgiv bud">
-        <div style={{ display:'flex', flexDirection:'column', gap:16 }}>
-          <div style={{ background:PAPER2, borderRadius:12, padding:16 }}>
-            <div style={{ fontFamily:FONT, fontWeight:700, fontSize:16, color:INK }}>{listing.title}</div>
-            <div style={{ color:INK3, fontSize:13, marginTop:4, fontFamily:FONT }}>{bidCount} nuværende bud{listing.min_bid ? ` · Mindste bud: ${listing.min_bid} kr.` : ''}</div>
-          </div>
-          {existingBid ? (
-            <div style={{ display:'flex', flexDirection:'column', gap:12 }}>
-              <div style={{ background:'#e8f0fb', border:`2px solid ${ACCENT2}`, borderRadius:12, padding:16, textAlign:'center' }}>
-                <div style={{ fontSize:13, color:'#666', marginBottom:4 }}>Dit aktuelle bud</div>
-                <div style={{ fontFamily:"'Nunito',sans-serif", fontWeight:900, fontSize:26, color:ACCENT2 }}>{existingBid.bid_amount} kr.</div>
-                <div style={{ fontSize:12, color:'#888', marginTop:4 }}>⏳ Afventer svar fra sælger</div>
-              </div>
-              <div>
-                <label style={{ display:'block', fontSize:13, fontWeight:700, marginBottom:8 }}>Opdater dit bud (kr.)</label>
-                <input type="number" value={bidAmount} onChange={e=>setBidAmount(e.target.value)} placeholder={`Fx ${existingBid.bid_amount}`} style={{ width:'100%', padding:'12px 14px', borderRadius:12, border:'1.5px solid #e5e5e5', fontSize:16, fontFamily:"'Nunito',sans-serif", fontWeight:700, outline:'none' }} />
-                {listing.min_bid && bidAmount && Number(bidAmount) < listing.min_bid && <p style={{ fontSize:12, color:'#e11d48', marginTop:4 }}>Mindste bud er {listing.min_bid} kr.</p>}
-              </div>
-              {bidPriceSummary(bidAmount)}
-              <Btn variant="primary" color={ACCENT2} radius={22} onClick={async()=>{
-                if (!bidAmount || (listing.min_bid && Number(bidAmount)<listing.min_bid)) return;
-                setSaving(true);
-                await db.from('chat_messages').update({ bid_amount: Number(bidAmount) }).eq('id', existingBid.id);
-                setExistingBid(e => ({...e, bid_amount: Number(bidAmount)}));
-                setSaving(false); setBidModal(false); setBidAmount('');
-                showToast('Bud opdateret ✓');
-              }} disabled={saving||!bidAmount} style={{ justifyContent:'center', padding:'14px', fontSize:15 }}>{saving?<><Spinner/>…</>:'Opdater bud'}</Btn>
-              <Btn variant="ghost" onClick={handleWithdrawBid} style={{ justifyContent:'center', color:'#e11d48' }}>🗑️ Træk bud tilbage</Btn>
-            </div>
-          ) : (
-            <>
-              <div>
-                <label style={{ display:'block', fontSize:13, fontWeight:700, marginBottom:8 }}>Dit bud (kr.){listing.min_bid ? ` — minimum ${listing.min_bid} kr.` : ''}</label>
-                <input type="number" value={bidAmount} onChange={e=>setBidAmount(e.target.value)} placeholder={listing.min_bid ? `Minimum ${listing.min_bid} kr.` : 'Fx 150'} min={listing.min_bid||1} style={{ width:'100%', padding:'12px 14px', borderRadius:12, border:'1.5px solid #e5e5e5', fontSize:16, fontFamily:"'Nunito',sans-serif", fontWeight:700, outline:'none' }} />
-                {listing.min_bid && bidAmount && Number(bidAmount) < listing.min_bid && <p style={{ fontSize:12, color:'#e11d48', marginTop:4 }}>Mindste bud er {listing.min_bid} kr.</p>}
-              </div>
-              {bidPriceSummary(bidAmount)}
-              <Btn variant="primary" color={ACCENT2} radius={22} onClick={handleBid} disabled={saving||!bidAmount||(listing.min_bid&&Number(bidAmount)<listing.min_bid)} style={{ justifyContent:'center', padding:'14px', fontSize:15 }}>{saving?<><Spinner/>Sender…</>:'Send bud'}</Btn>
-            </>
-          )}
-          <Btn variant="ghost" onClick={()=>setBidModal(false)} style={{ justifyContent:'center' }}>Luk</Btn>
-        </div>
-      </Modal>
-
-      <Modal open={swapModal} onClose={()=>{ setSwapModal(false); setSelectedSwapId(null); setSwapOffer(''); }} title="Foreslå bytte">
-        <div style={{ display:'flex', flexDirection:'column', gap:16 }}>
-          {ownListings.length === 0 ? (
-            <>
-              <div style={{ display:'flex', flexDirection:'column', alignItems:'center', gap:12, padding:'12px 0 8px' }}>
-                <div style={{ fontSize:44 }}>📭</div>
-                <div style={{ fontFamily:FONT, fontWeight:800, fontSize:16, color:INK, textAlign:'center' }}>Du har ingen aktive opslag</div>
-                <div style={{ fontFamily:FONT, fontSize:14, color:INK3, textAlign:'center', lineHeight:1.6 }}>
-                  Du skal have mindst ét aktivt opslag for at kunne foreslå en byttehandel.
-                </div>
-              </div>
-              <Btn variant="primary" color={ACCENT} radius={22} onClick={()=>{ setSwapModal(false); router.push('/opret'); }} style={{ justifyContent:'center', padding:'14px', fontSize:15 }}>Opret et opslag</Btn>
-              <Btn variant="ghost" onClick={()=>{ setSwapModal(false); setSelectedSwapId(null); setSwapOffer(''); }} style={{ justifyContent:'center' }}>Luk</Btn>
-            </>
-          ) : (
-            <>
-              <div style={{ background:'#FCEAE6', borderRadius:12, padding:16, borderLeft:`3px solid ${CORAL}` }}>
-                <div style={{ fontSize:13, color:CORAL, fontWeight:600, marginBottom:4, fontFamily:FONT }}>De tilbyder:</div>
-                <div style={{ fontFamily:FONT, fontWeight:700, fontSize:16, color:INK }}>{listing.title}</div>
-              </div>
-              <div>
-                <label style={{ display:'block', fontSize:13, fontWeight:700, marginBottom:10 }}>Vælg hvad I tilbyder i bytte:</label>
-                <div style={{ display:'flex', flexDirection:'column', gap:8, maxHeight:220, overflowY:'auto' }}>
-                  {ownListings.map(l => (
-                    <div key={l.id} onClick={()=>setSelectedSwapId(l.id===selectedSwapId?null:l.id)}
-                      style={{ display:'flex', alignItems:'center', gap:12, padding:'10px 14px', borderRadius:12, border:`2px solid ${selectedSwapId===l.id?ACCENT:'#e5e5e5'}`, background:selectedSwapId===l.id?'#FEF0E3':'#fff', cursor:'pointer', transition:'all 0.15s' }}>
-                      <div style={{ width:40, height:40, borderRadius:10, background:l.images?.[0]?'#e8e6e3':l.color||'#FFD166', display:'flex', alignItems:'center', justifyContent:'center', overflow:'hidden', flexShrink:0 }}>
-                        {l.images?.[0] ? <img src={l.images[0]} style={{ width:'100%', height:'100%', objectFit:'cover' }} alt="" /> : l.emoji||'🧸'}
-                      </div>
-                      <span style={{ fontWeight:600, fontSize:14 }}>{l.title}</span>
-                      {selectedSwapId===l.id && <span style={{ marginLeft:'auto', color:ACCENT, fontSize:18 }}>✓</span>}
-                    </div>
-                  ))}
-                </div>
-              </div>
-              <div>
-                <label style={{ display:'block', fontSize:13, fontWeight:600, marginBottom:6, color:'#888' }}>Eller skriv en fri beskrivelse:</label>
-                <textarea value={swapOffer} onChange={e=>setSwapOffer(e.target.value)} placeholder="Fx: Vi tilbyder vores cykeltrailer i god stand…" rows={3} style={{ width:'100%', padding:'11px 14px', borderRadius:12, border:'1.5px solid #e5e5e5', fontSize:14, resize:'none', fontFamily:"'Nunito Sans',sans-serif", outline:'none' }} />
-              </div>
-              <Btn variant="primary" color={ACCENT} radius={22} onClick={handleSwap} disabled={saving||(!selectedSwapId&&!swapOffer.trim())} style={{ justifyContent:'center', padding:'14px', fontSize:15 }}>{saving?<><Spinner/>Sender…</>:'Send bytteforslag'}</Btn>
-              <Btn variant="ghost" onClick={()=>{ setSwapModal(false); setSelectedSwapId(null); setSwapOffer(''); }} style={{ justifyContent:'center' }}>Annuller</Btn>
-            </>
-          )}
-        </div>
-      </Modal>
 
       {/* På mobil: relaterede opslag i bunden (fuld bredde) */}
       {isMobile && relatedSection}

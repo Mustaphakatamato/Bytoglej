@@ -918,8 +918,8 @@ function ListingsTab({ allInstitutions = [], isMobile }) {
             <select value={filterType} onChange={e => setFilterType(e.target.value)} style={{ padding: '10px 12px', border: `1.5px solid ${PAPER3}`, borderRadius: 10, fontFamily: FONT, fontSize: 13, background: PAPER2, color: INK, cursor: 'pointer' }}>
               <option value="">Alle typer</option>
               <option value="køb">Sælges</option>
-              <option value="byd">Søges</option>
               <option value="byt">Byttes</option>
+              <option value="søges">Søges</option>
             </select>
             <select value={filterStatus} onChange={e => setFilterStatus(e.target.value)} style={{ padding: '10px 12px', border: `1.5px solid ${PAPER3}`, borderRadius: 10, fontFamily: FONT, fontSize: 13, background: PAPER2, color: INK, cursor: 'pointer' }}>
               <option value="">Alle statusser</option>
