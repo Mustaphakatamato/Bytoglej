@@ -867,11 +867,14 @@ function Nav({ pathname, navigate, loggedIn, setLoggedIn, unreadTotal, instituti
               </>
             ) : (
               <>
-                <Link href="/login" style={{ padding:'8px 14px', fontSize:14, fontWeight:600, color:transparent?'rgba(255,255,255,0.9)':INK2, textDecoration:'none', borderRadius:22 }}>
-                  Log ind
+                <Link href="/login" style={{ padding:'8px 16px', fontSize:14, fontWeight:600, color:transparent?'rgba(255,255,255,0.9)':INK, textDecoration:'none', borderRadius:22, border:`1.5px solid ${transparent?'rgba(255,255,255,0.5)':INK}`, display:'inline-flex', alignItems:'center', gap:0, whiteSpace:'nowrap' }}>
+                  Tilmeld dig | Log på
                 </Link>
-                <Link href="/signup" style={{ background:PRIMARY, color:'#fff', fontWeight:700, fontSize:13, padding:'8px 18px', borderRadius:22, textDecoration:'none', display:'inline-flex', alignItems:'center' }}>
-                  Tilmeld institution
+                <Link href="/login" style={{ background:PRIMARY, color:'#fff', fontWeight:700, fontSize:13, padding:'8px 18px', borderRadius:22, textDecoration:'none', display:'inline-flex', alignItems:'center' }}>
+                  Sælg nu
+                </Link>
+                <Link href="/hjaelp" title="Hjælpecenter" aria-label="Hjælpecenter" style={{ width:34, height:34, borderRadius:'50%', border:`1.5px solid ${transparent?'rgba(255,255,255,0.5)':PAPER3}`, display:'inline-flex', alignItems:'center', justifyContent:'center', textDecoration:'none', color:transparent?'rgba(255,255,255,0.8)':INK2, fontSize:15, fontWeight:700, flexShrink:0, fontFamily:FONT }}>
+                  ?
                 </Link>
               </>
             )}
