@@ -133,6 +133,7 @@ const TABS = [
   { id: 'economy',      label: 'Økonomi',       emoji: '💰' },
   { id: 'log',          label: 'Log',           emoji: '📝' },
   { id: 'ai-bot',       label: 'AI Bot',        emoji: '🤖' },
+  { id: 'support',      label: 'Support',       emoji: '💬' },
 ];
 
 // ── Login form ──────────────────────────────────────────────────────────────────
@@ -349,6 +350,7 @@ export default function AdminPage() {
         {tab === 'economy'      && <EconomyTab isMobile={isMobile} />}
         {tab === 'log'          && <LogTab isMobile={isMobile} />}
         {tab === 'ai-bot'       && <AiBotTab isMobile={isMobile} />}
+        {tab === 'support'      && <SupportTab isMobile={isMobile} />}
       </div>
     </div>
   );
@@ -1862,6 +1864,243 @@ function AiBotTab({ isMobile }) {
       )}
       </>
       )}
+    </div>
+  );
+}
+
+// ── Support Tab ───────────────────────────────────────────────────────────────
+
+function SupportTab({ isMobile }) {
+  const [convs, setConvs]         = useState([]);
+  const [active, setActive]       = useState(null);
+  const [messages, setMessages]   = useState([]);
+  const [reply, setReply]         = useState('');
+  const [sending, setSending]     = useState(false);
+  const [loading, setLoading]     = useState(true);
+  const [statusFilter, setStatusFilter] = useState('');
+  const bottomRef = useRef(null);
+  const inputRef  = useRef(null);
+
+  const STATUS_LABELS = {
+    bot:           { label: 'Bot', bg: '#E0E7FF', color: '#3730A3' },
+    waiting_human: { label: 'Venter', bg: '#FEF9C3', color: '#92400E' },
+    open:          { label: 'Åben', bg: '#D1FAE5', color: '#065F46' },
+    closed:        { label: 'Lukket', bg: PAPER3, color: INK3 },
+  };
+
+  async function loadConvs() {
+    setLoading(true);
+    let q = db.from('support_conversations').select('*').order('last_message_at', { ascending: false });
+    if (statusFilter) q = q.eq('status', statusFilter);
+    const { data } = await q;
+    if (data) setConvs(data);
+    setLoading(false);
+  }
+
+  useEffect(() => { loadConvs(); }, [statusFilter]);
+
+  // Realtime: new conversations + updates
+  useEffect(() => {
+    const ch = db.channel('admin-support-convs')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'support_conversations' }, loadConvs)
+      .subscribe();
+    return () => db.removeChannel(ch);
+  }, [statusFilter]);
+
+  // Realtime: messages in active conv
+  useEffect(() => {
+    if (!active) return;
+    const ch = db.channel(`admin-support-msgs-${active.id}`)
+      .on('postgres_changes', {
+        event: 'INSERT', schema: 'public', table: 'support_messages',
+        filter: `conversation_id=eq.${active.id}`,
+      }, ({ new: m }) => {
+        setMessages(prev => prev.some(x => x.id === m.id) ? prev : [...prev, m]);
+        setTimeout(() => bottomRef.current?.scrollIntoView({ behavior: 'smooth' }), 60);
+      })
+      .subscribe();
+    return () => db.removeChannel(ch);
+  }, [active?.id]);
+
+  async function openConv(conv) {
+    setActive(conv);
+    setReply('');
+    setMessages([]);
+    const { data } = await db.from('support_messages')
+      .select('*').eq('conversation_id', conv.id).order('created_at', { ascending: true });
+    if (data) setMessages(data);
+    setTimeout(() => bottomRef.current?.scrollIntoView({ behavior: 'auto' }), 80);
+    // Mark admin_unread = 0
+    await db.from('support_conversations').update({ admin_unread: 0, status: conv.status === 'waiting_human' ? 'open' : conv.status }).eq('id', conv.id);
+    setConvs(cs => cs.map(c => c.id === conv.id ? { ...c, admin_unread: 0, status: c.status === 'waiting_human' ? 'open' : c.status } : c));
+    setTimeout(() => inputRef.current?.focus(), 150);
+  }
+
+  async function sendReply() {
+    const content = reply.trim();
+    if (!content || !active || sending) return;
+    setSending(true);
+    setReply('');
+    // Route through the API so the user gets an email notification (Resend).
+    await fetch('/api/support-chat/reply', {
+      method: 'POST',
+      headers: await authHeaders(),
+      body: JSON.stringify({ conversationId: active.id, message: content }),
+    });
+    setConvs(cs => cs.map(c => c.id === active.id ? { ...c, last_message: content, status: 'open' } : c));
+    setActive(a => a ? { ...a, status: 'open' } : a);
+    setSending(false);
+    inputRef.current?.focus();
+  }
+
+  async function closeConv(conv) {
+    await db.from('support_conversations').update({ status: 'closed' }).eq('id', conv.id);
+    setConvs(cs => cs.map(c => c.id === conv.id ? { ...c, status: 'closed' } : c));
+    if (active?.id === conv.id) setActive(a => ({ ...a, status: 'closed' }));
+  }
+
+  const waitingCount = convs.filter(c => c.status === 'waiting_human').length;
+
+  return (
+    <div style={{ fontFamily: FONT }}>
+      <SectionHead
+        title={`Support-henvendelser${waitingCount > 0 ? ` (${waitingCount} venter)` : ''}`}
+        action={
+          <select value={statusFilter} onChange={e => setStatusFilter(e.target.value)}
+            style={{ padding: '6px 10px', border: `1.5px solid ${PAPER3}`, borderRadius: 8, fontFamily: FONT, fontSize: 12, background: PAPER2, color: INK, cursor: 'pointer' }}>
+            <option value="">Alle</option>
+            <option value="waiting_human">Venter på svar</option>
+            <option value="open">Åbne</option>
+            <option value="bot">Bot (ubesvaret)</option>
+            <option value="closed">Lukkede</option>
+          </select>
+        }
+      />
+
+      <div style={{ display: 'grid', gridTemplateColumns: active ? (isMobile ? '1fr' : '320px 1fr') : '1fr', gap: 16, alignItems: 'start' }}>
+
+        {/* Conv list */}
+        {(!active || !isMobile) && (
+          <div style={{ border: `1px solid ${PAPER3}`, borderRadius: 12, overflow: 'hidden' }}>
+            {loading && <Spinner small />}
+            {!loading && convs.length === 0 && <Empty text="Ingen henvendelser" small />}
+            {convs.map(conv => {
+              const s = STATUS_LABELS[conv.status] || STATUS_LABELS.bot;
+              const isActive = active?.id === conv.id;
+              return (
+                <div key={conv.id} onClick={() => openConv(conv)} style={{
+                  padding: '12px 14px', cursor: 'pointer', borderBottom: `1px solid ${PAPER3}`,
+                  background: isActive ? GREEN_TINT : conv.admin_unread > 0 ? PAPER2 : PAPER,
+                  transition: 'background 0.12s',
+                }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
+                    <div style={{ width: 32, height: 32, borderRadius: '50%', background: GREEN_TINT, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12, fontWeight: 700, color: PRIMARY, flexShrink: 0 }}>
+                      {(conv.user_name || conv.user_email || '?').charAt(0).toUpperCase()}
+                    </div>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ fontSize: 13, fontWeight: conv.admin_unread > 0 ? 700 : 600, color: INK, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                        {conv.user_name || conv.user_email || 'Anonym'}
+                      </div>
+                      {conv.institution_name && (
+                        <div style={{ fontSize: 11, color: INK3, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                          {conv.institution_name}
+                        </div>
+                      )}
+                    </div>
+                    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 4, flexShrink: 0 }}>
+                      <Badge bg={s.bg} color={s.color}>{s.label}</Badge>
+                      {conv.admin_unread > 0 && (
+                        <div style={{ width: 8, height: 8, borderRadius: '50%', background: CORAL }} />
+                      )}
+                    </div>
+                  </div>
+                  <div style={{ fontSize: 12, color: INK3, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', paddingLeft: 40 }}>
+                    {conv.last_message || '-'}
+                  </div>
+                  <div style={{ fontSize: 11, color: INK3, paddingLeft: 40, marginTop: 2 }}>
+                    {conv.last_message_at ? new Date(conv.last_message_at).toLocaleString('da-DK', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }) : ''}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+
+        {/* Chat panel */}
+        {active && (
+          <div style={{ border: `1px solid ${PAPER3}`, borderRadius: 12, overflow: 'hidden', display: 'flex', flexDirection: 'column', height: 520 }}>
+            {/* Conv header */}
+            <div style={{ padding: '12px 16px', borderBottom: `1px solid ${PAPER3}`, display: 'flex', alignItems: 'center', gap: 10, flexShrink: 0, background: PAPER }}>
+              {isMobile && (
+                <button onClick={() => setActive(null)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: INK3, fontSize: 20, padding: '2px 8px 2px 0', lineHeight: 1 }}>←</button>
+              )}
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ fontWeight: 700, fontSize: 14, color: INK }}>{active.user_name || active.user_email || 'Anonym'}</div>
+                <div style={{ fontSize: 12, color: INK3 }}>{active.institution_name || active.user_email || ''}</div>
+              </div>
+              <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                {(() => { const s = STATUS_LABELS[active.status] || STATUS_LABELS.bot; return <Badge bg={s.bg} color={s.color}>{s.label}</Badge>; })()}
+                {active.status !== 'closed' && (
+                  <button onClick={() => closeConv(active)}
+                    style={{ background: PAPER3, color: INK3, border: 'none', borderRadius: 8, padding: '4px 10px', fontSize: 11, fontWeight: 700, fontFamily: FONT, cursor: 'pointer' }}>
+                    Luk
+                  </button>
+                )}
+              </div>
+            </div>
+
+            {/* Messages */}
+            <div style={{ flex: 1, overflowY: 'auto', padding: '12px 16px', display: 'flex', flexDirection: 'column', gap: 8 }}>
+              {messages.map((m, i) => {
+                const isAdmin = m.role === 'admin';
+                const isBot   = m.role === 'bot';
+                return (
+                  <div key={m.id || i} style={{ display: 'flex', flexDirection: 'column', alignItems: isAdmin ? 'flex-end' : 'flex-start', gap: 2 }}>
+                    <div style={{ fontSize: 10, fontWeight: 700, color: INK3, fontFamily: FONT, padding: isAdmin ? '0 4px' : '0 4px' }}>
+                      {isAdmin ? 'Du (support)' : isBot ? 'AI-bot' : (active.user_name || 'Bruger')}
+                    </div>
+                    <div style={{
+                      maxWidth: '80%',
+                      background: isAdmin ? PRIMARY : isBot ? PAPER3 : '#E8F5E9',
+                      color: isAdmin ? '#fff' : INK,
+                      borderRadius: isAdmin ? '16px 16px 4px 16px' : '16px 16px 16px 4px',
+                      padding: '9px 13px',
+                      fontSize: 13,
+                      lineHeight: 1.5,
+                      fontFamily: FONT,
+                      border: !isAdmin && !isBot ? `1px solid ${PRIMARY}22` : 'none',
+                    }}>
+                      {m.content}
+                    </div>
+                  </div>
+                );
+              })}
+              {messages.length === 0 && <Empty text="Ingen beskeder endnu" small />}
+              <div ref={bottomRef} />
+            </div>
+
+            {/* Reply input */}
+            {active.status !== 'closed' && (
+              <div style={{ borderTop: `1px solid ${PAPER3}`, padding: '10px 14px', display: 'flex', gap: 8, flexShrink: 0, background: PAPER }}>
+                <input
+                  ref={inputRef}
+                  value={reply}
+                  onChange={e => setReply(e.target.value)}
+                  onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendReply(); } }}
+                  placeholder="Skriv svar til brugeren…"
+                  style={{ flex: 1, padding: '9px 14px', borderRadius: 99, border: `1.5px solid ${PAPER3}`, fontSize: 13, fontFamily: FONT, outline: 'none', background: PAPER2, color: INK }}
+                />
+                <button
+                  onClick={sendReply}
+                  disabled={sending || !reply.trim()}
+                  style={{ padding: '0 18px', height: 38, borderRadius: 99, background: reply.trim() && !sending ? PRIMARY : PAPER3, color: reply.trim() && !sending ? '#fff' : INK3, border: 'none', fontFamily: FONT, fontWeight: 700, fontSize: 13, cursor: reply.trim() && !sending ? 'pointer' : 'default', transition: 'background 0.15s', flexShrink: 0 }}>
+                  Send
+                </button>
+              </div>
+            )}
+          </div>
+        )}
+      </div>
     </div>
   );
 }

@@ -35,21 +35,6 @@ const faqs = [
   },
 ];
 
-const channels = [
-  {
-    n: '01',
-    title: 'E-mail',
-    val: 'support@bytogleg.dk',
-    sub: 'Svar inden for 1-2 hverdage',
-  },
-  {
-    n: '02',
-    title: 'Platform-chat',
-    val: 'Åbn beskeder på platformen',
-    sub: 'For registrerede institutioner',
-  },
-];
-
 export default function KontaktPage() {
   const [open, setOpen] = useState(null);
   const router = useRouter();
@@ -81,8 +66,19 @@ export default function KontaktPage() {
             Vi er her for<br />at hjælpe
           </h1>
           <p style={{ fontSize: isMobile ? 15 : 17, color: 'rgba(255,255,255,0.72)', lineHeight: 1.65, maxWidth: 420, margin: '0 auto' }}>
-            Skriv til os eller find svaret i vores FAQ
+            Chat med vores AI-assistent eller skriv direkte til supportteamet
           </p>
+          <button
+            onClick={() => {
+              const btn = document.querySelector('[data-support-bubble]');
+              if (btn) btn.click();
+            }}
+            style={{ marginTop: 28, background: '#fff', color: PRIMARY, border: 'none', borderRadius: 999, padding: '14px 32px', fontSize: 15, fontWeight: 700, fontFamily: "'Sora',sans-serif", cursor: 'pointer', letterSpacing: '-0.01em', display: 'inline-flex', alignItems: 'center', gap: 10 }}>
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke={PRIMARY} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
+            </svg>
+            Skriv til os
+          </button>
         </div>
 
         {/* Wave bottom */}
@@ -91,67 +87,12 @@ export default function KontaktPage() {
         </svg>
       </div>
 
-      {/* ── Contact Channels ── */}
-      <div style={{ maxWidth: 820, margin: '0 auto', padding: isMobile ? '60px 20px' : '100px 40px' }}>
-        <div style={{
-          display: 'grid',
-          gridTemplateColumns: isMobile ? '1fr' : '1fr 1px 1fr',
-          gap: 0,
-          alignItems: 'center',
-        }}>
-          {channels.map((c, i) => (
-            <>
-              <div key={c.n} style={{
-                padding: isMobile ? '32px 0' : '40px 48px',
-                textAlign: 'center',
-              }}>
-                <div style={{
-                  fontFamily: "'Sora',sans-serif",
-                  fontWeight: 800,
-                  fontSize: isMobile ? 80 : 100,
-                  color: GREEN_SOFT,
-                  lineHeight: 0.85,
-                  letterSpacing: '-0.05em',
-                  marginBottom: isMobile ? 16 : 20,
-                  userSelect: 'none',
-                }}>
-                  {c.n}
-                </div>
-                <div style={{
-                  fontFamily: "'Sora',sans-serif",
-                  fontWeight: 700,
-                  fontSize: 20,
-                  color: INK,
-                  marginBottom: 10,
-                  letterSpacing: '-0.02em',
-                }}>
-                  {c.title}
-                </div>
-                <div style={{
-                  fontSize: 15,
-                  fontWeight: 600,
-                  color: PRIMARY,
-                  marginBottom: 8,
-                  fontFamily: "'Sora',sans-serif",
-                }}>
-                  {c.val}
-                </div>
-                <div style={{ fontSize: 13, color: INK3, lineHeight: 1.5 }}>
-                  {c.sub}
-                </div>
-              </div>
-
-              {/* Vertical divider between items on desktop, horizontal on mobile */}
-              {i === 0 && (
-                <div key="divider" style={
-                  isMobile
-                    ? { height: 1, background: GREEN_SOFT, margin: '0 0' }
-                    : { width: 1, alignSelf: 'stretch', background: GREEN_SOFT }
-                } />
-              )}
-            </>
-          ))}
-        </div>
+      {/* ── How it works ── */}
+      <div style={{ maxWidth: 820, margin: '0 auto', padding: isMobile ? '60px 20px' : '80px 40px', textAlign: 'center' }}>
+        <p style={{ fontSize: isMobile ? 14 : 16, color: INK3, lineHeight: 1.8, maxWidth: 560, margin: '0 auto' }}>
+          Vores AI-assistent kan svare med det samme på de fleste spørgsmål om platformen.
+          Kender den ikke svaret, sender den dig videre til vores supportteam, som vender tilbage inden for 1-2 hverdage.
+        </p>
       </div>
 
       {/* ── FAQ ── */}
