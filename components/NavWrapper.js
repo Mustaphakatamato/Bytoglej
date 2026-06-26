@@ -919,7 +919,7 @@ function Nav({ pathname, navigate, loggedIn, setLoggedIn, unreadTotal, instituti
                 <Link href="/login" style={{ background:PRIMARY, color:'#fff', fontWeight:700, fontSize:13, padding:'8px 18px', borderRadius:22, textDecoration:'none', display:'inline-flex', alignItems:'center' }}>
                   Sælg nu
                 </Link>
-                <Link href="/hjaelp" title="Hjælpecenter" aria-label="Hjælpecenter" style={{ width:34, height:34, borderRadius:'50%', border:`1.5px solid ${transparent?'rgba(255,255,255,0.5)':PAPER3}`, display:'inline-flex', alignItems:'center', justifyContent:'center', textDecoration:'none', color:transparent?'rgba(255,255,255,0.8)':INK2, fontSize:15, fontWeight:700, flexShrink:0, fontFamily:FONT }}>
+                <Link href="/hvordan" title="Sådan virker det" aria-label="Hjælpecenter" style={{ width:34, height:34, borderRadius:'50%', border:`1.5px solid ${transparent?'rgba(255,255,255,0.5)':PAPER3}`, display:'inline-flex', alignItems:'center', justifyContent:'center', textDecoration:'none', color:transparent?'rgba(255,255,255,0.8)':INK2, fontSize:15, fontWeight:700, flexShrink:0, fontFamily:FONT }}>
                   ?
                 </Link>
               </>
