@@ -179,7 +179,7 @@ function SupportChat({ userId, userName, institutionName }) {
           );
         })}
 
-        {loading && (
+        {loading && !human && (
           <div style={{ display: 'flex', alignItems: 'flex-start', gap: 2, flexDirection: 'column' }}>
             <div style={{ fontSize: 10, fontWeight: 700, color: INK3, fontFamily: FONT, paddingLeft: 4 }}>AI-assistent</div>
             <div style={{ background: PAPER3, borderRadius: '16px 16px 16px 4px', padding: '10px 14px', display: 'flex', gap: 5, alignItems: 'center' }}>
