@@ -348,7 +348,7 @@ export default function MessagesClient() {
 
   async function openSharedListing(share) {
     const { data } = await db.from('listings').select('*').eq('id', share.listing_id).maybeSingle();
-    if (data && setActiveListing) { setActiveListing(data); router.push('/opslag/detail'); }
+    if (data && setActiveListing) { setActiveListing(data); router.push('/opslag/' + data.id); }
   }
 
   useEffect(() => {
@@ -1175,7 +1175,7 @@ export default function MessagesClient() {
   async function openActiveListing() {
     if (!active?.listing_id) return;
     const { data } = await db.from('listings').select('*').eq('id', active.listing_id).maybeSingle();
-    if (data && setActiveListing) { setActiveListing(data); router.push('/opslag/detail'); }
+    if (data && setActiveListing) { setActiveListing(data); router.push('/opslag/' + data.id); }
   }
 
   function amInitiator(c) {
@@ -2589,7 +2589,7 @@ export default function MessagesClient() {
             </div>
             {swapPreview.description && <p style={{ fontSize:14, color:INK, lineHeight:1.75, marginBottom:16, fontFamily:FONT }}>{swapPreview.description}</p>}
             <div style={{ fontSize:13, color:INK3, fontFamily:FONT }}>Opslået af <strong style={{ color:INK }}>{swapPreview.institution_name}</strong></div>
-            <button onClick={()=>{ setSwapPreview(null); setActiveListing(swapPreview); router.push('/opslag/detail'); }}
+            <button onClick={()=>{ setSwapPreview(null); setActiveListing(swapPreview); router.push('/opslag/' + swapPreview.id); }}
               style={{ marginTop:16, width:'100%', padding:'13px', borderRadius:99, background:PRIMARY, color:'#fff', border:'none', fontWeight:700, fontSize:14, cursor:'pointer', fontFamily:FONT }}>
               Se fuldt opslag →
             </button>

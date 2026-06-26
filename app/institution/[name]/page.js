@@ -342,7 +342,7 @@ export default function InstitutionPage() {
                 <div key={l.id} style={{ position:'relative', cursor:selectMode?'pointer':'default', display:'flex', flexDirection:'column' }}>
                   <div style={{ transition:'transform 0.12s', transform: isSelected ? 'scale(0.97)' : 'scale(1)', outline: isSelected ? `3px solid ${PRIMARY}` : '3px solid transparent', borderRadius:16, overflow:'hidden', flex:1, display:'flex', flexDirection:'column' }}>
                     <ListingCard listing={l} favs={favs} toggleFav={selectMode ? ()=>{} : toggleFav}
-                      onClick={selectMode ? ()=>toggleSelect(l) : ()=>{ setActiveListing(l); router.push('/opslag/detail'); }} />
+                      onClick={selectMode ? ()=>toggleSelect(l) : ()=>{ setActiveListing(l); router.push('/opslag/' + l.id); }} />
                   </div>
                   {selectMode && (
                     <div style={{ position:'absolute', top:10, right:10, width:26, height:26, borderRadius:'50%', background: isSelected ? PRIMARY : 'rgba(255,255,255,0.9)', border:`2px solid ${isSelected?PRIMARY:PAPER3}`, display:'flex', alignItems:'center', justifyContent:'center', pointerEvents:'none', transition:'all 0.15s' }}>

@@ -115,7 +115,7 @@ function MobileHomeFeed({ listings, loading }) {
         {loading
           ? [1,2,3,4,5,6,7,8].map(i => <div key={i} className="skeleton" style={{ aspectRatio: '3/4', borderRadius: 12 }} />)
           : newest.map(l => (
-              <MobileCard key={l.id} listing={l} favs={favs} toggleFav={toggleFav} onClick={() => { setActiveListing(l); router.push('/opslag/detail'); }} />
+              <MobileCard key={l.id} listing={l} favs={favs} toggleFav={toggleFav} onClick={() => { setActiveListing(l); router.push('/opslag/' + l.id); }} />
             ))}
       </div>
     </div>
@@ -680,7 +680,7 @@ function ListingsPreview({ listings, loading, goToInstitution }) {
             : shown.map((l, i) => (
                 <Reveal key={l.id} variant="up" delay={Math.min(i, 7) * 80} duration={850}>
                   <ListingCard listing={l} favs={favs} toggleFav={toggleFav}
-                    onClick={() => { setActiveListing(l); router.push('/opslag/detail'); }}
+                    onClick={() => { setActiveListing(l); router.push('/opslag/' + l.id); }}
                     onInstitutionClick={goToInstitution}
                   />
                 </Reveal>

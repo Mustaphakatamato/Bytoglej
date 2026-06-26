@@ -45,7 +45,7 @@ export default function FavoritterPage() {
 
   function handleOpen(l) {
     setActiveListing(l);
-    router.push('/opslag/detail');
+    router.push('/opslag/' + l.id);
   }
   const ww = useWindowWidth();
   const isMobile = ww < 768;

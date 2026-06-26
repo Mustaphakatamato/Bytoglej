@@ -322,7 +322,7 @@ const [saveSearchModal, setSaveSearchModal] = useState(false);
 
   function handleListingClick(l) {
     setActiveListing(l);
-    router.push('/opslag/detail');
+    router.push('/opslag/' + l.id);
   }
 
   function goToInstitution(name) {
@@ -581,7 +581,7 @@ const [saveSearchModal, setSaveSearchModal] = useState(false);
                 <SøgesCard key={l.id} l={l} onContact={() => {
                   if (!loggedIn) { router.push('/login'); return; }
                   setActiveListing(l);
-                  router.push('/opslag/detail');
+                  router.push('/opslag/' + l.id);
                 }} />
               ))}
             </div>

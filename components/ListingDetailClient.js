@@ -1,6 +1,6 @@
 'use client';
 import { useState, useEffect } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, useParams } from 'next/navigation';
 import { db } from '@/lib/supabase';
 import { PRIMARY, GREEN_DEEP, GREEN_SOFT, GREEN_TINT, PAPER, PAPER2, PAPER3, INK, INK2, INK3, CORAL, SKY, ACCENT, ACCENT2, FONT } from '@/lib/constants';
 import { useWindowWidth } from '@/lib/hooks';
@@ -79,10 +79,26 @@ function ImageGallery({ images, color, emoji, title }) {
 
 export default function ListingDetailClient() {
   const router = useRouter();
-  const { activeListing: listing, setActiveListing, favs, toggleFav, setSelectedConvId, showToast, loggedIn, isAdmin, addToCart, cart } = useApp();
+  const params = useParams();
+  const { activeListing, setActiveListing, favs, toggleFav, setSelectedConvId, showToast, loggedIn, isAdmin, addToCart, cart } = useApp();
   const { isAdminView: ctxIsAdmin, adminInstName, institution: ctxInstitution, institutionId: ctxInstId } = useActiveUser();
   const ww = useWindowWidth();
   const isMobile = ww < 768;
+
+  // If navigated directly via shared URL, fetch listing from DB
+  const urlId = params?.id;
+  const listing = (activeListing?.id && (!urlId || String(activeListing.id) === String(urlId)))
+    ? activeListing
+    : null;
+
+  useEffect(() => {
+    if (!urlId || listing) return;
+    db.from('listings')
+      .select('*')
+      .eq('id', urlId)
+      .maybeSingle()
+      .then(({ data }) => { if (data) setActiveListing(data); else router.replace('/opslag'); });
+  }, [urlId]);
 
   const inCart = cart?.some(c => c.listingId === listing?.id);
   const [offerModal, setOfferModal] = useState(false);
@@ -483,7 +499,7 @@ export default function ListingDetailClient() {
             const typeColors = { køb: { bg:'#EEF4FF', text:'#2563EB' }, byt: { bg:'#FFF3E8', text:'#C2551E' }, søges: { bg:'#F5F0FF', text:'#7C3AED' }, gratis: { bg:'#F0FFF4', text:'#15803D' } };
             const tc = typeColors[l.type] || { bg:PAPER3, text:INK3 };
             return (
-              <div key={l.id} onClick={()=>{ setActiveListing(l); router.push('/opslag/detail'); }} style={{ cursor:'pointer', background:PAPER2, borderRadius:16, overflow:'hidden', border:`1px solid ${PAPER3}`, transition:'transform 0.15s, box-shadow 0.15s' }}
+              <div key={l.id} onClick={()=>{ setActiveListing(l); router.push('/opslag/' + l.id); }} style={{ cursor:'pointer', background:PAPER2, borderRadius:16, overflow:'hidden', border:`1px solid ${PAPER3}`, transition:'transform 0.15s, box-shadow 0.15s' }}
                 onMouseEnter={e=>{ e.currentTarget.style.transform='translateY(-2px)'; e.currentTarget.style.boxShadow='0 6px 20px rgba(22,34,28,0.1)'; }}
                 onMouseLeave={e=>{ e.currentTarget.style.transform=''; e.currentTarget.style.boxShadow=''; }}>
                 <div style={{ height: isMobile ? 120 : 140, background: l.images?.[0] ? '#e8e6e3' : (l.color||'#FFD166'), display:'flex', alignItems:'center', justifyContent:'center', fontSize:isMobile?40:48, overflow:'hidden', position:'relative' }}>
