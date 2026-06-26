@@ -349,7 +349,7 @@ export default function RedigerOpslagPage() {
                 <div>
                   <label style={labelStyle}>Anslået værdi (kr.) <span style={{ color: '#e53e3e' }}>*</span></label>
                   <input type="text" inputMode="numeric" value={form.price} onChange={e => setForm({ ...form, price: e.target.value.replace(/[^0-9]/g, '') })} placeholder="Fx 250" style={{ ...inputStyle, border: `1.5px solid ${!form.price ? '#FCA5A5' : PAPER3}` }} />
-                  <div style={{ marginTop: 6, fontFamily: FONT, fontSize: 12, color: INK3 }}>Bruges til at sammenligne værdi i bytteforslag — vises ikke som salgspris.</div>
+                  <div style={{ marginTop: 6, fontFamily: FONT, fontSize: 12, color: INK3 }}>Bruges til at sammenligne værdi i bytteforslag. Vises ikke som salgspris.</div>
                 </div>
               )}
 

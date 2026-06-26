@@ -108,7 +108,7 @@ function ListingDetail({ l, likers, offers, isMobile, onBack, onOpenBid, onToggl
         {/* Reservation-status */}
         {isReservedNow(l) && (
           <div style={{ background:'#FEF3C7', border:'1.5px solid #F59E0B', borderRadius:12, padding:'10px 14px', marginBottom:16, fontFamily:FONT, fontSize:13, color:'#92400E', fontWeight:600 }}>
-            ⏳ Reserveret — et tilbud er accepteret og varen holdes til køber indtil betaling.
+            ⏳ Reserveret: Et tilbud er accepteret og varen holdes til køber indtil betaling.
           </div>
         )}
 

@@ -117,10 +117,10 @@ export default function SwapPaymentPage() {
         }),
       });
       const data = await res.json();
-      if (!res.ok) { showToast?.(data.error || 'Noget gik galt — prøv igen', 'error'); setPaying(false); return; }
+      if (!res.ok) { showToast?.(data.error || 'Noget gik galt. Prøv igen.', 'error'); setPaying(false); return; }
       const bd = encodeURIComponent(JSON.stringify(data.breakdown));
       router.push(`/betaling/${data.orderId}?cs=${encodeURIComponent(data.clientSecret)}&total=${data.grandTotal}&bd=${bd}`);
-    } catch { showToast?.('Noget gik galt — prøv igen', 'error'); setPaying(false); }
+    } catch { showToast?.('Noget gik galt. Prøv igen.', 'error'); setPaying(false); }
   }
 
   if (loading) return <div style={{ maxWidth: 720, margin: '0 auto', paddingTop: 100, paddingLeft: 24, paddingRight: 24, fontFamily: FONT, color: INK3 }}>Henter byttehandel…</div>;
@@ -144,7 +144,7 @@ export default function SwapPaymentPage() {
     <div style={{ maxWidth: 720, margin: '0 auto', paddingTop: 100, paddingLeft: 16, paddingRight: 16, paddingBottom: 60, fontFamily: FONT }}>
       <button onClick={() => router.push('/beskeder')} style={linkBtn}>← Tilbage til beskeder</button>
       <h1 style={{ fontFamily: FONT, fontWeight: 800, fontSize: 24, color: INK, margin: '8px 0 4px' }}>Betal din del af byttet</h1>
-      <p style={{ fontFamily: FONT, fontSize: 14, color: INK3, marginTop: 0 }}>Du sender dine varer til {receiver?.name || 'modparten'} — vælg hvordan.</p>
+      <p style={{ fontFamily: FONT, fontSize: 14, color: INK3, marginTop: 0 }}>Du sender dine varer til {receiver?.name || 'modparten'}. Vælg leveringsmetode herunder.</p>
 
       {/* Dine udgående varer */}
       <div style={{ background: PAPER, border: `1px solid ${PAPER2}`, borderRadius: 16, padding: 16, marginBottom: 16 }}>
@@ -165,7 +165,7 @@ export default function SwapPaymentPage() {
           pickupPoint ? pickupPoint.address : 'Vælg afhentningssted nær modparten',
           method === 'parcel_shop' ? (pickupPoint?.price ?? null) : null,
           openPicker)}
-        {methodCard('custom', '🤝 Aftalt levering', 'I aftaler selv afhentning/levering — ingen pakkemærkat', 0,
+        {methodCard('custom', '🤝 Aftalt levering', 'I aftaler selv afhentning eller levering (ingen pakkemærkat)', 0,
           () => { setMethod('custom'); setPickupPoint(null); })}
       </div>
 

@@ -73,7 +73,7 @@ export default function SwapProposalModal({ open, onClose, listing, ownListings 
       onSubmitted?.(data);
       setSaving(false);
       onClose?.();
-    } catch { showToast?.('Noget gik galt — prøv igen', 'error'); setSaving(false); }
+    } catch { showToast?.('Noget gik galt. Prøv igen.', 'error'); setSaving(false); }
   }
 
   const itemRow = (l, checked, onToggle) => (
@@ -84,7 +84,7 @@ export default function SwapProposalModal({ open, onClose, listing, ownListings 
         {l.images?.[0] ? <img src={l.images[0]} alt="" style={{ width:'100%', height:'100%', objectFit:'cover' }} /> : (l.emoji || '🧸')}
       </div>
       <span style={{ flex:1, minWidth:0, fontFamily:FONT, fontSize:13, fontWeight:600, color:INK, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{l.title}</span>
-      <span style={{ fontFamily:FONT, fontSize:12, fontWeight:700, color:INK3 }}>{itemValue(l) ? kr(itemValue(l)) : '—'}</span>
+      <span style={{ fontFamily:FONT, fontSize:12, fontWeight:700, color:INK3 }}>{itemValue(l) ? kr(itemValue(l)) : '–'}</span>
       <span style={{ fontSize:14 }}>{checked ? '✅' : '＋'}</span>
     </button>
   );
@@ -119,7 +119,7 @@ export default function SwapProposalModal({ open, onClose, listing, ownListings 
           {diff !== 0 && (
             <div style={{ fontSize:11, color:INK3, lineHeight:1.5 }}>
               {diff > 0
-                ? `Du beder om ${kr(diff)} mere i værdi — overvej at lægge et kontant beløb oveni.`
+                ? `Du beder om ${kr(diff)} mere i værdi. Overvej at lægge et kontant beløb oveni.`
                 : `Du tilbyder ${kr(-diff)} mere i værdi.`}
             </div>
           )}

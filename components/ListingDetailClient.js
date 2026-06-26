@@ -270,7 +270,7 @@ export default function ListingDetailClient() {
     return (
       <div style={{ minHeight:'100vh', display:'flex', alignItems:'center', justifyContent:'center', paddingTop:80, background:PAPER }}>
         <div style={{ textAlign:'center' }}>
-          <div style={{ fontFamily:"'Sora',sans-serif", fontWeight:800, fontSize:80, color:GREEN_SOFT, lineHeight:1, marginBottom:16, userSelect:'none' }}>—</div>
+          <div style={{ fontFamily:"'Sora',sans-serif", fontWeight:800, fontSize:80, color:GREEN_SOFT, lineHeight:1, marginBottom:16, userSelect:'none' }}>–</div>
           <div style={{ fontFamily:"'Sora',sans-serif", fontWeight:800, fontSize:22, marginBottom:16, color:INK }}>Intet opslag valgt</div>
           <button onClick={()=>router.push('/opslag')} style={{ background:'none', border:`1.5px solid ${PRIMARY}`, color:PRIMARY, borderRadius:99, padding:'10px 22px', fontSize:14, fontWeight:700, cursor:'pointer', fontFamily:"'Sora',sans-serif" }}>← Tilbage til markedsplads</button>
         </div>
@@ -701,7 +701,7 @@ export default function ListingDetailClient() {
                 {isReservedForMe && (
                   <button onClick={()=>{ setSelectedConvId && setSelectedConvId(null); router.push('/beskeder'); }}
                     style={{ width:'100%', textAlign:'left', background:'#ECFDF5', border:`1.5px solid ${PRIMARY}`, borderRadius:14, padding:'12px 16px', fontSize:13, fontFamily:FONT, color:PRIMARY, fontWeight:600, cursor:'pointer' }}>
-                    🎉 Du har et accepteret tilbud på denne vare — gå til beskeder for at betale →
+                    🎉 Du har et accepteret tilbud på denne vare. Gå til beskeder for at betale →
                   </button>
                 )}
                 {listing.type==='køb' && !reservedActive && <Btn variant="primary" color={PRIMARY} radius={22} onClick={handleAddToCart} style={{ justifyContent:'center', padding:'15px', fontSize:16 }}>{inCart ? '🛒 Gå til kurv →' : (() => { const so = listing.shipping_options?.[0]; const canShip = so?.allow_shipping || (!so && listing.can_ship); const tag = canShip ? (so?.shipping_included_in_price ? ' inkl. fragt' : ' + fragt') : ''; const total = listing.price + calcServiceFee(listing.price); return `🛒 Læg i kurv (${total.toFixed(2).replace('.',',')} kr.${tag})`; })()}</Btn>}

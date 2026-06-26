@@ -1071,7 +1071,7 @@ export default function MessagesClient() {
         body: JSON.stringify({ offerId: offer.id, action, ...extra }),
       });
       const data = await res.json().catch(() => ({}));
-      if (!res.ok) { alert(data.error || 'Noget gik galt — prøv igen'); return; }
+      if (!res.ok) { alert(data.error || 'Noget gik galt. Prøv igen.'); return; }
       const newStatus = action === 'accept' ? 'accepted' : action === 'reject' ? 'rejected' : 'countered';
       setOffersById(prev => ({
         ...prev,
@@ -1098,7 +1098,7 @@ export default function MessagesClient() {
           }),
         }).catch(() => {});
       }
-    } catch { alert('Noget gik galt — prøv igen'); }
+    } catch { alert('Noget gik galt. Prøv igen.'); }
   }
 
   // Svar på et bytteforslag (kun ejer-parten): accept / afvis.
@@ -1110,7 +1110,7 @@ export default function MessagesClient() {
         body: JSON.stringify({ proposalId: proposal.id, action }),
       });
       const data = await res.json().catch(() => ({}));
-      if (!res.ok) { alert(data.error || 'Noget gik galt — prøv igen'); return; }
+      if (!res.ok) { alert(data.error || 'Noget gik galt. Prøv igen.'); return; }
       setProposalsById(prev => ({
         ...prev,
         [proposal.id]: {
@@ -1131,7 +1131,7 @@ export default function MessagesClient() {
           }),
         }).catch(() => {});
       }
-    } catch { alert('Noget gik galt — prøv igen'); }
+    } catch { alert('Noget gik galt. Prøv igen.'); }
   }
 
   // Betal egen andel af et bytteforslag (porto + beskyttelse + evt. kontant).
@@ -1143,10 +1143,10 @@ export default function MessagesClient() {
         body: JSON.stringify({ proposalId: proposal.id, deliveryMethod }),
       });
       const data = await res.json();
-      if (!res.ok) { alert(data.error || 'Noget gik galt — prøv igen'); setGoingToPayment(null); return; }
+      if (!res.ok) { alert(data.error || 'Noget gik galt. Prøv igen.'); setGoingToPayment(null); return; }
       const bd = encodeURIComponent(JSON.stringify(data.breakdown));
       router.push(`/betaling/${data.orderId}?cs=${encodeURIComponent(data.clientSecret)}&total=${data.grandTotal}&bd=${bd}`);
-    } catch { alert('Noget gik galt — prøv igen'); setGoingToPayment(null); }
+    } catch { alert('Noget gik galt. Prøv igen.'); setGoingToPayment(null); }
   }
 
   async function toggleReadUnread(conv, e) {
@@ -1323,7 +1323,7 @@ export default function MessagesClient() {
               : filtered.length === 0
                 ? (
                   <div style={{ padding: isMobile ? '48px 24px' : 40, textAlign:'center' }}>
-                    <div style={{ fontFamily:FONT, fontWeight:800, fontSize:48, color:GREEN_SOFT, lineHeight:1, marginBottom:12 }}>{showArchived ? '0' : '—'}</div>
+                    <div style={{ fontFamily:FONT, fontWeight:800, fontSize:48, color:GREEN_SOFT, lineHeight:1, marginBottom:12 }}>{showArchived ? '0' : '–'}</div>
                     <p style={{ fontSize:14, color:INK3, fontFamily:FONT }}>{showArchived ? 'Ingen arkiverede samtaler' : 'Ingen samtaler endnu'}</p>
                     {!showArchived && <button onClick={()=>router.push('/opslag')} style={{ marginTop:16, background:PRIMARY, border:'none', color:'#fff', borderRadius:99, padding:'10px 22px', fontSize:14, fontWeight:700, cursor:'pointer', fontFamily:FONT }}>Find opslag</button>}
                   </div>
@@ -1528,7 +1528,7 @@ export default function MessagesClient() {
                   : messages.length === 0
                     ? (
                       <div style={{ textAlign:'center', paddingTop:60 }}>
-                        <div style={{ fontFamily:FONT, fontWeight:800, fontSize:48, color:GREEN_SOFT, lineHeight:1, marginBottom:12 }}>—</div>
+                        <div style={{ fontFamily:FONT, fontWeight:800, fontSize:48, color:GREEN_SOFT, lineHeight:1, marginBottom:12 }}>–</div>
                         <p style={{ fontSize:14, color:INK3, fontFamily:FONT }}>Send den første besked for at starte samtalen</p>
                       </div>
                     )
@@ -1947,12 +1947,12 @@ export default function MessagesClient() {
                                         <div style={{ display:'flex', alignItems:'center', gap:8, marginTop:10, background:mine?'rgba(42,125,79,0.07)':PAPER2, borderRadius:10, padding:'10px 12px' }}>
                                           <div style={{ flex:1, textAlign:'center' }}>
                                             <div style={{ fontSize:9, color:INK3, fontWeight:700, fontFamily:FONT, marginBottom:2, textTransform:'uppercase', letterSpacing:0.5 }}>Ønsker</div>
-                                            <div style={{ fontFamily:FONT, fontWeight:800, fontSize:14, color:INK }}>{bTotal > 0 ? `${bTotal.toLocaleString('da-DK')} kr.` : '—'}</div>
+                                            <div style={{ fontFamily:FONT, fontWeight:800, fontSize:14, color:INK }}>{bTotal > 0 ? `${bTotal.toLocaleString('da-DK')} kr.` : '–'}</div>
                                           </div>
                                           <div style={{ fontSize:15, color:INK3 }}>⇄</div>
                                           <div style={{ flex:1, textAlign:'center' }}>
                                             <div style={{ fontSize:9, color:CORAL, fontWeight:700, fontFamily:FONT, marginBottom:2, textTransform:'uppercase', letterSpacing:0.5 }}>Tilbyder</div>
-                                            <div style={{ fontFamily:FONT, fontWeight:800, fontSize:14, color:CORAL }}>{oTotal > 0 ? `${oTotal.toLocaleString('da-DK')} kr.` : '—'}</div>
+                                            <div style={{ fontFamily:FONT, fontWeight:800, fontSize:14, color:CORAL }}>{oTotal > 0 ? `${oTotal.toLocaleString('da-DK')} kr.` : '–'}</div>
                                           </div>
                                         </div>
                                       );
@@ -2105,7 +2105,7 @@ export default function MessagesClient() {
                                   </div>
                                   {(items.length > 0 || hasCash)
                                     ? <>{items.map(itemRow)}{hasCash && cashRow(`${label}-cash`)}</>
-                                    : <div style={{ fontFamily:FONT, fontSize:12, color:INK3 }}>—</div>}
+                                    : <div style={{ fontFamily:FONT, fontSize:12, color:INK3 }}>–</div>}
                                 </div>
                               );
                               return (
@@ -2134,14 +2134,14 @@ export default function MessagesClient() {
                                           Din andel: porto + {krp(p.protection_fee)} beskyttelse{iAmCashPayer ? ` + ${krp(p.cash_adjustment)} kontant` : ''}
                                         </div>
                                         {myPaid ? (
-                                          <div style={{ fontFamily:FONT, fontSize:13, fontWeight:700, color:PRIMARY }}>✓ Du har betalt{otherPaid ? '' : ' — afventer modpart'}</div>
+                                          <div style={{ fontFamily:FONT, fontSize:13, fontWeight:700, color:PRIMARY }}>✓ Du har betalt{otherPaid ? '' : ', afventer modpart'}</div>
                                         ) : (
                                           <>
                                             {otherPaid && (
-                                              <div style={{ fontFamily:FONT, fontSize:13, fontWeight:700, color:PRIMARY, marginBottom:8 }}>✓ Modparten har betalt — det er din tur</div>
+                                              <div style={{ fontFamily:FONT, fontSize:13, fontWeight:700, color:PRIMARY, marginBottom:8 }}>✓ Modparten har betalt. Nu er det din tur.</div>
                                             )}
                                             <div style={{ display:'flex', gap:8, flexWrap:'wrap' }}>
-                                              <button disabled={paying} onClick={()=>router.push(`/bytte-betaling/${p.id}`)} style={{ padding:'9px 16px', borderRadius:99, background:PRIMARY, border:'none', color:'#fff', fontSize:13, fontWeight:700, cursor:paying?'default':'pointer', fontFamily:FONT, opacity:paying?0.6:1 }}>Betal — send med pakke</button>
+                                              <button disabled={paying} onClick={()=>router.push(`/bytte-betaling/${p.id}`)} style={{ padding:'9px 16px', borderRadius:99, background:PRIMARY, border:'none', color:'#fff', fontSize:13, fontWeight:700, cursor:paying?'default':'pointer', fontFamily:FONT, opacity:paying?0.6:1 }}>Betal og send med pakke</button>
                                               <button disabled={paying} onClick={()=>handleSwapProposalPay(p,'custom')} style={{ padding:'9px 16px', borderRadius:99, background:'#fff', border:`1.5px solid ${PAPER3}`, color:INK, fontSize:13, fontWeight:700, cursor:paying?'default':'pointer', fontFamily:FONT, opacity:paying?0.6:1 }}>Aftalt levering</button>
                                             </div>
                                             {p.payment_deadline && (
@@ -2156,7 +2156,7 @@ export default function MessagesClient() {
                                       const sh = swapShipmentsById[party === 'owner' ? p.owner_shipment_id : p.initiator_shipment_id];
                                       return (
                                         <div style={{ marginTop:12 }}>
-                                          <div style={{ fontFamily:FONT, fontSize:13, fontWeight:700, color:PRIMARY }}>🎉 Byttehandel gennemført{sh?.label_pdf_url ? ' — din pakkemærkat er klar.' : '.'}</div>
+                                          <div style={{ fontFamily:FONT, fontSize:13, fontWeight:700, color:PRIMARY }}>🎉 Byttehandel gennemført{sh?.label_pdf_url ? '! Din pakkemærkat er klar.' : '!'}</div>
                                           {sh && (
                                             <div style={{ display:'flex', flexDirection:'column', gap:8, marginTop:10 }}>
                                               {sh.label_pdf_url && <a href={sh.label_pdf_url} target="_blank" rel="noopener noreferrer" style={{ display:'block', textAlign:'center', padding:'10px', borderRadius:99, background:GREEN_TINT, color:PRIMARY, border:`1.5px solid ${PRIMARY}`, fontFamily:FONT, fontWeight:700, fontSize:13, textDecoration:'none' }}>🖨️ Download din pakkemærkat (PDF)</a>}
@@ -2172,7 +2172,7 @@ export default function MessagesClient() {
                                       );
                                     })()}
                                     {p.escrow_status === 'cancelled_timeout' && (
-                                      <div style={{ fontFamily:FONT, fontSize:12, color:'#e11d48', marginTop:12 }}>⏰ Annulleret — betalingsfristen udløb. Betalte beløb refunderes.</div>
+                                      <div style={{ fontFamily:FONT, fontSize:12, color:'#e11d48', marginTop:12 }}>⏰ Annulleret: betalingsfristen udløb. Betalte beløb refunderes.</div>
                                     )}
                                   </div>
                                   <div style={{ fontSize:10, color:INK3, marginTop:3, fontFamily:FONT }}>{d.toLocaleTimeString('da-DK',{hour:'2-digit',minute:'2-digit'})}</div>

@@ -90,7 +90,7 @@ export default function OfferModal({ open, onClose, listing, onSubmitted, showTo
       setSaving(false);
       onClose?.();
     } catch {
-      showToast?.('Noget gik galt — prøv igen', 'error');
+      showToast?.('Noget gik galt. Prøv igen.', 'error');
       setSaving(false);
     }
   }
@@ -198,7 +198,7 @@ export default function OfferModal({ open, onClose, listing, onSubmitted, showTo
           <div style={{ fontFamily:FONT, fontSize:12, color: quota.remainingToday > 0 ? INK3 : '#b91c1c', textAlign:'center' }}>
             {quota.remainingToday > 0
               ? `${quota.remainingToday} af ${quota.dailyLimit} tilbud tilbage i dag`
-              : 'Du har brugt dagens tilbud — prøv igen i morgen'}
+              : 'Du har brugt dagens tilbud. Prøv igen i morgen.'}
           </div>
         )}
       </div>
