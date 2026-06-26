@@ -4,7 +4,7 @@ import Link from 'next/link';
 import { useApp, useActiveUser } from '@/providers/AppProvider';
 import { db } from '@/lib/supabase';
 import { PRIMARY, GREEN_TINT, INK, INK2, INK3, PAPER, PAPER2, PAPER3, FONT } from '@/lib/constants';
-import { CATEGORIES } from '@/lib/categories';
+import { CATEGORIES, NAV_CATEGORY_GROUPS } from '@/lib/categories';
 import { useWindowWidth } from '@/lib/hooks';
 import { useState, useEffect, useRef, useMemo, Suspense } from 'react';
 import { createPortal } from 'react-dom';
@@ -510,45 +510,56 @@ function highlightMatch(text, query) {
 function CategoryStrip({ router }) {
   const searchParams = useSearchParams();
   const activeCategory = searchParams.get('category') || '';
-  const activeSubcategory = searchParams.get('subcategory') || '';
-  const [hoveredCat, setHoveredCat] = useState(null);
+  const [hoveredGroup, setHoveredGroup] = useState(null);
   const w = useWindowWidth();
   const isMobile = w < 768;
 
-  function goCategory(key) { router.push('/opslag?category=' + key); }
-  function goSubcategory(key, sub) { router.push('/opslag?category=' + key + '&subcategory=' + encodeURIComponent(sub)); }
-  function clearCategory() { router.push('/opslag'); }
+  function goCategory(key) { router.push('/opslag?category=' + key); setHoveredGroup(null); }
+  function clearCategory() { router.push('/opslag'); setHoveredGroup(null); }
 
+  // Which group is currently "active" (one of its items matches the URL category)
+  const activeGroup = NAV_CATEGORY_GROUPS.find(g => g.items.some(i => i.key === activeCategory));
   const activeCatObj = CATEGORIES.find(c => c.key === activeCategory);
 
   return (
-    <div style={{ position:'relative' }} onMouseLeave={() => setHoveredCat(null)}>
+    <div style={{ position:'relative' }} onMouseLeave={() => setHoveredGroup(null)}>
       {/* Strip row */}
-      <div style={{ borderTop:`1px solid ${PAPER2}`, overflowX:'auto', scrollbarWidth:'none', msOverflowStyle:'none' }}>
-        <div style={{ maxWidth:1140, margin:'0 auto', padding:'0 16px', display:'flex', alignItems:'center', gap:2, height:44, whiteSpace:'nowrap' }}>
-          {CATEGORIES.map(cat => {
-            const isActive = activeCategory === cat.key;
+      <div style={{ borderTop:`1px solid ${PAPER2}` }}>
+        <div style={{ maxWidth:1140, margin:'0 auto', padding:'0 16px', display:'flex', alignItems:'center', gap:2, height:44 }}>
+          {NAV_CATEGORY_GROUPS.map(group => {
+            const isActive = activeGroup?.key === group.key;
+            const isHovered = hoveredGroup === group.key;
+            const isSingle = group.items.length === 1;
+
             return (
               <button
-                key={cat.key}
-                onClick={() => isActive ? clearCategory() : goCategory(cat.key)}
-                onMouseEnter={() => !isMobile && setHoveredCat(cat.key)}
+                key={group.key}
+                onClick={() => {
+                  if (isSingle) { isActive ? clearCategory() : goCategory(group.items[0].key); }
+                  else { setHoveredGroup(isHovered ? null : group.key); }
+                }}
+                onMouseEnter={() => !isMobile && setHoveredGroup(group.key)}
                 style={{
                   display:'inline-flex', alignItems:'center', gap:5,
                   padding:'5px 13px', border:'none', cursor:'pointer', flexShrink:0,
-                  background: isActive ? GREEN_TINT : 'transparent',
-                  color: isActive ? PRIMARY : INK2,
-                  fontFamily:FONT, fontWeight: isActive ? 700 : 500, fontSize:13,
+                  background: (isActive || isHovered) ? GREEN_TINT : 'transparent',
+                  color: (isActive || isHovered) ? PRIMARY : INK2,
+                  fontFamily:FONT, fontWeight: (isActive || isHovered) ? 700 : 500, fontSize:13,
                   whiteSpace:'nowrap',
-                  borderRadius: isActive ? '8px 8px 0 0' : 99,
-                  borderBottom: isActive ? `2px solid ${PRIMARY}` : '2px solid transparent',
+                  borderRadius: (isActive || isHovered) ? '8px 8px 0 0' : 99,
+                  borderBottom: (isActive || isHovered) ? `2px solid ${PRIMARY}` : '2px solid transparent',
                   transition:'all 0.12s',
                 }}
               >
-                <span style={{ fontSize:14 }}>{cat.emoji}</span>
-                <span>{cat.label}</span>
-                {isActive && (
+                <span style={{ fontSize:14 }}>{group.emoji}</span>
+                <span>{group.label}</span>
+                {isActive && isSingle && (
                   <span onClick={e => { e.stopPropagation(); clearCategory(); }} style={{ marginLeft:2, fontSize:11, opacity:0.6, cursor:'pointer', fontWeight:800 }}>×</span>
+                )}
+                {!isSingle && (
+                  <svg width="10" height="10" viewBox="0 0 10 10" fill="none" style={{ opacity:0.5, transform: isHovered ? 'rotate(180deg)' : 'none', transition:'transform 0.15s' }}>
+                    <path d="M2 3.5L5 6.5L8 3.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
+                  </svg>
                 )}
               </button>
             );
@@ -556,53 +567,60 @@ function CategoryStrip({ router }) {
         </div>
       </div>
 
-      {/* Mobile subcategory breadcrumb */}
-      {isMobile && activeSubcategory && activeCatObj && (
+      {/* Active category breadcrumb (when a specific sub-category is selected) */}
+      {activeCategory && activeCatObj && activeGroup && (
         <div style={{ padding:'4px 16px 6px', background:GREEN_TINT, display:'flex', alignItems:'center', gap:6, fontSize:12, color:PRIMARY, fontFamily:FONT, fontWeight:600 }}>
-          <span>{activeCatObj.emoji} {activeCatObj.label}</span>
+          <span>{activeGroup.emoji} {activeGroup.label}</span>
           <span style={{ opacity:0.5 }}>›</span>
-          <span>{activeSubcategory}</span>
+          <span>{activeCatObj.label}</span>
           <button onClick={clearCategory} style={{ marginLeft:'auto', background:'none', border:'none', color:PRIMARY, cursor:'pointer', fontSize:14, fontWeight:800 }}>×</button>
         </div>
       )}
 
-      {/* Desktop hover dropdown */}
-      {!isMobile && hoveredCat && (
-        <div
-          onMouseEnter={() => setHoveredCat(hoveredCat)}
-          onMouseLeave={() => setHoveredCat(null)}
-          style={{
-            position:'absolute', top:'100%', left:0, right:0, zIndex:600,
-            background:'rgba(246,242,234,0.98)', backdropFilter:'blur(16px)',
-            borderTop:`1px solid ${PAPER2}`, borderBottom:`1px solid ${PAPER2}`,
-            boxShadow:'0 12px 32px rgba(22,34,28,0.1)',
-          }}
-        >
-          <div style={{ maxWidth:1140, margin:'0 auto', padding:'16px', display:'flex', flexWrap:'wrap', gap:8 }}>
-            {CATEGORIES.find(c => c.key === hoveredCat)?.sub.map(sub => {
-              const isActiveSub = activeSubcategory === sub && activeCategory === hoveredCat;
-              return (
-                <button
-                  key={sub}
-                  onClick={() => { goSubcategory(hoveredCat, sub); setHoveredCat(null); }}
-                  onMouseEnter={e => { if (!isActiveSub) { e.currentTarget.style.background = GREEN_TINT; e.currentTarget.style.color = PRIMARY; } }}
-                  onMouseLeave={e => { if (!isActiveSub) { e.currentTarget.style.background = PAPER2; e.currentTarget.style.color = INK2; } }}
-                  style={{
-                    padding:'6px 16px', borderRadius:99,
-                    border: isActiveSub ? `2px solid ${PRIMARY}` : `1.5px solid ${PAPER3}`,
-                    background: isActiveSub ? GREEN_TINT : PAPER2,
-                    color: isActiveSub ? PRIMARY : INK2,
-                    fontFamily:FONT, fontWeight: isActiveSub ? 700 : 500, fontSize:13,
-                    cursor:'pointer', transition:'all 0.12s',
-                  }}
-                >
-                  {sub}
-                </button>
-              );
-            })}
+      {/* Desktop hover dropdown — shows individual categories within the group */}
+      {!isMobile && hoveredGroup && (() => {
+        const group = NAV_CATEGORY_GROUPS.find(g => g.key === hoveredGroup);
+        if (!group || group.items.length <= 1) return null;
+        return (
+          <div
+            onMouseEnter={() => setHoveredGroup(hoveredGroup)}
+            onMouseLeave={() => setHoveredGroup(null)}
+            style={{
+              position:'absolute', top:'100%', left:0, right:0, zIndex:600,
+              background:'rgba(246,242,234,0.98)', backdropFilter:'blur(16px)',
+              borderTop:`1px solid ${PAPER2}`, borderBottom:`1px solid ${PAPER2}`,
+              boxShadow:'0 12px 32px rgba(22,34,28,0.1)',
+            }}
+          >
+            <div style={{ maxWidth:1140, margin:'0 auto', padding:'16px', display:'flex', flexWrap:'wrap', gap:8 }}>
+              {group.items.map(item => {
+                const cat = CATEGORIES.find(c => c.key === item.key);
+                const isActiveItem = activeCategory === item.key;
+                return (
+                  <button
+                    key={item.key}
+                    onClick={() => isActiveItem ? clearCategory() : goCategory(item.key)}
+                    onMouseEnter={e => { if (!isActiveItem) { e.currentTarget.style.background = GREEN_TINT; e.currentTarget.style.color = PRIMARY; } }}
+                    onMouseLeave={e => { if (!isActiveItem) { e.currentTarget.style.background = PAPER2; e.currentTarget.style.color = INK2; } }}
+                    style={{
+                      display:'inline-flex', alignItems:'center', gap:6,
+                      padding:'7px 16px', borderRadius:99,
+                      border: isActiveItem ? `2px solid ${PRIMARY}` : `1.5px solid ${PAPER3}`,
+                      background: isActiveItem ? GREEN_TINT : PAPER2,
+                      color: isActiveItem ? PRIMARY : INK2,
+                      fontFamily:FONT, fontWeight: isActiveItem ? 700 : 500, fontSize:13,
+                      cursor:'pointer', transition:'all 0.12s',
+                    }}
+                  >
+                    {cat?.emoji && <span style={{ fontSize:14 }}>{cat.emoji}</span>}
+                    {item.label}
+                  </button>
+                );
+              })}
+            </div>
           </div>
-        </div>
-      )}
+        );
+      })()}
     </div>
   );
 }
