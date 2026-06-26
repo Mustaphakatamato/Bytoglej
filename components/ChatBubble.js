@@ -9,9 +9,34 @@ import { useWindowWidth } from '@/lib/hooks';
 const PANEL_W = 340;
 const SUPPORT_CONV_KEY = 'bl_support_conv_id';
 
+// Gør interne stier (/signup) og URL'er klikbare i support-beskeder.
+// Token-baseret for at undgå at ramme skråstreger midt i ord (fx "ja/nej").
+function linkify(text, onNavigate) {
+  if (!text) return text;
+  return String(text).split(/(\s+)/).map((tok, i) => {
+    const m = tok.match(/^([([]*)((?:https?:\/\/[^\s]+)|(?:\/[a-zA-Z][a-zA-Z0-9\-/]*))([)\].,!?:;]*)$/);
+    if (!m) return tok;
+    const [, pre, url, post] = m;
+    const external = /^https?:/.test(url);
+    return (
+      <React.Fragment key={i}>
+        {pre}
+        <a
+          href={url}
+          onClick={external ? undefined : (e) => { e.preventDefault(); onNavigate?.(url); }}
+          target={external ? '_blank' : undefined}
+          rel={external ? 'noopener noreferrer' : undefined}
+          style={{ color: 'inherit', textDecoration: 'underline', fontWeight: 700 }}
+        >{url}</a>
+        {post}
+      </React.Fragment>
+    );
+  });
+}
+
 // ── Support chat ──────────────────────────────────────────────────────────────
 
-function SupportChat({ userId, userName, institutionName }) {
+function SupportChat({ userId, userName, institutionName, onNavigate }) {
   const GREETING = { role: 'bot', content: 'Hej! Jeg er byt&legs AI-assistent. Hvad kan jeg hjælpe dig med?' };
   const [messages, setMessages]   = useState([GREETING]); // {role:'user'|'bot'|'admin', content}
   const [input, setInput]         = useState('');
@@ -172,8 +197,9 @@ function SupportChat({ userId, userName, institutionName }) {
                 lineHeight: 1.5,
                 fontFamily: FONT,
                 border: isAdmin ? `1px solid ${PRIMARY}22` : 'none',
+                whiteSpace: 'pre-wrap',
               }}>
-                {m.content}
+                {linkify(m.content, onNavigate)}
               </div>
             </div>
           );
@@ -731,6 +757,7 @@ export default function ChatBubble() {
                   userId={userId}
                   userName={institution?.name || adminInstName || null}
                   institutionName={institution?.name || adminInstName || null}
+                  onNavigate={(path) => { router.push(path); setOpen(false); }}
                 />
               )}
               {isLoggedIn && tab === 'messages' && (
