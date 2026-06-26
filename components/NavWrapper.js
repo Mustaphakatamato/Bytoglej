@@ -510,15 +510,19 @@ function highlightMatch(text, query) {
 function CategoryStrip({ router }) {
   const searchParams = useSearchParams();
   const activeCategory = searchParams.get('category') || '';
+  const activeGroupParam = searchParams.get('group') || '';
   const [hoveredGroup, setHoveredGroup] = useState(null);
   const w = useWindowWidth();
   const isMobile = w < 768;
 
   function goCategory(key) { router.push('/opslag?category=' + key); setHoveredGroup(null); }
+  function goGroup(key) { router.push('/opslag?group=' + key); setHoveredGroup(null); }
   function clearCategory() { router.push('/opslag'); setHoveredGroup(null); }
 
-  // Which group is currently "active" (one of its items matches the URL category)
-  const activeGroup = NAV_CATEGORY_GROUPS.find(g => g.items.some(i => i.key === activeCategory));
+  // Which group is currently "active"
+  const activeGroup = NAV_CATEGORY_GROUPS.find(g =>
+    g.key === activeGroupParam || g.items.some(i => i.key === activeCategory)
+  );
   const activeCatObj = CATEGORIES.find(c => c.key === activeCategory);
 
   return (
@@ -567,12 +571,14 @@ function CategoryStrip({ router }) {
         </div>
       </div>
 
-      {/* Active category breadcrumb (when a specific sub-category is selected) */}
-      {activeCategory && activeCatObj && activeGroup && (
+      {/* Active filter breadcrumb */}
+      {(activeCategory || activeGroupParam) && activeGroup && (
         <div style={{ padding:'4px 16px 6px', background:GREEN_TINT, display:'flex', alignItems:'center', gap:6, fontSize:12, color:PRIMARY, fontFamily:FONT, fontWeight:600 }}>
           <span>{activeGroup.emoji} {activeGroup.label}</span>
-          <span style={{ opacity:0.5 }}>›</span>
-          <span>{activeCatObj.label}</span>
+          {activeCategory && activeCatObj && <>
+            <span style={{ opacity:0.5 }}>›</span>
+            <span>{activeCatObj.label}</span>
+          </>}
           <button onClick={clearCategory} style={{ marginLeft:'auto', background:'none', border:'none', color:PRIMARY, cursor:'pointer', fontSize:14, fontWeight:800 }}>×</button>
         </div>
       )}
@@ -593,6 +599,28 @@ function CategoryStrip({ router }) {
             }}
           >
             <div style={{ maxWidth:1140, margin:'0 auto', padding:'16px', display:'flex', flexWrap:'wrap', gap:8 }}>
+              {/* Alle-knap for gruppen */}
+              {(() => {
+                const isAllActive = activeGroupParam === group.key && !activeCategory;
+                return (
+                  <button
+                    onClick={() => isAllActive ? clearCategory() : goGroup(group.key)}
+                    onMouseEnter={e => { if (!isAllActive) { e.currentTarget.style.background = GREEN_TINT; e.currentTarget.style.color = PRIMARY; } }}
+                    onMouseLeave={e => { if (!isAllActive) { e.currentTarget.style.background = PAPER2; e.currentTarget.style.color = INK2; } }}
+                    style={{
+                      display:'inline-flex', alignItems:'center', gap:6,
+                      padding:'7px 16px', borderRadius:99,
+                      border: isAllActive ? `2px solid ${PRIMARY}` : `1.5px solid ${PAPER3}`,
+                      background: isAllActive ? GREEN_TINT : PAPER2,
+                      color: isAllActive ? PRIMARY : INK2,
+                      fontFamily:FONT, fontWeight: isAllActive ? 700 : 600, fontSize:13,
+                      cursor:'pointer', transition:'all 0.12s',
+                    }}
+                  >
+                    Alle {group.label.toLowerCase()}
+                  </button>
+                );
+              })()}
               {group.items.map(item => {
                 const cat = CATEGORIES.find(c => c.key === item.key);
                 const isActiveItem = activeCategory === item.key;
