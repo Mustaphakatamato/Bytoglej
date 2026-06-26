@@ -11,6 +11,10 @@
     {
       "path": "/api/cron/sweep-swap-deadlines",
       "schedule": "0 3 * * *"
+    },
+    {
+      "path": "/api/cron/close-stale-support",
+      "schedule": "15 3 * * *"
     }
   ]
 }

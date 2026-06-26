@@ -1983,7 +1983,11 @@ function SupportTab({ isMobile }) {
   }
 
   async function closeConv(conv) {
-    await db.from('support_conversations').update({ status: 'closed' }).eq('id', conv.id);
+    // Via API: poster en afslutningsbesked i chatten + sender mail til brugeren.
+    await fetch('/api/support-chat/reply', {
+      method: 'POST', headers: await authHeaders(),
+      body: JSON.stringify({ conversationId: conv.id, status: 'closed' }),
+    });
     setConvs(cs => cs.map(c => c.id === conv.id ? { ...c, status: 'closed' } : c));
     if (active?.id === conv.id) setActive(a => ({ ...a, status: 'closed' }));
   }
@@ -2081,25 +2085,47 @@ function SupportTab({ isMobile }) {
             {/* Messages */}
             <div style={{ flex: 1, overflowY: 'auto', padding: '12px 16px', display: 'flex', flexDirection: 'column', gap: 8 }}>
               {messages.map((m, i) => {
+                if (m.role === 'system' || m.message_type === 'system') {
+                  return (
+                    <div key={m.id || i} style={{ textAlign: 'center', fontSize: 11, color: INK3, fontFamily: FONT, padding: '4px 18px', lineHeight: 1.5 }}>
+                      {m.content}
+                    </div>
+                  );
+                }
                 const isAdmin = m.role === 'admin';
                 const isBot   = m.role === 'bot';
+                const isImage = m.message_type === 'image';
+                const label   = isAdmin ? 'Du (support)' : isBot ? 'AI-bot' : (active.user_name || 'Bruger');
+                const time    = m.created_at ? new Date(m.created_at).toLocaleTimeString('da-DK', { hour: '2-digit', minute: '2-digit' }) : '';
+                let imgData = null;
+                if (isImage) { try { imgData = JSON.parse(m.content); } catch {} }
                 return (
                   <div key={m.id || i} style={{ display: 'flex', flexDirection: 'column', alignItems: isAdmin ? 'flex-end' : 'flex-start', gap: 2 }}>
-                    <div style={{ fontSize: 10, fontWeight: 700, color: INK3, fontFamily: FONT, padding: isAdmin ? '0 4px' : '0 4px' }}>
-                      {isAdmin ? 'Du (support)' : isBot ? 'AI-bot' : (active.user_name || 'Bruger')}
-                    </div>
                     <div style={{
                       maxWidth: '80%',
-                      background: isAdmin ? PRIMARY : isBot ? PAPER3 : '#E8F5E9',
+                      background: isImage ? 'transparent' : isAdmin ? PRIMARY : isBot ? PAPER3 : '#E8F5E9',
                       color: isAdmin ? '#fff' : INK,
                       borderRadius: isAdmin ? '16px 16px 4px 16px' : '16px 16px 16px 4px',
-                      padding: '9px 13px',
-                      fontSize: 13,
-                      lineHeight: 1.5,
-                      fontFamily: FONT,
-                      border: !isAdmin && !isBot ? `1px solid ${PRIMARY}22` : 'none',
+                      padding: isImage ? 0 : '9px 13px',
+                      overflow: 'hidden',
+                      fontSize: 13, lineHeight: 1.5, fontFamily: FONT,
+                      border: !isAdmin && !isBot && !isImage ? `1px solid ${PRIMARY}22` : 'none',
+                      whiteSpace: 'pre-wrap',
                     }}>
-                      {m.content}
+                      {isImage && imgData?.urls?.length ? (
+                        <div style={{ borderRadius: 12, overflow: 'hidden', maxWidth: 220 }}>
+                          <div style={{ display: 'grid', gridTemplateColumns: imgData.urls.length > 1 ? '1fr 1fr' : '1fr', gap: 2 }}>
+                            {imgData.urls.slice(0, 4).map((u, ix) => (
+                              <img key={ix} src={u} alt="" onClick={() => window.open(u, '_blank')}
+                                style={{ width: '100%', aspectRatio: '1/1', objectFit: 'cover', display: 'block', cursor: 'zoom-in' }} />
+                            ))}
+                          </div>
+                          {imgData.caption && <div style={{ padding: '5px 8px', fontSize: 12, color: INK, background: PAPER3 }}>{imgData.caption}</div>}
+                        </div>
+                      ) : m.content}
+                    </div>
+                    <div style={{ fontSize: 10, color: INK3, fontFamily: FONT, padding: '0 4px' }}>
+                      {label}{time ? ` · ${time}` : ''}
                     </div>
                   </div>
                 );

@@ -57,6 +57,25 @@ export async function POST(req) {
   if (body.status && !body.message) {
     const allowed = ['bot', 'waiting_human', 'open', 'closed'];
     if (!allowed.includes(body.status)) return NextResponse.json({ error: 'Ugyldig status' }, { status: 400 });
+
+    // Closing the case posts a friendly closing message + notifies the user.
+    if (body.status === 'closed') {
+      const closeText = 'Vores supportteam har vurderet denne sag som løst og lukket den. Tak fordi du skrev til os! Får du brug for mere hjælp, er du altid velkommen til at skrive her i chatten igen — så genåbner vi sagen.';
+      await adminDb.from('support_messages').insert({
+        conversation_id: conversationId, role: 'system', content: closeText, message_type: 'system',
+      });
+      const { data: conv } = await adminDb
+        .from('support_conversations')
+        .select('user_unread, user_email, user_name, institution_name')
+        .eq('id', conversationId).single();
+      await adminDb.from('support_conversations').update({
+        status: 'closed', last_message: closeText, last_message_at: new Date().toISOString(),
+        user_unread: (conv?.user_unread || 0) + 1, admin_unread: 0,
+      }).eq('id', conversationId);
+      await notifyUser(conv, closeText);
+      return NextResponse.json({ ok: true });
+    }
+
     await adminDb.from('support_conversations')
       .update({ status: body.status, admin_unread: 0 })
       .eq('id', conversationId);

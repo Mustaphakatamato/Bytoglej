@@ -36,24 +36,59 @@ function linkify(text, onNavigate) {
 
 // ── Support chat ──────────────────────────────────────────────────────────────
 
-function SupportChat({ userId, userName, institutionName, onNavigate }) {
-  const GREETING = { role: 'bot', content: 'Hej! Jeg er byt&legs AI-assistent. Hvad kan jeg hjælpe dig med?' };
-  const [messages, setMessages]   = useState([GREETING]); // {role:'user'|'bot'|'admin', content}
+function fmtTime(iso) {
+  try { return new Date(iso || Date.now()).toLocaleTimeString('da-DK', { hour: '2-digit', minute: '2-digit' }); }
+  catch { return ''; }
+}
+const senderLabel = (role) => role === 'admin' ? 'byt&leg support' : role === 'bot' ? 'AI-assistent' : 'Sendt';
+
+function SupportImage({ content }) {
+  let d = null; try { d = JSON.parse(content); } catch {}
+  if (!d?.urls?.length) return <span style={{ fontSize: 12 }}>📷 Billede</span>;
+  return (
+    <div style={{ borderRadius: 12, overflow: 'hidden', maxWidth: 200 }}>
+      <div style={{ display: 'grid', gridTemplateColumns: d.urls.length > 1 ? '1fr 1fr' : '1fr', gap: 2 }}>
+        {d.urls.slice(0, 4).map((u, i) => (
+          <img key={i} src={u} alt="" onClick={() => window.open(u, '_blank')}
+            style={{ width: '100%', aspectRatio: '1/1', objectFit: 'cover', display: 'block', cursor: 'zoom-in' }} />
+        ))}
+      </div>
+      {d.caption && <div style={{ padding: '5px 8px', fontSize: 12, color: INK, background: PAPER3, fontFamily: FONT }}>{d.caption}</div>}
+    </div>
+  );
+}
+
+function SupportChat({ userId, userEmail, userName, institutionName, onNavigate }) {
+  const GREETING = { role: 'bot', content: 'Hej! Jeg er byt&legs AI-assistent. Hvad kan jeg hjælpe dig med?', created_at: null };
+  const [messages, setMessages]   = useState([GREETING]);
   const [input, setInput]         = useState('');
   const [loading, setLoading]     = useState(false);
   const [convId, setConvId]       = useState(null);
-  const [escalated, setEscalated] = useState(false); // bot couldn't answer → offer human
-  const [human, setHuman]         = useState(false);  // conversation handed to support
-  const [submitted, setSubmitted] = useState(false);  // guest form sent
+  const [escalated, setEscalated] = useState(false);
+  const [human, setHuman]         = useState(false);
+  const [closed, setClosed]       = useState(false);
+  const [showForm, setShowForm]   = useState(false);
   const [guestName, setGuestName] = useState('');
   const [guestEmail, setGuestEmail] = useState('');
-  const [showForm, setShowForm]   = useState(false);
+  const [menuOpen, setMenuOpen]   = useState(false);
+  const [askEmail, setAskEmail]   = useState(false);  // transcript needs an email
+  const [emailDraft, setEmailDraft] = useState('');
+  const [info, setInfo]           = useState('');     // small status line
+  const [uploading, setUploading] = useState(false);
   const bottomRef = useRef(null);
   const inputRef  = useRef(null);
+  const fileRef   = useRef(null);
 
   const isGuest = !userId;
 
-  // Load or restore conversation history via the API (capability = the stored UUID)
+  const mergeIncoming = (prev, hist, roles) => {
+    const have = new Set(prev.map(x => x.id).filter(Boolean));
+    const add = hist.filter(m => roles.includes(m.role) && !have.has(m.id))
+      .map(m => ({ id: m.id, role: m.role, content: m.content, message_type: m.message_type, created_at: m.created_at }));
+    return add.length ? [...prev, ...add] : prev;
+  };
+
+  // Load / restore conversation history (capability = the stored UUID)
   useEffect(() => {
     const stored = localStorage.getItem(SUPPORT_CONV_KEY);
     if (!stored) return;
@@ -63,63 +98,66 @@ function SupportChat({ userId, userName, institutionName, onNavigate }) {
         const res = await fetch(`/api/support-chat?conversationId=${encodeURIComponent(stored)}`);
         const { messages: hist, status } = await res.json();
         if (Array.isArray(hist) && hist.length) {
-          setMessages(hist.map(m => ({ id: m.id, role: m.role, content: m.content })));
-          if (status === 'waiting_human' || status === 'open') { setEscalated(true); setHuman(true); setSubmitted(true); }
+          setMessages(hist.map(m => ({ id: m.id, role: m.role, content: m.content, message_type: m.message_type, created_at: m.created_at })));
+          if (status === 'waiting_human' || status === 'open') { setEscalated(true); setHuman(true); }
+          if (status === 'closed') setClosed(true);
         }
       } catch {}
     })();
   }, []);
 
-  useEffect(() => {
-    setTimeout(() => bottomRef.current?.scrollIntoView({ behavior: 'smooth' }), 60);
-  }, [messages, loading]);
+  useEffect(() => { setTimeout(() => bottomRef.current?.scrollIntoView({ behavior: 'smooth' }), 60); }, [messages, loading]);
 
-  // Realtime admin replies — only for logged-in users (RLS scopes reads to the owner).
+  // Realtime for logged-in users (RLS scopes reads to the owner): admin + system messages.
   useEffect(() => {
     if (!convId || !userId) return;
     const ch = db.channel(`support-msgs-${convId}`)
-      .on('postgres_changes', {
-        event: 'INSERT', schema: 'public', table: 'support_messages',
-        filter: `conversation_id=eq.${convId}`,
-      }, ({ new: m }) => {
-        if (m.role === 'admin') {
-          setMessages(prev => prev.some(x => x.id === m.id) ? prev : [...prev, { id: m.id, role: 'admin', content: m.content }]);
-        }
-      })
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'support_messages', filter: `conversation_id=eq.${convId}` },
+        ({ new: m }) => {
+          if (m.role === 'admin' || m.role === 'system') {
+            setMessages(prev => prev.some(x => x.id === m.id) ? prev : [...prev, { id: m.id, role: m.role, content: m.content, message_type: m.message_type, created_at: m.created_at }]);
+            if (m.role === 'system' && /lukket|afsluttet/i.test(m.content)) setClosed(true);
+          }
+        })
       .subscribe();
     return () => db.removeChannel(ch);
   }, [convId, userId]);
 
-  // Anonymous visitors have no RLS identity for realtime, so poll the API for admin
-  // replies every 5s while the chat is open (component is only mounted when open).
+  // Anonymous visitors poll for admin + system messages.
   useEffect(() => {
     if (!convId || userId) return;
     const t = setInterval(async () => {
       try {
         const res = await fetch(`/api/support-chat?conversationId=${encodeURIComponent(convId)}`);
         const { messages: hist } = await res.json();
-        if (!Array.isArray(hist)) return;
-        setMessages(prev => {
-          const have = new Set(prev.map(x => x.id).filter(Boolean));
-          const incoming = hist.filter(m => m.role === 'admin' && !have.has(m.id))
-            .map(m => ({ id: m.id, role: 'admin', content: m.content }));
-          return incoming.length ? [...prev, ...incoming] : prev;
-        });
+        if (Array.isArray(hist)) setMessages(prev => mergeIncoming(prev, hist, ['admin', 'system']));
       } catch {}
     }, 5000);
     return () => clearInterval(t);
   }, [convId, userId]);
 
-  // Post to the support API; persistence + bot run server-side. Returns the response JSON.
+  // Auto-close after 15 min of inactivity (timer resets on every message change).
+  useEffect(() => {
+    if (!convId || closed) return;
+    const t = setTimeout(async () => {
+      try {
+        const d = await callApi({ mode: 'close', reason: 'timeout' });
+        setClosed(true);
+        setMessages(m => [...m, { role: 'system', message_type: 'system', content: d.systemText || 'Chatten blev automatisk afsluttet pga. inaktivitet.', created_at: new Date().toISOString() }]);
+      } catch {}
+    }, 15 * 60 * 1000);
+    return () => clearTimeout(t);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [convId, closed, messages]);
+
   async function callApi(payload) {
     const res = await fetch('/api/support-chat', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         conversationId: convId,
         userId: userId || null,
         userName: userName || guestName || null,
-        userEmail: guestEmail || null,
+        userEmail: userEmail || guestEmail || null,
         institutionName: institutionName || null,
         ...payload,
       }),
@@ -135,71 +173,141 @@ function SupportChat({ userId, userName, institutionName, onNavigate }) {
   async function sendMessage() {
     const text = input.trim();
     if (!text || loading) return;
-    setInput('');
-    setLoading(true);
+    setInput(''); setLoading(true); setInfo('');
+    if (closed) setClosed(false); // writing reopens
 
-    const newMessages = [...messages, { role: 'user', content: text }];
+    const newMessages = [...messages, { role: 'user', content: text, created_at: new Date().toISOString() }];
     setMessages(newMessages);
-
-    // History for the AI: drop the static greeting + the just-added user message
-    const history = newMessages.slice(1, -1).filter(m => m.role !== 'admin');
+    const history = newMessages.slice(1, -1).filter(m => m.role !== 'admin' && m.role !== 'system' && m.message_type !== 'image');
 
     try {
       const data = await callApi({ message: text, history, mode: human ? 'human' : 'bot' });
-      if (data.humanMode) {
-        setHuman(true);
-      } else if (data.reply) {
+      if (data.humanMode) setHuman(true);
+      else if (data.reply) {
         const reply = data.escalate
           ? data.reply + (/[.!?]$/.test(data.reply) ? '' : '.') + ' Vil du have mig til at sende din besked videre til vores supportteam?'
           : data.reply;
-        setMessages(m => [...m, { role: 'bot', content: reply }]);
+        setMessages(m => [...m, { role: 'bot', content: reply, created_at: new Date().toISOString() }]);
         if (data.escalate) setEscalated(true);
       }
     } catch {
-      setMessages(m => [...m, { role: 'bot', content: 'Beklager, der opstod en fejl. Prøv igen.' }]);
+      setMessages(m => [...m, { role: 'bot', content: 'Beklager, der opstod en fejl. Prøv igen.', created_at: new Date().toISOString() }]);
     }
-
     setLoading(false);
     setTimeout(() => inputRef.current?.focus(), 100);
   }
 
-  async function submitEscalationForm() {
+  async function onPickFiles(e) {
+    const files = [...(e.target.files || [])].slice(0, 4);
+    e.target.value = '';
+    if (!files.length) return;
+    setUploading(true); setInfo('');
+    const urls = [];
+    for (const f of files) {
+      try {
+        const fd = new FormData();
+        fd.append('file', f);
+        fd.append('conversationId', convId || 'anon');
+        const r = await fetch('/api/support-chat/upload', { method: 'POST', body: fd });
+        const d = await r.json();
+        if (d.url) urls.push(d.url); else if (d.error) setInfo(d.error);
+      } catch { setInfo('Kunne ikke uploade billedet.'); }
+    }
+    setUploading(false);
+    if (!urls.length) return;
+    const caption = input.trim(); setInput('');
+    if (closed) setClosed(false);
+    setMessages(m => [...m, { role: 'user', message_type: 'image', content: JSON.stringify({ urls, caption }), created_at: new Date().toISOString() }]);
     try {
-      await callApi({ mode: 'handoff' });
+      const data = await callApi({ imageUrls: urls, message: caption, mode: human ? 'human' : 'bot' });
+      if (data.humanMode) setHuman(true);
+      if (data.reply) { setMessages(m => [...m, { role: 'bot', content: data.reply, created_at: new Date().toISOString() }]); if (data.escalate) setEscalated(true); }
     } catch {}
-    setHuman(true);
-    setSubmitted(true);
-    setShowForm(false);
-    setMessages(m => [...m, { role: 'bot', content: 'Tak! Vores supportteam har modtaget din henvendelse og vender tilbage inden for 1-2 hverdage. Du kan skrive videre herunder.' }]);
   }
+
+  async function submitEscalationForm() {
+    try { await callApi({ mode: 'handoff' }); } catch {}
+    setHuman(true); setShowForm(false);
+    setMessages(m => [...m, { role: 'system', message_type: 'system', content: 'Din henvendelse er sendt til vores supportteam. Du kan skrive videre herunder — vi vender tilbage hurtigst muligt.', created_at: new Date().toISOString() }]);
+  }
+
+  async function endChat() {
+    setMenuOpen(false);
+    if (!convId) { setInfo('Der er ingen aktiv samtale at afslutte.'); return; }
+    try {
+      const d = await callApi({ mode: 'close' });
+      setClosed(true);
+      setMessages(m => [...m, { role: 'system', message_type: 'system', content: d.systemText || 'Du afsluttede chatten.', created_at: new Date().toISOString() }]);
+    } catch {}
+  }
+
+  async function requestTranscript(email) {
+    setMenuOpen(false);
+    if (!convId) { setInfo('Der er ingen samtale at sende endnu.'); return; }
+    try {
+      const res = await fetch('/api/support-chat/transcript', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ conversationId: convId, email }),
+      });
+      const d = await res.json();
+      if (res.ok) { setInfo('Udskrift sendt til ' + (d.sentTo || 'din mail') + '.'); setAskEmail(false); setEmailDraft(''); }
+      else if (d.error === 'needs_email') setAskEmail(true);
+      else setInfo(d.error || 'Kunne ikke sende udskriften.');
+    } catch { setInfo('Kunne ikke sende udskriften.'); }
+  }
+
+  const canSend = (input.trim() || uploading) && !loading;
 
   return (
     <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+      {/* Toolbar */}
+      <div style={{ position: 'relative', flexShrink: 0, display: 'flex', justifyContent: 'flex-end', alignItems: 'center', padding: '4px 8px', borderBottom: `1px solid ${PAPER2}` }}>
+        <button onClick={() => setMenuOpen(o => !o)} aria-label="Muligheder"
+          style={{ background: 'none', border: 'none', cursor: 'pointer', color: INK3, padding: '4px 8px', borderRadius: 8, lineHeight: 0 }}>
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="5" r="1.6"/><circle cx="12" cy="12" r="1.6"/><circle cx="12" cy="19" r="1.6"/></svg>
+        </button>
+        {menuOpen && (
+          <>
+            <div onClick={() => setMenuOpen(false)} style={{ position: 'fixed', inset: 0, zIndex: 1 }} />
+            <div style={{ position: 'absolute', top: 38, right: 8, background: PAPER, borderRadius: 12, border: `1px solid ${PAPER3}`, boxShadow: '0 6px 24px rgba(22,34,28,0.16)', zIndex: 2, overflow: 'hidden', minWidth: 180 }}>
+              <button onClick={() => requestTranscript()} style={{ display: 'block', width: '100%', textAlign: 'left', background: 'none', border: 'none', padding: '11px 14px', fontSize: 13, color: INK, fontFamily: FONT, cursor: 'pointer' }}>Anmod om udskrift</button>
+              <div style={{ height: 1, background: PAPER2 }} />
+              <button onClick={endChat} style={{ display: 'block', width: '100%', textAlign: 'left', background: 'none', border: 'none', padding: '11px 14px', fontSize: 13, color: CORAL, fontFamily: FONT, cursor: 'pointer' }}>Afslut chat</button>
+            </div>
+          </>
+        )}
+      </div>
+
       {/* Messages */}
       <div style={{ flex: 1, overflowY: 'auto', padding: '12px 14px', display: 'flex', flexDirection: 'column', gap: 8 }}>
         {messages.map((m, i) => {
+          if (m.role === 'system' || m.message_type === 'system') {
+            return (
+              <div key={m.id || i} style={{ textAlign: 'center', fontSize: 11, color: INK3, fontFamily: FONT, padding: '4px 18px', lineHeight: 1.5 }}>
+                {m.content}
+              </div>
+            );
+          }
           const isUser  = m.role === 'user';
           const isAdmin = m.role === 'admin';
+          const isImage = m.message_type === 'image';
           return (
             <div key={m.id || i} style={{ display: 'flex', flexDirection: 'column', alignItems: isUser ? 'flex-end' : 'flex-start', gap: 2 }}>
-              {!isUser && (
-                <div style={{ fontSize: 10, fontWeight: 700, color: INK3, fontFamily: FONT, paddingLeft: 4 }}>
-                  {isAdmin ? 'Support' : 'AI-assistent'}
-                </div>
-              )}
               <div style={{
                 maxWidth: '82%',
-                background: isUser ? PRIMARY : isAdmin ? '#E8F5E9' : PAPER3,
+                background: isImage ? 'transparent' : isUser ? PRIMARY : isAdmin ? '#E8F5E9' : PAPER3,
                 color: isUser ? '#fff' : INK,
                 borderRadius: isUser ? '16px 16px 4px 16px' : '16px 16px 16px 4px',
-                padding: '9px 13px',
-                fontSize: 13,
-                lineHeight: 1.5,
-                fontFamily: FONT,
-                border: isAdmin ? `1px solid ${PRIMARY}22` : 'none',
+                padding: isImage ? 0 : '9px 13px',
+                overflow: 'hidden',
+                fontSize: 13, lineHeight: 1.5, fontFamily: FONT,
+                border: isAdmin && !isImage ? `1px solid ${PRIMARY}22` : 'none',
                 whiteSpace: 'pre-wrap',
               }}>
-                {linkify(m.content, onNavigate)}
+                {isImage ? <SupportImage content={m.content} /> : linkify(m.content, onNavigate)}
+              </div>
+              <div style={{ fontSize: 10, color: INK3, fontFamily: FONT, padding: '0 4px' }}>
+                {senderLabel(m.role)}{m.created_at ? ` · ${fmtTime(m.created_at)}` : ''}
               </div>
             </div>
           );
@@ -207,13 +315,9 @@ function SupportChat({ userId, userName, institutionName, onNavigate }) {
 
         {loading && !human && (
           <div style={{ display: 'flex', alignItems: 'flex-start', gap: 2, flexDirection: 'column' }}>
-            <div style={{ fontSize: 10, fontWeight: 700, color: INK3, fontFamily: FONT, paddingLeft: 4 }}>AI-assistent</div>
             <div style={{ background: PAPER3, borderRadius: '16px 16px 16px 4px', padding: '10px 14px', display: 'flex', gap: 5, alignItems: 'center' }}>
               {[0, 1, 2].map(i => (
-                <div key={i} style={{
-                  width: 6, height: 6, borderRadius: '50%', background: INK3,
-                  animation: 'bounce 1.2s infinite', animationDelay: `${i * 0.2}s`,
-                }} />
+                <div key={i} style={{ width: 6, height: 6, borderRadius: '50%', background: INK3, animation: 'bounce 1.2s infinite', animationDelay: `${i * 0.2}s` }} />
               ))}
             </div>
           </div>
@@ -222,36 +326,37 @@ function SupportChat({ userId, userName, institutionName, onNavigate }) {
         {/* Escalation CTA */}
         {escalated && !human && !showForm && (
           <div style={{ display: 'flex', justifyContent: 'flex-start' }}>
-            <button
-              onClick={() => isGuest ? setShowForm(true) : submitEscalationForm()}
+            <button onClick={() => isGuest ? setShowForm(true) : submitEscalationForm()}
               style={{ background: PRIMARY, color: '#fff', border: 'none', borderRadius: 99, padding: '8px 16px', fontSize: 13, fontWeight: 700, fontFamily: FONT, cursor: 'pointer', marginTop: 4 }}>
               Ja, kontakt support
             </button>
           </div>
         )}
 
-        {/* Guest form for escalation */}
+        {/* Guest contact form */}
         {showForm && !human && (
           <div style={{ background: PAPER2, borderRadius: 12, padding: 14, border: `1px solid ${PAPER3}`, display: 'flex', flexDirection: 'column', gap: 8 }}>
             <div style={{ fontSize: 12, fontWeight: 700, color: INK, fontFamily: FONT }}>Hvem skal vi kontakte?</div>
-            <input
-              placeholder="Dit navn"
-              value={guestName}
-              onChange={e => setGuestName(e.target.value)}
-              style={{ padding: '8px 12px', borderRadius: 8, border: `1.5px solid ${PAPER3}`, fontSize: 13, fontFamily: FONT, outline: 'none', background: PAPER }}
-            />
-            <input
-              placeholder="Din e-mail"
-              type="email"
-              value={guestEmail}
-              onChange={e => setGuestEmail(e.target.value)}
-              style={{ padding: '8px 12px', borderRadius: 8, border: `1.5px solid ${PAPER3}`, fontSize: 13, fontFamily: FONT, outline: 'none', background: PAPER }}
-            />
-            <button
-              onClick={submitEscalationForm}
-              disabled={!guestEmail.trim()}
+            <input placeholder="Dit navn" value={guestName} onChange={e => setGuestName(e.target.value)}
+              style={{ padding: '8px 12px', borderRadius: 8, border: `1.5px solid ${PAPER3}`, fontSize: 13, fontFamily: FONT, outline: 'none', background: PAPER }} />
+            <input placeholder="Din e-mail" type="email" value={guestEmail} onChange={e => setGuestEmail(e.target.value)}
+              style={{ padding: '8px 12px', borderRadius: 8, border: `1.5px solid ${PAPER3}`, fontSize: 13, fontFamily: FONT, outline: 'none', background: PAPER }} />
+            <button onClick={submitEscalationForm} disabled={!guestEmail.trim()}
               style={{ background: guestEmail.trim() ? PRIMARY : PAPER3, color: guestEmail.trim() ? '#fff' : INK3, border: 'none', borderRadius: 99, padding: '9px 16px', fontSize: 13, fontWeight: 700, fontFamily: FONT, cursor: guestEmail.trim() ? 'pointer' : 'default' }}>
               Send til support
+            </button>
+          </div>
+        )}
+
+        {/* Transcript: ask for email (anonymous without one on file) */}
+        {askEmail && (
+          <div style={{ background: PAPER2, borderRadius: 12, padding: 14, border: `1px solid ${PAPER3}`, display: 'flex', flexDirection: 'column', gap: 8 }}>
+            <div style={{ fontSize: 12, fontWeight: 700, color: INK, fontFamily: FONT }}>Hvor skal vi sende udskriften?</div>
+            <input placeholder="Din e-mail" type="email" value={emailDraft} onChange={e => setEmailDraft(e.target.value)}
+              style={{ padding: '8px 12px', borderRadius: 8, border: `1.5px solid ${PAPER3}`, fontSize: 13, fontFamily: FONT, outline: 'none', background: PAPER }} />
+            <button onClick={() => requestTranscript(emailDraft.trim())} disabled={!emailDraft.trim()}
+              style={{ background: emailDraft.trim() ? PRIMARY : PAPER3, color: emailDraft.trim() ? '#fff' : INK3, border: 'none', borderRadius: 99, padding: '9px 16px', fontSize: 13, fontWeight: 700, fontFamily: FONT, cursor: emailDraft.trim() ? 'pointer' : 'default' }}>
+              Send udskrift
             </button>
           </div>
         )}
@@ -259,40 +364,38 @@ function SupportChat({ userId, userName, institutionName, onNavigate }) {
         <div ref={bottomRef} />
       </div>
 
-      {/* Status banner when handed to a human */}
-      {human && (
-        <div style={{ flexShrink: 0, background: '#E8F5E9', borderTop: `1px solid ${PRIMARY}22`, padding: '7px 14px', fontSize: 11, fontWeight: 600, color: PRIMARY, fontFamily: FONT, textAlign: 'center' }}>
-          Du skriver nu med vores supportteam
+      {/* Status / info line */}
+      {(human || closed || info) && (
+        <div style={{ flexShrink: 0, background: closed ? PAPER2 : '#E8F5E9', borderTop: `1px solid ${closed ? PAPER3 : PRIMARY + '22'}`, padding: '7px 14px', fontSize: 11, fontWeight: 600, color: closed ? INK3 : PRIMARY, fontFamily: FONT, textAlign: 'center' }}>
+          {info || (closed ? 'Chatten er afsluttet. Skriv herunder for at genåbne.' : 'Du skriver nu med vores supportteam')}
         </div>
       )}
 
       {/* Input */}
-      <div style={{ borderTop: `1px solid ${PAPER3}`, padding: '10px 12px', display: 'flex', gap: 8, flexShrink: 0, background: PAPER }}>
+      <div style={{ borderTop: `1px solid ${PAPER3}`, padding: '10px 12px', display: 'flex', gap: 8, alignItems: 'center', flexShrink: 0, background: PAPER }}>
+        <input ref={fileRef} type="file" accept="image/*" multiple onChange={onPickFiles} style={{ display: 'none' }} />
+        <button onClick={() => fileRef.current?.click()} disabled={uploading} aria-label="Vedhæft billede"
+          style={{ width: 34, height: 34, borderRadius: '50%', background: 'none', border: 'none', cursor: uploading ? 'default' : 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, color: uploading ? PAPER3 : INK3 }}>
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/></svg>
+        </button>
         <input
           ref={inputRef}
           value={input}
           onChange={e => setInput(e.target.value)}
           onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMessage(); } }}
-          placeholder={human ? 'Skriv til support…' : 'Skriv et spørgsmål…'}
+          placeholder={uploading ? 'Uploader billede…' : closed ? 'Skriv for at genåbne…' : human ? 'Skriv til support…' : 'Skriv et spørgsmål…'}
           disabled={loading}
           style={{ flex: 1, padding: '8px 14px', borderRadius: 99, border: `1.5px solid ${PAPER3}`, fontSize: 13, fontFamily: FONT, outline: 'none', background: PAPER2, color: INK }}
         />
-        <button
-          onClick={sendMessage}
-          disabled={loading || !input.trim()}
-          style={{ width: 36, height: 36, borderRadius: '50%', background: input.trim() && !loading ? PRIMARY : PAPER3, border: 'none', cursor: input.trim() && !loading ? 'pointer' : 'default', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, transition: 'background 0.15s' }}>
-          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke={input.trim() && !loading ? '#fff' : INK3} strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+        <button onClick={sendMessage} disabled={!canSend}
+          style={{ width: 36, height: 36, borderRadius: '50%', background: canSend ? PRIMARY : PAPER3, border: 'none', cursor: canSend ? 'pointer' : 'default', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, transition: 'background 0.15s' }}>
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke={canSend ? '#fff' : INK3} strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
             <line x1="22" y1="2" x2="11" y2="13" /><polygon points="22 2 15 22 11 13 2 9 22 2" />
           </svg>
         </button>
       </div>
 
-      <style>{`
-        @keyframes bounce {
-          0%, 60%, 100% { transform: translateY(0); }
-          30% { transform: translateY(-5px); }
-        }
-      `}</style>
+      <style>{`@keyframes bounce { 0%, 60%, 100% { transform: translateY(0); } 30% { transform: translateY(-5px); } }`}</style>
     </div>
   );
 }
@@ -665,7 +768,7 @@ export default function ChatBubble() {
   const router   = useRouter();
   const pathname = usePathname();
   const { unreadTotal, fetchUnread } = useApp();
-  const { userId: ctxUserId, institution, institutionId, isAdminView, adminInstName, realUserId } = useActiveUser();
+  const { userId: ctxUserId, userEmail, institution, institutionId, isAdminView, adminInstName, realUserId } = useActiveUser();
 
   const [open, setOpen]   = useState(false);
   const [tab, setTab]     = useState('support'); // 'messages' | 'support'
@@ -755,6 +858,7 @@ export default function ChatBubble() {
               {(!isLoggedIn || tab === 'support') && (
                 <SupportChat
                   userId={userId}
+                  userEmail={userEmail || null}
                   userName={institution?.name || adminInstName || null}
                   institutionName={institution?.name || adminInstName || null}
                   onNavigate={(path) => { router.push(path); setOpen(false); }}
