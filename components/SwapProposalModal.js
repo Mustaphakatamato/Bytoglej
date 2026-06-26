@@ -4,6 +4,7 @@ import { Modal, Btn, Spinner } from '@/components/ui';
 import { PRIMARY, INK, INK2, INK3, GREEN_TINT, GREEN_SOFT, PAPER2, PAPER3, CORAL, FONT } from '@/lib/constants';
 import { db } from '@/lib/supabase';
 import { authedFetch } from '@/lib/authed-fetch';
+import { SWAP_PROTECTION_FEE } from '@/lib/pricing';
 
 const kr = n => `${Number(n || 0).toFixed(2).replace('.', ',')} kr.`;
 // Køb-opslag bærer værdien i price; byt-opslag i estimated_value.
@@ -123,6 +124,10 @@ export default function SwapProposalModal({ open, onClose, listing, ownListings 
                 : `Du tilbyder ${kr(-diff)} mere i værdi.`}
             </div>
           )}
+          {/* A1: Byttebeskyttelsen vises også på bundter — som i det almindelige bytteflow. */}
+          <div style={{ fontSize:11, color:INK3, lineHeight:1.5, borderTop:`1px solid ${GREEN_SOFT}`, paddingTop:6 }}>
+            🛡️ Begge parter betaler {kr(SWAP_PROTECTION_FEE)} byttebeskyttelse. Porto beregnes på betalingssiden.
+          </div>
         </div>
 
         {/* Kontant mellemlag */}

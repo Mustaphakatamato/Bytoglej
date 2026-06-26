@@ -46,6 +46,11 @@ export default function PickupPointPicker({ points, cheapestCarrier, buyerCoords
   const mapInstanceRef = useRef(null);
   const markersRef = useRef(null);
   const resizeObsRef = useRef(null);
+  const tilesRef = useRef(null);     // tile-laget, så det kan gentegnes uden for init
+  const pointsRef = useRef(points);  // seneste punkter (init fanger ellers tom liste)
+  const fixRef = useRef(null);       // size/zoom-fix kaldbar fra andre effekter
+  const retryIvRef = useRef(null);   // retry-interval indtil containeren har reel størrelse
+  pointsRef.current = points;        // hold altid seneste punkter (async-ankomst)
 
   useEffect(() => {
     setMounted(true);
@@ -57,50 +62,60 @@ export default function PickupPointPicker({ points, cheapestCarrier, buyerCoords
 
   const selected = points.find(p => p.id === selectedId) || null;
 
-  // Init Leaflet-kort
+  // Init Leaflet-kort (oprettes én gang; størrelse/zoom håndteres robust af fix()).
   useEffect(() => {
     if (!mounted || typeof window === 'undefined' || !mapRef.current) return;
     // Leaflet-CSS'en bundles via top-level import — altid til stede ved mount.
     const L = require('leaflet');
-    const valid = points.filter(p => p.lat != null && p.lng != null);
-    const center = valid.length
-      ? [valid.reduce((s, p) => s + p.lat, 0) / valid.length, valid.reduce((s, p) => s + p.lng, 0) / valid.length]
-      : [55.67, 12.56];
 
     if (!mapInstanceRef.current) {
+      const init = pointsRef.current.filter(p => p.lat != null && p.lng != null);
+      const center = init.length
+        ? [init.reduce((s, p) => s + p.lat, 0) / init.length, init.reduce((s, p) => s + p.lng, 0) / init.length]
+        : [55.67, 12.56];
       mapInstanceRef.current = L.map(mapRef.current, { center, zoom: 12, zoomControl: true, scrollWheelZoom: true });
-      const tiles = L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
+      tilesRef.current = L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
         attribution: '© OpenStreetMap © CARTO', maxZoom: 19,
       }).addTo(mapInstanceRef.current);
       markersRef.current = L.layerGroup().addTo(mapInstanceRef.current);
 
-      // Genberegn størrelse + zoom til alle punkter, og tving tiles til at gentegne.
-      // Safari resolver ikke altid højden på et position:absolute element fra dets
-      // flex-forælder, så vi sætter eksplicit højde fra forælderens målte størrelse —
-      // ellers ser invalidateSize 0 og loader ingen tiles.
+      // Robust størrelses-/zoom-fix. Læser ALTID seneste punkter (async-ankomst),
+      // sætter eksplicit højde fra forælderen (Safari resolver ikke altid højden på
+      // et position:absolute element), invalidate'r størrelsen og zoomer til punkterne.
+      // Returnerer true når containeren har en reel størrelse (modal færdig-animeret).
       const fix = () => {
-        const map = mapInstanceRef.current;
-        const el = mapRef.current;
-        if (!map || !el) return;
+        const map = mapInstanceRef.current, el = mapRef.current;
+        if (!map || !el) return false;
+        let sized = true;
         const parent = el.parentElement;
         if (parent) {
           const h = parent.clientHeight, w = parent.clientWidth;
-          if (h > 0) el.style.height = h + 'px';
+          if (h > 0) el.style.height = h + 'px'; else sized = false;
           if (w > 0) el.style.width = w + 'px';
         }
         map.invalidateSize();
+        const valid = pointsRef.current.filter(p => p.lat != null && p.lng != null);
         if (valid.length > 1) {
           map.fitBounds(L.latLngBounds(valid.map(p => [p.lat, p.lng])), { padding: [40, 40] });
+        } else if (valid.length === 1) {
+          map.setView([valid[0].lat, valid[0].lng], 13);
         }
-        tiles.redraw();
+        tilesRef.current?.redraw();
+        return sized;
       };
-      requestAnimationFrame(fix);
-      setTimeout(fix, 150);
-      setTimeout(fix, 500);
+      fixRef.current = fix;
 
-      // Kortet ligger i en modal hvis flex-layout først har endelig størrelse
-      // efter mount. Observér forælder-wrapperen (konkret flex-størrelse) frem for
-      // det absolutte element, da Safari ikke pålideligt rapporterer sidstnævnte.
+      // Retry indtil containeren faktisk har størrelse (modal-animation kan tage tid),
+      // maks ~3s. Erstatter de skrøbelige faste timeouts der ikke ramte hver gang.
+      requestAnimationFrame(fix);
+      let tries = 0;
+      retryIvRef.current = setInterval(() => {
+        const sized = fix();
+        if (sized || ++tries >= 20) { clearInterval(retryIvRef.current); retryIvRef.current = null; }
+      }, 150);
+
+      // Observér forælder-wrapperen (konkret flex-størrelse) frem for det absolutte
+      // element, da Safari ikke pålideligt rapporterer sidstnævnte.
       if (typeof ResizeObserver !== 'undefined' && mapRef.current?.parentElement) {
         const ro = new ResizeObserver(() => fix());
         ro.observe(mapRef.current.parentElement);
@@ -108,8 +123,10 @@ export default function PickupPointPicker({ points, cheapestCarrier, buyerCoords
       }
     }
     return () => {
+      if (retryIvRef.current) { clearInterval(retryIvRef.current); retryIvRef.current = null; }
       if (resizeObsRef.current) { resizeObsRef.current.disconnect(); resizeObsRef.current = null; }
       if (mapInstanceRef.current) { mapInstanceRef.current.remove(); mapInstanceRef.current = null; }
+      tilesRef.current = null; fixRef.current = null;
     };
   }, [mounted]); // eslint-disable-line
 
@@ -141,6 +158,20 @@ export default function PickupPointPicker({ points, cheapestCarrier, buyerCoords
       markerByIdRef.current[p.id] = marker;
     });
   }, [points, selectedId, mounted, buyerCoords]);
+
+  // Refit når punkterne (eller køber-koordinaten) ankommer asynkront EFTER at
+  // kortet er oprettet — ellers står kortet på default-center med grå/blanke tiles.
+  useEffect(() => {
+    if (mapInstanceRef.current && fixRef.current) fixRef.current();
+  }, [points, buyerCoords]); // eslint-disable-line
+
+  // På mobil oprettes kortet mens kort-fanen kan være skjult (0 størrelse).
+  // Refit når man skifter til kort-fanen, så tiles tegnes korrekt.
+  useEffect(() => {
+    if (mobileTab === 'kort' && mapInstanceRef.current && fixRef.current) {
+      requestAnimationFrame(() => fixRef.current && fixRef.current());
+    }
+  }, [mobileTab]); // eslint-disable-line
 
   // Hover-fremhævning (desktop)
   useEffect(() => {

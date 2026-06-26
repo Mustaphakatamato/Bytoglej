@@ -31,9 +31,17 @@ export default function LoginPage() {
   const [showPass,  setShowPass]  = useState(false);
   const passRef = useRef(null);
 
+  // Læs ?redirect=… og tillad KUN interne stier (undgå open redirect).
+  function safeRedirect() {
+    if (typeof window === 'undefined') return null;
+    const r = new URLSearchParams(window.location.search).get('redirect');
+    if (r && r.startsWith('/') && !r.startsWith('//')) return r;
+    return null;
+  }
+
   useEffect(() => {
     db.auth.getSession().then(({ data: { session } }) => {
-      if (session) router.replace('/profil');
+      if (session) router.replace(safeRedirect() || '/profil');
     });
   }, []);
 
@@ -82,7 +90,7 @@ export default function LoginPage() {
     setLoading(false);
     if (error) { setError('Forkert adgangskode. Prøv igen'); return; }
     setLoggedIn(true);
-    router.push('/dashboard');
+    router.push(safeRedirect() || '/dashboard');
   }
 
   const inputStyle = {

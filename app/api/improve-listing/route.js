@@ -15,7 +15,7 @@ export async function POST(req) {
     const tagList = tags?.length ? tags.join(', ') : 'ingen';
 
     const completion = await groq.chat.completions.create({
-      model: 'llama-3.1-8b-instant',
+      model: 'openai/gpt-oss-20b', // erstatter udfaset llama-3.1-8b-instant (Groq shutdown 2026-08-16)
       max_tokens: 400,
       response_format: { type: 'json_object' },
       messages: [

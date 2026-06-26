@@ -1,5 +1,5 @@
 'use client';
-import { useState, useEffect, useCallback, useRef } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { db } from '@/lib/supabase';
 import {
   PRIMARY, GREEN_SOFT, GREEN_TINT, GREEN_DEEP,
@@ -1718,6 +1718,7 @@ function AiBotTab({ isMobile }) {
   const [stats, setStats] = useState(null);
   const [scanTypeFilter, setScanTypeFilter] = useState('');
   const [showRejections, setShowRejections] = useState(false);
+  const [expandedId, setExpandedId] = useState(null); // F2: udfoldet række → før/efter-diff
 
   useEffect(() => {
     async function load() {
@@ -1841,8 +1842,10 @@ function AiBotTab({ isMobile }) {
               </thead>
               <tbody>
                 {filtered.map((l, i) => (
-                  <tr key={l.id} style={{ borderBottom: `1px solid ${PAPER3}`, background: i % 2 === 0 ? '#fff' : PAPER2 }}>
-                    <td style={{ padding: '8px 10px', color: INK3, whiteSpace: 'nowrap' }}>{fmtDate(l.created_at, true)}</td>
+                  <React.Fragment key={l.id}>
+                  <tr onClick={() => setExpandedId(id => id === l.id ? null : l.id)}
+                    style={{ borderBottom: `1px solid ${PAPER3}`, background: expandedId === l.id ? GREEN_TINT : (i % 2 === 0 ? '#fff' : PAPER2), cursor: 'pointer' }}>
+                    <td style={{ padding: '8px 10px', color: INK3, whiteSpace: 'nowrap' }}>{expandedId === l.id ? '▾ ' : '▸ '}{fmtDate(l.created_at, true)}</td>
                     <td style={{ padding: '8px 10px' }}><Badge bg={GREEN_TINT} color={PRIMARY}>{l.scan_type}</Badge></td>
                     <td style={{ padding: '8px 10px', color: INK, maxWidth: 140, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{l.institution_name || '—'}</td>
                     <td style={{ padding: '8px 10px', color: INK, whiteSpace: 'nowrap' }}>{l.ai_price_suggested != null ? `${l.ai_price_suggested} kr.` : '—'}</td>
@@ -1855,6 +1858,14 @@ function AiBotTab({ isMobile }) {
                     <td style={{ padding: '8px 10px', textAlign: 'center' }}>{l.used_price == null ? '—' : l.used_price ? '✅' : '❌'}</td>
                     <td style={{ padding: '8px 10px', textAlign: 'center' }}>{l.submitted ? '✅' : '⏳'}</td>
                   </tr>
+                  {expandedId === l.id && (
+                    <tr style={{ background: '#fff' }}>
+                      <td colSpan={10} style={{ padding: '14px 16px', borderBottom: `2px solid ${PAPER3}` }}>
+                        <AiDiffDetail log={l} />
+                      </td>
+                    </tr>
+                  )}
+                  </React.Fragment>
                 ))}
               </tbody>
             </table>
@@ -1864,6 +1875,58 @@ function AiBotTab({ isMobile }) {
       )}
       </>
       )}
+    </div>
+  );
+}
+
+// F2: Detaljevisning pr. AI-scan — viser hvad brugeren ændrede fra AI-forslaget
+// ("før" = AI) til det gemte opslag ("efter" = final), felt for felt.
+function AiDiffDetail({ log }) {
+  const fields = [
+    { label: 'Titel',        ai: log.ai_title,           final: log.final_title },
+    { label: 'Beskrivelse',  ai: log.ai_description,      final: log.final_description },
+    { label: 'Kategori',     ai: log.ai_category,         final: log.final_category },
+    { label: 'Stand',        ai: log.ai_condition,        final: log.final_condition },
+    { label: 'Aldersgruppe', ai: log.ai_age_group,        final: log.final_age_group },
+    { label: 'Pris',         ai: log.ai_price_suggested != null ? `${log.ai_price_suggested} kr.` : null,
+                             final: log.final_price != null ? `${log.final_price} kr.` : null },
+  ].filter(f => (f.ai != null && f.ai !== '') || (f.final != null && f.final !== ''));
+
+  const cell = (v, changed, side) => (
+    <div style={{ flex: 1, minWidth: 0, background: changed ? (side === 'ai' ? '#FEF2F2' : '#ECFDF3') : PAPER2,
+      border: `1px solid ${changed ? (side === 'ai' ? '#FCA5A5' : '#86EFAC') : PAPER3}`,
+      borderRadius: 8, padding: '8px 10px', fontFamily: FONT, fontSize: 12,
+      color: v == null || v === '' ? INK3 : INK, whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>
+      {v == null || v === '' ? '—' : String(v)}
+    </div>
+  );
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+      <div style={{ fontFamily: FONT, fontSize: 11, fontWeight: 700, color: INK3, textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+        Brugerens ændringer (før = AI-forslag · efter = gemt af bruger)
+      </div>
+      {fields.length === 0 && <div style={{ fontFamily: FONT, fontSize: 12, color: INK3 }}>Ingen tekstdata gemt for denne scan.</div>}
+      {fields.map((f, i) => {
+        const changed = String(f.ai ?? '') !== String(f.final ?? '');
+        return (
+          <div key={i} style={{ display: 'flex', gap: 10, alignItems: 'stretch', flexWrap: 'wrap' }}>
+            <div style={{ width: 96, flexShrink: 0, fontFamily: FONT, fontSize: 12, fontWeight: 700, color: INK, paddingTop: 8 }}>
+              {f.label}{changed ? ' ✏️' : ''}
+            </div>
+            <div style={{ flex: 1, minWidth: 240, display: 'flex', gap: 8, alignItems: 'stretch' }}>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ fontFamily: FONT, fontSize: 10, color: INK3, marginBottom: 3 }}>FØR (AI)</div>
+                {cell(f.ai, changed, 'ai')}
+              </div>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ fontFamily: FONT, fontSize: 10, color: INK3, marginBottom: 3 }}>EFTER (gemt)</div>
+                {cell(f.final, changed, 'final')}
+              </div>
+            </div>
+          </div>
+        );
+      })}
     </div>
   );
 }

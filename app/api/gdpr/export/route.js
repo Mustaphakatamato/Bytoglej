@@ -1,15 +1,19 @@
 import { NextResponse } from 'next/server';
 import { requireAuth, UNAUTHORIZED } from '@/lib/api-auth';
 import { createServerClient } from '@/lib/supabase-server';
+import { gdprExportHtml } from '@/lib/gdpr-export-html';
 
 // GET /api/gdpr/export
 //
 // GDPR art. 15 (indsigt) + art. 20 (dataportabilitet): samler alle
-// personoplysninger byt&leg behandler om den indloggede brugers institution
-// og leverer dem som en struktureret, maskinlæsbar JSON-fil.
+// personoplysninger byt&leg behandler om den indloggede brugers institution.
+// Standard-leverancen er en pæn, læsevenlig HTML-rapport (klienten gemmer den
+// som PDF). Maskinlæsbar JSON bevares via ?format=json.
 export async function GET(req) {
   const user = await requireAuth(req);
   if (!user) return UNAUTHORIZED();
+
+  const format = new URL(req.url).searchParams.get('format') === 'json' ? 'json' : 'html';
 
   const supa = createServerClient();
 
@@ -80,13 +84,24 @@ export async function GET(req) {
     samtykke_historik:   consentLog || [],
   };
 
-  const filename = `bytogleg-data-${instName?.replace(/[^a-z0-9]/gi, '-').toLowerCase() || 'eksport'}-${new Date().toISOString().slice(0, 10)}.json`;
+  const base = `bytogleg-data-${instName?.replace(/[^a-z0-9]/gi, '-').toLowerCase() || 'eksport'}-${new Date().toISOString().slice(0, 10)}`;
 
-  return new NextResponse(JSON.stringify(exportData, null, 2), {
+  if (format === 'json') {
+    return new NextResponse(JSON.stringify(exportData, null, 2), {
+      status: 200,
+      headers: {
+        'Content-Type': 'application/json; charset=utf-8',
+        'Content-Disposition': `attachment; filename="${base}.json"`,
+      },
+    });
+  }
+
+  // Standard: pæn HTML-rapport (klienten renderer + udskriver til PDF).
+  return new NextResponse(gdprExportHtml(exportData), {
     status: 200,
     headers: {
-      'Content-Type': 'application/json; charset=utf-8',
-      'Content-Disposition': `attachment; filename="${filename}"`,
+      'Content-Type': 'text/html; charset=utf-8',
+      'Content-Disposition': `inline; filename="${base}.html"`,
     },
   });
 }

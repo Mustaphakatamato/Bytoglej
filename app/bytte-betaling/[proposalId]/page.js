@@ -17,7 +17,7 @@ export default function SwapPaymentPage() {
   const { institutionId, institution } = useActiveUser();
 
   const [proposal, setProposal] = useState(null);
-  const [receiver, setReceiver] = useState(null);
+  const [counterparty, setCounterparty] = useState(null); // modparten = afsenderen af den pakke JEG modtager
   const [sizeCategory, setSizeCategory] = useState('medium');
   const [loading, setLoading] = useState(true);
   const [method, setMethod] = useState(null); // 'parcel_shop' | 'custom'
@@ -36,14 +36,11 @@ export default function SwapPaymentPage() {
     return null;
   }, [proposal, institutionId]);
 
-  const outgoing = useMemo(() => {
+  // Det JEG modtager = den anden parts udgående bundt (modsat min egen afsendelse).
+  const incoming = useMemo(() => {
     if (!proposal || !party) return [];
-    return party === 'initiator' ? (proposal.offered_items || []) : (proposal.requested_items || []);
+    return party === 'initiator' ? (proposal.requested_items || []) : (proposal.offered_items || []);
   }, [proposal, party]);
-
-  const receiverInstId = party && proposal
-    ? (party === 'initiator' ? proposal.owner_institution_id : proposal.initiator_institution_id)
-    : null;
 
   const alreadyPaid = proposal && party && (party === 'owner' ? proposal.owner_paid : proposal.initiator_paid);
   const cash = proposal && party && proposal.cash_payer === party ? (Number(proposal.cash_adjustment) || 0) : 0;
@@ -62,15 +59,17 @@ export default function SwapPaymentPage() {
       if (p) {
         const myParty = p.initiator_institution_id === institutionId ? 'initiator'
           : p.owner_institution_id === institutionId ? 'owner' : null;
-        const recvId = myParty === 'initiator' ? p.owner_institution_id : p.initiator_institution_id;
-        const out = myParty === 'initiator' ? (p.offered_items || []) : (p.requested_items || []);
-        const outIds = out.map(i => i.listing_id).filter(Boolean);
-        const [{ data: recv }, { data: so }] = await Promise.all([
-          recvId ? db.from('institutions').select('name, address, zipcode, city').eq('id', recvId).maybeSingle() : Promise.resolve({ data: null }),
-          outIds.length ? db.from('shipping_options').select('shipping_size_category').in('listing_id', outIds) : Promise.resolve({ data: [] }),
+        // Modparten = afsenderen af det jeg modtager.
+        const otherId = myParty === 'initiator' ? p.owner_institution_id : p.initiator_institution_id;
+        // Størrelsen beregnes på de varer JEG modtager (den indgående pakke).
+        const inc = myParty === 'initiator' ? (p.requested_items || []) : (p.offered_items || []);
+        const incIds = inc.map(i => i.listing_id).filter(Boolean);
+        const [{ data: other }, { data: so }] = await Promise.all([
+          otherId ? db.from('institutions').select('name, address, zipcode, city').eq('id', otherId).maybeSingle() : Promise.resolve({ data: null }),
+          incIds.length ? db.from('shipping_options').select('shipping_size_category').in('listing_id', incIds) : Promise.resolve({ data: [] }),
         ]);
         if (cancelled) return;
-        setReceiver(recv || null);
+        setCounterparty(other || null);
         let best = 'medium', rank = 0;
         for (const s of (so || [])) { const r = SIZE_RANK[s.shipping_size_category] || 2; if (r > rank) { rank = r; best = s.shipping_size_category; } }
         setSizeCategory(best);
@@ -89,10 +88,10 @@ export default function SwapPaymentPage() {
       const res = await authedFetch('/api/shipping/pickup-points-all', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          zip: receiver?.zipcode || '2100',
+          zip: institution?.zipcode || '2100',    // søg udleveringssteder nær MIG (jeg afhenter)
           sizeCategory,
-          sellerName: institution?.name,          // afsender = mig
-          buyerInstitutionId: receiverInstId,     // modtager = modparten
+          sellerName: counterparty?.name,          // afsender = modparten
+          buyerInstitutionId: institutionId,       // modtager = mig
         }),
       });
       const json = await res.json();
@@ -144,12 +143,12 @@ export default function SwapPaymentPage() {
     <div style={{ maxWidth: 720, margin: '0 auto', paddingTop: 100, paddingLeft: 16, paddingRight: 16, paddingBottom: 60, fontFamily: FONT }}>
       <button onClick={() => router.push('/beskeder')} style={linkBtn}>← Tilbage til beskeder</button>
       <h1 style={{ fontFamily: FONT, fontWeight: 800, fontSize: 24, color: INK, margin: '8px 0 4px' }}>Betal din del af byttet</h1>
-      <p style={{ fontFamily: FONT, fontSize: 14, color: INK3, marginTop: 0 }}>Du sender dine varer til {receiver?.name || 'modparten'}. Vælg leveringsmetode herunder.</p>
+      <p style={{ fontFamily: FONT, fontSize: 14, color: INK3, marginTop: 0 }}>Du modtager varer fra {counterparty?.name || 'modparten'}. Vælg hvor du vil afhente pakken.</p>
 
-      {/* Dine udgående varer */}
+      {/* Varer du modtager — udleveringsstedet gælder DENNE pakke */}
       <div style={{ background: PAPER, border: `1px solid ${PAPER2}`, borderRadius: 16, padding: 16, marginBottom: 16 }}>
-        <div style={{ fontFamily: FONT, fontWeight: 800, fontSize: 13, color: INK2, marginBottom: 10 }}>Dine varer ({outgoing.length})</div>
-        {outgoing.map((it, i) => (
+        <div style={{ fontFamily: FONT, fontWeight: 800, fontSize: 13, color: INK2, marginBottom: 10 }}>Varer du modtager ({incoming.length})</div>
+        {incoming.map((it, i) => (
           <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '6px 0' }}>
             <span style={{ fontSize: 18 }}>{it.emoji || '🧸'}</span>
             <span style={{ fontFamily: FONT, fontSize: 14, color: INK }}>{it.title}</span>
@@ -162,7 +161,7 @@ export default function SwapPaymentPage() {
         <div style={{ fontFamily: FONT, fontWeight: 800, fontSize: 13, color: INK2, marginBottom: 10 }}>Leveringsmulighed</div>
         {methodCard('parcel_shop',
           pickupPoint ? `📦 ${pickupPoint.name}` : '📦 Pakkeshop',
-          pickupPoint ? pickupPoint.address : 'Vælg afhentningssted nær modparten',
+          pickupPoint ? pickupPoint.address : 'Vælg afhentningssted nær dig',
           method === 'parcel_shop' ? (pickupPoint?.price ?? null) : null,
           openPicker)}
         {methodCard('custom', '🤝 Aftalt levering', 'I aftaler selv afhentning eller levering (ingen pakkemærkat)', 0,
@@ -191,7 +190,7 @@ export default function SwapPaymentPage() {
           points={pickerData.points}
           cheapestCarrier={pickerData.cheapest_carrier}
           buyerCoords={pickerData.buyer_coords}
-          addressLabel={receiver?.name}
+          addressLabel={institution?.name}
           onConfirm={(pt) => {
             if (pt) { setPickupPoint({ id: pt.id, name: pt.name, address: pt.address, carrier_code: pt.carrier_code, price: pt.price }); setMethod('parcel_shop'); }
             setPickerOpen(false);

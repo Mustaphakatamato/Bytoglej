@@ -226,8 +226,9 @@ async function handleProposalIntent(user, supa, body) {
   if (party === 'initiator' && proposal.initiator_paid) return NextResponse.json({ error: 'Du har allerede betalt' }, { status: 409 });
   if (party === 'owner' && proposal.owner_paid) return NextResponse.json({ error: 'Du har allerede betalt' }, { status: 409 });
 
-  const outgoing = party === 'initiator' ? (proposal.offered_items || []) : (proposal.requested_items || []);
-  const receiverInstId = party === 'initiator' ? proposal.owner_institution_id : proposal.initiator_institution_id;
+  // Hver part betaler porto for den pakke de MODTAGER (modpartens udgående bundt).
+  const incoming = party === 'initiator' ? (proposal.requested_items || []) : (proposal.offered_items || []);
+  const senderInstId = party === 'initiator' ? proposal.owner_institution_id : proposal.initiator_institution_id;
 
   let myInst = null;
   if (myInstId) {
@@ -238,19 +239,20 @@ async function handleProposalIntent(user, supa, body) {
   let porto = 0;
   let sizeCategory = 'medium';
   if (deliveryMethod === 'shipping') {
-    sizeCategory = await largestSize(supa, outgoing.map(i => i.listing_id).filter(Boolean));
+    sizeCategory = await largestSize(supa, incoming.map(i => i.listing_id).filter(Boolean));
     porto = getShippingPrice('parcel_shop_gls', sizeCategory) || 0;
-    let receiverInst = null;
-    if (receiverInstId) {
-      const { data } = await supa.from('institutions').select('name, address, zipcode, city, email').eq('id', receiverInstId).maybeSingle();
-      receiverInst = data;
+    let senderInst = null;
+    if (senderInstId) {
+      const { data } = await supa.from('institutions').select('name, address, zipcode, city, email').eq('id', senderInstId).maybeSingle();
+      senderInst = data;
     }
-    if (myInst && receiverInst) {
+    if (myInst && senderInst) {
       try {
+        // Pakken sendes FRA modparten TIL mig og afhentes på MIT valgte udleveringssted.
         const quote = await getPriceQuote({
           carrier: pickupPoint?.carrier_code || 'gls', service_type: 'parcel_shop', size_category: sizeCategory,
-          sender:   { name: myInst.name, address: myInst.address, zip: myInst.zipcode, city: myInst.city, email: myInst.email },
-          receiver: { name: receiverInst.name, address: receiverInst.address, zip: receiverInst.zipcode, city: receiverInst.city, email: receiverInst.email },
+          sender:   { name: senderInst.name, address: senderInst.address, zip: senderInst.zipcode, city: senderInst.city, email: senderInst.email },
+          receiver: { name: myInst.name, address: myInst.address, zip: myInst.zipcode, city: myInst.city, email: myInst.email },
           service_point_id: pickupPointId,
         });
         if (quote?.price_dkk > 0) porto = Math.round(quote.price_dkk * 100) / 100;
@@ -294,8 +296,8 @@ async function handleProposalIntent(user, supa, body) {
   }
 
   const breakdown = [{
-    sellerName: deliveryMethod === 'shipping' ? 'Byttehandel — forsendelse af dine varer' : 'Byttehandel — aftalt levering',
-    items: outgoing.map(i => ({ title: i.title, price: 0, emoji: i.emoji })),
+    sellerName: deliveryMethod === 'shipping' ? 'Byttehandel — levering af varer til dig' : 'Byttehandel — aftalt levering',
+    items: incoming.map(i => ({ title: i.title, price: 0, emoji: i.emoji })),
     shippingTotal: porto,
     serviceFee: protection,
     ...(cash > 0 ? { cashAdjustment: cash } : {}),

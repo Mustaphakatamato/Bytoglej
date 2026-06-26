@@ -3,6 +3,7 @@ import { createClient } from '@supabase/supabase-js';
 import { requireAuth, UNAUTHORIZED } from '@/lib/api-auth';
 import { sendPushToUser } from '@/lib/push';
 import { escapeHtml } from '@/lib/escape-html';
+import { notify } from '@/lib/notify';
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
@@ -41,6 +42,28 @@ export async function POST(req) {
     if (!res.ok) {
       const body = await res.text();
       return NextResponse.json({ error: 'E-mail kunne ikke sendes', detail: body }, { status: 502 });
+    }
+
+    // Klokke-notifikation (e-mail er sendt ovenfor, push nedenfor) — så nye
+    // beskeder/modbud også lander i klokken hos modtageren.
+    if (process.env.SUPABASE_SERVICE_ROLE_KEY) {
+      try {
+        const adminSupa = createClient(
+          process.env.NEXT_PUBLIC_SUPABASE_URL,
+          process.env.SUPABASE_SERVICE_ROLE_KEY,
+          { auth: { persistSession: false } }
+        );
+        await notify(adminSupa, {
+          institutionName: ownerName || null,
+          email: ownerEmail,
+          sendEmail: false, sendPush: false, // begge håndteres separat her
+          type: messageType === 'counter' ? 'message_counter' : 'message',
+          title: messageType === 'counter' ? `${senderName} sendte et modbud` : `${senderName} sendte en besked`,
+          body: `${listingEmoji || ''} ${listingTitle}`.trim(),
+          data: { listing_title: listingTitle },
+          url: '/beskeder',
+        });
+      } catch (e) { console.error('[notify-message] klokke-fejl:', e?.message); }
     }
 
     // Send push notification to recipient (fire-and-forget)

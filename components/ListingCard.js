@@ -129,7 +129,7 @@ export default function ListingCard({ listing, onClick, favs, toggleFav, onInsti
   async function handleFav(e) {
     e.stopPropagation();
     const { data: { user } } = await db.auth.getUser();
-    if (!user) { router.push('/login'); return; }
+    if (!user) { router.push('/login?redirect=' + encodeURIComponent(window.location.pathname + window.location.search)); return; }
     setPopping(true);
     setTimeout(() => setPopping(false), 350);
     toggleFav(listing.id);

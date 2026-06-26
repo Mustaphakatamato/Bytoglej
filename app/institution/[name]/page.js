@@ -262,10 +262,24 @@ export default function InstitutionPage() {
                 {inst?.city && <span>📍 {inst.city}</span>}
                 {inst?.institution_type && <span>🏫 {inst.institution_type}</span>}
                 {inst?.ownership_type && <span>🏢 {inst.ownership_type}</span>}
-                {inst?.phone && <span>📞 {inst.phone}</span>}
               </div>
             </div>
           </div>
+
+          {/* Kontaktoplysninger — kun synlige når man er logget ind (G3) */}
+          {currentUserId ? (
+            (inst?.address || inst?.phone || inst?.contact_name) && (
+              <div style={{ display:'flex', flexDirection:'column', gap:4, fontSize:13, color:INK2, marginBottom:14 }}>
+                {inst?.address && <span>🏠 {inst.address}{inst.zipcode ? `, ${inst.zipcode}` : ''}{inst.city ? ` ${inst.city}` : ''}</span>}
+                {inst?.phone && <span>📞 {inst.phone}</span>}
+                {inst?.contact_name && <span>👤 {inst.contact_name}</span>}
+              </div>
+            )
+          ) : (
+            <div style={{ fontSize:12, color:'#888', marginBottom:14 }}>
+              🔒 <span onClick={()=>router.push('/login?redirect=' + encodeURIComponent(window.location.pathname))} style={{ color:PRIMARY, cursor:'pointer', fontWeight:700 }}>Log ind</span> for at se kontaktoplysninger (adresse, telefon, kontaktperson)
+            </div>
+          )}
           {/* Stats row */}
           <div style={{ display:'grid', gridTemplateColumns: trustScore ? 'repeat(3,1fr)' : 'repeat(2,1fr)', gap:8, marginBottom:14 }}>
             {trustScore && (

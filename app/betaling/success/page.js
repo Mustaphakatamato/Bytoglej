@@ -2,6 +2,7 @@
 import { Suspense, useEffect, useState } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
 import { db } from '@/lib/supabase';
+import { authedFetch } from '@/lib/authed-fetch';
 import { useApp } from '@/providers/AppProvider';
 import { PRIMARY, GREEN_TINT, GREEN_SOFT, INK, INK3, PAPER, PAPER3, FONT } from '@/lib/constants';
 
@@ -48,6 +49,17 @@ function SuccessContent() {
           setVerifying(false);
           return;
         }
+        // Finaliser ordren server-side (idempotent) FØR vi viser "gennemført",
+        // så Mine køb, beskeder og sælgers status er konsistente med det samme —
+        // også hvis Stripe-webhooken er forsinket eller ikke nåede frem.
+        try {
+          await authedFetch('/api/payments/finalize', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ orderId }),
+          });
+        } catch { /* webhooken er fallback — bloker ikke kvitteringen */ }
+        if (cancelled) return;
         // Ordren er verificeret — ryd nu de gemte vare-IDs fra kurven
         try {
           const raw = sessionStorage.getItem('pending_cart_ids');

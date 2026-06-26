@@ -3,6 +3,7 @@ import { requireAuth, UNAUTHORIZED } from '@/lib/api-auth';
 import { createServerClient } from '@/lib/supabase-server';
 import { resolveCallerInstitution, resolveInstitutionByName } from '@/lib/institution-server';
 import { SWAP_PROTECTION_FEE } from '@/lib/pricing';
+import { notify } from '@/lib/notify';
 
 // Køb-opslag bærer værdien i price; byt-opslag i estimated_value.
 const itemValue = l => Number(l?.price ?? l?.estimated_value) || 0;
@@ -173,13 +174,15 @@ export async function POST(req) {
   // vælte oprettelsen hvis den fejler.
   if (ownerInst?.id || ownerName) {
     try {
-      await supa.from('notifications').insert({
-        institution_id: ownerInst?.id || null,
-        institution_name: ownerInst?.name || ownerName || null,
+      // Klokke + e-mail + push i ét kald (C1).
+      await notify(supa, {
+        institutionId: ownerInst?.id || null,
+        institutionName: ownerInst?.name || ownerName || null,
         type: 'swap_proposal_received',
         title: 'Nyt bytteforslag 🔄',
         body: `${initiatorInst?.name || 'En institution'} har sendt dig et bytteforslag${cashAdjustment > 0 ? ` (+ ${cashAdjustment} kr. kontant)` : ''}.`,
         data: { proposal_id: proposal.id, conversation_id: convId },
+        url: '/beskeder',
       });
     } catch (e) { console.error('[swaps/create] notifikation fejl:', e?.message); }
   }

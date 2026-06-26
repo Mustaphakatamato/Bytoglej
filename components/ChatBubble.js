@@ -8,6 +8,8 @@ import { useWindowWidth } from '@/lib/hooks';
 
 const PANEL_W = 340;
 const SUPPORT_CONV_KEY = 'bl_support_conv_id';
+const SUPPORT_TS_KEY   = 'bl_support_last_activity'; // tidsstempel for seneste aktivitet
+const SUPPORT_IDLE_MS  = 30 * 60 * 1000;             // nulstil chat efter 30 min inaktivitet (D1)
 
 // Gør interne stier (/signup) og URL'er klikbare i support-beskeder.
 // Token-baseret for at undgå at ramme skråstreger midt i ord (fx "ja/nej").
@@ -92,6 +94,14 @@ function SupportChat({ userId, userEmail, userName, institutionName, onNavigate 
   useEffect(() => {
     const stored = localStorage.getItem(SUPPORT_CONV_KEY);
     if (!stored) return;
+    // D1: nulstil chatten hvis der er gået mere end 30 min siden seneste aktivitet,
+    // så man ikke lander i en gammel samtale når man åbner chatten igen senere.
+    const lastTs = Number(localStorage.getItem(SUPPORT_TS_KEY) || 0);
+    if (lastTs && Date.now() - lastTs > SUPPORT_IDLE_MS) {
+      localStorage.removeItem(SUPPORT_CONV_KEY);
+      localStorage.removeItem(SUPPORT_TS_KEY);
+      return; // start forfra med standard-hilsenen
+    }
     setConvId(stored);
     (async () => {
       try {
@@ -107,6 +117,11 @@ function SupportChat({ userId, userEmail, userName, institutionName, onNavigate 
   }, []);
 
   useEffect(() => { setTimeout(() => bottomRef.current?.scrollIntoView({ behavior: 'smooth' }), 60); }, [messages, loading]);
+
+  // D1: opdatér aktivitets-tidsstempel ved hver besked, så 30-min-reset måler korrekt.
+  useEffect(() => {
+    if (convId) localStorage.setItem(SUPPORT_TS_KEY, String(Date.now()));
+  }, [messages, convId]);
 
   // Realtime for logged-in users (RLS scopes reads to the owner): admin + system messages.
   useEffect(() => {

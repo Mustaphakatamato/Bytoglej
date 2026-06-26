@@ -291,19 +291,35 @@ export default function IndstillingerPage() {
   async function handleDataExport() {
     setExporting(true);
     try {
+      // Hent den pæne HTML-rapport (authed) og udskriv den til PDF via en skjult
+      // iframe — undgår popup-blokering og kræver ingen ekstra afhængigheder.
       const res = await authedFetch('/api/gdpr/export');
       if (!res.ok) throw new Error('failed');
-      const blob = await res.blob();
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      const cd = res.headers.get('Content-Disposition') || '';
-      a.download = cd.match(/filename="([^"]+)"/)?.[1] || 'bytogleg-data.json';
-      document.body.appendChild(a);
-      a.click();
-      a.remove();
-      URL.revokeObjectURL(url);
-      showToast('Dine data er downloadet ✓');
+      const html = await res.text();
+
+      const iframe = document.createElement('iframe');
+      iframe.style.position = 'fixed';
+      iframe.style.right = '0';
+      iframe.style.bottom = '0';
+      iframe.style.width = '0';
+      iframe.style.height = '0';
+      iframe.style.border = '0';
+      document.body.appendChild(iframe);
+
+      const cleanup = () => { try { iframe.remove(); } catch {} };
+      iframe.onload = () => {
+        try {
+          const win = iframe.contentWindow;
+          win.focus();
+          win.print();
+          showToast('Vælg "Gem som PDF" i printdialogen ✓');
+        } catch {
+          showToast('Kunne ikke åbne printdialogen. Prøv igen', 'error');
+        }
+        // Ryd op efter at dialogen er håndteret.
+        setTimeout(cleanup, 60000);
+      };
+      iframe.srcdoc = html;
     } catch {
       showToast('Kunne ikke hente data. Prøv igen', 'error');
     }

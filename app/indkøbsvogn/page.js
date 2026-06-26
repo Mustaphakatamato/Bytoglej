@@ -346,15 +346,18 @@ export default function CartPage() {
     if (!userId) { router.push('/login'); return; }
     if (selectedGroups.length === 0) { showToast('Vælg mindst én sælger', 'error'); return; }
 
-    // Validate delivery choices
+    // A2: Valider leveringsvalg. Betaling blokeres indtil DER er valgt en
+    // leveringsmetode for hver sælger — og et udleveringssted hvor det er relevant
+    // (pakkeshop/pakkeboks). "Afhentning" vises altid som mulighed, så et eksplicit
+    // valg kan altid foretages.
     for (const group of selectedGroups) {
       const name = group.ownerInstitutionName;
-      const firstSo = shippingOptions[group.items[0]?.listingId];
-      const canShip = firstSo?.allow_shipping || (!firstSo && listingsCanShip[group.items[0]?.listingId]);
-      if (canShip && !deliveryState[name]?.method) {
-        showToast('Vælg leveringsmetode for alle sælgere', 'error'); return;
+      const ds = deliveryState[name];
+      if (!ds?.method) {
+        showToast('Vælg en leveringsmulighed for alle sælgere', 'error'); return;
       }
-      if (deliveryState[name]?.method?.startsWith('parcel_shop_') && !pickupState[name]?.chosen) {
+      // Bemærk: 'parcel_shop' uden carrier-suffiks skal også fanges → ingen trailing '_'.
+      if (ds.method.startsWith('parcel_shop') && !(pickupState[name]?.chosen || ds.pickupPoint)) {
         showToast('Vælg et afhentningssted', 'error'); return;
       }
     }

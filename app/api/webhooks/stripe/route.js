@@ -4,6 +4,7 @@ import { createServerClient } from '@/lib/supabase-server';
 import { createShipment } from '@/lib/shipmondo/client';
 import { escapeHtml } from '@/lib/escape-html';
 import { persistSwapCO2 } from '@/lib/co2/persist-server';
+import { notify } from '@/lib/notify';
 
 function getStripe() {
   if (!process.env.STRIPE_SECRET_KEY) throw new Error('STRIPE_SECRET_KEY er ikke sat');
@@ -65,9 +66,15 @@ export async function POST(req) {
     return NextResponse.json({ received: true });
   }
 
-  const pi = event.data.object;
+  return finalizePurchase(event.data.object, supa);
+}
 
-  // Idempotency: kun ét webhook-kald må behandle ordren.
+// ── Køb (køb/byd): finaliser betaling idempotent ──────────────────
+// Udtrukket så den kan kaldes BÅDE fra webhooken OG fra klientens retur
+// (/api/payments/finalize). Dermed opdaterer én gennemført betaling altid
+// ordre, samtale, bud/tilbud og listings — uanset om webhooken nåede frem.
+export async function finalizePurchase(pi, supa) {
+  // Idempotency: kun ét kald må behandle ordren.
   // Atomisk pending → paid; hvis ingen række opdateres, er den allerede behandlet.
   const { data: claimed } = await supa
     .from('orders')
@@ -361,7 +368,7 @@ export async function POST(req) {
 // ── Byttehandel: betaling fra én part ─────────────────────────
 // Markerer parten betalt. Når BEGGE har betalt, bookes to forsendelser
 // (initiator→ejer og ejer→initiator) og handlen markeres gennemført.
-async function handleSwapPayment(pi, supa) {
+export async function handleSwapPayment(pi, supa) {
   const convId   = pi.metadata?.conversation_id;
   const party    = pi.metadata?.party === 'owner' ? 'owner' : 'initiator';
   const delivery = pi.metadata?.delivery_method || 'shipping';
@@ -458,7 +465,7 @@ async function swapBundleSize(supa, listingIds) {
   return best;
 }
 
-async function handleSwapProposalPayment(pi, supa) {
+export async function handleSwapProposalPayment(pi, supa) {
   const proposalId = pi.metadata?.swap_proposal_id;
   const party    = pi.metadata?.party === 'owner' ? 'owner' : 'initiator';
   const delivery = pi.metadata?.delivery_method || 'shipping';
@@ -499,15 +506,18 @@ async function handleSwapProposalPayment(pi, supa) {
     const offeredIds   = (p.offered_items   || []).map(i => i.listing_id).filter(Boolean);
     const requestedIds = (p.requested_items || []).map(i => i.listing_id).filter(Boolean);
 
-    // Forsendelse 1: initiator → ejer (initiators bundt), til ejers valgte udleveringssted
+    // Forsendelse 1: initiator → ejer (initiators bundt). EJER modtager denne pakke,
+    // så den bookes til EJERS valgte udleveringssted, og EJERS leveringsvalg afgør
+    // om der overhovedet bookes en label (custom = aftalt levering, ingen label).
     let initShipmentId = p.initiator_shipment_id || null;
-    if (!initShipmentId && p.initiator_delivery !== 'custom' && conv) {
-      initShipmentId = await bookSwapShipment(supa, conv, offeredIds[0], initInst, ownerInst, await swapBundleSize(supa, offeredIds), p.initiator_pickup?.id || null);
+    if (!initShipmentId && p.owner_delivery !== 'custom' && conv) {
+      initShipmentId = await bookSwapShipment(supa, conv, offeredIds[0], initInst, ownerInst, await swapBundleSize(supa, offeredIds), p.owner_pickup?.id || null);
     }
-    // Forsendelse 2: ejer → initiator (ejers bundt), til initiators valgte udleveringssted
+    // Forsendelse 2: ejer → initiator (ejers bundt). INITIATOR modtager denne pakke,
+    // så den bookes til INITIATORS valgte udleveringssted + initiators leveringsvalg.
     let ownerShipmentId = p.owner_shipment_id || null;
-    if (!ownerShipmentId && p.owner_delivery !== 'custom' && conv) {
-      ownerShipmentId = await bookSwapShipment(supa, conv, requestedIds[0], ownerInst, initInst, await swapBundleSize(supa, requestedIds), p.owner_pickup?.id || null);
+    if (!ownerShipmentId && p.initiator_delivery !== 'custom' && conv) {
+      ownerShipmentId = await bookSwapShipment(supa, conv, requestedIds[0], ownerInst, initInst, await swapBundleSize(supa, requestedIds), p.initiator_pickup?.id || null);
     }
 
     await supa.from('swap_proposals').update({
@@ -533,8 +543,9 @@ async function handleSwapProposalPayment(pi, supa) {
       : { data: [] };
     const shipById = new Map((shipRows || []).map(s => [s.id, s]));
     await Promise.all([
-      initInst?.email && sendSwapDoneEmail(initInst.email, initInst.name, shipById.get(initShipmentId), p.initiator_delivery),
-      ownerInst?.email && sendSwapDoneEmail(ownerInst.email, ownerInst.name, shipById.get(ownerShipmentId), p.owner_delivery),
+      // initShipmentId = initiators udgående pakke; om den fik label afgøres af EJERS leveringsvalg.
+      initInst?.email && sendSwapDoneEmail(initInst.email, initInst.name, shipById.get(initShipmentId), p.owner_delivery),
+      ownerInst?.email && sendSwapDoneEmail(ownerInst.email, ownerInst.name, shipById.get(ownerShipmentId), p.initiator_delivery),
     ].filter(Boolean));
 
     // Skriv tracking + mærkat ind på hver parts ordre, så Mine ordrer kan vise/downloade dem.
@@ -612,13 +623,16 @@ async function handleSwapProposalPayment(pi, supa) {
       const { data: oi } = await supa.from('institutions').select('email, name').eq('id', owingInstId).maybeSingle();
       if (oi?.email) await sendSwapNudgeEmail(oi.email, oi.name, p.payment_deadline);
       try {
-        await supa.from('notifications').insert({
-          institution_id: owingInstId,
-          institution_name: oi?.name || null,
+        // Klokke + push (e-mail sendes allerede via nudge-skabelonen ovenfor).
+        await notify(supa, {
+          institutionId: owingInstId,
+          institutionName: oi?.name || null,
+          sendEmail: false,
           type: 'swap_payment_turn',
           title: 'Det er din tur at betale 🔄',
           body: 'Modparten har betalt sin del af byttehandlen. Betal din andel for at fuldføre handlen.',
           data: { proposal_id: p.id, conversation_id: convId || p.conversation_id },
+          url: '/beskeder',
         });
       } catch (e) { console.error('[stripe-webhook] notifikation fejl:', e?.message); }
     }

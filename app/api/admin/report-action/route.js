@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { Resend } from 'resend';
 import { requireAuth, UNAUTHORIZED } from '@/lib/api-auth';
 import { createServerClient } from '@/lib/supabase-server';
+import { notify } from '@/lib/notify';
 import { escapeHtml } from '@/lib/escape-html';
 
 // Admin-handlinger på et rapporteret opslag: aktivér/inaktivér eller slet.
@@ -87,15 +88,15 @@ export async function POST(req) {
 
   if (action === 'deactivate') {
     await supa.from('listings').update({ is_active: false }).eq('id', listing.id);
-    await supa.from('notifications').insert({
-      institution_id: institutionId,
-      institution_name: listing.institution_name,
+    await notify(supa, {
+      institutionId, institutionName: listing.institution_name, sendEmail: false, // e-mail sendes nedenfor med pænere skabelon
       type: 'listing_deactivated',
       title: 'Dit opslag er gjort inaktivt',
       body: trimmed
         ? `Dit opslag "${listing.title}" er gjort inaktivt af byt&leg. ${trimmed}`
         : `Dit opslag "${listing.title}" er gjort inaktivt af byt&leg efter en indberetning.`,
       data: { listing_id: listing.id, listing_title: listing.title, message: trimmed || null },
+      url: '/mine-opslag',
     }).catch(() => {});
     await supa.from('listing_reports').update({ ...snapshot, resolution: 'deactivated' }).eq('id', report.id);
     await sendSellerEmail(sellerEmail, `Dit opslag "${listing.title}" er gjort inaktivt`,
@@ -107,13 +108,13 @@ export async function POST(req) {
       }));
   } else if (action === 'activate') {
     await supa.from('listings').update({ is_active: true }).eq('id', listing.id);
-    await supa.from('notifications').insert({
-      institution_id: institutionId,
-      institution_name: listing.institution_name,
+    await notify(supa, {
+      institutionId, institutionName: listing.institution_name, sendEmail: false,
       type: 'listing_activated',
       title: 'Dit opslag er aktivt igen',
       body: `Dit opslag "${listing.title}" er aktivt igen og synligt på markedspladsen.`,
       data: { listing_id: listing.id, listing_title: listing.title },
+      url: `/opslag/${listing.id}`,
     }).catch(() => {});
     await supa.from('listing_reports').update({ ...snapshot, resolution: null }).eq('id', report.id);
     await sendSellerEmail(sellerEmail, `Dit opslag "${listing.title}" er aktivt igen`,
@@ -132,13 +133,13 @@ export async function POST(req) {
       reviewed_by: user.email,
       reviewed_at: new Date().toISOString(),
     }).eq('id', report.id);
-    await supa.from('notifications').insert({
-      institution_id: institutionId,
-      institution_name: listing.institution_name,
+    await notify(supa, {
+      institutionId, institutionName: listing.institution_name, sendEmail: false,
       type: 'listing_removed',
       title: 'Dit opslag er fjernet',
       body: `Dit opslag "${listing.title}" er fjernet af byt&leg. Begrundelse: ${trimmed}`,
       data: { listing_id: listing.id, listing_title: listing.title, reason: trimmed },
+      url: '/mine-opslag',
     }).catch(() => {});
     await supa.from('listings').delete().eq('id', listing.id);
     await sendSellerEmail(sellerEmail, `Dit opslag "${listing.title}" er fjernet`,

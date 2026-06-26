@@ -278,7 +278,18 @@ export default function ListingDetailClient() {
     );
   }
 
-  function handleToggleFav() {
+  // Kræv login; ellers send til login med redirect tilbage til denne side.
+  async function requireLogin() {
+    const { data: { user } } = await db.auth.getUser();
+    if (!user) {
+      router.push('/login?redirect=' + encodeURIComponent(window.location.pathname + window.location.search));
+      return false;
+    }
+    return true;
+  }
+
+  async function handleToggleFav() {
+    if (!(await requireLogin())) return;
     const adding = !isFav;
     toggleFav?.(listing.id);
     setIsFav(v => !v);
@@ -787,7 +798,7 @@ export default function ListingDetailClient() {
               </button>
             </div>
             {!isOwn && (
-              <button onClick={()=>setReportModal(true)} style={{ display:'inline-flex', alignItems:'center', gap:6, alignSelf:'flex-start', background:'#fff', border:`1.5px solid ${PAPER3}`, borderRadius:12, fontSize:12, fontWeight:700, color:INK3, cursor:'pointer', fontFamily:FONT, padding:'8px 14px', marginBottom:6 }}>
+              <button onClick={async ()=>{ if (await requireLogin()) setReportModal(true); }} style={{ display:'inline-flex', alignItems:'center', gap:6, alignSelf:'flex-start', background:'#fff', border:`1.5px solid ${PAPER3}`, borderRadius:12, fontSize:12, fontWeight:700, color:INK3, cursor:'pointer', fontFamily:FONT, padding:'8px 14px', marginBottom:6 }}>
                 <span aria-hidden="true">🚩</span> Rapportér opslag
               </button>
             )}

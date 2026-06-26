@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import Stripe from 'stripe';
 import { createServerClient } from '@/lib/supabase-server';
+import { notifyFollowersAvailable } from '@/lib/follow-notify';
 
 // Vercel Cron: kører dagligt kl. 03:00 UTC (schedule i vercel.json: "0 3 * * *").
 // Hobby-planen tillader kun daglige cron-jobs; en 48t-frist fanges fint
@@ -62,6 +63,8 @@ export async function GET(req) {
     const ids = [...(p.offered_items || []), ...(p.requested_items || [])].map(i => i.listing_id).filter(Boolean);
     if (ids.length) {
       await supa.from('listings').update({ reserved_until: null, reserved_for_institution_id: null }).in('id', ids);
+      // A4: varen er ledig igen → notificér dem der følger den (favoritter).
+      await notifyFollowersAvailable(supa, ids).catch(e => console.error('[sweep] følger-notifikation fejl:', e?.message));
     }
 
     if (p.conversation_id) {

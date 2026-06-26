@@ -54,7 +54,7 @@ async function runBot(message, history) {
       content: m.content,
     }));
     const completion = await groq.chat.completions.create({
-      model: 'llama-3.3-70b-versatile',
+      model: 'openai/gpt-oss-120b', // erstatter udfaset llama-3.3-70b-versatile (Groq shutdown 2026-08-16)
       max_tokens: 300,
       temperature: 0.1, // Lav temperatur = mere faktuel, mindre kreativ
       response_format: { type: 'json_object' },

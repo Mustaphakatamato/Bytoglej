@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { requireAuth, UNAUTHORIZED } from '@/lib/api-auth';
 import { createServerClient } from '@/lib/supabase-server';
+import { notify } from '@/lib/notify';
 
 export async function POST(req) {
   const user = await requireAuth(req);
@@ -50,20 +51,21 @@ export async function POST(req) {
       review_reason: null,
     }).eq('id', listing_id);
 
-    await supa.from('notifications').insert({
-      institution_id: institutionId,
-      institution_name: listing.institution_name,
+    await notify(supa, {
+      institutionId,
+      institutionName: listing.institution_name,
       type: 'listing_review_approved',
       title: 'Dit opslag er godkendt! 🎉',
       body: `Dit opslag "${listing.title}" er godkendt og er nu live på markedspladsen.`,
       data: { listing_id: listing.id, listing_title: listing.title },
+      url: `/opslag/${listing.id}`,
     }).catch(() => {});
   } else {
     await supa.from('listings').delete().eq('id', listing_id);
 
-    await supa.from('notifications').insert({
-      institution_id: institutionId,
-      institution_name: listing.institution_name,
+    await notify(supa, {
+      institutionId,
+      institutionName: listing.institution_name,
       type: 'listing_review_rejected',
       title: 'Dit opslag kunne ikke godkendes',
       body: `Dit opslag "${listing.title}" kunne ikke godkendes. Begrundelse: ${reason.trim()}`,
