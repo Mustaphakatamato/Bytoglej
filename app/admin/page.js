@@ -1878,8 +1878,35 @@ function SupportTab({ isMobile }) {
   const [sending, setSending]     = useState(false);
   const [loading, setLoading]     = useState(true);
   const [statusFilter, setStatusFilter] = useState('');
+  const [assisting, setAssisting] = useState(false);   // AI-forslag indlæses
+  const [aiSummary, setAiSummary] = useState('');       // AI: hvad handler det om
+  const [aiNeedsInfo, setAiNeedsInfo] = useState([]);   // AI: hvad skal tjekkes
   const bottomRef = useRef(null);
   const inputRef  = useRef(null);
+
+  // Bed AI om et svarudkast ud fra samtalens kontekst. Hvis svar-feltet allerede
+  // har tekst, bruges den som instruktion ("skriv et svar der ...").
+  async function suggestReply() {
+    if (assisting || !active) return;
+    setAssisting(true);
+    setAiSummary(''); setAiNeedsInfo([]);
+    try {
+      const res = await fetch('/api/support-chat/assist', {
+        method: 'POST',
+        headers: await authHeaders(),
+        body: JSON.stringify({ conversationId: active.id, instruction: reply.trim() || undefined }),
+      });
+      const data = await res.json();
+      if (data.error) { alert(data.error); }
+      else {
+        if (data.draft) setReply(data.draft);
+        if (data.summary) setAiSummary(data.summary);
+        if (Array.isArray(data.needs_info)) setAiNeedsInfo(data.needs_info);
+      }
+    } catch { alert('AI-forslag fejlede. Prøv igen.'); }
+    setAssisting(false);
+    setTimeout(() => inputRef.current?.focus(), 60);
+  }
 
   const STATUS_LABELS = {
     bot:           { label: 'Bot', bg: '#E0E7FF', color: '#3730A3' },
@@ -1925,6 +1952,7 @@ function SupportTab({ isMobile }) {
   async function openConv(conv) {
     setActive(conv);
     setReply('');
+    setAiSummary(''); setAiNeedsInfo([]);
     setMessages([]);
     const { data } = await db.from('support_messages')
       .select('*').eq('conversation_id', conv.id).order('created_at', { ascending: true });
@@ -1949,6 +1977,7 @@ function SupportTab({ isMobile }) {
     });
     setConvs(cs => cs.map(c => c.id === active.id ? { ...c, last_message: content, status: 'open' } : c));
     setActive(a => a ? { ...a, status: 'open' } : a);
+    setAiSummary(''); setAiNeedsInfo([]);
     setSending(false);
     inputRef.current?.focus();
   }
@@ -2079,23 +2108,62 @@ function SupportTab({ isMobile }) {
               <div ref={bottomRef} />
             </div>
 
-            {/* Reply input */}
+            {/* Reply input + AI-assistent */}
             {active.status !== 'closed' && (
-              <div style={{ borderTop: `1px solid ${PAPER3}`, padding: '10px 14px', display: 'flex', gap: 8, flexShrink: 0, background: PAPER }}>
-                <input
-                  ref={inputRef}
-                  value={reply}
-                  onChange={e => setReply(e.target.value)}
-                  onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendReply(); } }}
-                  placeholder="Skriv svar til brugeren…"
-                  style={{ flex: 1, padding: '9px 14px', borderRadius: 99, border: `1.5px solid ${PAPER3}`, fontSize: 13, fontFamily: FONT, outline: 'none', background: PAPER2, color: INK }}
-                />
-                <button
-                  onClick={sendReply}
-                  disabled={sending || !reply.trim()}
-                  style={{ padding: '0 18px', height: 38, borderRadius: 99, background: reply.trim() && !sending ? PRIMARY : PAPER3, color: reply.trim() && !sending ? '#fff' : INK3, border: 'none', fontFamily: FONT, fontWeight: 700, fontSize: 13, cursor: reply.trim() && !sending ? 'pointer' : 'default', transition: 'background 0.15s', flexShrink: 0 }}>
-                  Send
-                </button>
+              <div style={{ borderTop: `1px solid ${PAPER3}`, flexShrink: 0, background: PAPER }}>
+
+                {/* AI-resumé + ting at tjekke (vises efter et forslag) */}
+                {(aiSummary || aiNeedsInfo.length > 0) && (
+                  <div style={{ padding: '10px 14px 0' }}>
+                    <div style={{ background: '#F5F3FF', border: '1px solid #E0E7FF', borderRadius: 10, padding: '8px 12px' }}>
+                      {aiSummary && (
+                        <div style={{ fontSize: 12, color: INK, fontFamily: FONT, lineHeight: 1.5 }}>
+                          <span style={{ fontWeight: 700, color: '#5B21B6' }}>✨ Resumé: </span>{aiSummary}
+                        </div>
+                      )}
+                      {aiNeedsInfo.length > 0 && (
+                        <div style={{ marginTop: 6, display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+                          {aiNeedsInfo.map((t, i) => (
+                            <span key={i} style={{ fontSize: 11, fontWeight: 600, color: '#92400E', background: '#FEF9C3', borderRadius: 99, padding: '2px 10px', fontFamily: FONT }}>
+                              Tjek: {t}
+                            </span>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
+
+                {/* AI-knaprække */}
+                <div style={{ padding: '10px 14px 0', display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <button
+                    onClick={suggestReply}
+                    disabled={assisting}
+                    style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '6px 12px', borderRadius: 99, border: `1.5px solid ${assisting ? PAPER3 : '#C4B5FD'}`, background: assisting ? PAPER2 : '#F5F3FF', color: assisting ? INK3 : '#5B21B6', fontFamily: FONT, fontWeight: 700, fontSize: 12, cursor: assisting ? 'default' : 'pointer' }}>
+                    {assisting ? 'AI tænker…' : (reply.trim() ? '✨ Forbedr / udfyld svar' : '✨ Foreslå svar')}
+                  </button>
+                  <span style={{ fontSize: 11, color: INK3, fontFamily: FONT }}>
+                    AI læser samtalen — du godkender før afsendelse
+                  </span>
+                </div>
+
+                <div style={{ padding: '10px 14px', display: 'flex', gap: 8, alignItems: 'flex-end' }}>
+                  <textarea
+                    ref={inputRef}
+                    value={reply}
+                    onChange={e => setReply(e.target.value)}
+                    onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendReply(); } }}
+                    placeholder="Skriv svar til brugeren… (Enter sender, Shift+Enter ny linje)"
+                    rows={2}
+                    style={{ flex: 1, padding: '9px 14px', borderRadius: 16, border: `1.5px solid ${PAPER3}`, fontSize: 13, fontFamily: FONT, outline: 'none', background: PAPER2, color: INK, resize: 'vertical', minHeight: 38, boxSizing: 'border-box' }}
+                  />
+                  <button
+                    onClick={sendReply}
+                    disabled={sending || !reply.trim()}
+                    style={{ padding: '0 18px', height: 38, borderRadius: 99, background: reply.trim() && !sending ? PRIMARY : PAPER3, color: reply.trim() && !sending ? '#fff' : INK3, border: 'none', fontFamily: FONT, fontWeight: 700, fontSize: 13, cursor: reply.trim() && !sending ? 'pointer' : 'default', transition: 'background 0.15s', flexShrink: 0 }}>
+                    Send
+                  </button>
+                </div>
               </div>
             )}
           </div>
