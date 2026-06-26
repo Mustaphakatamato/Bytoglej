@@ -336,7 +336,7 @@ function SearchBar({ transparent, router }) {
   );
 
   return (
-    <div ref={wrapRef} style={{ flex:1, maxWidth:560, position:'relative' }}>
+    <div ref={wrapRef} style={{ flex:1, maxWidth:760, position:'relative' }}>
       <form onSubmit={submit}>
         <div style={{
           display:'flex', alignItems:'center', gap:8,
