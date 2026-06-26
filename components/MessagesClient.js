@@ -613,9 +613,10 @@ export default function MessagesClient() {
       const imageContent = JSON.stringify({ urls, caption: content });
       setChatImages([]);
       const { data: imgMsg } = await db.from('chat_messages').insert({ conversation_id: active.id, sender_id: effectiveUserId, sender_name: senderName, content: imageContent, message_type: 'image' }).select().single();
-      const unreadPatch = isInit ? { owner_unread: (active.owner_unread||0)+1 } : { initiator_unread: (active.initiator_unread||0)+1 };
-      const updated = { last_message: '📷 Billede', last_message_at: new Date().toISOString(), ...unreadPatch };
+      const updated = { last_message: '📷 Billede', last_message_at: new Date().toISOString() };
       await db.from('conversations').update(updated).eq('id', active.id);
+      // Inkrementér modtagerens ulæst-tæller atomisk i DB (undgår opblæsning fra forældet cache).
+      await db.rpc('bump_conv_unread', { p_conv_id: active.id, p_field: isInit ? 'owner_unread' : 'initiator_unread' });
       setActive(a => ({ ...a, ...updated }));
       setConvs(cs => cs.map(c => c.id === active.id ? { ...c, ...updated } : c).sort((a,b) => new Date(b.last_message_at)-new Date(a.last_message_at)));
       if (imgMsg) {
@@ -627,9 +628,10 @@ export default function MessagesClient() {
       return;
     }
     const { data: txtMsg } = await db.from('chat_messages').insert({ conversation_id: active.id, sender_id: effectiveUserId, sender_name: senderName, content }).select().single();
-    const unreadPatch = isInit ? { owner_unread: (active.owner_unread||0)+1 } : { initiator_unread: (active.initiator_unread||0)+1 };
-    const updated = { last_message: content, last_message_at: new Date().toISOString(), ...unreadPatch };
+    const updated = { last_message: content, last_message_at: new Date().toISOString() };
     await db.from('conversations').update(updated).eq('id', active.id);
+    // Inkrementér modtagerens ulæst-tæller atomisk i DB (undgår opblæsning fra forældet cache).
+    await db.rpc('bump_conv_unread', { p_conv_id: active.id, p_field: isInit ? 'owner_unread' : 'initiator_unread' });
     setActive(a => ({ ...a, ...updated }));
     setConvs(cs => cs.map(c => c.id === active.id ? { ...c, ...updated } : c).sort((a,b) => new Date(b.last_message_at)-new Date(a.last_message_at)));
     if (txtMsg) {
@@ -839,10 +841,10 @@ export default function MessagesClient() {
     const now = new Date().toISOString();
     const upd = {
       last_message: confirmMsg, last_message_at: now,
-      initiator_unread: (active.initiator_unread||0)+1,
       is_handled: true, handled_at: now, handled_action: 'accepted',
     };
     await db.from('conversations').update(upd).eq('id', active.id);
+    await db.rpc('bump_conv_unread', { p_conv_id: active.id, p_field: 'initiator_unread' });
     setActive(a => ({ ...a, ...upd }));
     setConvs(cs => cs.map(c => c.id === active.id ? { ...c, ...upd } : c));
     setMessages(ms => [...ms.map(m => m.id === msg.id ? { ...m, bid_status: 'accepted' } : m), ...(newMsg ? [newMsg] : [])]);
@@ -878,11 +880,11 @@ export default function MessagesClient() {
     const now = new Date().toISOString();
     const upd = {
       last_message: confirmContent, last_message_at: now,
-      owner_unread: (active.owner_unread||0)+1,
       deal_completed: true, deal_completed_at: now,
       deal_type: checkoutData.deal_type || 'byd',
     };
     await db.from('conversations').update(upd).eq('id', active.id);
+    await db.rpc('bump_conv_unread', { p_conv_id: active.id, p_field: 'owner_unread' });
     setActive(a => ({ ...a, ...upd }));
     setConvs(cs => cs.map(c => c.id === active.id ? { ...c, ...upd } : c));
     setMessages(ms => [
@@ -949,9 +951,9 @@ export default function MessagesClient() {
       is_handled: true, handled_at: now, handled_action: 'accepted',
       last_message: '🔄 Byttehandel godkendt. Begge parter betaler for forsendelse',
       last_message_at: now,
-      initiator_unread: (active.initiator_unread||0)+1,
     };
     await db.from('conversations').update(upd).eq('id', active.id);
+    await db.rpc('bump_conv_unread', { p_conv_id: active.id, p_field: 'initiator_unread' });
     setActive(a => ({ ...a, ...upd }));
     setConvs(cs => cs.map(c => c.id === active.id ? { ...c, ...upd } : c));
     setMessages(ms => ms.map(x => x.id === msg.id ? { ...x, bid_status: 'accepted' } : x));
@@ -966,10 +968,10 @@ export default function MessagesClient() {
     const now = new Date().toISOString();
     const upd = {
       last_message: rejectMsg, last_message_at: now,
-      initiator_unread: (active.initiator_unread||0)+1,
       is_handled: true, handled_at: now, handled_action: 'rejected',
     };
     await db.from('conversations').update(upd).eq('id', active.id);
+    await db.rpc('bump_conv_unread', { p_conv_id: active.id, p_field: 'initiator_unread' });
     setActive(a => ({ ...a, ...upd }));
     setConvs(cs => cs.map(c => c.id === active.id ? { ...c, ...upd } : c));
     setMessages(ms => ms.map(x => x.id === msg.id ? { ...x, bid_status: 'rejected' } : x));
@@ -1026,10 +1028,10 @@ export default function MessagesClient() {
     const now = new Date().toISOString();
     const upd = {
       last_message: rejectMsg, last_message_at: now,
-      initiator_unread: (active.initiator_unread||0)+1,
       is_handled: true, handled_at: now, handled_action: 'rejected',
     };
     await db.from('conversations').update(upd).eq('id', active.id);
+    await db.rpc('bump_conv_unread', { p_conv_id: active.id, p_field: 'initiator_unread' });
     setActive(a => ({ ...a, ...upd }));
     setConvs(cs => cs.map(c => c.id === active.id ? { ...c, ...upd } : c));
     setMessages(ms => ms.map(m => m.id === msg.id ? { ...m, bid_status: 'rejected', bid_note: rejectNote } : m));
@@ -1051,10 +1053,10 @@ export default function MessagesClient() {
     const now = new Date().toISOString();
     const upd = {
       last_message: counterContent, last_message_at: now,
-      initiator_unread: (active.initiator_unread||0)+1,
       is_handled: true, handled_at: now, handled_action: 'countered',
     };
     await db.from('conversations').update(upd).eq('id', active.id);
+    await db.rpc('bump_conv_unread', { p_conv_id: active.id, p_field: 'initiator_unread' });
     setActive(a => ({ ...a, ...upd }));
     setConvs(cs => cs.map(c => c.id === active.id ? { ...c, ...upd } : c));
     setCounterBidMsg(null); setCounterAmount('');
@@ -1623,8 +1625,9 @@ export default function MessagesClient() {
                                           await db.from('listings').update({ is_sold: true, is_active: false, sold_at: new Date().toISOString(), sold_to: active.initiator_name, sold_to_institution_id: active.initiator_institution_id }).eq('id', item.listingId);
                                         }
                                         const now = new Date().toISOString();
-                                        const convUpd = { last_message: confirmMsg, last_message_at: now, initiator_unread: (active.initiator_unread||0)+1, is_handled: true, handled_at: now, handled_action: 'order_confirmed', deal_type: 'køb' };
+                                        const convUpd = { last_message: confirmMsg, last_message_at: now, is_handled: true, handled_at: now, handled_action: 'order_confirmed', deal_type: 'køb' };
                                         await db.from('conversations').update(convUpd).eq('id', active.id);
+                                        await db.rpc('bump_conv_unread', { p_conv_id: active.id, p_field: 'initiator_unread' });
                                         setMessages(ms => [...ms, ...(newMsg ? [newMsg] : [])]);
                                         setActive(a => ({ ...a, ...convUpd }));
                                         setConvs(cs => cs.map(c => c.id === active.id ? { ...c, ...convUpd } : c));
@@ -1696,8 +1699,9 @@ export default function MessagesClient() {
                                           const msg = `✅ Afhentning bekræftet af ${senderName}.`;
                                           const { data: newMsg } = await db.from('chat_messages').insert({ conversation_id: active.id, sender_id: effUid, sender_name: senderName, content: msg }).select().single();
                                           const now = new Date().toISOString();
-                                          const convUpd = { last_message: msg, last_message_at: now, initiator_unread: (active.initiator_unread||0)+1, deal_completed: true, deal_completed_at: now };
+                                          const convUpd = { last_message: msg, last_message_at: now, deal_completed: true, deal_completed_at: now };
                                           await db.from('conversations').update(convUpd).eq('id', active.id);
+                                          await db.rpc('bump_conv_unread', { p_conv_id: active.id, p_field: 'initiator_unread' });
                                           const convWithFallback = active.initiator_institution_id ? active : { ...active, initiator_institution_id: ctxInstId || null };
                                           persistCO2Saving(convWithFallback, buyData?.items?.[0]?.category || null);
                                           if (newMsg) setMessages(ms => [...ms, newMsg]);
@@ -1993,8 +1997,9 @@ export default function MessagesClient() {
                                             message_type: 'checkout_pending',
                                           }).select().single();
                                           const now = new Date().toISOString();
-                                          const upd = { last_message: previewMsg, last_message_at: now, initiator_unread: (active.initiator_unread||0)+1, is_handled: true, handled_at: now, handled_action: 'accepted' };
+                                          const upd = { last_message: previewMsg, last_message_at: now, is_handled: true, handled_at: now, handled_action: 'accepted' };
                                           await db.from('conversations').update(upd).eq('id', active.id);
+                                          await db.rpc('bump_conv_unread', { p_conv_id: active.id, p_field: 'initiator_unread' });
                                           setActive(a => ({ ...a, ...upd }));
                                           setConvs(cs => cs.map(c => c.id === active.id ? { ...c, ...upd } : c));
                                           setMessages(ms => [...ms.map(x => x.id === m.id ? { ...x, bid_status: 'accepted' } : x), ...(newMsg ? [newMsg] : [])]);
@@ -2009,8 +2014,9 @@ export default function MessagesClient() {
                                           const rejectMsg = `❌ ${senderName} har afvist dit bundttilbud.`;
                                           const { data: newMsg } = await db.from('chat_messages').insert({ conversation_id: active.id, sender_id: effUid, sender_name: senderName, content: rejectMsg }).select().single();
                                           const now = new Date().toISOString();
-                                          const upd = { last_message: rejectMsg, last_message_at: now, initiator_unread: (active.initiator_unread||0)+1, is_handled: true, handled_at: now, handled_action: 'rejected' };
+                                          const upd = { last_message: rejectMsg, last_message_at: now, is_handled: true, handled_at: now, handled_action: 'rejected' };
                                           await db.from('conversations').update(upd).eq('id', active.id);
+                                          await db.rpc('bump_conv_unread', { p_conv_id: active.id, p_field: 'initiator_unread' });
                                           setActive(a => ({ ...a, ...upd }));
                                           setConvs(cs => cs.map(c => c.id === active.id ? { ...c, ...upd } : c));
                                           setMessages(ms => [...ms.map(x => x.id === m.id ? { ...x, bid_status: 'rejected' } : x), ...(newMsg ? [newMsg] : [])]);
@@ -2033,8 +2039,9 @@ export default function MessagesClient() {
                                           const retractMsg = `↩️ ${senderName} har trukket sin accept af bundttilbuddet tilbage.`;
                                           const { data: newMsg } = await db.from('chat_messages').insert({ conversation_id: active.id, sender_id: effUid, sender_name: senderName, content: retractMsg }).select().single();
                                           const now = new Date().toISOString();
-                                          const upd = { last_message: retractMsg, last_message_at: now, initiator_unread: (active.initiator_unread||0)+1, is_handled: false, handled_at: null, handled_action: null };
+                                          const upd = { last_message: retractMsg, last_message_at: now, is_handled: false, handled_at: null, handled_action: null };
                                           await db.from('conversations').update(upd).eq('id', active.id);
+                                          await db.rpc('bump_conv_unread', { p_conv_id: active.id, p_field: 'initiator_unread' });
                                           setActive(a => ({ ...a, ...upd }));
                                           setConvs(cs => cs.map(c => c.id === active.id ? { ...c, ...upd } : c));
                                           setMessages(ms => [...ms.map(x => x.id === m.id ? { ...x, bid_status: 'pending' } : x), ...(newMsg ? [newMsg] : [])]);
