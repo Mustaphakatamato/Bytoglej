@@ -3,6 +3,7 @@ import { createClient } from '@supabase/supabase-js';
 import { requireAuth, UNAUTHORIZED } from '@/lib/api-auth';
 import { checkIsAdmin } from '@/lib/admin';
 import { escapeHtml } from '@/lib/escape-html';
+import { brandedEmail } from '@/lib/email-template';
 
 const adminDb = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL,
@@ -25,16 +26,18 @@ async function notifyUser(conv, message) {
         from: 'byt&leg <noreply@bytogleg.dk>',
         to: [to],
         subject: 'Svar fra byt&leg support',
-        html: `
-          <div style="font-family:Arial,sans-serif;max-width:560px;margin:0 auto;padding:24px;">
-            <h2 style="color:#1B4332;margin:0 0 16px;">Du har fået svar fra supporten</h2>
-            <p style="color:#3A473D;font-size:15px;margin:0 0 16px;">${name ? `Hej ${escapeHtml(name)},` : 'Hej,'}</p>
-            <p style="color:#3A473D;font-size:15px;margin:0 0 8px;">Vores supportteam har svaret på din henvendelse:</p>
-            <div style="background:#E8F1EC;border-radius:12px;padding:16px 18px;color:#16221C;font-size:15px;line-height:1.6;white-space:pre-wrap;margin:0 0 20px;">${escapeHtml(message)}</div>
-            <a href="${base}/kontakt" style="display:inline-block;background:#2A7D4F;color:#fff;text-decoration:none;font-weight:700;font-size:14px;padding:12px 24px;border-radius:999px;">Åbn chatten og svar</a>
-            <p style="color:#6B7570;font-size:12px;margin:24px 0 0;">Du modtager denne mail fordi du har skrevet til byt&amp;leg support. Åbn chat-boblen på platformen for at fortsætte samtalen.</p>
-          </div>
-        `,
+        html: brandedEmail({
+          heading: 'Du har fået svar fra supporten',
+          bodyHtml: `
+            <p style="margin:0 0 16px;">${name ? `Hej ${escapeHtml(name)},` : 'Hej,'}</p>
+            <p style="margin:0 0 8px;">Vores supportteam har svaret på din henvendelse:</p>
+            <div style="background:#E8F1EC;border-radius:12px;padding:16px 18px;color:#16221C;font-size:15px;line-height:1.6;white-space:pre-wrap;margin:0 0 8px;">${escapeHtml(message)}</div>
+            <p style="color:#6B7570;font-size:12px;margin:20px 0 0;">Du modtager denne mail fordi du har skrevet til byt&amp;leg support. Åbn chat-boblen på platformen for at fortsætte samtalen.</p>
+          `,
+          ctaText: 'Åbn chatten og svar',
+          ctaUrl: `${base}/kontakt`,
+          preheader: 'Du har fået svar fra byt&leg support',
+        }),
       }),
     });
     if (!res.ok) console.error('[support-reply] Resend fejl:', res.status, await res.text());

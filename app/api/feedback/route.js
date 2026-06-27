@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { requireAuth, UNAUTHORIZED } from '@/lib/api-auth';
 import { escapeHtml } from '@/lib/escape-html';
+import { brandedEmail } from '@/lib/email-template';
 
 const adminDb = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL,
@@ -53,9 +54,9 @@ export async function POST(req) {
           from: 'byt&leg <noreply@bytogleg.dk>',
           to: [to],
           subject: `[Pilot-feedback] ${categoryLabel}: ${institutionName || userEmail || 'Ukendt'}`,
-          html: `
-            <div style="font-family:Arial,sans-serif;max-width:560px;margin:0 auto;padding:24px;">
-              <h2 style="color:#1B4332;margin:0 0 16px;">Ny pilot-feedback</h2>
+          html: brandedEmail({
+            heading: 'Ny pilot-feedback',
+            bodyHtml: `
               <table style="width:100%;border-collapse:collapse;">
                 <tr><td style="padding:8px 0;color:#6B7570;width:120px;vertical-align:top;">Kategori</td><td style="padding:8px 0;font-weight:600;">${categoryLabel}</td></tr>
                 <tr><td style="padding:8px 0;color:#6B7570;vertical-align:top;">Institution</td><td style="padding:8px 0;">${escapeHtml(institutionName) || '—'}</td></tr>
@@ -65,8 +66,8 @@ export async function POST(req) {
                 ${screenshotRow}
               </table>
               ${screenshotUrl ? `<img src="${escapeHtml(screenshotUrl)}" alt="Screenshot" style="margin-top:16px;max-width:100%;border-radius:8px;border:1px solid #e5e7eb;" />` : ''}
-            </div>
-          `,
+            `,
+          }),
         }),
       });
 

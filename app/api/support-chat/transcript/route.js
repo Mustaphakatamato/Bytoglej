@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { escapeHtml } from '@/lib/escape-html';
+import { brandedEmail } from '@/lib/email-template';
 
 export const maxDuration = 30;
 
@@ -76,12 +77,15 @@ export async function POST(req) {
         from: 'byt&leg <noreply@bytogleg.dk>',
         to: [to],
         subject: 'Din chat-udskrift fra byt&leg',
-        html: `<div style="font-family:Arial,sans-serif;max-width:620px;margin:0 auto;padding:24px;">
-          <h2 style="color:#1B4332;margin:0 0 4px;">Din chat-udskrift</h2>
-          <p style="color:#6B7570;font-size:13px;margin:0 0 20px;">Samtale med byt&amp;leg support</p>
-          <table style="width:100%;border-collapse:collapse;border-top:1px solid #DAD3C4;">${rows || '<tr><td>Ingen beskeder</td></tr>'}</table>
-          <p style="color:#6B7570;font-size:12px;margin:24px 0 0;">Du modtager denne udskrift fordi den blev anmodet i chatten. Spørgsmål? Skriv til support@bytogleg.dk</p>
-        </div>`,
+        html: brandedEmail({
+          heading: 'Din chat-udskrift',
+          bodyHtml: `
+            <p style="color:#6B7570;font-size:13px;margin:0 0 20px;">Samtale med byt&amp;leg support</p>
+            <table style="width:100%;border-collapse:collapse;border-top:1px solid #DAD3C4;">${rows || '<tr><td>Ingen beskeder</td></tr>'}</table>
+            <p style="color:#6B7570;font-size:12px;margin:24px 0 0;">Du modtager denne udskrift fordi den blev anmodet i chatten. Spørgsmål? Skriv til support@bytogleg.dk</p>
+          `,
+          preheader: 'Din chat-udskrift fra byt&leg support',
+        }),
       }),
     });
     if (!res.ok) { console.error('[transcript] Resend fejl:', res.status, await res.text()); return NextResponse.json({ error: 'Kunne ikke sende' }, { status: 500 }); }

@@ -4,23 +4,25 @@ import { requireAuth, UNAUTHORIZED } from '@/lib/api-auth';
 import { createServerClient } from '@/lib/supabase-server';
 import { notify } from '@/lib/notify';
 import { escapeHtml } from '@/lib/escape-html';
+import { brandedEmail } from '@/lib/email-template';
 
 // Admin-handlinger på et rapporteret opslag: aktivér/inaktivér eller slet.
 // Alle sender notifikation + e-mail til sælger. Spejler /api/admin/review-listing.
 const FROM = 'byt&leg <noreply@bytogleg.dk>';
 
 function sellerEmailHtml({ heading, contact, intro, reason }) {
-  return `
-    <div style="font-family:Arial,sans-serif;max-width:560px;margin:0 auto;padding:24px">
-      <h2 style="color:#133F2B;margin:0 0 16px">${heading}</h2>
-      <p style="font-size:14px;color:#16221c;line-height:1.6;margin:0 0 12px">Hej ${escapeHtml(contact || '')},</p>
-      <p style="font-size:14px;color:#16221c;line-height:1.6;margin:0 0 16px">${intro}</p>
+  return brandedEmail({
+    heading,
+    bodyHtml: `
+      <p style="margin:0 0 12px">Hej ${escapeHtml(contact || '')},</p>
+      <p style="margin:0 0 16px">${intro}</p>
       ${reason ? `<div style="background:#FEF2F2;border-left:3px solid #DC2626;border-radius:8px;padding:14px 16px;margin:0 0 16px">
         <div style="font-size:12px;color:#991B1B;font-weight:700;margin-bottom:4px">Begrundelse</div>
         <div style="font-size:14px;color:#16221c;white-space:pre-wrap">${escapeHtml(reason)}</div>
       </div>` : ''}
       <p style="font-size:13px;color:#6B7570;line-height:1.6;margin:0">Har du spørgsmål, kan du svare på denne mail eller kontakte os via support.</p>
-    </div>`;
+    `,
+  });
 }
 
 async function sendSellerEmail(to, subject, html) {
