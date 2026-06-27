@@ -2,6 +2,8 @@ import Groq from 'groq-sdk';
 import { NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { SUPPORT_FACTS } from '@/lib/support-knowledge';
+import { brandedEmail } from '@/lib/email-template';
+import { escapeHtml } from '@/lib/escape-html';
 
 export const maxDuration = 30;
 
@@ -97,11 +99,14 @@ async function sendHandoffEmail(conv) {
         from: 'byt&leg <noreply@bytogleg.dk>',
         to: [to],
         subject: 'Vi har modtaget din henvendelse',
-        html: `<div style="font-family:Arial,sans-serif;max-width:560px;margin:0 auto;padding:24px;">
-          <h2 style="color:#1B4332;margin:0 0 16px;">Tak for din henvendelse</h2>
-          <p style="color:#3A473D;font-size:15px;line-height:1.6;">${name ? `Hej ${name},` : 'Hej,'}</p>
-          <p style="color:#3A473D;font-size:15px;line-height:1.6;">Vores supportteam har modtaget din besked og vender tilbage hurtigst muligt — typisk inden for 1-2 hverdage. Du får en mail når vi svarer, og du kan altid følge med i chat-boblen på platformen.</p>
-        </div>`,
+        html: brandedEmail({
+          heading: 'Tak for din henvendelse',
+          bodyHtml: `
+            <p style="margin:0 0 12px;">${name ? `Hej ${escapeHtml(name)},` : 'Hej,'}</p>
+            <p style="margin:0;">Vores supportteam har modtaget din besked og vender tilbage hurtigst muligt — typisk inden for 1-2 hverdage. Du får en mail når vi svarer, og du kan altid følge med i chat-boblen på platformen.</p>
+          `,
+          preheader: 'Vi har modtaget din henvendelse og vender tilbage hurtigst muligt',
+        }),
       }),
     });
   } catch (e) { console.error('[support] handoff email fejl:', e.message); }

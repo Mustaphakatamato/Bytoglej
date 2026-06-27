@@ -3,6 +3,7 @@ import { Resend } from 'resend';
 import { requireAuth, UNAUTHORIZED } from '@/lib/api-auth';
 import { createServerClient } from '@/lib/supabase-server';
 import { escapeHtml } from '@/lib/escape-html';
+import { brandedEmail } from '@/lib/email-template';
 
 const ADMIN_NOTIFICATION_EMAIL = process.env.ADMIN_NOTIFICATION_EMAIL || 'admin@bytogleg.dk';
 
@@ -43,19 +44,19 @@ export async function POST(req) {
       from: 'byt&leg <noreply@bytogleg.dk>',
       to: ADMIN_NOTIFICATION_EMAIL,
       subject: `Rapporteret opslag: ${listingTitle || listingId}`,
-      html: `
-        <div style="font-family:sans-serif;max-width:560px;margin:0 auto">
-          <h2 style="color:#133F2B">Opslag rapporteret</h2>
+      html: brandedEmail({
+        heading: 'Opslag rapporteret',
+        bodyHtml: `
           <table style="width:100%;border-collapse:collapse;font-size:14px">
             <tr><td style="padding:8px 0;color:#666;width:140px">Opslag ID</td><td style="padding:8px 0;font-weight:600">${listingId}</td></tr>
             <tr><td style="padding:8px 0;color:#666">Titel</td><td style="padding:8px 0;font-weight:600">${listingTitle || '—'}</td></tr>
             <tr><td style="padding:8px 0;color:#666">Årsag</td><td style="padding:8px 0;font-weight:600;color:#e11d48">${reason}</td></tr>
             <tr><td style="padding:8px 0;color:#666">Rapporteret af</td><td style="padding:8px 0">${reporterName || 'Ukendt'}</td></tr>
             ${note ? `<tr><td style="padding:8px 0;color:#666;vertical-align:top">Note</td><td style="padding:8px 0">${note}</td></tr>` : ''}
-          </table>
-          <a href="https://bytogleg.dk/admin" style="display:inline-block;margin-top:20px;background:#133F2B;color:#fff;padding:10px 24px;border-radius:99px;text-decoration:none;font-weight:700">Gå til admin →</a>
-        </div>
-      `,
+          </table>`,
+        ctaText: 'Gå til admin',
+        ctaUrl: 'https://bytogleg.dk/admin',
+      }),
     });
 
     return NextResponse.json({ ok: true });
