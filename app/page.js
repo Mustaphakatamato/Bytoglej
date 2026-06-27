@@ -897,7 +897,7 @@ export default function HomePage() {
 
   useEffect(() => {
     Promise.all([
-      db.from('institutions').select('id', { count: 'exact', head: true }),
+      db.from('institutions_public').select('id', { count: 'exact', head: true }),
       db.from('listings').select('id', { count: 'exact', head: true }).eq('is_active', true).eq('is_sold', false),
       db.from('conversations').select('id', { count: 'exact', head: true }).eq('deal_completed', true),
     ]).then(([{ count: instCount }, { count: listCount }, { count: dealCount }]) => {

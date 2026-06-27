@@ -470,15 +470,26 @@ export async function handleSwapProposalPayment(pi, supa) {
   const party    = pi.metadata?.party === 'owner' ? 'owner' : 'initiator';
   const delivery = pi.metadata?.delivery_method || 'shipping';
 
-  // Idempotency: kun ét webhook-kald må behandle denne betaling.
-  const { data: claimed } = await supa
+  // Idempotency: kun ét webhook-kald må markere DENNE betaling betalt.
+  let { data: claimed } = await supa
     .from('orders')
     .update({ status: 'paid', paid_at: new Date().toISOString() })
     .eq('payment_intent_id', pi.id)
     .eq('status', 'pending')
     .select()
     .maybeSingle();
-  if (!claimed) return NextResponse.json({ received: true, already_processed: true });
+  // Hvis claim'et fejler er det enten en dublet-webhook ELLER et retry efter et
+  // nedbrud midt i færdiggørelsen. Hent den allerede-betalte ordre, så færdiggørelsen
+  // kan GENKØRES idempotent (escrow_status-guard nedenfor sikrer at en fuldført
+  // handel ikke køres igen) — i stedet for at tabe handlen med penge trukket.
+  const isRetry = !claimed;
+  if (!claimed) {
+    const { data: existing } = await supa.from('orders').select('*').eq('payment_intent_id', pi.id).maybeSingle();
+    if (!existing || existing.status !== 'paid') {
+      return NextResponse.json({ received: true, already_processed: true });
+    }
+    claimed = existing;
+  }
   if (!proposalId) return NextResponse.json({ received: true, warning: 'Mangler forslag' });
 
   // Markér denne part betalt + gem leveringsvalg + ordre-id (til evt. refusion).
@@ -498,7 +509,7 @@ export async function handleSwapProposalPayment(pi, supa) {
     : { data: null };
   const now = new Date().toISOString();
 
-  if (p.initiator_paid && p.owner_paid) {
+  if (p.initiator_paid && p.owner_paid && p.escrow_status !== 'both_paid_released') {
     const [{ data: initInst }, { data: ownerInst }] = await Promise.all([
       p.initiator_institution_id ? supa.from('institutions').select('*').eq('id', p.initiator_institution_id).maybeSingle() : Promise.resolve({ data: null }),
       p.owner_institution_id     ? supa.from('institutions').select('*').eq('id', p.owner_institution_id).maybeSingle()     : Promise.resolve({ data: null }),
@@ -509,23 +520,19 @@ export async function handleSwapProposalPayment(pi, supa) {
     // Forsendelse 1: initiator → ejer (initiators bundt). EJER modtager denne pakke,
     // så den bookes til EJERS valgte udleveringssted, og EJERS leveringsvalg afgør
     // om der overhovedet bookes en label (custom = aftalt levering, ingen label).
+    // Shipment-id'et persisteres STRAKS, så et retry efter nedbrud ikke dobbelt-booker.
     let initShipmentId = p.initiator_shipment_id || null;
     if (!initShipmentId && p.owner_delivery !== 'custom' && conv) {
       initShipmentId = await bookSwapShipment(supa, conv, offeredIds[0], initInst, ownerInst, await swapBundleSize(supa, offeredIds), p.owner_pickup?.id || null);
+      if (initShipmentId) await supa.from('swap_proposals').update({ initiator_shipment_id: initShipmentId }).eq('id', proposalId);
     }
     // Forsendelse 2: ejer → initiator (ejers bundt). INITIATOR modtager denne pakke,
     // så den bookes til INITIATORS valgte udleveringssted + initiators leveringsvalg.
     let ownerShipmentId = p.owner_shipment_id || null;
     if (!ownerShipmentId && p.initiator_delivery !== 'custom' && conv) {
       ownerShipmentId = await bookSwapShipment(supa, conv, requestedIds[0], ownerInst, initInst, await swapBundleSize(supa, requestedIds), p.initiator_pickup?.id || null);
+      if (ownerShipmentId) await supa.from('swap_proposals').update({ owner_shipment_id: ownerShipmentId }).eq('id', proposalId);
     }
-
-    await supa.from('swap_proposals').update({
-      escrow_status: 'both_paid_released',
-      completed_at: now,
-      initiator_shipment_id: initShipmentId,
-      owner_shipment_id: ownerShipmentId,
-    }).eq('id', proposalId);
 
     // Markér alle byttede varer solgt + ryd reservation.
     const tradedIds = [...offeredIds, ...requestedIds];
@@ -603,12 +610,24 @@ export async function handleSwapProposalPayment(pi, supa) {
         message_type: 'swap_completed',
       });
     }
+
+    // FULDFØRT-markør sættes ALLERSIDST. Sker der et nedbrud undervejs, vil et
+    // webhook-retry genkøre færdiggørelsen (guard = escrow_status ovenfor), og
+    // shipment-id'erne er allerede persisteret, så intet dobbelt-bookes.
+    await supa.from('swap_proposals').update({
+      escrow_status: 'both_paid_released',
+      completed_at: now,
+      initiator_shipment_id: initShipmentId,
+      owner_shipment_id: ownerShipmentId,
+    }).eq('id', proposalId);
   } else {
     // Kun én part har betalt → opdatér escrow-tilstand + besked.
+    // (Idempotent state-update kører altid; beskeder/nudges KUN ved første behandling,
+    // så et dublet-webhook ikke dobbelt-tæller unread eller sender nudge igen.)
     await supa.from('swap_proposals')
       .update({ escrow_status: p.initiator_paid ? 'awaiting_owner' : 'awaiting_initiator' })
       .eq('id', proposalId);
-    if (convId) {
+    if (convId && !isRetry) {
       await supa.from('conversations').update({
         last_message: 'En part har betalt — afventer den anden part.',
         last_message_at: now,
@@ -619,7 +638,7 @@ export async function handleSwapProposalPayment(pi, supa) {
     // "Din tur"-nudge til den part der endnu mangler at betale (Trin 5):
     // både e-mail og en in-app notifikation (klokke-menuen).
     const owingInstId = p.initiator_paid ? p.owner_institution_id : p.initiator_institution_id;
-    if (owingInstId) {
+    if (owingInstId && !isRetry) {
       const { data: oi } = await supa.from('institutions').select('email, name').eq('id', owingInstId).maybeSingle();
       if (oi?.email) await sendSwapNudgeEmail(oi.email, oi.name, p.payment_deadline);
       try {
@@ -667,7 +686,10 @@ async function bookSwapShipment(supa, conv, listingId, senderInst, receiverInst,
       carrier, service_type, size_category: sizeCategory,
       cost_dkk: result.price_dkk,
       markup_dkk: 0,
-      total_charged_to_seller_dkk: result.price_dkk,
+      // Bytte-fragt er FORUDBETALT af parterne ved checkout. Markér prepaid og
+      // sæt seller-charge til 0, så månedscron'en ikke fakturerer den igen.
+      total_charged_to_seller_dkk: 0,
+      prepaid: true,
       tracking_number: result.tracking_number,
       tracking_url: result.tracking_url,
       label_pdf_url: result.label_pdf_url,

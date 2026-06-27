@@ -299,7 +299,7 @@ export default function MineOpslagPage() {
         const instIds = [...new Set((offers || []).map(o => o.buyer_institution_id).filter(Boolean))];
         const nameById = {};
         if (instIds.length) {
-          const { data: insts } = await db.from('institutions').select('id,name').in('id', instIds);
+          const { data: insts } = await db.from('institutions_public').select('id,name').in('id', instIds);
           for (const i of (insts || [])) nameById[i.id] = i.name;
         }
         const byListing = {};

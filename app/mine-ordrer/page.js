@@ -330,7 +330,7 @@ function MineOrdrerContent() {
       const otherIds = [...new Set(props.map(p => p.initiator_institution_id === institutionId ? p.owner_institution_id : p.initiator_institution_id).filter(Boolean))];
       const [{ data: ships }, { data: insts }] = await Promise.all([
         incomingShipIds.length ? db.from('shipments').select('id,tracking_number,tracking_url,status').in('id', incomingShipIds) : Promise.resolve({ data: [] }),
-        otherIds.length ? db.from('institutions').select('id,name').in('id', otherIds) : Promise.resolve({ data: [] }),
+        otherIds.length ? db.from('institutions_public').select('id,name').in('id', otherIds) : Promise.resolve({ data: [] }),
       ]);
       const shipById = Object.fromEntries((ships || []).map(s => [s.id, s]));
       const nameById = Object.fromEntries((insts || []).map(i => [i.id, i.name]));

@@ -55,7 +55,7 @@ export default function InstitutionPage() {
     setLoading(true);
     Promise.all([
       db.from('listings').select('*').eq('institution_name', institutionName).eq('is_active', true).eq('is_sold', false).order('created_at', { ascending: false }),
-      db.from('institutions').select('*').eq('name', institutionName).maybeSingle(),
+      db.from('institutions_public').select('*').eq('name', institutionName).maybeSingle(),
       db.from('transaction_reviews').select('description_score,contact_score,trade_again').eq('reviewed_institution_name', institutionName),
       db.from('institution_follows').select('id', { count: 'exact' }).eq('institution_name', institutionName),
     ]).then(([{ data: lst }, { data: instData }, { data: reviews }, { count }]) => {
@@ -189,7 +189,7 @@ export default function InstitutionPage() {
       if (!user) { router.push('/login'); setContacting(false); return; }
       const { data: myInstData } = await db.from('institutions').select('id,name').ilike('email', user.email).maybeSingle();
       if (myInstData?.name === institutionName) { setContacting(false); return; }
-      const { data: ownerInst } = await db.from('institutions').select('id,user_id,email,name').eq('name', institutionName).maybeSingle();
+      const { data: ownerInst } = await db.from('institutions_public').select('id,name').eq('name', institutionName).maybeSingle();
       if (!ownerInst) { setContacting(false); return; }
       const myInstId = myInstData?.id || null;
       const userName = myInstData?.name || user.email;
@@ -220,10 +220,9 @@ export default function InstitutionPage() {
     setContacting(false);
   }
 
-  // Fortrolighed: skjult profil er kun synlig for institutionen selv.
-  const isOwner = inst && currentUserEmail && inst.email &&
-    inst.email.toLowerCase() === currentUserEmail.toLowerCase();
-  if (!loading && inst && inst.profile_public === false && !isOwner) {
+  // Fortrolighed: kun offentlige profiler eksponeres (institutions_public-view).
+  // En skjult eller ikke-eksisterende institution giver ingen række → vis lås-skærm.
+  if (!loading && !inst) {
     return (
       <div style={{ minHeight:'100vh', paddingTop:80, background:'#f8f5f0' }} className="page-enter">
         <div style={{ maxWidth:560, margin:'0 auto', padding:isMobile?'48px 16px':'80px 24px', textAlign:'center' }}>
