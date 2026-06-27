@@ -115,6 +115,7 @@ export default function FeedbackWidget({ loggedIn, institutionName, userEmail })
 
   async function handleSend() {
     if (!message.trim()) return;
+    if (!loggedIn) { setError('Log ind for at sende feedback — eller skriv til support@bytogleg.dk.'); return; }
     setSending(true);
     try {
       const screenshotUrl = await uploadScreenshot();

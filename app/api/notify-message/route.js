@@ -22,6 +22,22 @@ export async function POST(req) {
       return NextResponse.json({ error: 'ownerEmail er påkrævet' }, { status: 400 });
     }
 
+    // Anti-phishing: send kun byt&leg-brandede mails til REGISTREREDE modtagere
+    // (institution/leder/medlem), aldrig til vilkårlige eksterne adresser.
+    // (.ilike med værdi som parameter — ikke streng-interpoleret filter, så ingen injection.)
+    if (process.env.SUPABASE_SERVICE_ROLE_KEY) {
+      const lookup = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL, process.env.SUPABASE_SERVICE_ROLE_KEY, { auth: { persistSession: false } });
+      const lower = ownerEmail.toLowerCase();
+      const [{ data: byEmail }, { data: byLeader }, { data: byMember }] = await Promise.all([
+        lookup.from('institutions').select('id').ilike('email', lower).maybeSingle(),
+        lookup.from('institutions').select('id').ilike('leader_email', lower).maybeSingle(),
+        lookup.from('institution_members').select('id').ilike('email', lower).maybeSingle(),
+      ]);
+      if (!byEmail && !byLeader && !byMember) {
+        return NextResponse.json({ error: 'Ukendt modtager' }, { status: 400 });
+      }
+    }
+
     const base = process.env.NEXT_PUBLIC_BASE_URL || 'https://bytogleg.dk';
     const link = `${base}/beskeder`;
 

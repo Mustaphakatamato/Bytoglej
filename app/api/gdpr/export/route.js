@@ -44,7 +44,7 @@ export async function GET(req) {
     { data: consentLog },
   ] = await Promise.all([
     supa.from('institution_members').select('*').eq('institution_id', instId),
-    supa.from('listings').select('*').or(`user_id.eq.${user.id},institution_name.ilike.${instName}`),
+    supa.from('listings').select('*').or(`user_id.eq.${user.id},institution_name.ilike."${instName}"`),
     supa.from('orders').select('*')
       .or(`buyer_institution_id.eq.${instId},buyer_id.eq.${user.id}`)
       .order('created_at', { ascending: false }).limit(500),

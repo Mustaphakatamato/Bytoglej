@@ -64,11 +64,19 @@ export async function GET(req) {
         .maybeSingle();
       if (!inst) continue;
 
-      const totalAmount = instShipments.reduce((s, r) => s + Number(r.total_charged_to_seller_dkk || r.cost_dkk || 0), 0);
-      const invoiceNumber = `BL-SHIP-${now.getFullYear()}-${String(now.getMonth()).padStart(2, '0')}-${instId.slice(0, 6).toUpperCase()}`;
+      // Udelad forsendelser uden gyldig pris (0/null) — de må ikke faktureres til 0 i det skjulte.
+      const amtOf = (r) => Number(r.total_charged_to_seller_dkk ?? r.cost_dkk ?? 0);
+      const billable = instShipments.filter(r => amtOf(r) > 0);
+      const skippedCount = instShipments.length - billable.length;
+      if (skippedCount > 0) console.warn(`[shipping-invoices] ${skippedCount} forsendelse(r) for institution ${instId} mangler pris (0 kr) — udeladt, kræver manuel gennemgang.`);
+      if (!billable.length) continue;
+
+      const totalAmount = billable.reduce((s, r) => s + amtOf(r), 0);
+      // Fakturanummer bruger PERIODENS måned/år (ikke now), så december-perioden ikke bliver "-00-".
+      const invoiceNumber = `BL-SHIP-${periodStart.getFullYear()}-${String(periodStart.getMonth() + 1).padStart(2, '0')}-${instId.slice(0, 6).toUpperCase()}`;
 
       // Build HTML invoice
-      const html = buildInvoiceHtml({ inst, instShipments, invoiceNumber, periodStartStr, periodEndStr, dueDateStr, totalAmount, baseUrl });
+      const html = buildInvoiceHtml({ inst, instShipments: billable, invoiceNumber, periodStartStr, periodEndStr, dueDateStr, totalAmount, baseUrl });
 
       // Insert invoice
       const { data: invoice } = await supa.from('shipping_invoices').insert({
@@ -86,11 +94,11 @@ export async function GET(req) {
       if (!invoice) continue;
 
       // Insert invoice lines
-      const lines = instShipments.map(s => ({
+      const lines = billable.map(s => ({
         shipping_invoice_id: invoice.id,
         shipment_id: s.id,
         description: `Forsendelse: ${s.conversations?.listing_title || s.tracking_number || s.id}`,
-        amount_dkk: Number(s.total_charged_to_seller_dkk || s.cost_dkk || 0),
+        amount_dkk: amtOf(s),
         shipment_date: (s.booked_at || new Date().toISOString()).slice(0, 10),
         tracking_number: s.tracking_number,
       }));

@@ -24,7 +24,7 @@ export async function POST(req) {
     // Saml brugerens institutions-ID'er og -navne, så vi kan verificere deltagelse.
     const email = user.email?.toLowerCase() || '';
     const [ledRes, memberRes] = await Promise.all([
-      svc.from('institutions').select('id,name').or(`email.ilike.${email},leader_email.ilike.${email}`),
+      svc.from('institutions').select('id,name').or(`email.ilike."${email}",leader_email.ilike."${email}"`),
       svc.from('institution_members').select('institution_id').ilike('email', email),
     ]);
     const memberInstIds = (memberRes.data || []).map(m => m.institution_id);
