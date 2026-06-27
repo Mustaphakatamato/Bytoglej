@@ -126,6 +126,7 @@ const TABS = [
   { id: 'approvals',    label: 'Godkendelser',  emoji: '✅' },
   { id: 'institutions', label: 'Institutioner', emoji: '🏫' },
   { id: 'listings',     label: 'Opslag',        emoji: '📋' },
+  { id: 'brands',       label: 'Mærker',        emoji: '🏷️' },
   { id: 'orders',       label: 'Handler',       emoji: '🛒' },
   { id: 'shipping',     label: 'Forsendelser',  emoji: '🚚' },
   { id: 'feedback',     label: 'Feedback',      emoji: '🐛' },
@@ -196,6 +197,7 @@ export default function AdminPage() {
   const [pendingApprovalCount, setPendingApprovalCount] = useState(0);
   const [feedbackNewCount, setFeedbackNewCount] = useState(0);
   const [pendingReviewCount, setPendingReviewCount] = useState(0);
+  const [pendingBrandCount, setPendingBrandCount] = useState(0);
   const w = useWindowWidth();
   const isMobile = w < 768;
 
@@ -204,14 +206,16 @@ export default function AdminPage() {
   useEffect(() => {
     if (authState !== 'authenticated') return;
     async function fetchCounts() {
-      const [{ count: approvals }, { count: newFb }, { count: pendingReviews }] = await Promise.all([
+      const [{ count: approvals }, { count: newFb }, { count: pendingReviews }, { count: pendingBrands }] = await Promise.all([
         db.from('institutions').select('id', { count: 'exact', head: true }).eq('is_approved', false),
         db.from('feedback').select('id', { count: 'exact', head: true }).eq('status', 'new'),
         db.from('listings').select('id', { count: 'exact', head: true }).eq('review_status', 'pending'),
+        db.from('brand_suggestions').select('id', { count: 'exact', head: true }).eq('status', 'pending'),
       ]);
       setPendingApprovalCount(approvals || 0);
       setFeedbackNewCount(newFb || 0);
       setPendingReviewCount(pendingReviews || 0);
+      setPendingBrandCount(pendingBrands || 0);
     }
     fetchCounts();
   }, [authState]);
@@ -335,6 +339,9 @@ export default function AdminPage() {
               {id === 'listings' && pendingReviewCount > 0 && (
                 <span style={{ background: '#F59E0B', color: '#fff', borderRadius: 99, fontSize: 10, fontWeight: 800, minWidth: 18, height: 18, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', padding: '0 5px' }}>{pendingReviewCount}</span>
               )}
+              {id === 'brands' && pendingBrandCount > 0 && (
+                <span style={{ background: '#EF476F', color: '#fff', borderRadius: 99, fontSize: 10, fontWeight: 800, minWidth: 18, height: 18, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', padding: '0 5px' }}>{pendingBrandCount}</span>
+              )}
             </button>
           ))}
         </div>
@@ -343,6 +350,7 @@ export default function AdminPage() {
         {tab === 'approvals'    && <ApprovalsTab isMobile={isMobile} onCountChange={setPendingApprovalCount} />}
         {tab === 'institutions' && <InstitutionsTab institutions={allInstitutions} refresh={fetchInstitutions} isMobile={isMobile} />}
         {tab === 'listings'     && <ListingsTab allInstitutions={allInstitutions} isMobile={isMobile} />}
+        {tab === 'brands'       && <BrandsTab isMobile={isMobile} onCountChange={setPendingBrandCount} />}
         {tab === 'orders'       && <OrdersTab isMobile={isMobile} />}
         {tab === 'shipping'     && <ShippingTab isMobile={isMobile} />}
         {tab === 'feedback'     && <FeedbackTab isMobile={isMobile} onNewCountChange={setFeedbackNewCount} />}
@@ -561,6 +569,114 @@ function ApprovalsTab({ isMobile, onCountChange }) {
           )}
         </div>
       ))}
+    </div>
+  );
+}
+
+// ── SECTION 2b: Brands (varemærke-forslag) ──────────────────────────────────────
+
+function BrandsTab({ isMobile, onCountChange }) {
+  const [filter, setFilter] = useState('pending'); // pending | approved | rejected
+  const [items, setItems] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [acting, setActing] = useState(null);
+
+  const fetchItems = useCallback(async () => {
+    setLoading(true);
+    const { data } = await db.from('brand_suggestions').select('*').eq('status', filter).order('created_at', { ascending: false });
+    setItems(data || []);
+    setLoading(false);
+    if (filter === 'pending') {
+      const { count } = await db.from('brand_suggestions').select('id', { count: 'exact', head: true }).eq('status', 'pending');
+      onCountChange?.(count || 0);
+    }
+  }, [filter, onCountChange]);
+
+  useEffect(() => { fetchItems(); }, [fetchItems]);
+
+  async function handleAction(id, action) {
+    setActing(id + action);
+    // Optimistisk: fjern fra listen med det samme
+    setItems(prev => prev.filter(x => x.id !== id));
+    const res = await fetch('/api/admin/brand-suggestion', {
+      method: 'POST', headers: await authHeaders(),
+      body: JSON.stringify({ suggestion_id: id, action }),
+    });
+    setActing(null);
+    if (!res.ok) { await fetchItems(); }
+    else if (filter === 'pending') {
+      const { count } = await db.from('brand_suggestions').select('id', { count: 'exact', head: true }).eq('status', 'pending');
+      onCountChange?.(count || 0);
+    }
+  }
+
+  return (
+    <div>
+      <div style={{ display: 'flex', gap: 8, marginBottom: 16, flexWrap: 'wrap' }}>
+        {[['pending', 'Afventer'], ['approved', 'Godkendt'], ['rejected', 'Afvist']].map(([k, l]) => (
+          <button key={k} onClick={() => setFilter(k)} style={{ padding: '6px 14px', borderRadius: 99, border: `1.5px solid ${filter === k ? PRIMARY : PAPER3}`, background: filter === k ? GREEN_TINT : PAPER2, color: filter === k ? PRIMARY : INK3, fontFamily: FONT, fontWeight: 600, fontSize: 13, cursor: 'pointer' }}>{l}</button>
+        ))}
+      </div>
+
+      {loading ? <Spinner /> : items.length === 0 ? (
+        <div style={{ padding: '50px 20px', textAlign: 'center' }}>
+          <div style={{ fontSize: 40, marginBottom: 10 }}>🏷️</div>
+          <div style={{ fontFamily: FONT, fontWeight: 700, fontSize: 16, color: INK }}>
+            {filter === 'pending' ? 'Ingen mærker afventer' : 'Ingen mærker her'}
+          </div>
+          <div style={{ fontSize: 13, color: INK3, marginTop: 6 }}>
+            {filter === 'pending' ? 'Når en bruger skriver et nyt mærke, dukker det op her.' : '—'}
+          </div>
+        </div>
+      ) : (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+          {items.map(b => {
+            const aiKnown = b.ai_recognized === true;
+            const aiUnknown = b.ai_recognized === false;
+            return (
+              <div key={b.id} style={{ background: '#fff', borderRadius: 16, padding: '18px 20px', border: `1px solid ${PAPER3}`, boxShadow: '0 1px 4px rgba(22,34,28,0.06)' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 12, flexWrap: 'wrap' }}>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontFamily: FONT, fontWeight: 800, fontSize: 18, color: INK, marginBottom: 6 }}>{b.brand_name}</div>
+                    <div style={{ fontSize: 12, color: INK3, display: 'flex', gap: 12, flexWrap: 'wrap' }}>
+                      {b.institution_name && <span>🏫 {b.institution_name}</span>}
+                      <span>📅 {fmtDate(b.created_at)}</span>
+                    </div>
+
+                    {/* AI-vurdering — hjælp til admin */}
+                    <div style={{ marginTop: 12, display: 'flex', alignItems: 'flex-start', gap: 8, background: aiKnown ? GREEN_TINT : aiUnknown ? '#FEF3C7' : PAPER2, border: `1px solid ${aiKnown ? GREEN_SOFT : aiUnknown ? '#FCD34D' : PAPER3}`, borderRadius: 10, padding: '9px 12px' }}>
+                      <span style={{ fontSize: 15, flexShrink: 0, lineHeight: 1.3 }}>{aiKnown ? '🤖✅' : aiUnknown ? '🤖⚠️' : '🤖'}</span>
+                      <div style={{ fontFamily: FONT, fontSize: 12.5, lineHeight: 1.45 }}>
+                        <span style={{ fontWeight: 700, color: aiKnown ? GREEN_DEEP : aiUnknown ? '#92400E' : INK2 }}>
+                          {aiKnown ? 'AI genkender mærket' : aiUnknown ? 'AI kan ikke genkende dette mærke' : 'AI-vurdering ikke tilgængelig'}
+                        </span>
+                        {b.ai_note && <span style={{ color: INK2 }}> — {b.ai_note}</span>}
+                      </div>
+                    </div>
+                  </div>
+
+                  {b.status === 'pending' ? (
+                    <div style={{ display: 'flex', gap: 8, flexShrink: 0 }}>
+                      <button onClick={() => handleAction(b.id, 'approve')} disabled={!!acting}
+                        style={{ padding: '9px 18px', borderRadius: 10, border: 'none', background: PRIMARY, color: '#fff', fontFamily: FONT, fontWeight: 700, fontSize: 13, cursor: acting ? 'default' : 'pointer', opacity: acting ? 0.7 : 1 }}>
+                        {acting === b.id + 'approve' ? '…' : '✓ Tilføj'}
+                      </button>
+                      <button onClick={() => handleAction(b.id, 'reject')} disabled={!!acting}
+                        style={{ padding: '9px 18px', borderRadius: 10, border: `1.5px solid #FCA5A5`, background: '#FEF2F2', color: '#DC2626', fontFamily: FONT, fontWeight: 700, fontSize: 13, cursor: acting ? 'default' : 'pointer' }}>
+                        {acting === b.id + 'reject' ? '…' : '✕ Afvis'}
+                      </button>
+                    </div>
+                  ) : (
+                    <Badge bg={b.status === 'approved' ? GREEN_TINT : '#FEE2E2'} color={b.status === 'approved' ? PRIMARY : '#991B1B'}>
+                      {b.status === 'approved' ? 'På listen' : 'Afvist'}
+                    </Badge>
+                  )}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
     </div>
   );
 }
