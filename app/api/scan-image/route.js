@@ -17,7 +17,7 @@ export async function POST(req) {
     const mimeType = file.type || 'image/jpeg';
 
     const completion = await groq.chat.completions.create({
-      model: 'meta-llama/llama-4-scout-17b-16e-instruct',
+      model: 'qwen/qwen3.6-27b', // vision; erstatter udfaset llama-4-scout (Groq decommission 2026-07-17)
       max_tokens: 30,
       temperature: 0,
       messages: [{
