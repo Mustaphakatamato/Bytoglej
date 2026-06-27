@@ -79,8 +79,9 @@ Lav et svarudkast medarbejderen kan sende (eller redigere) til kunden. Svar KUN 
     const groq = new Groq({ apiKey: process.env.GROQ_API_KEY });
     const completion = await groq.chat.completions.create({
       model: 'openai/gpt-oss-120b', // erstatter udfaset llama-3.3-70b-versatile (Groq shutdown 2026-08-16)
-      max_tokens: 500,
+      max_tokens: 1024,
       temperature: 0.3,
+      reasoning_effort: 'low', // gpt-oss er reasoning-model — giv plads til JSON efter reasoning
       response_format: { type: 'json_object' },
       messages: [
         { role: 'system', content: SYSTEM_PROMPT },

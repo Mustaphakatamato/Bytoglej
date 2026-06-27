@@ -55,8 +55,9 @@ async function runBot(message, history) {
     }));
     const completion = await groq.chat.completions.create({
       model: 'openai/gpt-oss-120b', // erstatter udfaset llama-3.3-70b-versatile (Groq shutdown 2026-08-16)
-      max_tokens: 300,
+      max_tokens: 768,
       temperature: 0.1, // Lav temperatur = mere faktuel, mindre kreativ
+      reasoning_effort: 'low', // gpt-oss er reasoning-model — giv plads til JSON efter reasoning
       response_format: { type: 'json_object' },
       messages: [
         { role: 'system', content: SYSTEM_PROMPT },

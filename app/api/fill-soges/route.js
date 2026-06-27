@@ -58,8 +58,10 @@ Institutionens tekst: "${query}"`;
 
     const completion = await groq.chat.completions.create({
       model: 'openai/gpt-oss-20b', // erstatter udfaset llama-3.1-8b-instant (Groq shutdown 2026-08-16)
-      max_tokens: 300,
+      max_tokens: 512,
       temperature: 0.2,
+      reasoning_effort: 'low', // gpt-oss er reasoning-model — begræns reasoning så JSON ikke trunkeres
+      response_format: { type: 'json_object' },
       messages: [{ role: 'user', content: prompt }],
     });
 
