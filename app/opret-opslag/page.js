@@ -396,7 +396,7 @@ export default function OpretOpslagPage() {
       setAiVisual(json.visual_description || null);
       setAiScanData({
         scan_type: 'scan-toy',
-        model_used: 'qwen/qwen3.6-27b',
+        model_used: 'gemini-2.0-flash',
         ai_raw_response: json,
         ai_title: json.title || null,
         ai_description: json.description || null,
