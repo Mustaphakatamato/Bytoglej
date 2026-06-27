@@ -1,7 +1,7 @@
-import Groq from 'groq-sdk';
 import { NextResponse } from 'next/server';
 import { requireAuth, UNAUTHORIZED } from '@/lib/api-auth';
 import { createServerClient } from '@/lib/supabase-server'; // bruges til prissammenligning
+import { visionAnalyze, visionConfigured } from '@/lib/vision';
 
 // Antal sammenlignelige opslag der kræves før vi bruger platform-median frem for AI-estimat.
 const MIN_COMPARABLES = 5;
@@ -25,7 +25,7 @@ const CATEGORY_KEYS = [
 
 export async function POST(req) {
   if (!await requireAuth(req)) return UNAUTHORIZED();
-  if (!process.env.GROQ_API_KEY) {
+  if (!visionConfigured()) {
     return NextResponse.json({ error: 'AI-scanning er ikke konfigureret' }, { status: 500 });
   }
 
@@ -37,8 +37,6 @@ export async function POST(req) {
     const bytes = await file.arrayBuffer();
     const base64 = Buffer.from(bytes).toString('base64');
     const mimeType = file.type || 'image/jpeg';
-
-    const groq = new Groq({ apiKey: process.env.GROQ_API_KEY });
 
     const prompt = `Du er en assistent der hjælper med at oprette annoncer for danske institutioner (vuggestuer, børnehaver, skoler).
 
@@ -58,21 +56,12 @@ Relevante ting: legetøj, spil, puslespil, bøger, børnemøbler, sportsudstyr, 
 Sæt needs_review: true for alt andet og giv et bedste gæt på felterne.
 Ingen markdown, ingen forklaring — kun JSON.`;
 
-    const completion = await groq.chat.completions.create({
-      model: 'qwen/qwen3.6-27b', // vision; erstatter Scout (Groq decommission 2026-07-17)
-      max_tokens: 420,
-      reasoning_effort: 'none', // qwen3.6 er en thinking-model — slå reasoning fra for rent JSON-svar
-      messages: [{
-        role: 'user',
-        content: [
-          { type: 'image_url', image_url: { url: `data:${mimeType};base64,${base64}` } },
-          { type: 'text', text: prompt },
-        ],
-      }],
+    const text = await visionAnalyze({
+      base64, mimeType, prompt,
+      json: true,
+      maxOutputTokens: 512,
+      temperature: 0,
     });
-
-    // Strip evt. <think>…</think> (sikring hvis reasoning ikke slås fra).
-    const text = (completion.choices[0].message.content || '').replace(/<think>[\s\S]*?<\/think>/gi, '').trim();
     const jsonMatch = text.match(/\{[\s\S]*\}/);
     if (!jsonMatch) return NextResponse.json({ error: 'Ugyldigt AI-svar. Prøv igen' }, { status: 500 });
 
