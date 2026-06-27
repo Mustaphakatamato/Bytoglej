@@ -59,7 +59,7 @@ Sæt needs_review: true for alt andet og giv et bedste gæt på felterne.
 Ingen markdown, ingen forklaring — kun JSON.`;
 
     const completion = await groq.chat.completions.create({
-      model: 'qwen/qwen3.6-27b', // vision; erstatter udfaset llama-4-scout (Groq decommission 2026-07-17)
+      model: 'meta-llama/llama-4-scout-17b-16e-instruct',
       max_tokens: 420,
       messages: [{
         role: 'user',

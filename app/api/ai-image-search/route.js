@@ -25,7 +25,7 @@ export async function POST(req) {
     // Step 1: Groq beskriver legetøjet på dansk (samme vision-model som ved upload)
     const groq = new Groq({ apiKey: process.env.GROQ_API_KEY });
     const completion = await groq.chat.completions.create({
-      model: 'qwen/qwen3.6-27b', // vision; erstatter udfaset llama-4-scout (Groq decommission 2026-07-17)
+      model: 'meta-llama/llama-4-scout-17b-16e-instruct',
       max_tokens: 120,
       temperature: 0.2,
       messages: [{
