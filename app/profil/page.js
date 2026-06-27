@@ -72,7 +72,7 @@ function ActivityCard({ icon, label, sublabel, value, badge, highlight, onClick 
 
 export default function ProfilPage() {
   const router = useRouter();
-  const { effectiveInstitution, setLoggedIn, favs } = useApp();
+  const { effectiveInstitution, setLoggedIn, favs, pendingApproval } = useApp();
   const { realUserId, userId } = useActiveUser();
   const ww = useWindowWidth();
   const isMobile = ww > 0 && ww < 768;
@@ -93,6 +93,11 @@ export default function ProfilPage() {
   useEffect(() => {
     if (typeof Notification !== 'undefined') setNotifPermission(Notification.permission);
   }, []);
+
+  // Ikke-godkendte institutioner har "afventer godkendelse"-guiden som hjemmeside.
+  useEffect(() => {
+    if (pendingApproval) router.replace('/afventer-godkendelse');
+  }, [pendingApproval]);
 
   async function handleNotifToggle() {
     if (notifPermission === 'denied') {
