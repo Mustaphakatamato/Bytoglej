@@ -389,23 +389,32 @@ export default function SignupPage() {
       setSaving(false);
       return;
     }
-    await db.from('institutions').insert({
-      cvr: cvr.length === 8 ? cvr : null,
-      pnr: cvr.length === 10 ? cvr : null,
-      name: cvrData.name,
-      kommune: cvrData.kommune || null,
-      institution_type: form.inst_type,
-      ownership_type: form.ownership,
-      address: form.address, zipcode: form.zipcode, city: form.city,
-      children_count: Number(form.children_count) || null,
-      phone: form.inst_phone || null, website: form.website || null,
-      leader_name: form.leader_name, leader_phone: form.leader_phone, leader_email: form.leader_email,
-      contact_name: form.contact_name, email: form.email.toLowerCase(),
-      is_approved: false,
+    // Institutionen oprettes server-side (service-role). Direkte klient-insert ville
+    // fejle under email-bekræftelse, hvor der endnu ikke er en session (RLS afviser).
+    const instRes = await fetch('/api/signup-institution', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        userId: data.user?.id,
+        email: form.email.toLowerCase(),
+        cvr: cvr.length === 8 ? cvr : null,
+        pnr: cvr.length === 10 ? cvr : null,
+        name: cvrData.name,
+        kommune: cvrData.kommune || null,
+        institution_type: form.inst_type,
+        ownership_type: form.ownership,
+        address: form.address, zipcode: form.zipcode, city: form.city,
+        children_count: Number(form.children_count) || null,
+        phone: form.inst_phone || null, website: form.website || null,
+        leader_name: form.leader_name, leader_phone: form.leader_phone, leader_email: form.leader_email,
+        contact_name: form.contact_name,
+      }),
     });
-    geocodeAddress(form.address, form.zipcode, form.city).then(coords => {
-      if (coords) db.from('institutions').update({ latitude: coords.lat, longitude: coords.lon }).eq('email', form.email.toLowerCase());
-    });
+    if (!instRes.ok) {
+      const j = await instRes.json().catch(() => ({}));
+      setAuthError(`Kontoen blev oprettet, men institutionen kunne ikke gemmes: ${j.error || 'ukendt fejl'}. Kontakt support.`);
+      setSaving(false);
+      return;
+    }
     authedFetch('/api/welcome-email', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
