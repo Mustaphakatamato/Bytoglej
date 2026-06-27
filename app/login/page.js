@@ -71,12 +71,12 @@ export default function LoginPage() {
       return;
     }
     const emailLower = email.trim().toLowerCase();
-    const [{ data: inst }, { data: member }] = await Promise.all([
-      db.from('institutions').select('email').ilike('email', emailLower).maybeSingle(),
-      db.from('institution_members').select('email').ilike('email', emailLower).maybeSingle(),
-    ]);
+    // Via SECURITY DEFINER RPC — institutions/institution_members er ikke anon-læsbare,
+    // så en direkte tabel-læsning her (før login) ville altid give null og fejlagtigt
+    // sende eksisterende brugere til signup.
+    const { data: exists } = await db.rpc('institution_email_exists', { p_email: emailLower });
     setChecking(false);
-    if (inst || member) {
+    if (exists) {
       setStep('password');
     } else {
       router.push('/signup?email=' + encodeURIComponent(email.trim()));
