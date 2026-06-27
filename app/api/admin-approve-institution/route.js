@@ -28,6 +28,15 @@ export async function POST(req) {
     if (action === 'approve') {
       await supabase.from('institutions').update({ is_approved: true, approved_at: new Date().toISOString() }).eq('id', institutionId);
 
+      // Aktivér institutionens kladde-opslag automatisk, så det de forberedte mens de
+      // ventede går live med det samme. (Kun ikke-solgte, ikke under scan-gennemgang.)
+      await supabase.from('listings')
+        .update({ is_active: true })
+        .eq('institution_name', inst.name)
+        .eq('is_active', false)
+        .eq('is_sold', false)
+        .is('review_status', null);
+
       // Send approval email to institution
       if (process.env.RESEND_API_KEY) {
         const base = process.env.NEXT_PUBLIC_BASE_URL || 'https://bytogleg.dk';

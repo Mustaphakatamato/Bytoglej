@@ -109,16 +109,9 @@ export default function OpretOpslagPage() {
       if (!user) { router.push('/login'); return; }
       if (!institution) {
         const { data: own } = await db.from('institutions').select('*').ilike('email', user.email).maybeSingle();
-        if (own) {
-          // Godkendelses-gate: ikke-godkendte institutioner må ikke oprette opslag.
-          if (own.is_approved !== true) { router.push('/afventer-godkendelse'); return; }
-          setInstitution(own); return;
-        }
+        if (own) { setInstitution(own); return; }
         const { data: mem } = await db.from('institution_members').select('role,institutions(*)').eq('email', user.email).maybeSingle();
-        if (mem?.institutions) {
-          if (mem.institutions.is_approved !== true) { router.push('/afventer-godkendelse'); return; }
-          setInstitution({ ...mem.institutions, _memberRole: mem.role });
-        }
+        if (mem?.institutions) setInstitution({ ...mem.institutions, _memberRole: mem.role });
       }
     });
   }, []);
@@ -513,7 +506,9 @@ export default function OpretOpslagPage() {
       user_id: user?.id || null,
       emoji: isSøges ? '🔍' : form.emoji,
       color: isSøges ? '#F5F0FF' : form.color,
-      tags: form.tags || [], images: [], bid_count: 0, is_active: scanRejected ? false : true,
+      // Ikke-godkendte institutioner gemmer opslag som KLADDE (is_active=false) — de
+      // bliver synlige automatisk når institutionen godkendes. Også kladde ved scan-afvisning.
+      tags: form.tags || [], images: [], bid_count: 0, is_active: (scanRejected || inst?.is_approved !== true) ? false : true,
       review_status: scanRejected ? 'pending' : null,
       review_requested_at: scanRejected ? new Date().toISOString() : null,
       category: form.category || null, subcategory: form.subcategory || null, brand: form.brand || null,
@@ -588,7 +583,8 @@ export default function OpretOpslagPage() {
         submitted_at: new Date().toISOString(),
       }).then(() => {}).catch(() => {});
     }
-    if (!scanRejected) {
+    if (!scanRejected && inst?.is_approved === true) {
+      // Kun publicerede (godkendte) opslag må udløse match-notifikationer til andre — ikke kladder.
       // Fire-and-forget: saved-search email notifications
       authedFetch('/api/match-searches', {
         method:'POST', headers:{'Content-Type':'application/json'},
@@ -606,7 +602,11 @@ export default function OpretOpslagPage() {
       }).catch(()=>{});
     }
     fetchListings?.();
-    showToast(scanRejected ? 'Opslag sendt til gennemgang! Vi vender tilbage inden for 1–2 hverdage 🔍' : (isSøges ? 'Søges-opslag publiceret! Tjek mulige matches på dit dashboard 🔍' : 'Opslag publiceret! 🎉'));
+    showToast(
+      scanRejected ? 'Opslag sendt til gennemgang! Vi vender tilbage inden for 1–2 hverdage 🔍'
+      : inst?.is_approved !== true ? 'Opslag gemt som kladde! Det bliver synligt automatisk når din institution er godkendt ✅'
+      : (isSøges ? 'Søges-opslag publiceret! Tjek mulige matches på dit dashboard 🔍' : 'Opslag publiceret! 🎉')
+    );
     router.push('/profil');
     } catch (e) {
       console.error('handleCreate error:', e);
@@ -673,6 +673,17 @@ export default function OpretOpslagPage() {
 
       {/* Body */}
       <div style={{ maxWidth:900, margin:'0 auto', padding:isMobile?'28px 16px 60px':'40px 24px 80px' }}>
+        {institution && institution.is_approved !== true && (
+          <div style={{ background:'#FEF9C3', border:'1px solid #FDE68A', borderRadius:16, padding:isMobile?'14px 16px':'16px 20px', marginBottom:24, display:'flex', gap:12, alignItems:'flex-start' }}>
+            <span style={{ fontSize:22, lineHeight:1, flexShrink:0 }}>📝</span>
+            <div>
+              <div style={{ fontFamily:FONT, fontWeight:800, fontSize:14, color:'#92400E', marginBottom:3 }}>Du kan forberede dine opslag nu</div>
+              <div style={{ fontFamily:FONT, fontSize:13, color:'#92400E', lineHeight:1.6, opacity:0.92 }}>
+                Din institution afventer godkendelse — typisk inden for 2 timer. Opslag du opretter nu gemmes som <strong>kladde</strong> og bliver synlige automatisk, så snart I er godkendt.
+              </div>
+            </div>
+          </div>
+        )}
         <div style={{ display:'grid', gridTemplateColumns:isMobile?'1fr':'1fr 340px', gap:32, alignItems:'start' }}>
 
           {/* Form */}
@@ -1091,7 +1102,7 @@ export default function OpretOpslagPage() {
                     }}
                     disabled={saving || !form.description.trim()}
                     style={{ flex:2, padding:'13px', borderRadius:99, background: saving || !form.description.trim() ? PAPER3 : PRIMARY, color: saving || !form.description.trim() ? INK3 : '#fff', border:'none', fontFamily:FONT, fontWeight:700, fontSize:15, cursor: saving || !form.description.trim() ? 'not-allowed' : 'pointer', display:'flex', alignItems:'center', justifyContent:'center', gap:8, transition:'all 0.2s' }}>
-                    {saving ? <><Spinner /> {scanRejected ? 'Sender til gennemgang…' : 'Publicerer…'}</> : (scanRejected ? '🔍 Send til gennemgang' : '✓ Publicer opslag')}
+                    {saving ? <><Spinner /> {scanRejected ? 'Sender til gennemgang…' : (institution?.is_approved !== true ? 'Gemmer kladde…' : 'Publicerer…')}</> : (scanRejected ? '🔍 Send til gennemgang' : (institution?.is_approved !== true ? '📝 Gem som kladde' : '✓ Publicer opslag'))}
                   </button>
                 </div>
               </div>
