@@ -10,7 +10,8 @@ export const maxDuration = 60;
 // Kaldes fire-and-forget efter et opslag oprettes ELLER redigeres. Bruges af
 // AI-billedsøgning. `text` er valgfri fallback hvis opslaget ingen billeder har.
 export async function POST(req) {
-  if (!await requireAuth(req)) return UNAUTHORIZED();
+  const user = await requireAuth(req);
+  if (!user) return UNAUTHORIZED();
 
   try {
     const { listingId, text } = await req.json();
@@ -19,6 +20,15 @@ export async function POST(req) {
     }
 
     const supa = createServerClient();
+
+    // Ejerskabstjek: kun opslagets ejer må regenerere dets søge-metadata (ellers kunne
+    // enhver logget-in bruger overskrive et fremmed opslags beskrivelse/embedding).
+    const { data: listing } = await supa.from('listings').select('user_id').eq('id', listingId).maybeSingle();
+    if (!listing) return NextResponse.json({ error: 'Opslag ikke fundet' }, { status: 404 });
+    if (listing.user_id !== user.id) {
+      return NextResponse.json({ error: 'Ingen adgang til dette opslag' }, { status: 403 });
+    }
+
     const result = await describeImagesAndEmbed(supa, listingId, text);
     if (!result.ok) return NextResponse.json({ error: result.error }, { status: 500 });
 

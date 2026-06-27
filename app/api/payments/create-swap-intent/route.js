@@ -60,7 +60,7 @@ export async function POST(req) {
   let { data: myInst } = await supa
     .from('institutions')
     .select('id, name, address, zipcode, city, email, phone')
-    .or(`email.eq.${user.email},leader_email.eq.${user.email}`)
+    .or(`email.eq."${user.email}",leader_email.eq."${user.email}"`)
     .maybeSingle();
   if (!myInst) {
     // Teammedlem: slå institution op via medlemskab

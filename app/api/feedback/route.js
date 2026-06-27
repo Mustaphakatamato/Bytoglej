@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
+import { requireAuth, UNAUTHORIZED } from '@/lib/api-auth';
 import { escapeHtml } from '@/lib/escape-html';
 
 const adminDb = createClient(
@@ -9,12 +10,16 @@ const adminDb = createClient(
 );
 
 export async function POST(req) {
+  // Kræv login — lukker den uautentificerede spam-/mailbombnings-vektor mod admin-indbakken.
+  const user = await requireAuth(req);
+  if (!user) return UNAUTHORIZED();
   try {
     const body = await req.json();
     const category = String(body.category || 'general').slice(0, 50);
     const message = String(body.message || '').trim().slice(0, 5000);
     const institutionName = String(body.institutionName || '').slice(0, 200);
-    const userEmail = String(body.userEmail || '').slice(0, 200);
+    // E-mail udledes fra det verificerede token — ikke fra klienten (anti-spoof).
+    const userEmail = String(user.email || '').slice(0, 200);
     const page = String(body.page || '').slice(0, 500);
     const screenshotUrl = String(body.screenshotUrl || '').slice(0, 1000) || null;
     if (!message) return NextResponse.json({ error: 'Besked mangler' }, { status: 400 });
