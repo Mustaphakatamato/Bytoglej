@@ -42,6 +42,7 @@ export default function AfventerGodkendelse() {
   const ww = useWindowWidth();
   const isMobile = ww > 0 && ww < 768;
   const [instName, setInstName] = useState(null);
+  const [drafts, setDrafts] = useState([]);
 
   useEffect(() => {
     let active = true;
@@ -53,6 +54,12 @@ export default function AfventerGodkendelse() {
       // Allerede godkendt? Så hører man hjemme på profilen, ikke her.
       if (data?.is_approved === true) { router.replace('/profil'); return; }
       if (data?.name) setInstName(data.name);
+      // Hent brugerens kladde-opslag, så de kan se hvad de har forberedt.
+      const { data: d } = await db.from('listings')
+        .select('id,title,emoji,color,created_at')
+        .eq('user_id', user.id).eq('is_active', false).eq('is_sold', false)
+        .order('created_at', { ascending: false });
+      if (active) setDrafts(d || []);
     });
     return () => { active = false; };
   }, []);
@@ -87,6 +94,35 @@ export default function AfventerGodkendelse() {
             Vi godkender jer hurtigst muligt — som regel inden for et par timer. Men I behøver <strong style={{ color: '#fff' }}>ikke vente</strong> med at komme i gang: gør alt det nedenfor nu, så er I klar i samme øjeblik vi godkender.
           </p>
         </div>
+
+        {/* Dine kladder */}
+        {drafts.length > 0 && (
+          <div style={{ margin: isMobile ? '28px 0 0' : '36px 0 0' }}>
+            <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', marginBottom: 14 }}>
+              <div style={{ fontFamily: FONT, fontWeight: 800, fontSize: 13, letterSpacing: '0.08em', textTransform: 'uppercase', color: INK3 }}>
+                Dine kladder ({drafts.length})
+              </div>
+              <button onClick={() => router.push('/opret-opslag')} style={{ background: 'none', border: 'none', color: PRIMARY, fontFamily: FONT, fontWeight: 700, fontSize: 13, cursor: 'pointer' }}>
+                + Tilføj
+              </button>
+            </div>
+            <div style={{ background: '#fff', border: `1px solid ${PAPER2}`, borderRadius: 18, overflow: 'hidden', boxShadow: '0 1px 4px rgba(22,34,28,0.06)' }}>
+              {drafts.map((d, i) => (
+                <div key={d.id} style={{ display: 'flex', alignItems: 'center', gap: 14, padding: '14px 18px', borderTop: i > 0 ? `1px solid ${PAPER2}` : 'none' }}>
+                  <div style={{ width: 40, height: 40, borderRadius: 11, background: d.color || GREEN_TINT, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 20, flexShrink: 0 }}>{d.emoji || '📦'}</div>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontFamily: FONT, fontWeight: 700, fontSize: 14.5, color: INK, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{d.title || 'Uden titel'}</div>
+                    <div style={{ fontFamily: FONT, fontSize: 12.5, color: INK3 }}>Bliver synlig ved godkendelse</div>
+                  </div>
+                  <span style={{ flexShrink: 0, fontFamily: FONT, fontSize: 11, fontWeight: 800, color: '#92400E', background: '#FEF9C3', border: '1px solid #FDE68A', borderRadius: 99, padding: '4px 10px' }}>Kladde</span>
+                </div>
+              ))}
+            </div>
+            <div style={{ fontFamily: FONT, fontSize: 12.5, color: INK3, marginTop: 10, paddingLeft: 2 }}>
+              Disse opslag bliver synlige på markedspladsen automatisk, så snart vi har godkendt jer.
+            </div>
+          </div>
+        )}
 
         {/* Getting-started guide */}
         <div style={{ margin: isMobile ? '28px 0 0' : '36px 0 0' }}>

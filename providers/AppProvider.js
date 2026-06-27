@@ -84,7 +84,7 @@ export function AppProvider({ children }) {
         const { ts, isAdmin: ca, inst, allInsts } = JSON.parse(cached);
         if (Date.now() - ts < 5 * 60 * 1000) { // 5-minute TTL
           if (ca) { setIsAdmin(true); setInstitution(null); if (allInsts) setAllInstitutions(allInsts); }
-          else if (inst) setInstitution(inst);
+          else if (inst) { setInstitution(inst); if (inst.is_approved === false) setPendingApproval(true); }
           return;
         }
       }
