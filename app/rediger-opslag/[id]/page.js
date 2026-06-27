@@ -2,6 +2,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 import { db } from '@/lib/supabase';
+import { authedFetch } from '@/lib/authed-fetch';
 import { PRIMARY, GREEN_DEEP, GREEN_SOFT, GREEN_TINT, PAPER, PAPER2, PAPER3, INK, INK2, INK3, CORAL, TYPE_CFG, CONDITIONS, AGE_GROUPS, FONT } from '@/lib/constants';
 import { CATEGORIES } from '@/lib/categories';
 import BrandPicker from '@/components/BrandPicker';
@@ -245,6 +246,15 @@ export default function RedigerOpslagPage() {
     }).eq('id', id);
 
     if (error) { setSaving(false); showToast('Noget gik galt. Prøv igen', 'error'); return; }
+
+    // Fire-and-forget: re-generér visuel billedbeskrivelse + embedding ud fra de
+    // (evt. ændrede) billeder, så AI-billedsøgning altid afspejler opslaget.
+    if (form.type !== 'søges') {
+      authedFetch('/api/embed-listing', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ listingId: id, text: `${form.title}. ${form.description}` }),
+      }).then(() => {}).catch(() => {});
+    }
 
     // Gem/opdater forsendelses-indstillinger
     const { error: soError } = await db.from('shipping_options').upsert({

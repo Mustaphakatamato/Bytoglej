@@ -1,32 +1,28 @@
 import { NextResponse } from 'next/server';
 import { requireAuth, UNAUTHORIZED } from '@/lib/api-auth';
 import { createServerClient } from '@/lib/supabase-server';
-import { embedText } from '@/lib/embed';
+import { describeImagesAndEmbed } from '@/lib/describe-images';
 
-export const maxDuration = 30;
+export const maxDuration = 60;
 
-// Genererer en semantisk embedding for et opslag og gemmer den i description_embedding.
-// Kaldes fire-and-forget efter et opslag er oprettet. Embeddingen bruges af AI-billedsøgning.
+// Genererer en visuel beskrivelse af ALLE opslagets billeder (uanset om brugeren
+// trykkede "Scan med AI") + en semantisk embedding, og gemmer dem på opslaget.
+// Kaldes fire-and-forget efter et opslag oprettes ELLER redigeres. Bruges af
+// AI-billedsøgning. `text` er valgfri fallback hvis opslaget ingen billeder har.
 export async function POST(req) {
   if (!await requireAuth(req)) return UNAUTHORIZED();
 
   try {
     const { listingId, text } = await req.json();
-    if (!listingId || !text?.trim()) {
-      return NextResponse.json({ error: 'listingId og text kræves' }, { status: 400 });
+    if (!listingId) {
+      return NextResponse.json({ error: 'listingId kræves' }, { status: 400 });
     }
 
-    const embedding = await embedText(text);
-    if (!embedding) return NextResponse.json({ error: 'Kunne ikke generere embedding' }, { status: 500 });
-
     const supa = createServerClient();
-    const { error } = await supa
-      .from('listings')
-      .update({ description_embedding: embedding })
-      .eq('id', listingId);
+    const result = await describeImagesAndEmbed(supa, listingId, text);
+    if (!result.ok) return NextResponse.json({ error: result.error }, { status: 500 });
 
-    if (error) return NextResponse.json({ error: error.message }, { status: 500 });
-    return NextResponse.json({ ok: true });
+    return NextResponse.json(result);
   } catch (e) {
     console.error('embed-listing error:', e.message);
     return NextResponse.json({ error: e.message }, { status: 500 });
