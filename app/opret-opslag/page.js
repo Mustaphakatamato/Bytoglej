@@ -93,7 +93,7 @@ export default function OpretOpslagPage() {
   const [form, setForm] = useState({
     title:'', type:'køb', price:'', age_group:'3-6 år',
     description:'', condition:'God', emoji:'🧸', color:'#FFD166',
-    tags:[], min_bid:'', category:'', subcategory:'', brand: null, urgency:'ingen', can_ship: false,
+    tags:[], min_bid:'', category:'', subcategory:'', brand: null, brandIsCustom: false, urgency:'ingen', can_ship: false,
   });
 
   // Leveringsvalg
@@ -544,6 +544,13 @@ export default function OpretOpslagPage() {
       }
       if (urls.length) await db.from('listings').update({ images: urls }).eq('id', listing.id);
     }
+    // Fire-and-forget: selvskrevet mærke → forslag til admin-godkendelse (med AI-vurdering)
+    if (listing?.id && form.brandIsCustom && form.brand && String(form.brand).trim()) {
+      authedFetch('/api/brand-suggest', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ brand_name: form.brand, listing_id: listing.id, institution_name: inst?.name || null }),
+      }).then(() => {}).catch(() => {});
+    }
     // Fire-and-forget: semantisk embedding til AI-billedsøgning (kun ikke-søges opslag indgår i søgning)
     if (listing?.id && !isSøges) {
       const descText = aiVisual || aiScanData?.ai_description || `${form.title}. ${form.description}`;
@@ -968,7 +975,7 @@ export default function OpretOpslagPage() {
                   })()}
                   <div>
                     <label style={labelStyle}>Varemærke <span style={{ color:'#e53e3e' }}>*</span></label>
-                    <BrandPicker value={form.brand} onChange={v => setForm(f => ({ ...f, brand: v }))} error={step1Attempted && (form.brand === null || form.brand === undefined)} />
+                    <BrandPicker value={form.brand} onChange={(v, meta) => setForm(f => ({ ...f, brand: v, brandIsCustom: !!meta?.custom }))} error={step1Attempted && (form.brand === null || form.brand === undefined)} />
                   </div>
                 </div>
 
