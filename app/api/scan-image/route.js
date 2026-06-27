@@ -17,9 +17,10 @@ export async function POST(req) {
     const mimeType = file.type || 'image/jpeg';
 
     const completion = await groq.chat.completions.create({
-      model: 'meta-llama/llama-4-scout-17b-16e-instruct',
+      model: 'qwen/qwen3.6-27b', // vision; erstatter Scout (Groq decommission 2026-07-17)
       max_tokens: 30,
       temperature: 0,
+      reasoning_effort: 'none', // qwen3.6 er en thinking-model — slå reasoning fra for rent svar
       messages: [{
         role: 'user',
         content: [
@@ -29,7 +30,8 @@ export async function POST(req) {
       }],
     });
 
-    const text = completion.choices[0].message.content.trim();
+    // Strip evt. <think>…</think> (sikring hvis reasoning ikke slås fra).
+    const text = (completion.choices[0].message.content || '').replace(/<think>[\s\S]*?<\/think>/gi, '').trim();
     const hasPeople = text.toLowerCase().startsWith('yes');
     const reason = hasPeople
       ? text.replace(/^yes[:\s]*/i, '').trim() || 'Ansigt eller person synlig i billedet'

@@ -59,8 +59,9 @@ Sæt needs_review: true for alt andet og giv et bedste gæt på felterne.
 Ingen markdown, ingen forklaring — kun JSON.`;
 
     const completion = await groq.chat.completions.create({
-      model: 'meta-llama/llama-4-scout-17b-16e-instruct',
+      model: 'qwen/qwen3.6-27b', // vision; erstatter Scout (Groq decommission 2026-07-17)
       max_tokens: 420,
+      reasoning_effort: 'none', // qwen3.6 er en thinking-model — slå reasoning fra for rent JSON-svar
       messages: [{
         role: 'user',
         content: [
@@ -70,7 +71,8 @@ Ingen markdown, ingen forklaring — kun JSON.`;
       }],
     });
 
-    const text = completion.choices[0].message.content.trim();
+    // Strip evt. <think>…</think> (sikring hvis reasoning ikke slås fra).
+    const text = (completion.choices[0].message.content || '').replace(/<think>[\s\S]*?<\/think>/gi, '').trim();
     const jsonMatch = text.match(/\{[\s\S]*\}/);
     if (!jsonMatch) return NextResponse.json({ error: 'Ugyldigt AI-svar. Prøv igen' }, { status: 500 });
 

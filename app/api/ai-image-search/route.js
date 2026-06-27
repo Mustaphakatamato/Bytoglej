@@ -25,9 +25,10 @@ export async function POST(req) {
     // Step 1: Groq beskriver legetøjet på dansk (samme vision-model som ved upload)
     const groq = new Groq({ apiKey: process.env.GROQ_API_KEY });
     const completion = await groq.chat.completions.create({
-      model: 'meta-llama/llama-4-scout-17b-16e-instruct',
+      model: 'qwen/qwen3.6-27b', // vision; erstatter Scout (Groq decommission 2026-07-17)
       max_tokens: 120,
       temperature: 0.2,
+      reasoning_effort: 'none', // qwen3.6 er en thinking-model — slå reasoning fra for ren beskrivelse
       messages: [{
         role: 'user',
         content: [
@@ -37,7 +38,7 @@ export async function POST(req) {
       }],
     });
 
-    const description = (completion.choices[0]?.message?.content || '').trim();
+    const description = (completion.choices[0]?.message?.content || '').replace(/<think>[\s\S]*?<\/think>/gi, '').trim();
     if (!description) return NextResponse.json({ error: 'Kunne ikke beskrive billedet. Prøv et andet foto' }, { status: 502 });
 
     // Step 2: embed beskrivelsen og find nærmeste opslag
