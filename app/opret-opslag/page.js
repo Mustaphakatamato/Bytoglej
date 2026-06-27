@@ -602,12 +602,14 @@ export default function OpretOpslagPage() {
       }).catch(()=>{});
     }
     fetchListings?.();
+    const isDraft = inst && inst.is_approved !== true;
     showToast(
       scanRejected ? 'Opslag sendt til gennemgang! Vi vender tilbage inden for 1–2 hverdage 🔍'
-      : inst?.is_approved !== true ? 'Opslag gemt som kladde! Det bliver synligt automatisk når din institution er godkendt ✅'
+      : isDraft ? 'Opslag gemt som kladde! Det bliver synligt automatisk når din institution er godkendt ✅'
       : (isSøges ? 'Søges-opslag publiceret! Tjek mulige matches på dit dashboard 🔍' : 'Opslag publiceret! 🎉')
     );
-    router.push('/profil');
+    // Ventende institution: tilbage til guide-landingen (hvor kladderne vises), ikke den tomme profil.
+    router.push(isDraft ? '/afventer-godkendelse' : '/profil');
     } catch (e) {
       console.error('handleCreate error:', e);
       showToast('Noget gik galt. Prøv igen', 'error');
