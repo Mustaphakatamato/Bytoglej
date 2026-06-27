@@ -49,7 +49,7 @@ export default function OmOsPage() {
   useEffect(() => {
     if (!STATS_CONFIG.showStats) return;
     Promise.all([
-      db.from('institutions').select('id', { count: 'exact', head: true }),
+      db.from('institutions_public').select('id', { count: 'exact', head: true }),
       db.from('conversations').select('id', { count: 'exact', head: true }).eq('deal_completed', true),
       db.from('transaction_co2_savings').select('net_saved_kg'),
     ]).then(([{ count: instCount }, { count: dealCount }, { data: co2Data }]) => {

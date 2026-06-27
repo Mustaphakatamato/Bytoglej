@@ -55,7 +55,7 @@ export default function VilkaarPage() {
             <li style={{ marginBottom: 6 }}>byt&amp;leg er en formidlingsplatform og er ikke part i handler mellem institutioner.</li>
             <li style={{ marginBottom: 6 }}>byt&amp;leg påtager sig intet ansvar for kvaliteten, tilstanden eller lovligheden af de varer der handles.</li>
             <li style={{ marginBottom: 6 }}>Tvister mellem institutioner skal løses direkte mellem de involverede parter.</li>
-            <li style={{ marginBottom: 6 }}>Betalinger foregår uden om platformen og er udelukkende et anliggende mellem køber og sælger.</li>
+            <li style={{ marginBottom: 6 }}>Betalinger for køb gennemføres sikkert på platformen via vores betalingspartner Stripe. byt&amp;leg formidler betalingen mellem køber og sælger og videresender beløbet til sælger.</li>
           </ul>
         </Section>
 

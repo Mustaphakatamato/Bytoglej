@@ -336,8 +336,8 @@ export default function IndstillingerPage() {
     }
     setEmailSaving(true);
     setEmailMsg(null);
-    // Check if email already exists in institutions
-    const { data: existing } = await db.from('institutions').select('id').eq('email', trimmed).maybeSingle();
+    // Check if email already exists in institutions (via SECURITY DEFINER RPC).
+    const { data: existing } = await db.rpc('institution_email_exists', { p_email: trimmed });
     if (existing) {
       setEmailSaving(false);
       setEmailMsg({ ok:false, text:'Denne e-mailadresse er allerede tilknyttet en konto.' }); return;

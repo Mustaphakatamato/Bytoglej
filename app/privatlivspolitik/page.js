@@ -66,8 +66,10 @@ export default function PrivatlivspolitikPage() {
           <p>Vi deler dine data med:</p>
           <ul style={{ paddingLeft: 20, marginTop: 8 }}>
             <li style={{ marginBottom: 6 }}><strong>Supabase</strong> (databaseudbyder, EU-servere): opbevaring af alle data</li>
+            <li style={{ marginBottom: 6 }}><strong>Stripe</strong> (betalingsudbyder): behandling af betalinger ved køb</li>
+            <li style={{ marginBottom: 6 }}><strong>Shipmondo</strong> (forsendelsesudbyder): oprettelse af pakkelabels (navn og adresse på afsender/modtager)</li>
             <li style={{ marginBottom: 6 }}><strong>Resend</strong> (email-udbyder): udsendelse af notifikationer</li>
-            <li style={{ marginBottom: 6 }}><strong>Groq / Google Gemini</strong>: AI-behandling af billedbeskrivelser og søgninger (ingen persondata sendes)</li>
+            <li style={{ marginBottom: 6 }}><strong>AI-tjenester</strong>: AI-behandling af billedbeskrivelser og søgninger (der sendes ikke persondata)</li>
           </ul>
           <p style={{ marginTop: 8 }}>Vi sælger <strong>aldrig</strong> dine data til tredjepart.</p>
         </Section>

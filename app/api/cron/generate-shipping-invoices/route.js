@@ -29,6 +29,7 @@ export async function GET(req) {
       .select('id,seller_institution_id,cost_dkk,markup_dkk,total_charged_to_seller_dkk,tracking_number,booked_at,conversation_id,conversations(listing_title)')
       .not('seller_institution_id', 'is', null)
       .eq('status', 'delivered')
+      .eq('prepaid', false) // forudbetalt bytte-fragt må ikke faktureres igen
       .gte('delivered_at', periodStartStr)
       .lte('delivered_at', periodEndStr + 'T23:59:59Z');
 

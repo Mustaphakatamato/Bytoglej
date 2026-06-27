@@ -109,9 +109,16 @@ export default function OpretOpslagPage() {
       if (!user) { router.push('/login'); return; }
       if (!institution) {
         const { data: own } = await db.from('institutions').select('*').ilike('email', user.email).maybeSingle();
-        if (own) { setInstitution(own); return; }
+        if (own) {
+          // Godkendelses-gate: ikke-godkendte institutioner må ikke oprette opslag.
+          if (own.is_approved !== true) { router.push('/afventer-godkendelse'); return; }
+          setInstitution(own); return;
+        }
         const { data: mem } = await db.from('institution_members').select('role,institutions(*)').eq('email', user.email).maybeSingle();
-        if (mem?.institutions) setInstitution({ ...mem.institutions, _memberRole: mem.role });
+        if (mem?.institutions) {
+          if (mem.institutions.is_approved !== true) { router.push('/afventer-godkendelse'); return; }
+          setInstitution({ ...mem.institutions, _memberRole: mem.role });
+        }
       }
     });
   }, []);

@@ -7,6 +7,12 @@ export async function POST(req) {
   try {
     const signature = req.headers.get('x-shipmondo-hmac-sha256') || '';
     const secret = process.env.SHIPMONDO_WEBHOOK_SECRET || '';
+    // Fail closed: uden konfigureret secret kan signaturen ikke verificeres,
+    // og en angriber kunne ellers forfalske shipment-status. Afvis i stedet.
+    if (!secret) {
+      console.error('shipmondo-webhook: SHIPMONDO_WEBHOOK_SECRET mangler — afviser (fail-closed).');
+      return NextResponse.json({ error: 'Webhook ikke konfigureret' }, { status: 500 });
+    }
     const payload = await req.json();
 
     let event;

@@ -360,7 +360,7 @@ export default function MineOpgaverPage() {
         const otherIds = [...new Set(props.map(p => p.initiator_institution_id === instId ? p.owner_institution_id : p.initiator_institution_id).filter(Boolean))];
         const [{ data: ships }, { data: insts }] = await Promise.all([
           myShipIds.length ? db.from('shipments').select('id,label_pdf_url,tracking_number,tracking_url').in('id', myShipIds) : Promise.resolve({ data: [] }),
-          otherIds.length ? db.from('institutions').select('id,name').in('id', otherIds) : Promise.resolve({ data: [] }),
+          otherIds.length ? db.from('institutions_public').select('id,name').in('id', otherIds) : Promise.resolve({ data: [] }),
         ]);
         const shipById = Object.fromEntries((ships || []).map(x => [x.id, x]));
         const nameById = Object.fromEntries((insts || []).map(x => [x.id, x.name]));

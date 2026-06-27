@@ -199,6 +199,7 @@ export default function SignupPage() {
   const [authError, setAuthError] = useState(null);
   const [needsConfirm, setNeedsConfirm] = useState(false);
   const [alreadyExists, setAlreadyExists] = useState(false);
+  const [acceptedTerms, setAcceptedTerms] = useState(false);
 
   // Live CVR search
   const [cvrQuery, setCvrQuery]       = useState('');
@@ -354,6 +355,7 @@ export default function SignupPage() {
   async function handleCreate() {
     const err = validateStep4();
     if (err) { setAuthError(err); return; }
+    if (!acceptedTerms) { setAuthError('Du skal acceptere handelsbetingelserne og privatlivspolitikken for at oprette en konto.'); return; }
     setSaving(true); setAuthError(null);
 
     // Tjek at maildomænet faktisk findes (MX/A-record)
@@ -363,8 +365,9 @@ export default function SignupPage() {
       return;
     }
 
-    // Check if email already exists in institutions table
-    const { data: existingInst } = await db.from('institutions').select('email').ilike('email', form.email.trim()).maybeSingle();
+    // Check if email already exists in institutions table (via SECURITY DEFINER RPC —
+    // institutions is no longer publicly readable).
+    const { data: existingInst } = await db.rpc('institution_email_exists', { p_email: form.email.trim() });
     if (existingInst) {
       setAuthError(`Denne e-mail er allerede tilknyttet en konto. Log ind i stedet.`);
       setAlreadyExists(true);
@@ -661,6 +664,10 @@ export default function SignupPage() {
                   )}
                 </div>
               )}
+              <label style={{ display: 'flex', gap: 10, alignItems: 'flex-start', fontSize: 13, color: INK2, fontFamily: FONT, cursor: 'pointer', marginTop: 4 }}>
+                <input type="checkbox" checked={acceptedTerms} onChange={e => { setAcceptedTerms(e.target.checked); setAuthError(null); }} style={{ marginTop: 2, width: 16, height: 16, flexShrink: 0, cursor: 'pointer' }} />
+                <span>Jeg accepterer <a href="/vilkaar" target="_blank" rel="noopener noreferrer" style={{ color: PRIMARY, fontWeight: 700 }}>handelsbetingelserne</a> og <a href="/privatlivspolitik" target="_blank" rel="noopener noreferrer" style={{ color: PRIMARY, fontWeight: 700 }}>privatlivspolitikken</a>.</span>
+              </label>
               <div style={{ display: 'flex', gap: 10, marginTop: 4 }}>
                 <Btn variant="outline" radius={22} onClick={() => setStep(3)} style={{ padding: '12px 20px', fontSize: 14 }}>← Tilbage</Btn>
                 <Btn variant="primary" color={PRIMARY} radius={22} onClick={handleCreate} disabled={saving} style={{ flex: 1, justifyContent: 'center', padding: '13px', fontSize: 15 }}>

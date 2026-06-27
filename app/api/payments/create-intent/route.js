@@ -46,7 +46,7 @@ export async function POST(req) {
   if (body.buyerInstitutionId) {
     const { data } = await supa
       .from('institutions')
-      .select('id, name, address, zipcode, city, email, phone, leader_email')
+      .select('id, name, address, zipcode, city, email, phone, leader_email, is_approved')
       .eq('id', body.buyerInstitutionId)
       .maybeSingle();
     buyer = data;
@@ -66,6 +66,11 @@ export async function POST(req) {
         if (!mem) {
           return NextResponse.json({ error: 'Du har ikke adgang til denne institution' }, { status: 403 });
         }
+      }
+
+      // Godkendelses-gate: kun godkendte institutioner må handle.
+      if (buyer.is_approved !== true) {
+        return NextResponse.json({ error: 'Din institution afventer godkendelse og kan endnu ikke købe.' }, { status: 403 });
       }
     }
   }
@@ -222,6 +227,7 @@ export async function POST(req) {
       return NextResponse.json({ error: 'Ugyldig leveringsmetode' }, { status: 400 });
     }
     if (shippingMethod && shippingMethod !== 'pickup' && shippingMethod !== 'custom') {
+      let quoted = null;
       try {
         const carrier = shippingMethod.replace('parcel_shop_', '').replace('home_', '');
         const serviceType = shippingMethod.startsWith('parcel_shop_') ? 'parcel_shop' : 'home_delivery';
@@ -233,10 +239,16 @@ export async function POST(req) {
           receiver: { name: buyer?.name,  address: buyer?.address,  zip: buyer?.zipcode,  city: buyer?.city,  email: buyer?.email },
           service_point_id: g.pickupPoint?.id,
         });
-        if (quote?.price_dkk > 0) shippingTotal = Math.round(quote.price_dkk * 100) / 100;
+        if (quote?.price_dkk > 0) quoted = Math.round(quote.price_dkk * 100) / 100;
       } catch (e) {
-        console.error('[create-intent] Shipmondo quote fejlede — bruger fast tabel:', e.message);
+        console.error('[create-intent] Shipmondo quote fejlede:', e.message);
       }
+      // Fail closed: hellere blokere checkout end opkræve den gamle, for-lave
+      // tabelpris (systematisk tab pr. forsendelse ved Shipmondo-nedetid).
+      if (quoted === null) {
+        return NextResponse.json({ error: 'Kunne ikke beregne fragtpris lige nu. Prøv igen om lidt.' }, { status: 503 });
+      }
+      shippingTotal = quoted;
     }
 
     // Bundle discount (applied before service fee)

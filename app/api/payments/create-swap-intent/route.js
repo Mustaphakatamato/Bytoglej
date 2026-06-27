@@ -114,16 +114,22 @@ export async function POST(req) {
       receiverInst = data;
     }
     if (myInst && receiverInst) {
+      let quoted = null;
       try {
         const quote = await getPriceQuote({
           carrier: 'gls', service_type: 'parcel_shop', size_category: sizeCategory,
           sender:   { name: myInst.name, address: myInst.address, zip: myInst.zipcode, city: myInst.city, email: myInst.email },
           receiver: { name: receiverInst.name, address: receiverInst.address, zip: receiverInst.zipcode, city: receiverInst.city, email: receiverInst.email },
         });
-        if (quote?.price_dkk > 0) porto = Math.round(quote.price_dkk * 100) / 100;
+        if (quote?.price_dkk > 0) quoted = Math.round(quote.price_dkk * 100) / 100;
       } catch (e) {
-        console.error('[create-swap-intent] Shipmondo quote fejlede — bruger tabel:', e.message);
+        console.error('[create-swap-intent] Shipmondo quote fejlede:', e.message);
       }
+      // Fail closed: blokér frem for at opkræve den for-lave tabelpris.
+      if (quoted === null) {
+        return NextResponse.json({ error: 'Kunne ikke beregne fragtpris lige nu. Prøv igen om lidt.' }, { status: 503 });
+      }
+      porto = quoted;
     }
   }
 
@@ -247,6 +253,7 @@ async function handleProposalIntent(user, supa, body) {
       senderInst = data;
     }
     if (myInst && senderInst) {
+      let quoted = null;
       try {
         // Pakken sendes FRA modparten TIL mig og afhentes på MIT valgte udleveringssted.
         const quote = await getPriceQuote({
@@ -255,10 +262,15 @@ async function handleProposalIntent(user, supa, body) {
           receiver: { name: myInst.name, address: myInst.address, zip: myInst.zipcode, city: myInst.city, email: myInst.email },
           service_point_id: pickupPointId,
         });
-        if (quote?.price_dkk > 0) porto = Math.round(quote.price_dkk * 100) / 100;
+        if (quote?.price_dkk > 0) quoted = Math.round(quote.price_dkk * 100) / 100;
       } catch (e) {
         console.error('[create-swap-intent] proposal quote fejl:', e.message);
       }
+      // Fail closed: blokér frem for at opkræve den for-lave tabelpris.
+      if (quoted === null) {
+        return NextResponse.json({ error: 'Kunne ikke beregne fragtpris lige nu. Prøv igen om lidt.' }, { status: 503 });
+      }
+      porto = quoted;
     }
   }
 
