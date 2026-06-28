@@ -461,12 +461,12 @@ export default function IndstillingerPage() {
                   <div style={{ borderTop:'1px solid #f0eeeb', paddingTop:20 }}>
                     <div style={{ fontSize:12, fontWeight:700, color:'#aaa', textTransform:'uppercase', letterSpacing:0.8, marginBottom:14 }}>Kontaktoplysninger</div>
                     <div style={{ display:'flex', flexDirection:'column', gap:12 }}>
-                      <div style={{ display:'grid', gridTemplateColumns:'1fr 120px', gap:12 }}>
+                      <div style={{ display:'grid', gridTemplateColumns:'minmax(0,1fr) 120px', gap:12 }}>
                         <div><label style={{ display:'block', fontSize:13, fontWeight:700, marginBottom:6 }}>Adresse</label>{inp(form.address,'address','')}</div>
                         <div><label style={{ display:'block', fontSize:13, fontWeight:700, marginBottom:6 }}>Postnr.</label>{inp(form.zipcode,'zipcode','')}</div>
                       </div>
                       <div><label style={{ display:'block', fontSize:13, fontWeight:700, marginBottom:6 }}>By</label>{inp(form.city,'city','')}</div>
-                      <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:12 }}>
+                      <div style={{ display:'grid', gridTemplateColumns:'minmax(0,1fr) minmax(0,1fr)', gap:12 }}>
                         <div><label style={{ display:'block', fontSize:13, fontWeight:700, marginBottom:6 }}>Telefon</label><input type="tel" value={form.phone} onChange={e=>setForm(f=>({...f,phone:e.target.value.replace(/[^+\d\s]/g,'')}))} placeholder="+45 12 34 56 78" style={INP} /></div>
                         <div><label style={{ display:'block', fontSize:13, fontWeight:700, marginBottom:6 }}>Hjemmeside</label>{inp(form.website,'website','https://...')}</div>
                       </div>
@@ -478,7 +478,7 @@ export default function IndstillingerPage() {
                     <div style={{ fontSize:12, fontWeight:700, color:'#aaa', textTransform:'uppercase', letterSpacing:0.8, marginBottom:14 }}>Institutionsleder</div>
                     <div style={{ display:'flex', flexDirection:'column', gap:12 }}>
                       <div><label style={{ display:'block', fontSize:13, fontWeight:700, marginBottom:6 }}>Fulde navn</label>{inp(form.leader_name,'leader_name','Fornavn Efternavn')}</div>
-                      <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:12 }}>
+                      <div style={{ display:'grid', gridTemplateColumns:'minmax(0,1fr) minmax(0,1fr)', gap:12 }}>
                         <div><label style={{ display:'block', fontSize:13, fontWeight:700, marginBottom:6 }}>Telefon</label><input type="tel" value={form.leader_phone} onChange={e=>setForm(f=>({...f,leader_phone:e.target.value.replace(/[^+\d\s]/g,'')}))} placeholder="+45 12 34 56 78" style={INP} /></div>
                         <div><label style={{ display:'block', fontSize:13, fontWeight:700, marginBottom:6 }}>E-mail</label>{inp(form.leader_email,'leader_email','leder@institution.dk')}</div>
                       </div>
@@ -507,7 +507,7 @@ export default function IndstillingerPage() {
 
                   <div>
                     <div style={{ fontSize:12, fontWeight:700, color:'#aaa', textTransform:'uppercase', letterSpacing:0.8, marginBottom:14 }}>Bankkonto til udbetaling</div>
-                    <div style={{ display:'grid', gridTemplateColumns:'140px 1fr', gap:12 }}>
+                    <div style={{ display:'grid', gridTemplateColumns:'140px minmax(0,1fr)', gap:12 }}>
                       <div>
                         <label style={{ display:'block', fontSize:13, fontWeight:700, marginBottom:6 }}>Reg.nr.</label>
                         <input value={form.bank_reg_nr} onChange={e=>setForm(f=>({...f,bank_reg_nr:e.target.value.replace(/\D/g,'').slice(0,4)}))} placeholder="1234" maxLength={4} style={INP} />
