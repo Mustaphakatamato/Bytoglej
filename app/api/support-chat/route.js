@@ -2,6 +2,7 @@ import Groq from 'groq-sdk';
 import { NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { SUPPORT_FACTS } from '@/lib/support-knowledge';
+import { helpArticleIndexForAI } from '@/lib/help-content';
 import { brandedEmail } from '@/lib/email-template';
 import { escapeHtml } from '@/lib/escape-html';
 
@@ -37,6 +38,10 @@ ESKALÉR ALTID TIL MENNESKE (sæt escalate: true) HVIS:
 ---
 ${SUPPORT_FACTS}
 ---
+
+${helpArticleIndexForAI()}
+
+Hvis brugerens spørgsmål er dækket af en hjælpeartikel ovenfor, må du gerne henvise til den med dens sti (fx "Du kan læse mere her: /hjaelp/artikel/opret-opslag-med-ai"). Brug KUN stier fra listen — gæt aldrig en sti.
 
 Svar altid i dette JSON-format:
 {"reply": "din besked her", "escalate": false}
