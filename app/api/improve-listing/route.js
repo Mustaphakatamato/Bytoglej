@@ -37,7 +37,8 @@ Du må GERNE:
 - Omformulere uklart sprog til præcist og professionelt dansk
 - Strukturere beskrivelsen logisk (stand → indhold → begrundelse)
 - Gøre titlen mere konkret og søgbar inden for 60 tegn
-- Sikre at titel og beskrivelse er konsistente med hinanden`,
+- Sikre at titel og beskrivelse er konsistente med hinanden
+- Fjerne tvivls- og gætteformuleringer som "ser ud til", "ser ud som om", "virker", "lader til", "umiddelbart" eller "muligvis" og skrive bestemt og konkret — teksten er sælgers egen beskrivelse og skal lyde sikker`,
         },
         {
           role: 'user',
