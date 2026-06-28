@@ -25,6 +25,7 @@ export default function FeedbackWidget({ loggedIn, institutionName, userEmail })
   const [screenshotPreview, setScreenshotPreview] = useState(null); // object URL
   const [capturing, setCapturing]         = useState(false);
   const [hideForCapture, setHideForCapture] = useState(false);
+  const [canScreenshot, setCanScreenshot] = useState(false); // skærmoptagelse giver ikke mening på mobil
   const fileInputRef                      = useRef(null);
 
   useEffect(() => {
@@ -45,6 +46,13 @@ export default function FeedbackWidget({ loggedIn, institutionName, userEmail })
   useEffect(() => {
     return () => { if (screenshotPreview) URL.revokeObjectURL(screenshotPreview); };
   }, [screenshotPreview]);
+
+  // Skærmoptagelse understøttes ikke på mobil — vis kun "Tag screenshot" på desktop
+  useEffect(() => {
+    const supportsCapture = !!navigator.mediaDevices?.getDisplayMedia;
+    const isMobile = window.matchMedia('(max-width: 768px), (pointer: coarse)').matches;
+    setCanScreenshot(supportsCapture && !isMobile);
+  }, []);
 
   function attachBlob(blob) {
     if (screenshotPreview) URL.revokeObjectURL(screenshotPreview);
@@ -281,6 +289,7 @@ export default function FeedbackWidget({ loggedIn, institutionName, userEmail })
                     </div>
                   ) : (
                     <div style={{ display: 'flex', gap: 6 }}>
+                      {canScreenshot && (
                       <button onClick={captureScreen} disabled={capturing} style={{
                         flex: 1, padding: '8px 6px', borderRadius: 10,
                         border: `1.5px dashed ${PAPER3}`, background: PAPER2,
@@ -291,6 +300,7 @@ export default function FeedbackWidget({ loggedIn, institutionName, userEmail })
                         <span style={{ fontSize: 14 }}>📸</span>
                         {capturing ? 'Vælg skærm…' : 'Tag screenshot'}
                       </button>
+                      )}
                       <button onClick={openFilePicker} disabled={capturing} style={{
                         flex: 1, padding: '8px 6px', borderRadius: 10,
                         border: `1.5px dashed ${PAPER3}`, background: PAPER2,
