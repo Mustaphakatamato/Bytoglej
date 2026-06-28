@@ -15,6 +15,28 @@ function fmtKr(n) {
   return `${Number(n || 0).toFixed(2).replace('.', ',')} kr.`;
 }
 
+// ── Auto-gem af et igangværende opslag (kladde) i browseren ──────────────────
+// Så man kan forlade siden (fx tjekke sin profil) og fortsætte hvor man slap.
+const DRAFT_KEY = 'bl_listing_draft_v1';
+const DRAFT_TTL_MS = 7 * 24 * 60 * 60 * 1000; // gendan i op til 7 dage; derefter forfra
+const DRAFT_MAX_BYTES = 4_500_000;            // localStorage-budget (~4,5 MB)
+
+function blobToDataURL(blob) {
+  return new Promise((resolve, reject) => {
+    const r = new FileReader();
+    r.onload = () => resolve(r.result);
+    r.onerror = reject;
+    r.readAsDataURL(blob);
+  });
+}
+async function dataUrlToFile(dataUrl, name) {
+  const blob = await (await fetch(dataUrl)).blob();
+  return new File([blob], name || `billede-${Date.now()}.jpg`, { type: blob.type || 'image/jpeg' });
+}
+function draftHasContent(f, imgs) {
+  return !!(f && (f.title?.trim() || f.description?.trim() || f.price || f.category || (imgs && imgs.length)));
+}
+
 function PreviewCard({ form, imgPreview }) {
   const tc = TYPE_CFG[form.type] || { label: form.type, color: INK3, bg: PAPER2 };
   return (
@@ -103,6 +125,109 @@ export default function OpretOpslagPage() {
     shipping: false, weight_g: 1000,
   });
   const [deliveryDefaultApplied, setDeliveryDefaultApplied] = useState(false);
+
+  // ── Kladde (auto-gem) ──
+  const [draftRestored, setDraftRestored] = useState(false);
+  const draftHydrated = useRef(false);   // true når vi har forsøgt at gendanne (gemmer først derefter)
+  const submittingRef = useRef(false);   // gem ikke mens vi indsender
+  const imgCacheRef = useRef({ sig: '', images: [] }); // cache billed-encoding så vi ikke re-encoder ved hvert tastetryk
+
+  async function encodedDraftImages() {
+    const sig = imgFiles.map(f => `${f.name}:${f.size}:${f.lastModified}`).join('|');
+    if (imgCacheRef.current.sig === sig) return imgCacheRef.current.images;
+    const images = await Promise.all(imgFiles.map(async (f) => ({
+      name: f.name,
+      dataUrl: await blobToDataURL(await compressImage(f, 768, 0.7)),
+    })));
+    imgCacheRef.current = { sig, images };
+    return images;
+  }
+
+  async function saveDraft() {
+    if (submittingRef.current) return;
+    try {
+      if (!draftHasContent(form, imgFiles)) { localStorage.removeItem(DRAFT_KEY); return; }
+      const images = await encodedDraftImages().catch(() => []);
+      const base = { v: 1, savedAt: Date.now(), step, form, delivery };
+      let str = JSON.stringify({ ...base, images });
+      if (str.length > DRAFT_MAX_BYTES) str = JSON.stringify({ ...base, images: [], imagesDropped: true });
+      localStorage.setItem(DRAFT_KEY, str);
+    } catch {
+      // fx QuotaExceeded → gem tekst uden billeder
+      try { localStorage.setItem(DRAFT_KEY, JSON.stringify({ v: 1, savedAt: Date.now(), step, form, delivery, images: [], imagesDropped: true })); } catch {}
+    }
+  }
+
+  function discardDraft() {
+    try { localStorage.removeItem(DRAFT_KEY); } catch {}
+    imgPreviews.forEach((u) => URL.revokeObjectURL(u));
+    imgCacheRef.current = { sig: '', images: [] };
+    setForm({
+      title:'', type:'køb', price:'', age_group:'3-6 år',
+      description:'', condition:'God', emoji:'🧸', color:'#FFD166',
+      tags:[], min_bid:'', category:'', subcategory:'', brand: null, brandIsCustom: false, urgency:'ingen', can_ship: false,
+    });
+    setDelivery({ shipping: false, weight_g: 1000 });
+    setImgFiles([]); setImgPreviews([]); setImgError(false);
+    setStep(1);
+    setDraftRestored(false);
+  }
+
+  // Gendan kladde ved indlæsning (kopierings-flow med ?from= har forrang).
+  useEffect(() => {
+    if (new URLSearchParams(window.location.search).get('from')) { draftHydrated.current = true; return; }
+    (async () => {
+      try {
+        const raw = localStorage.getItem(DRAFT_KEY);
+        if (raw) {
+          const d = JSON.parse(raw);
+          const fresh = d?.savedAt && (Date.now() - d.savedAt < DRAFT_TTL_MS);
+          if (fresh && draftHasContent(d.form, d.images)) {
+            if (d.form) setForm((f) => ({ ...f, ...d.form }));
+            if (d.delivery) { setDelivery((dv) => ({ ...dv, ...d.delivery })); setDeliveryDefaultApplied(true); }
+            if (d.step) setStep(d.step);
+            if (Array.isArray(d.images) && d.images.length) {
+              const files = await Promise.all(d.images.map((im) => dataUrlToFile(im.dataUrl, im.name)));
+              setImgFiles(files);
+              setImgPreviews(files.map((f) => URL.createObjectURL(f)));
+            }
+            setDraftRestored(true);
+          } else if (!fresh) {
+            localStorage.removeItem(DRAFT_KEY);
+          }
+        }
+      } catch {}
+      draftHydrated.current = true;
+    })();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Auto-gem løbende (debounced) når noget ændres.
+  useEffect(() => {
+    if (!draftHydrated.current) return;
+    const t = setTimeout(() => { saveDraft(); }, 700);
+    return () => clearTimeout(t);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [form, delivery, step, imgFiles]);
+
+  // Seneste state i en ref, så vi kan gemme synkront ved unmount (fx når man
+  // klikker væk til profilen før debounce-gemningen når at køre).
+  const latestRef = useRef(null);
+  latestRef.current = { form, delivery, step, imgFiles };
+  useEffect(() => {
+    return () => {
+      if (submittingRef.current || !draftHydrated.current) return;
+      const s = latestRef.current; if (!s) return;
+      try {
+        if (!draftHasContent(s.form, s.imgFiles)) return;
+        const base = { v: 1, savedAt: Date.now(), step: s.step, form: s.form, delivery: s.delivery, images: imgCacheRef.current.images || [] };
+        let str = JSON.stringify(base);
+        if (str.length > DRAFT_MAX_BYTES) str = JSON.stringify({ ...base, images: [], imagesDropped: true });
+        localStorage.setItem(DRAFT_KEY, str);
+      } catch {}
+    };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   useEffect(() => {
     db.auth.getUser().then(async ({ data:{ user } }) => {
@@ -470,6 +595,7 @@ export default function OpretOpslagPage() {
     if (form.brand === null || form.brand === undefined) { showToast('Vælg et varemærke (eller "Intet varemærke")', 'error'); return; }
     if (delivery.shipping && !delivery.weight_g) { showToast('Vælg pakkevægt for forsendelse', 'error'); return; }
     setSaving(true);
+    submittingRef.current = true; // stop auto-gem af kladde under indsendelse
     try {
     const { data:{ user } } = await db.auth.getUser();
     let inst = institution;
@@ -606,6 +732,7 @@ export default function OpretOpslagPage() {
       }).catch(()=>{});
     }
     fetchListings?.();
+    try { localStorage.removeItem(DRAFT_KEY); } catch {} // opslag oprettet → ryd den gemte kladde
     const isDraft = inst && inst.is_approved !== true;
     showToast(
       scanRejected ? 'Opslag sendt til gennemgang! Vi vender tilbage inden for 1–2 hverdage 🔍'
@@ -617,6 +744,7 @@ export default function OpretOpslagPage() {
     } catch (e) {
       console.error('handleCreate error:', e);
       showToast('Noget gik galt. Prøv igen', 'error');
+      submittingRef.current = false; // indsendelse fejlede → tillad auto-gem igen
     } finally {
       setSaving(false);
     }
@@ -688,6 +816,17 @@ export default function OpretOpslagPage() {
                 Din institution afventer godkendelse — typisk inden for 2 timer. Opslag du opretter nu gemmes som <strong>kladde</strong> og bliver synlige automatisk, så snart I er godkendt.
               </div>
             </div>
+          </div>
+        )}
+        {draftRestored && (
+          <div style={{ background:GREEN_TINT, border:`1px solid ${GREEN_SOFT}`, borderRadius:16, padding:isMobile?'12px 14px':'14px 18px', marginBottom:20, display:'flex', gap:12, alignItems:'center', flexWrap:'wrap' }}>
+            <span style={{ fontSize:20, lineHeight:1, flexShrink:0 }}>↩️</span>
+            <div style={{ flex:1, minWidth:180 }}>
+              <div style={{ fontFamily:FONT, fontWeight:800, fontSize:14, color:PRIMARY, marginBottom:2 }}>Vi gendannede din kladde</div>
+              <div style={{ fontFamily:FONT, fontSize:13, color:INK2, lineHeight:1.5 }}>Du kan fortsætte hvor du slap. Kladden gemmes automatisk, indtil du opretter opslaget.</div>
+            </div>
+            <button onClick={discardDraft} style={{ flexShrink:0, background:'#fff', border:`1.5px solid ${PAPER3}`, borderRadius:99, padding:'8px 16px', fontSize:13, fontWeight:700, color:INK2, cursor:'pointer', fontFamily:FONT }}>Start forfra</button>
+            <button onClick={()=>setDraftRestored(false)} aria-label="Luk" style={{ flexShrink:0, background:'none', border:'none', color:INK3, fontSize:16, cursor:'pointer', lineHeight:1, padding:4 }}>✕</button>
           </div>
         )}
         <div style={{ display:'grid', gridTemplateColumns:isMobile?'1fr':'1fr 340px', gap:32, alignItems:'start' }}>
