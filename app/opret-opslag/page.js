@@ -345,38 +345,30 @@ export default function OpretOpslagPage() {
     try {
       const compressed = await compressImage(file);
 
-      // Person detection — inline to capture reason
-      let personDetected = false;
-      let personReason = null;
-      try {
-        const safeForm = new FormData(); safeForm.append('image', compressed);
-        const safeRes = await authedFetch('/api/scan-image', { method: 'POST', body: safeForm });
-        const safeJson = await safeRes.json();
-        if (safeJson.safe === false) { personDetected = true; personReason = safeJson.reason || null; }
-      } catch {}
+      // Ét vision-kald: scan-toy udfylder felter OG laver person-tjek (foldet sammen
+      // for at spare kald → færre 429-fejl på gratis-loftet).
+      const fd = new FormData();
+      fd.append('image', compressed);
+      const res = await authedFetch('/api/scan-toy', { method: 'POST', body: fd });
+      const json = await res.json();
+      if (json.error) {
+        setScanError(json.error || 'Scan mislykkedes. Prøv igen');
+        setScanning(false);
+        return;
+      }
 
-      if (personDetected) {
-        // Log rejection server-side (fire-and-forget result; save log_id for dispute button)
+      // Person-guard (privatliv) — kommer nu fra scan-toy-svaret.
+      if (json.has_person) {
         try {
           const logForm = new FormData();
           logForm.append('image', compressed);
-          logForm.append('ai_reason', personReason || 'Person detekteret');
+          logForm.append('ai_reason', json.person_reason || 'Person detekteret');
           logForm.append('institution_name', institution?.name || '');
           const logRes = await authedFetch('/api/log-scan-rejection', { method: 'POST', body: logForm });
           const logJson = await logRes.json();
           if (logJson.log_id) setRejectionLogId(logJson.log_id);
         } catch {}
         setScanError('AI har registreret en person på billedet. Upload et billede uden personer.');
-        setScanning(false);
-        return;
-      }
-
-      const fd = new FormData();
-      fd.append('image', compressed);
-      const res = await authedFetch('/api/scan-toy', { method: 'POST', body: fd });
-      const json = await res.json();
-      if (json.error) {
-        setScanError('Scan mislykkedes. Prøv igen');
         setScanning(false);
         return;
       }

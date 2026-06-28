@@ -41,6 +41,8 @@ export async function POST(req) {
     const prompt = `Du er en assistent der hjælper med at oprette annoncer for danske institutioner (vuggestuer, børnehaver, skoler).
 
 Returner KUN et JSON-objekt med følgende felter:
+- has_person: true hvis billedet viser en ÆGTE, levende person (synligt ansigt eller tydeligt genkendelig krop, uanset orientering) — false ellers. Tegnefigurer, tegninger, dukker, actionfigurer, bamser, eller personer trykt på legetøj/bøger/emballage tæller IKKE som person.
+- person_reason: kort dansk grund på max 80 tegn (kun hvis has_person er true)
 - needs_review: true hvis billedet IKKE tydeligt viser legetøj eller institutions-udstyr (fx mad, landskaber, dyr, mennesker, tilfældige genstande) — false ellers
 - reject_reason: kort dansk forklaring på max 80 tegn (kun hvis needs_review er true, ellers udelad feltet)
 - title: kort dansk titel på max 60 tegn (bedste gæt selv ved usikre billeder)
@@ -116,15 +118,24 @@ Ingen markdown, ingen forklaring — kun JSON.`;
       console.error('scan-toy pris-forslag fejl:', e.message);
     }
 
-    // Fjern de rå AI-prisfelter fra svaret; returnér det strukturerede price-objekt.
+    // Fjern de rå AI-felter fra svaret; returnér det strukturerede resultat.
     const needsReview = !!parsed.needs_review;
     const rejectReason = parsed.reject_reason || null;
+    const hasPerson = !!parsed.has_person;
+    const personReason = parsed.person_reason || null;
     delete parsed.price_min; delete parsed.price_max;
     delete parsed.needs_review; delete parsed.reject_reason;
+    delete parsed.has_person; delete parsed.person_reason;
 
-    return NextResponse.json({ ...parsed, price, needs_review: needsReview, reject_reason: rejectReason });
+    // Person-tjek er foldet ind her, så scanning kun bruger ÉT vision-kald
+    // (i stedet for et separat scan-image-kald oveni).
+    return NextResponse.json({ ...parsed, price, needs_review: needsReview, reject_reason: rejectReason, has_person: hasPerson, person_reason: personReason });
   } catch (e) {
     console.error('scan-toy error:', e.message);
+    const msg = String(e?.message || '');
+    if (/429|too many requests|resource[_ ]?exhausted|rate limit/i.test(msg)) {
+      return NextResponse.json({ error: 'AI-tjenesten er travl lige nu. Vent et øjeblik og prøv igen.' }, { status: 429 });
+    }
     return NextResponse.json({ error: 'Noget gik galt. Prøv igen' }, { status: 500 });
   }
 }
