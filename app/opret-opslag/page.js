@@ -202,13 +202,22 @@ export default function OpretOpslagPage() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Auto-gem løbende (debounced) når noget ændres.
+  // Auto-gem tekstfelter løbende (debounced) når noget ændres.
   useEffect(() => {
     if (!draftHydrated.current) return;
     const t = setTimeout(() => { saveDraft(); }, 700);
     return () => clearTimeout(t);
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [form, delivery, step, imgFiles]);
+  }, [form, delivery, step]);
+
+  // Billed-ændringer (fx et scannet billede) gemmes STRAKS uden debounce — så de
+  // ikke går tabt, hvis man hurtigt forlader siden lige efter. saveDraft encoder
+  // billederne og opdaterer samtidig imgCacheRef, som unmount-gemningen bruger.
+  useEffect(() => {
+    if (!draftHydrated.current) return;
+    saveDraft();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [imgFiles]);
 
   // Seneste state i en ref, så vi kan gemme synkront ved unmount (fx når man
   // klikker væk til profilen før debounce-gemningen når at køre).
