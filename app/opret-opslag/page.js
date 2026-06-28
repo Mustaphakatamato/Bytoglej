@@ -29,9 +29,17 @@ function blobToDataURL(blob) {
     r.readAsDataURL(blob);
   });
 }
-async function dataUrlToFile(dataUrl, name) {
-  const blob = await (await fetch(dataUrl)).blob();
-  return new File([blob], name || `billede-${Date.now()}.jpg`, { type: blob.type || 'image/jpeg' });
+// Dekod en data-URL til en File UDEN fetch() — i en PWA kan service-workeren
+// opsnappe fetch af data:-URLs og få det til at fejle. atob er synkront og sikkert.
+function dataUrlToFile(dataUrl, name) {
+  const comma = dataUrl.indexOf(',');
+  const head = dataUrl.slice(0, comma);
+  const b64 = dataUrl.slice(comma + 1);
+  const mime = (head.match(/data:(.*?);base64/) || [])[1] || 'image/jpeg';
+  const bin = atob(b64);
+  const bytes = new Uint8Array(bin.length);
+  for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+  return new File([bytes], name || `billede-${Date.now()}.jpg`, { type: mime });
 }
 function draftHasContent(f, imgs) {
   return !!(f && (f.title?.trim() || f.description?.trim() || f.price || f.category || (imgs && imgs.length)));
@@ -146,7 +154,9 @@ export default function OpretOpslagPage() {
   async function saveDraft() {
     if (submittingRef.current) return;
     try {
-      if (!draftHasContent(form, imgFiles)) { localStorage.removeItem(DRAFT_KEY); return; }
+      // Tom formular → gem ikke (men slet HELLER ikke — så en netop gendannet
+      // kladde aldrig kan blive ryddet af en tidlig, tom auto-gem-kørsel).
+      if (!draftHasContent(form, imgFiles)) return;
       const images = await encodedDraftImages().catch(() => []);
       const base = { v: 1, savedAt: Date.now(), step, form, delivery };
       let str = JSON.stringify({ ...base, images });
@@ -176,29 +186,31 @@ export default function OpretOpslagPage() {
   // Gendan kladde ved indlæsning (kopierings-flow med ?from= har forrang).
   useEffect(() => {
     if (new URLSearchParams(window.location.search).get('from')) { draftHydrated.current = true; return; }
-    (async () => {
-      try {
-        const raw = localStorage.getItem(DRAFT_KEY);
-        if (raw) {
-          const d = JSON.parse(raw);
-          const fresh = d?.savedAt && (Date.now() - d.savedAt < DRAFT_TTL_MS);
-          if (fresh && draftHasContent(d.form, d.images)) {
-            if (d.form) setForm((f) => ({ ...f, ...d.form }));
-            if (d.delivery) { setDelivery((dv) => ({ ...dv, ...d.delivery })); setDeliveryDefaultApplied(true); }
-            if (d.step) setStep(d.step);
-            if (Array.isArray(d.images) && d.images.length) {
-              const files = await Promise.all(d.images.map((im) => dataUrlToFile(im.dataUrl, im.name)));
+    try {
+      const raw = localStorage.getItem(DRAFT_KEY);
+      if (raw) {
+        const d = JSON.parse(raw);
+        const fresh = d?.savedAt && (Date.now() - d.savedAt < DRAFT_TTL_MS);
+        if (fresh && draftHasContent(d.form, d.images)) {
+          if (d.form) setForm((f) => ({ ...f, ...d.form }));
+          if (d.delivery) { setDelivery((dv) => ({ ...dv, ...d.delivery })); setDeliveryDefaultApplied(true); }
+          if (d.step) setStep(d.step);
+          // Billed-gendannelse i egen try, så en evt. fejl IKKE forhindrer at
+          // tekst gendannes eller at banneret vises.
+          if (Array.isArray(d.images) && d.images.length) {
+            try {
+              const files = d.images.map((im) => dataUrlToFile(im.dataUrl, im.name));
               setImgFiles(files);
               setImgPreviews(files.map((f) => URL.createObjectURL(f)));
-            }
-            setDraftRestored(true);
-          } else if (!fresh) {
-            localStorage.removeItem(DRAFT_KEY);
+            } catch (err) { console.warn('Kunne ikke gendanne kladde-billeder:', err); }
           }
+          setDraftRestored(true);
+        } else if (!fresh) {
+          localStorage.removeItem(DRAFT_KEY);
         }
-      } catch {}
-      draftHydrated.current = true;
-    })();
+      }
+    } catch {}
+    draftHydrated.current = true;
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
