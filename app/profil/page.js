@@ -6,6 +6,7 @@ import { PRIMARY, GREEN_TINT, PAPER2, PAPER3, INK, INK3, FONT } from '@/lib/cons
 import { useWindowWidth } from '@/lib/hooks';
 import { useApp, useActiveUser } from '@/providers/AppProvider';
 import { Spinner } from '@/components/ui';
+import ConfirmDialog from '@/components/ConfirmDialog';
 
 function MenuItem({ icon, label, value, badge, onClick, danger }) {
   return (
@@ -274,11 +275,27 @@ export default function ProfilPage() {
     return () => { cancelled = true; };
   }, [effectiveInstitution?.id]);
 
+  const [showLogout, setShowLogout] = useState(false);
+
   async function handleLogout() {
+    setShowLogout(false);
     await db.auth.signOut();
     setLoggedIn(false);
     router.push('/');
   }
+
+  // Genbrugelig log ud-bekræftelse (Vinted-agtig) — vises i begge layouts.
+  const logoutConfirm = (
+    <ConfirmDialog
+      open={showLogout}
+      title="Vil du logge af din konto?"
+      confirmLabel="Ja, log af"
+      cancelLabel="Nej, forbliv logget på"
+      danger
+      onConfirm={handleLogout}
+      onCancel={() => setShowLogout(false)}
+    />
+  );
 
   const initials = institution?.name?.slice(0, 2).toUpperCase() || '?';
 
@@ -368,8 +385,9 @@ export default function ProfilPage() {
               <MenuItem icon="📧" label="Kontakt os" onClick={() => router.push('/kontakt')} />
             </MenuSection>
             <MenuSection>
-              <MenuItem icon="🚪" label="Log ud" danger onClick={handleLogout} />
+              <MenuItem icon="🚪" label="Log ud" danger onClick={() => setShowLogout(true)} />
             </MenuSection>
+            {logoutConfirm}
             <div style={{ textAlign:'center', padding:'8px 0' }}>
               <span style={{ fontFamily:FONT, fontSize:11, color:INK3 }}>Privatlivspolitik · Vilkår og betingelser</span>
             </div>
@@ -489,13 +507,14 @@ export default function ProfilPage() {
                 <svg width="6" height="10" viewBox="0 0 7 12" fill="none"><path d="M1 1l5 5-5 5" stroke={INK3} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/></svg>
               </button>
             ))}
-            <button onClick={handleLogout} style={{
+            <button onClick={() => setShowLogout(true)} style={{
               width:'100%', display:'flex', alignItems:'center', gap:12,
               padding:'14px 18px', background:'none', border:'none', cursor:'pointer', textAlign:'left',
             }}>
               <span style={{ fontSize:16, width:22, textAlign:'center', flexShrink:0 }}>🚪</span>
               <span style={{ fontFamily:FONT, fontSize:14, fontWeight:600, color:'#e11d48' }}>Log ud</span>
             </button>
+            {logoutConfirm}
           </div>
 
           <div style={{ textAlign:'center', padding:'4px 0' }}>
