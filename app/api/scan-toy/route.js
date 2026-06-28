@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { requireAuth, UNAUTHORIZED } from '@/lib/api-auth';
 import { createServerClient } from '@/lib/supabase-server'; // bruges til prissammenligning
 import { visionAnalyze, visionConfigured } from '@/lib/vision';
+import { CATEGORIES } from '@/lib/categories';
 
 // Antal sammenlignelige opslag der kræves før vi bruger platform-median frem for AI-estimat.
 const MIN_COMPARABLES = 5;
@@ -16,12 +17,14 @@ function percentile(sortedAsc, p) {
 
 export const maxDuration = 60;
 
-const CATEGORY_KEYS = [
-  'books','puzzles','board-games','plush-small','plush-large','wooden-toys',
-  'plastic-toys-small','plastic-toys-medium','plastic-toys-large','construction-toys',
-  'outdoor-toys','ride-on-toys','electronic-toys','children-furniture','baby-equipment',
-  'musical-instruments','sports-equipment','costumes-roleplay','art-craft-supplies','other',
-];
+// Afledt fra den fælles kategori-definition, så scan-toy altid er i sync med
+// formularen (kategori-nøgler + tilhørende underkategori-tekster).
+const CATEGORY_KEYS = CATEGORIES.map(c => c.key);
+const SUBCATEGORIES = Object.fromEntries(CATEGORIES.map(c => [c.key, c.sub || []]));
+const SUBCAT_LINES = CATEGORIES
+  .filter(c => (c.sub || []).length)
+  .map(c => `  ${c.key}: ${c.sub.join(' | ')}`)
+  .join('\n');
 
 export async function POST(req) {
   if (!await requireAuth(req)) return UNAUTHORIZED();
@@ -47,12 +50,16 @@ Returner KUN et JSON-objekt med følgende felter:
 - reject_reason: kort dansk forklaring på max 80 tegn (kun hvis needs_review er true, ellers udelad feltet)
 - title: kort dansk titel på max 60 tegn (bedste gæt selv ved usikre billeder)
 - category: vælg ÉN nøgle fra: ${CATEGORY_KEYS.join(', ')}
+- subcategory: vælg ÉN underkategori-tekst der hører til den valgte category, og kopiér teksten PRÆCIST fra listen under "Underkategorier" nedenfor. Vælg den mest passende; hvis ingen passer godt, brug den mest generelle/"Diverse" for den category. Brug "" hvis category er "other" og intet passer.
 - condition: vælg ÉN: "Ny", "God stand", "Brugt", "Slidte"
 - age_group: vælg ÉN: "0-2 år", "3-6 år", "6-10 år", "10+ år", "Alle aldre"
 - description: 2-3 sætninger på dansk der beskriver genstanden direkte og konkret (hvad det er, indhold/antal, materiale og hvad det egner sig til). Skriv det som en færdig annoncetekst i sælgers egen stemme — bestemt og uden forbehold. Brug ALDRIG tvivls- eller gætteformuleringer som "ser ud til", "ser ud som om", "virker", "lader til", "umiddelbart", "muligvis" eller "sandsynligvis". Gæt ikke på stand i teksten (sælger vælger selv stand) — beskriv genstanden faktuelt i stedet
 - visual_description: 1-2 sætninger der KUN beskriver hvad man ser på billedet — genstandstype, hovedfarve(r), materiale, form og evt. tekst/logo/mærke samt distinkte træk. Ingen vurdering af stand, alder eller egnethed. Intet salgssprog.
 - price_min: laveste rimelige BRUGTPRIS i danske kroner (heltal)
 - price_max: højeste rimelige brugtpris i danske kroner (heltal), skal være ≥ price_min
+
+Underkategorier (vælg subcategory der hører til den valgte category):
+${SUBCAT_LINES}
 
 Relevante ting: legetøj, spil, puslespil, bøger, børnemøbler, sportsudstyr, musikinstrumenter, kreativt materiale, legeredskaber, babyudstyr, kostumer.
 Sæt needs_review: true for alt andet og giv et bedste gæt på felterne.
@@ -70,6 +77,11 @@ Ingen markdown, ingen forklaring — kun JSON.`;
     const parsed = JSON.parse(jsonMatch[0]);
 
     if (!CATEGORY_KEYS.includes(parsed.category)) parsed.category = 'other';
+
+    // Validér underkategori mod den valgte kategori (case-insensitivt). Ugyldig → tom.
+    const subList = SUBCATEGORIES[parsed.category] || [];
+    const wantSub = String(parsed.subcategory || '').trim().toLowerCase();
+    parsed.subcategory = subList.find(s => s.toLowerCase() === wantSub) || '';
 
     // ── Prisforslag ────────────────────────────────────────────
     // ≥5 sammenlignelige aktive opslag i kategorien → brug platform-data

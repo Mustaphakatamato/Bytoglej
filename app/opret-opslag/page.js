@@ -524,6 +524,9 @@ export default function OpretOpslagPage() {
         ...f,
         title: json.title || f.title,
         category: json.category || f.category,
+        // Underkategori fra samme AI-kald. Sættes sammen med kategorien, så de er
+        // konsistente (ryd gammel underkategori hvis kategorien skifter).
+        subcategory: json.category ? (json.subcategory || '') : f.subcategory,
         condition: json.condition || f.condition,
         age_group: json.age_group || f.age_group,
         description: json.description || f.description,
