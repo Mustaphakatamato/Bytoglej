@@ -8,6 +8,7 @@ import { CATEGORIES, NAV_CATEGORY_GROUPS } from '@/lib/categories';
 import { useWindowWidth } from '@/lib/hooks';
 import { useState, useEffect, useRef, useMemo, Suspense } from 'react';
 import { createPortal } from 'react-dom';
+import ConfirmDialog from '@/components/ConfirmDialog';
 
 function Mark09({ size = 36, bg = PRIMARY }) {
   const r = Math.round(size * 0.18);
@@ -779,6 +780,7 @@ function Nav({ pathname, navigate, loggedIn, setLoggedIn, unreadTotal, instituti
   const [scrolled,  setScrolled]  = useState(false);
   const [menuOpen,  setMenuOpen]  = useState(false);
   const [profileOpen, setProfileOpen] = useState(false);
+  const [showLogout, setShowLogout] = useState(false);
   const { cart } = useApp();
   const cartCount = cart?.length || 0;
   const w = useWindowWidth();
@@ -799,8 +801,27 @@ function Nav({ pathname, navigate, loggedIn, setLoggedIn, unreadTotal, instituti
 
   function go(p) { navigate(p); }
 
+  async function doLogout() {
+    setShowLogout(false);
+    await db.auth.signOut();
+    setLoggedIn(false);
+    setProfileOpen(false);
+    setMenuOpen(false);
+    go('/');
+  }
+
   return (
     <nav style={{ position:'fixed', top:0, left:0, right:0, zIndex:500, background:transparent?'transparent':'rgba(246,242,234,0.96)', backdropFilter:transparent?'none':'blur(18px)', boxShadow:transparent?'none':'0 1px 0 rgba(22,34,28,0.08)', transition:'all 0.3s' }}>
+
+      <ConfirmDialog
+        open={showLogout}
+        title="Vil du logge af din konto?"
+        confirmLabel="Ja, log af"
+        cancelLabel="Nej, forbliv logget på"
+        danger
+        onConfirm={doLogout}
+        onCancel={()=>setShowLogout(false)}
+      />
 
       {/* ── Main row ── */}
       <div style={{ maxWidth:1140, margin:'0 auto', display:'flex', alignItems:'center', height:68, gap:isMobile?10:20, paddingLeft:16, paddingRight:16, boxSizing:'border-box', width:'100%' }}>
@@ -900,7 +921,7 @@ function Nav({ pathname, navigate, loggedIn, setLoggedIn, unreadTotal, instituti
                         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
                         Indstillinger
                       </Link>
-                      <button onClick={async()=>{ await db.auth.signOut(); setLoggedIn(false); setProfileOpen(false); go('/'); }}
+                      <button onClick={()=>{ setProfileOpen(false); setShowLogout(true); }}
                         style={{ width:'100%', display:'flex', alignItems:'center', gap:9, padding:'11px 14px', fontSize:13, fontWeight:700, color:'#DC2626', background:'transparent', border:'none', cursor:'pointer', fontFamily:FONT, textAlign:'left' }}
                         onMouseEnter={e=>e.currentTarget.style.background='#FEF2F2'} onMouseLeave={e=>e.currentTarget.style.background='transparent'}>
                         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
@@ -1020,7 +1041,7 @@ function Nav({ pathname, navigate, loggedIn, setLoggedIn, unreadTotal, instituti
                 </Link>
               </div>
             ) : (
-              <button onClick={async()=>{ await db.auth.signOut(); setLoggedIn(false); setMenuOpen(false); go('/'); }}
+              <button onClick={()=>{ setMenuOpen(false); setShowLogout(true); }}
                 style={{ width:'100%', padding:'13px', borderRadius:99, background:'#FEF2F2', border:'none', color:'#DC2626', fontFamily:FONT, fontWeight:700, fontSize:14, cursor:'pointer' }}>
                 Log ud
               </button>
