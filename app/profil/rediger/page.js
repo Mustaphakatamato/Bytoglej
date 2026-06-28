@@ -374,7 +374,7 @@ export default function IndstillingerPage() {
 
   // ── Sidebar nav ──
   const sidebarNav = (
-    <div style={{ display:'flex', flexDirection: isMobile ? 'row' : 'column', gap: isMobile ? 8 : 4, overflowX: isMobile ? 'auto' : 'visible', paddingBottom: isMobile ? 4 : 0, scrollbarWidth:'none' }}>
+    <div style={{ display:'flex', flexDirection: isMobile ? 'row' : 'column', gap: isMobile ? 8 : 4, overflowX: isMobile ? 'auto' : 'visible', WebkitOverflowScrolling:'touch', width:'100%', maxWidth:'100%', minWidth:0, paddingBottom: isMobile ? 4 : 0, scrollbarWidth:'none' }}>
       {SECTIONS.map(s => {
         const active = section === s.key;
         return (
