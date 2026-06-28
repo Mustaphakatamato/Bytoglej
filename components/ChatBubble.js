@@ -94,25 +94,46 @@ function SupportChat({ userId, userEmail, userName, institutionName, onNavigate 
   useEffect(() => {
     const stored = localStorage.getItem(SUPPORT_CONV_KEY);
     if (!stored) return;
-    // D1: nulstil chatten hvis der er gået mere end 30 min siden seneste aktivitet,
-    // så man ikke lander i en gammel samtale når man åbner chatten igen senere.
-    const lastTs = Number(localStorage.getItem(SUPPORT_TS_KEY) || 0);
-    if (lastTs && Date.now() - lastTs > SUPPORT_IDLE_MS) {
+
+    const forget = () => {
       localStorage.removeItem(SUPPORT_CONV_KEY);
       localStorage.removeItem(SUPPORT_TS_KEY);
+    };
+
+    // Nulstil chatten efter inaktivitet, så man ikke lander i en gammel samtale
+    // når man åbner chatten igen senere (best practice for support-chat).
+    // Hurtig sti: lokalt tidsstempel er for gammelt → nulstil med det samme.
+    const lastTs = Number(localStorage.getItem(SUPPORT_TS_KEY) || 0);
+    if (lastTs && Date.now() - lastTs > SUPPORT_IDLE_MS) {
+      forget();
       return; // start forfra med standard-hilsenen
     }
-    setConvId(stored);
+
     (async () => {
       try {
         const res = await fetch(`/api/support-chat?conversationId=${encodeURIComponent(stored)}`);
         const { messages: hist, status } = await res.json();
+        // Server-sandhed: hvis seneste besked er ældre end inaktivitetsgrænsen,
+        // så nulstil i stedet for at genåbne en gammel samtale. Dette dækker også
+        // tilfælde hvor det lokale tidsstempel mangler eller er forældet.
+        const lastMsgTs = Array.isArray(hist) && hist.length
+          ? new Date(hist[hist.length - 1].created_at || 0).getTime()
+          : 0;
+        if (lastMsgTs && Date.now() - lastMsgTs > SUPPORT_IDLE_MS) {
+          forget();
+          return; // convId forbliver null → standard-hilsenen vises
+        }
+        setConvId(stored);
         if (Array.isArray(hist) && hist.length) {
           setMessages(hist.map(m => ({ id: m.id, role: m.role, content: m.content, message_type: m.message_type, created_at: m.created_at })));
           if (status === 'waiting_human' || status === 'open') { setEscalated(true); setHuman(true); }
           if (status === 'closed') setClosed(true);
         }
-      } catch {}
+      } catch {
+        // Netværksfejl: behold den gemte samtale, så et midlertidigt udfald
+        // ikke smider en aktiv chat væk.
+        setConvId(stored);
+      }
     })();
   }, []);
 
@@ -181,6 +202,7 @@ function SupportChat({ userId, userEmail, userName, institutionName, onNavigate 
     if (data.conversationId && data.conversationId !== convId) {
       setConvId(data.conversationId);
       localStorage.setItem(SUPPORT_CONV_KEY, data.conversationId);
+      localStorage.setItem(SUPPORT_TS_KEY, String(Date.now())); // hold tidsstempel i sync med conv-id
     }
     return data;
   }
