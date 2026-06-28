@@ -50,7 +50,7 @@ export default function HelpCenterPage() {
                 Din guide til byt&leg
               </h2>
               <p style={{ fontFamily: FONT, fontSize: isMobile ? 14 : 15.5, color: 'rgba(255,255,255,0.7)', lineHeight: 1.6, margin: '0 0 22px', maxWidth: 520 }}>
-                Følg de syv trin fra konto til din første handel — vi guider dig hele vejen.
+                Følg de syv trin fra konto til din første handel. Vi guider dig hele vejen.
               </p>
               <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
                 {GUIDE_STEPS.map((step, i) => {
@@ -133,7 +133,7 @@ export default function HelpCenterPage() {
                 Fandt du ikke svaret?
               </h2>
               <p style={{ fontFamily: FONT, fontSize: 14.5, color: INK2, lineHeight: 1.6, margin: 0 }}>
-                Spørg vores AI-assistent — den svarer med det samme på de fleste spørgsmål og sender dig videre til supportteamet, hvis den er i tvivl.
+                Spørg vores AI-assistent. Den svarer med det samme på de fleste spørgsmål og sender dig videre til supportteamet, hvis den er i tvivl.
               </p>
             </div>
             <button onClick={openSupportBubble} style={{

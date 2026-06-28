@@ -3,7 +3,7 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { PRIMARY, GREEN_DEEP, GREEN_SOFT, GREEN_TINT, INK, INK2, INK3, PAPER, PAPER3, BUTTER, CORAL, SKY, FONT } from '@/lib/constants';
 
-/* Søgefelt — bruges i hero og kan styres udefra. */
+/* Søgefelt, bruges i hero og kan styres udefra. */
 export function HelpSearch({ defaultValue = '', autoFocus = false, big = false }) {
   const router = useRouter();
   const [q, setQ] = useState(defaultValue);
