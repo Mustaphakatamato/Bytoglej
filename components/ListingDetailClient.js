@@ -555,6 +555,12 @@ export default function ListingDetailClient() {
 
           {/* LEFT: Gallery */}
           <div>
+            {!isOwn && (
+              <button onClick={async ()=>{ if (await requireLogin()) setReportModal(true); }}
+                style={{ display:'block', marginLeft:'auto', marginBottom:8, background:'none', border:'none', padding:'2px 2px', fontSize:11, fontWeight:500, color:INK3, opacity:0.5, cursor:'pointer', fontFamily:FONT, textDecoration:'underline', textDecorationColor:'rgba(0,0,0,0.18)', textUnderlineOffset:2 }}>
+                Rapportér opslag
+              </button>
+            )}
             <ImageGallery images={listing.images} color={listing.color} emoji={listing.emoji} title={listing.title} />
             {/* Category path + brand under image */}
             {(listing.brand || listing.category) && (
@@ -797,11 +803,6 @@ export default function ListingDetailClient() {
                 📧
               </button>
             </div>
-            {!isOwn && (
-              <button onClick={async ()=>{ if (await requireLogin()) setReportModal(true); }} style={{ display:'inline-flex', alignItems:'center', gap:6, alignSelf:'flex-start', background:'#fff', border:`1.5px solid ${PAPER3}`, borderRadius:12, fontSize:12, fontWeight:700, color:INK3, cursor:'pointer', fontFamily:FONT, padding:'8px 14px', marginBottom:6 }}>
-                <span aria-hidden="true">🚩</span> Rapportér opslag
-              </button>
-            )}
 
             {/* Metadata box */}
             <div style={{ background:PAPER2, borderRadius:18, padding:'16px 20px', border:`1px solid ${PAPER3}`, marginBottom:14 }}>
