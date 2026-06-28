@@ -180,7 +180,9 @@ export default function OpretOpslagPage() {
 
   async function checkImageSafe(file) {
     try {
-      const fd = new FormData(); fd.append('image', file);
+      // Nedskalér til ~768px før person-tjek → færre vision-tokens, hurtigere.
+      const small = await compressImage(file, 768, 0.7);
+      const fd = new FormData(); fd.append('image', small);
       const res = await authedFetch('/api/scan-image', { method: 'POST', body: fd });
       const json = await res.json();
       return json.safe !== false;
@@ -388,7 +390,7 @@ export default function OpretOpslagPage() {
       setAiVisual(json.visual_description || null);
       setAiScanData({
         scan_type: 'scan-toy',
-        model_used: 'gemini-2.0-flash',
+        model_used: 'qwen/qwen3.6-27b',
         ai_raw_response: json,
         ai_title: json.title || null,
         ai_description: json.description || null,
@@ -529,9 +531,12 @@ export default function OpretOpslagPage() {
     if (imgFiles.length > 0) {
       const urls = [];
       for (const file of imgFiles) {
-        const ext = file.name.split('.').pop().toLowerCase();
-        const path = `${listing.id}/${Date.now()}_${Math.random().toString(36).slice(2)}.${ext}`;
-        const { data: up } = await db.storage.from('listing-images').upload(path, file, { contentType: file.type });
+        // Nedskalér til ~1280px før upload: god visningskvalitet, men markant færre
+        // vision-tokens når describe-images (AI-søgning) senere læser de gemte billeder,
+        // + hurtigere upload og mindre storage.
+        const toUpload = await compressImage(file, 1280, 0.8);
+        const path = `${listing.id}/${Date.now()}_${Math.random().toString(36).slice(2)}.jpg`;
+        const { data: up } = await db.storage.from('listing-images').upload(path, toUpload, { contentType: 'image/jpeg' });
         if (up) { const { data:{publicUrl} } = db.storage.from('listing-images').getPublicUrl(up.path); urls.push(publicUrl); }
       }
       if (urls.length) await db.from('listings').update({ images: urls }).eq('id', listing.id);

@@ -360,12 +360,31 @@ const [saveSearchModal, setSaveSearchModal] = useState(false);
     setAiExplanation('');
   }
 
-  async function runImageSearch(blob) {
+  // Nedskalér søgefotoet til ~768px før vision → færre tokens, hurtigere.
+  function downscaleBlob(blob, maxPx = 768, quality = 0.72) {
+    return new Promise(resolve => {
+      const img = new Image();
+      const u = URL.createObjectURL(blob);
+      img.onload = () => {
+        URL.revokeObjectURL(u);
+        const scale = Math.min(1, maxPx / Math.max(img.width, img.height));
+        const c = document.createElement('canvas');
+        c.width = Math.round(img.width * scale); c.height = Math.round(img.height * scale);
+        c.getContext('2d').drawImage(img, 0, 0, c.width, c.height);
+        c.toBlob(b => resolve(b || blob), 'image/jpeg', quality);
+      };
+      img.onerror = () => { URL.revokeObjectURL(u); resolve(blob); };
+      img.src = u;
+    });
+  }
+
+  async function runImageSearch(rawBlob) {
     if (imgSearching) return;
     setImgSearching(true);
     setAiResults(null);
     setAiQuery('');
     try {
+      const blob = await downscaleBlob(rawBlob);
       const fd = new FormData();
       fd.append('image', blob, 'soegning.jpg');
       const res = await authedFetch('/api/ai-image-search', { method: 'POST', body: fd });
