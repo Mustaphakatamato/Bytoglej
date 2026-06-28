@@ -381,7 +381,7 @@ export default function ProfilPage() {
               )}
             </MenuSection>
             <MenuSection>
-              <MenuItem icon="❓" label="Hjælp & vejledning" onClick={() => router.push('/hvordan')} />
+              <MenuItem icon="❓" label="Hjælpecenter" onClick={() => router.push('/hjaelp')} />
               <MenuItem icon="📧" label="Kontakt os" onClick={() => router.push('/kontakt')} />
             </MenuSection>
             <MenuSection>
@@ -494,7 +494,7 @@ export default function ProfilPage() {
             )}
             {[
               { icon:'👥', label:'Medarbejdere', to:'/medarbejdere' },
-              { icon:'❓', label:'Hjælp & vejledning', to:'/hvordan' },
+              { icon:'❓', label:'Hjælpecenter', to:'/hjaelp' },
               { icon:'📧', label:'Kontakt os', to:'/kontakt' },
             ].map(item => (
               <button key={item.to} onClick={() => router.push(item.to)} style={{

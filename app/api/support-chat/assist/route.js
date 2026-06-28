@@ -4,6 +4,7 @@ import { createClient } from '@supabase/supabase-js';
 import { requireAuth, UNAUTHORIZED } from '@/lib/api-auth';
 import { checkIsAdmin } from '@/lib/admin';
 import { SUPPORT_FACTS } from '@/lib/support-knowledge';
+import { helpArticleIndexForAI } from '@/lib/help-content';
 
 export const maxDuration = 30;
 
@@ -28,6 +29,10 @@ REGLER:
 ---
 ${SUPPORT_FACTS}
 ---
+
+${helpArticleIndexForAI()}
+
+Du må gerne lade udkastet henvise kunden til en relevant hjælpeartikel med dens sti (fx /hjaelp/artikel/opret-opslag-med-ai). Brug kun stier fra listen.
 
 Svar i dette JSON-format:
 {"draft": "dit svarudkast til kunden", "summary": "1 sætning: hvad handler henvendelsen om / hvad er problemet", "needs_info": ["evt. ting medarbejderen bør tjekke eller spørge om"]}`;
