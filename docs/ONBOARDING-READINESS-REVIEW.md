@@ -44,7 +44,7 @@ Til sidst: en **samlet go/no-go-vurdering** med begrundelse.
 5. **GDPR & juridisk**
    - `gdpr/export`, `gdpr/consent` — virker dataeksport? Samtykke logget?
    - Privatlivspolitik, vilkår, handelsbetingelser til stede og udfyldt?
-   - PNR/CVR-håndtering (`cvr-lookup`, `migrate_pnr.sql`).
+   - PNR/CVR-håndtering (`cvr-lookup`).
 
 6. **Kerneflows (manuelt/logisk gennemspil)**
    - Signup → afventer godkendelse → godkendt → opret opslag → køb/byt → betaling → forsendelse → modtaget.
@@ -61,7 +61,7 @@ Til sidst: en **samlet go/no-go-vurdering** med begrundelse.
    - Hvilke tabeller har realtime-publikation (se memory `realtime-publication`) — mangler nogen, så UI kræver genindlæsning?
 
 9. **Seed/test-data**
-   - Er der dummy/test-opslag i prod-DB der skal ryddes før ægte brugere? (`seed_*.sql`, memory `seed-listings-user-id`).
+   - Er der dummy/test-opslag i prod-DB der skal ryddes før ægte brugere? (memory `seed-listings-user-id`).
 
 ---
 
