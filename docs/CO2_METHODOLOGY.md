@@ -1,7 +1,7 @@
 # CO₂-beregningsmodul — Teknisk dokumentation
 
-**Metode-version:** 1.0  
-**Implementeret:** 2026-05-30  
+**Metode-version:** 1.1  
+**Implementeret:** 2026-06-30 (v1.0: 2026-05-30)  
 **Offentlig metode-side:** `/baeredygtighed/metode`
 
 ---
@@ -38,11 +38,12 @@ active               boolean
 ### `co2_methodology_versions`
 Versioneret historik over beregningskonstanter.
 ```sql
-version                     text PRIMARY KEY  -- fx "1.0"
+version                     text PRIMARY KEY  -- fx "1.1"
 displacement_rate           numeric(4,3)
-transport_emission_g_per_km integer
-route_buffer_factor         numeric(4,3)      -- default 1.3
-default_distance_km         integer           -- default 10
+parcel_emission_g           integer           -- v1.1: pakke-emission i gram (~200)
+transport_emission_g_per_km integer           -- legacy (v1.0 bil-model, ubrugt i v1.1)
+route_buffer_factor         numeric(4,3)      -- legacy
+default_distance_km         integer           -- legacy
 active                      boolean           -- kun én kan være aktiv
 ```
 
@@ -50,7 +51,7 @@ active                      boolean           -- kun én kan være aktiv
 **IMMUTABLE** — ingen UPDATE- eller DELETE-policies.
 ```sql
 id                    uuid PRIMARY KEY
-transaction_id        uuid      -- FK til conversations.id
+transaction_id        uuid UNIQUE  -- FK til conversations.id (én CO₂-række pr. handel)
 listing_category_id   text
 net_saved_kg          numeric(8,3)
 breakdown             jsonb     -- fuld beregnings-dekomposition
@@ -71,37 +72,48 @@ co2_breakdown     jsonb
 
 ---
 
-## Beregningsformel
+## Beregningsformel (v1.1)
 
 ```
-produktion_sparet   = kategori_co2 × DISPLACEMENT_RATE
-transport_km_routed = distance_km × ROUTE_BUFFER          # fugleflugt → rute
-transport_cost      = transport_km_routed × 2 × KG_PER_KM # tur/retur
-netto_sparet        = max(0, produktion_sparet − transport_cost)
+produktion_sparet    = Σ (kategori_co2 × DISPLACEMENT_RATE)   # summeret over varer i forsendelsen
+transport_omkostning = PARCEL_CO2_KG                          # fast pr. forsendelse (pakkenetværk)
+netto_sparet         = max(0, produktion_sparet − transport_omkostning)
 ```
 
-### Konstanter (v1.0)
+### Konstanter (v1.1)
 | Konstant | Værdi | Kilde |
 |----------|-------|-------|
-| DISPLACEMENT_RATE | 0.6 | S3, S6, S7 (konservativt) |
-| TRANSPORT_KG_PER_KM | 0.170 | EEA 2024 (S8) |
-| ROUTE_BUFFER | 1.0 (OSRM) / 1.3 (haversine-fallback) | OSRM returnerer faktisk vejafstand — buffer kun ved fallback |
-| DEFAULT_DISTANCE_KM | 10 | typisk intra-kommunal afstand (bruges kun hvis geocoding fejler) |
+| DISPLACEMENT_RATE | 0.4 | Vinted/Vaayu 39–40% (S6, S9) |
+| PARCEL_CO2_KG | 0.2 (≈200 g/forsendelse) | Last-mile pakkedata (S10) |
+
+Transporten er **distance-uafhængig** og trækkes fra **én gang pr. handel** (én
+forsendelse) — også for bundter. Det erstatter v1.0's bil-tur/retur-pr.-km-model,
+der overvurderede transporten ~20× og nulstillede de fleste lette varer.
 
 ---
 
 ## Flow: hvornår beregnes CO₂?
 
-1. Bruger A accepterer bud i `MessagesClient.handleAcceptBid()`
-2. `deal_completed: true` sættes på `conversations`
-3. `persistCO2Saving(conversation, categoryId)` kaldes **non-blocking**:
-   a. Henter institutionskoordinater (Nominatim geocoding + cacher på institutions-tabel)
-   b. Beregner faktisk vejafstand via OSRM routing (fallback: haversine × 1.3)
-   c. Kalder `calculateCO2Savings({ categoryId, distanceKm, isRoutedDistance })`
-   d. Inserter immutabelt i `transaction_co2_savings`
-   e. Opdaterer `conversations.co2_net_saved_kg` som summary
+CO₂ registreres for **alle** gennemførte handler — køb, bud og bytte — idempotent
+pr. samtale (én række pr. `transaction_id`, beskyttet af både en eksistens-guard
+og en UNIQUE-constraint).
 
-Hvis trin 3 fejler, logges fejlen — men deal-flowet blokeres **aldrig**.
+- **Betalte handler (Stripe)**: webhooken (`app/api/webhooks/stripe/route.js`)
+  kalder `persistTransactionCO2()` fra `lib/co2/persist-server.js` i
+  `finalizePurchase` (køb/byd) og i begge bytte-flows. Service-role-klient,
+  ingen netværkskald udover DB.
+- **In-chat handler (afhentning/aftalt)**: `MessagesClient.persistCO2Saving()`
+  kaldes non-blocking ved deal-afslutning.
+
+Begge:
+  a. Tjekker idempotens (findes en række for samtalen → stop)
+  b. Henter de aktive faktorer/metodologi fra DB (fallback: hardcodede v1.1)
+  c. Kalder `calculateCO2Savings({ categoryIds, factors, methodology })`
+  d. Inserter immutabelt i `transaction_co2_savings`
+  e. Opdaterer `conversations.co2_net_saved_kg` som summary
+
+Ingen geocoding/routing længere — transporten er en fast pakke-emission.
+Hvis beregningen fejler, logges fejlen — men handelsflowet blokeres **aldrig**.
 
 ---
 
@@ -134,14 +146,12 @@ Admin-siden fremhæver "AFVIGER" hvis kode-konstanten afviger fra DB-værdien.
 
 ---
 
-## Geocoding
+## Geocoding (udgået i v1.1)
 
-`persistCO2Saving` bruger `geocodeForCO2()` fra `lib/co2/geocoding.js` (Nominatim primær, DAWA postnummer-centroid som fallback).
-Koordinater caches på `institutions.latitude/longitude` efter første opslag.
-
-Faktisk vejafstand hentes via OSRM (`router.project-osrm.org`) — ingen route-buffer nødvendig.
-Fallback: haversine × 1.3 hvis OSRM fejler.
-Ved manglende koordinater bruges `DEFAULT_DISTANCE_KM = 10`.
+Pakke-modellen er distance-uafhængig, så CO₂-beregningen bruger **ikke længere**
+geocoding eller routing. `lib/co2/geocoding.js` er bevaret i repoet (kan bruges
+andre steder), men kaldes ikke fra CO₂-flowet. Det fjernede de mest skrøbelige
+netværkskald (Nominatim/OSRM) fra deal-afslutningen.
 
 ---
 
@@ -173,10 +183,13 @@ For at validere beregningerne:
 
 ---
 
-## Kendte begrænsninger (v1.0)
+## Kendte begrænsninger (v1.1)
 
-- Kun `byd`-deals (bud-accept) trigger CO₂-beregning. `byt`-deals og
-  direkte `køb`-aftaler tæller ikke endnu (ingen deal_completed for disse)
-- Transport-mode antages altid personbil — cykel/offentlig transport beregnes ikke
-- Displacement rate er estimeret, ikke målt på byt&leg-brugere specifikt
-- Emballage og end-of-life er ikke inkluderet
+- Pakke-emissionen er et fast gennemsnit — den varierer ikke med faktisk
+  forsendelsesafstand, transportør eller pakkestørrelse
+- Produktionsfaktoren er fast pr. kategori pr. vare — den skalerer ikke med
+  varens faktiske størrelse/vægt (mulig fremtidig forbedring via
+  `shipping_size_category`)
+- Displacement rate (0,4) er overtaget fra Vinted/Vaayu, ikke målt på
+  byt&leg-brugere specifikt
+- Emballage og end-of-life er ikke inkluderet (bevidst konservativt)

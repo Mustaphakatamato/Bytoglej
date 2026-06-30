@@ -15,37 +15,38 @@ byt&leg tracker CO2-besparelser per handel. Metoden er:
 **Grundantagelse:**
 Når et brugt legetøj handles i stedet for et nyt, undgås produktionsemissioner for det nye legetøj.
 
-**Beregning:**
+**Beregning (metode v1.1):**
 ```
-CO2_spart = vægt_kg × emissions_faktor_kg_CO2_per_kg
+produktion_sparet    = Σ (kategori_co2 × displacement_rate)   // summeret over varer i forsendelsen
+transport_omkostning = pakke_emission                          // fast pr. forsendelse (~0,2 kg)
+netto_sparet         = max(0, produktion_sparet − transport_omkostning)
 ```
 
-**Eksempel-faktorer (fra `/admin/co2-config`):**
-- Plastlegetøj: ~5-8 kg CO2 per kg (produktion)
-- Trælegetøj: ~1-3 kg CO2 per kg
-- Elektronisk legetøj: ~10-20 kg CO2 per kg
-- Standard-faktor (fallback): ~6 kg CO2 per kg
+- `kategori_co2` er en fast kg CO₂e-værdi **pr. vare pr. kategori** (ikke vægt-baseret).
+  De 20 værdier ligger i `lib/co2/emission-factors.js` og `co2_emission_factors`.
+- `displacement_rate = 0,4` — andelen af handler der reelt erstatter et nyt køb
+  (Vinted/Vaayu måler 39–40%). Sænket fra 0,6 i v1.0.
+- `pakke_emission ≈ 0,2 kg` — gennemsnitlig last-mile pakkeemission. Erstatter
+  v1.0's privatbil-tur/retur-model, der overvurderede transporten ~20× og
+  nulstillede besparelsen for de fleste lette varer.
+- Transport trækkes fra **én gang pr. handel** (én forsendelse), også for bundter.
 
-**Faktorer i beregning:**
-| Faktor | Kilde |
-|--------|-------|
-| Produktionsemissioner for nyt legetøj | LCA-studier (Life Cycle Assessment) |
-| Fragt til Danmark (importeret legetøj) | ~0,5-1 kg CO2 per kg legetøj |
-| Forsendelse af brugt legetøj | Faktisk CO2 fra Shipmondo (estimeret 0,3 kg/pakke) |
-| Emballageproduktion undgået | ~0,1-0,3 kg CO2 per handel |
-
-**Nettobesparelse:**
-```
-CO2_netto = CO2_undgået_produktion - CO2_forsendelse
-```
+**Ikke medregnet (bevidst, for at undgå greenwashing):** emballage, end-of-life,
+fragt til DK, vand/biodiversitet. Se `/baeredygtighed/metode` for forbehold.
 
 ### CO2-konfiguration (teknisk)
 
-- Tabel: `co2_config` (konfigureres via `/admin/co2-config`)
-- Emissions-faktorer kan opdateres af admin uden code-deploy
+- Tabeller: `co2_emission_factors` + `co2_methodology_versions` (konfigureres via `/admin/co2-config`)
+- Emissions-faktorer/metodologi kan opdateres af admin uden code-deploy. Den
+  server-side persistering (Stripe-webhook → `lib/co2/persist-server.js`) læser
+  de AKTIVE DB-værdier og falder tilbage til de hardcodede v1.0-værdier i
+  `lib/co2/emission-factors.js` hvis DB ikke svarer.
+- CO2 registreres for ALLE gennemførte handler — køb, bud og bytte — idempotent
+  pr. samtale (`transaction_co2_savings`, UNIQUE på `transaction_id`).
 - CO2-besparelser vises på:
   - Instituts profil-side (`/profil`) — "X kg CO2 sparet"
-  - Listings-detalje-side
+  - Klimarapport pr. institution (`/baeredygtighed/rapport`) — overblik,
+    udvikling over tid, top-kategorier, CSV-eksport + print/PDF
   - Platform-statistik på forsiden
 
 ### Ekstern dokumentation og referencer
