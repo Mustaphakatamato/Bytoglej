@@ -1367,7 +1367,7 @@ const FB_STATUSES = [
   { key: 'fixed',               label: 'Løst',               emoji: '✅', bg: '#D1FAE5', color: '#065F46', border: '#6EE7B7' },
   { key: 'wont_fix',            label: 'Ikke relevant',      emoji: '❌', bg: '#FEF2F2', color: '#DC2626', border: '#FCA5A5' },
 ];
-const FB_CAT = { bug: { emoji: '🐛', label: 'Fejl' }, suggestion: { emoji: '💡', label: 'Forslag' }, general: { emoji: '⭐', label: 'Generel' } };
+const FB_CAT = { bug: { emoji: '🐛', label: 'Fejl' }, suggestion: { emoji: '💡', label: 'Forslag' }, general: { emoji: '⭐', label: 'Generel' }, help_article: { emoji: '📄', label: 'Artikel' } };
 
 function FeedbackTab({ isMobile, onNewCountChange }) {
   const [items, setItems] = useState([]);
