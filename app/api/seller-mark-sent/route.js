@@ -49,7 +49,16 @@ export async function POST(req) {
   const convId = msgs?.[0]?.conversation_id;
   if (convId) {
     const sellerName = ownInst?.name || 'Sælger';
-    const msg = `Sælger har afsendt pakken. Hold øje med din e-mail for sporingsoplysninger.`;
+    // Afhentnings-/aftalt-ordrer har ingen pakke — beskeden skal matche det,
+    // ikke tale om "afsendt pakke" og sporingsoplysninger.
+    const sellerGroup = (order.order_groups || []).find(g =>
+      (instId && g.sellerInstitutionId === instId) || g.sellerId === user.id
+    );
+    const method = sellerGroup?.shippingMethod;
+    const isPickup = method === 'pickup' || method === 'custom';
+    const msg = isPickup
+      ? `${sellerName} har markeret varen som klar til afhentning. Aftal tid og sted her i beskeder.`
+      : `Sælger har afsendt pakken. Hold øje med din e-mail for sporingsoplysninger.`;
     await supa.from('chat_messages').insert({
       conversation_id: convId,
       sender_id: user.id,

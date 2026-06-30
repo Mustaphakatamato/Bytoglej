@@ -5,6 +5,7 @@ import { db } from '@/lib/supabase';
 import { useActiveUser } from '@/providers/AppProvider';
 import { PRIMARY, GREEN_TINT, INK, INK2, INK3, PAPER, PAPER2, PAPER3, FONT, CORAL } from '@/lib/constants';
 import CarrierLogo from '@/components/CarrierLogo';
+import { formatOrderNumber } from '@/lib/order-number';
 
 // Et bytte hvor JEG modtager modpartens varer (indgående). Tracking, ingen mærkat.
 function SwapReceiveCard({ r, router, onReceived }) {
@@ -170,9 +171,9 @@ function OrderCard({ order, onUpdate, autoOpen }) {
       >
         <div style={{ flex: 1, textAlign: 'left' }}>
           <div style={{ fontFamily: FONT, fontWeight: 700, fontSize: 13, color: INK, marginBottom: 4 }}>
-            {firstItem ? `${firstItem.emoji || '📦'} ${firstItem.title}${itemCount > 1 ? ` +${itemCount - 1} mere` : ''}` : `Ordre #${order.id.slice(0, 8).toUpperCase()}`}
+            {firstItem ? `${firstItem.emoji || '📦'} ${firstItem.title}${itemCount > 1 ? ` +${itemCount - 1} mere` : ''}` : `Ordre ${formatOrderNumber(order)}`}
           </div>
-          <div style={{ fontFamily: FONT, fontSize: 11, color: INK3 }}>{fmtDate(order.created_at)}</div>
+          <div style={{ fontFamily: FONT, fontSize: 11, color: INK3 }}>Ordre {formatOrderNumber(order)} · {fmtDate(order.created_at)}</div>
         </div>
         <StatusBadge status={order.status} />
         <div style={{ fontFamily: FONT, fontWeight: 800, fontSize: 14, color: INK, minWidth: 80, textAlign: 'right' }}>
@@ -296,7 +297,7 @@ function MineOrdrerContent() {
         if (!user) { router.push('/login'); return; }
         const { data, error: dbErr } = await db
           .from('orders')
-          .select('id, created_at, grand_total, status, order_groups, tracking_number, tracking_url, paid_at')
+          .select('id, order_number, created_at, grand_total, status, order_groups, tracking_number, tracking_url, paid_at')
           .eq('buyer_id', user.id)
           .not('status', 'in', '("pending","failed","cancelled")')
           .order('created_at', { ascending: false });
