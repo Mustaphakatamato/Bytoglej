@@ -737,6 +737,16 @@ export default function MessagesClient() {
 
   async function persistCO2Saving(conversation, categoryId) {
     try {
+      // Idempotens: registrér hver samtale præcis én gang. Samme handel kan
+      // ramme denne funktion flere gange (køber-checkout, sælgers label-
+      // generering, afhentnings-bekræftelse) — uden denne guard tæller CO2 dobbelt.
+      const { data: alreadyLogged } = await db
+        .from('transaction_co2_savings')
+        .select('id')
+        .eq('transaction_id', conversation.id)
+        .maybeSingle();
+      if (alreadyLogged) return;
+
       let distanceKm = null;
       const [ownerRes, initiatorRes] = await Promise.all([
         conversation.owner_institution_id

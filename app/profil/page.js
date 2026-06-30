@@ -356,7 +356,7 @@ export default function ProfilPage() {
             </MenuSection>
             <MenuSection>
               <MenuItem icon="⚙️" label="Indstillinger" onClick={() => router.push('/profil/rediger')} />
-              <MenuItem icon="🌱" label="Bæredygtighed" value={co2Total !== null ? `${co2Total.toFixed(1)} kg CO₂` : undefined} onClick={() => router.push('/baeredygtighed/metode')} />
+              <MenuItem icon="🌱" label="Klimarapport" value={co2Total !== null ? `${co2Total.toFixed(1)} kg CO₂` : undefined} onClick={() => router.push('/baeredygtighed/rapport')} />
               {typeof Notification !== 'undefined' && (
                 <button onClick={notifLoading ? undefined : handleNotifToggle} style={{
                   width:'100%', display:'flex', alignItems:'center', gap:14,
@@ -577,10 +577,10 @@ export default function ProfilPage() {
             />
             <ActivityCard
               icon="🌱"
-              label="Bæredygtighed"
-              sublabel={co2Total !== null ? `${co2Total.toFixed(1)} kg CO₂ sparet` : 'Se din impact'}
-              value={null}
-              onClick={() => router.push('/baeredygtighed/metode')}
+              label="Klimarapport"
+              sublabel={co2Total !== null ? `${co2Total.toFixed(1)} kg CO₂ sparet` : 'Se & træk rapport'}
+              value={co2Total !== null ? `${co2Total.toFixed(0)} kg` : null}
+              onClick={() => router.push('/baeredygtighed/rapport')}
             />
           </div>
 

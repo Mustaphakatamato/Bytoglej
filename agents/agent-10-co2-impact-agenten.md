@@ -41,11 +41,17 @@ CO2_netto = CO2_undgået_produktion - CO2_forsendelse
 
 ### CO2-konfiguration (teknisk)
 
-- Tabel: `co2_config` (konfigureres via `/admin/co2-config`)
-- Emissions-faktorer kan opdateres af admin uden code-deploy
+- Tabeller: `co2_emission_factors` + `co2_methodology_versions` (konfigureres via `/admin/co2-config`)
+- Emissions-faktorer/metodologi kan opdateres af admin uden code-deploy. Den
+  server-side persistering (Stripe-webhook → `lib/co2/persist-server.js`) læser
+  de AKTIVE DB-værdier og falder tilbage til de hardcodede v1.0-værdier i
+  `lib/co2/emission-factors.js` hvis DB ikke svarer.
+- CO2 registreres for ALLE gennemførte handler — køb, bud og bytte — idempotent
+  pr. samtale (`transaction_co2_savings`, UNIQUE på `transaction_id`).
 - CO2-besparelser vises på:
   - Instituts profil-side (`/profil`) — "X kg CO2 sparet"
-  - Listings-detalje-side
+  - Klimarapport pr. institution (`/baeredygtighed/rapport`) — overblik,
+    udvikling over tid, top-kategorier, CSV-eksport + print/PDF
   - Platform-statistik på forsiden
 
 ### Ekstern dokumentation og referencer

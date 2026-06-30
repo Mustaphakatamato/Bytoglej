@@ -180,6 +180,33 @@ describe('legacy category mapping', () => {
   });
 });
 
+// ─── 6b. DB-drevne overrides (admin-config) ───────────────────────────────────
+describe('factors/methodology overrides', () => {
+  test('factors-override bruges i stedet for hardcodede værdier', () => {
+    const factors = { 'books': { co2KgPerUnit: 50, sources: ['X'] }, 'other': { co2KgPerUnit: 2 } };
+    const r = calculateCO2Savings({ categoryId: 'books', distanceKm: 5, factors });
+    expect(r.breakdown.categoryFactor).toBe(50);
+    expect(r.breakdown.productionSavedKg).toBeCloseTo(30, 2); // 50 × 0.6
+  });
+
+  test('methodology-override ændrer displacement rate og transport', () => {
+    const methodology = { version: '2.0', displacementRate: 0.9, transportKgPerKm: 0.1, routeBuffer: 1.0, defaultDistanceKm: 20 };
+    const r = calculateCO2Savings({ categoryId: 'children-furniture', distanceKm: 10, methodology });
+    expect(r.methodologyVersion).toBe('2.0');
+    expect(r.breakdown.displacementRate).toBe(0.9);
+    expect(r.breakdown.productionSavedKg).toBeCloseTo(18, 2); // 20 × 0.9
+    expect(r.breakdown.transportCostKg).toBeCloseTo(2, 2);   // 10 × 1.0 × 2 × 0.1
+    expect(r.netSavedKg).toBeCloseTo(16, 1);
+  });
+
+  test('uden overrides er resultatet identisk med hardcodede defaults', () => {
+    const a = calculateCO2Savings({ categoryId: 'wooden-toys', distanceKm: 8 });
+    const b = calculateCO2Savings({ categoryId: 'wooden-toys', distanceKm: 8, factors: undefined, methodology: undefined });
+    expect(b.netSavedKg).toBe(a.netSavedKg);
+    expect(b.breakdown.categoryFactor).toBe(a.breakdown.categoryFactor);
+  });
+});
+
 // ─── 7. Alle kategorier har gyldig data ───────────────────────────────────────
 describe('emission factors integritet', () => {
   test('alle 20 kategorier har co2KgPerUnit > 0', () => {

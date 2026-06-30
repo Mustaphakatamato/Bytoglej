@@ -3,7 +3,7 @@ import Stripe from 'stripe';
 import { createServerClient } from '@/lib/supabase-server';
 import { createShipment } from '@/lib/shipmondo/client';
 import { escapeHtml } from '@/lib/escape-html';
-import { persistSwapCO2 } from '@/lib/co2/persist-server';
+import { persistSwapCO2, persistTransactionCO2 } from '@/lib/co2/persist-server';
 import { notify } from '@/lib/notify';
 
 function getStripe() {
@@ -274,6 +274,23 @@ export async function finalizePurchase(pi, supa) {
         owner_unread:    (conv?.owner_unread || 0) + 1,
         delivery_method: g.shippingMethod === 'pickup' || g.shippingMethod === 'custom' ? g.shippingMethod : 'shipping',
       }).eq('id', convId);
+
+      // CO2-besparelse for dette køb (server-side, idempotent pr. samtale).
+      // Tidligere blev CO2 KUN registreret for bundt-bytter — betalte køb/bud
+      // talte 0 kg, så profil-tallet rykkede sig aldrig. Det rettes her.
+      const groupListingIds = (g.items || []).map(it => it.listingId).filter(Boolean);
+      const { data: catRows } = groupListingIds.length
+        ? await supa.from('listings').select('category').in('id', groupListingIds)
+        : { data: [] };
+      await persistTransactionCO2(supa, {
+        transactionId: convId,
+        dealType:      bidMessageId ? 'byd' : 'køb',
+        sellerInstId:  g.sellerInstitutionId || null,
+        buyerInstId:   order.buyer_institution_id || null,
+        sellerName:    g.sellerName || null,
+        buyerName:     buyerInst?.name || order.buyer_name || null,
+        categoryIds:   (catRows || []).map(r => r.category).filter(Boolean),
+      });
     }
 
     // Send bekræftelses-email til sælger via Resend
@@ -436,6 +453,20 @@ export async function handleSwapPayment(pi, supa) {
     if (tradedIds.length) {
       await supa.from('listings').update({ is_sold: true, is_active: false, sold_at: now }).in('id', tradedIds);
     }
+
+    // CO2-besparelse for byttet (server-side, idempotent pr. samtale).
+    const { data: swapCatRows } = tradedIds.length
+      ? await supa.from('listings').select('category').in('id', tradedIds)
+      : { data: [] };
+    await persistTransactionCO2(supa, {
+      transactionId: convId,
+      dealType:      'byt',
+      sellerInstId:  conv.owner_institution_id,
+      buyerInstId:   conv.initiator_institution_id,
+      sellerName:    conv.owner_name,
+      buyerName:     conv.initiator_name,
+      categoryIds:   (swapCatRows || []).map(r => r.category).filter(Boolean),
+    });
   } else {
     // Kun én part har betalt → besked om at afvente modparten.
     await supa.from('conversations').update({
