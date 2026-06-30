@@ -123,6 +123,7 @@ export default function IndstillingerPage() {
   const [profilePublic, setProfilePublic]       = useState(institution?.profile_public ?? true);
   const [consentSaving, setConsentSaving]       = useState(null); // hvilken toggle der gemmer
   const [exporting, setExporting]               = useState(false);
+  const [exportHistory, setExportHistory]       = useState(null); // null = ikke hentet endnu
 
   useEffect(() => {
     if (!institution) return;
@@ -288,38 +289,49 @@ export default function IndstillingerPage() {
     setConsentSaving(null);
   }
 
+  // Henter downloadhistorikken (hvornår data sidst er hentet).
+  async function loadExportHistory() {
+    try {
+      const res = await authedFetch('/api/gdpr/export/history');
+      if (!res.ok) throw new Error('failed');
+      const { history } = await res.json();
+      setExportHistory(history || []);
+    } catch {
+      setExportHistory([]);
+    }
+  }
+
+  // Hent historikken når fortroligheds-fanen åbnes.
+  useEffect(() => {
+    if (section === 'fortrolighed' && exportHistory === null) loadExportHistory();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [section]);
+
   async function handleDataExport() {
     setExporting(true);
     try {
-      // Hent den pæne HTML-rapport (authed) og udskriv den til PDF via en skjult
-      // iframe — undgår popup-blokering og kræver ingen ekstra afhængigheder.
+      // Hent den pæne HTML-rapport (authed) og gem den som en fil, brugeren
+      // selv kan åbne, gemme og dele — i stedet for en flygtig printdialog.
       const res = await authedFetch('/api/gdpr/export');
       if (!res.ok) throw new Error('failed');
-      const html = await res.text();
 
-      const iframe = document.createElement('iframe');
-      iframe.style.position = 'fixed';
-      iframe.style.right = '0';
-      iframe.style.bottom = '0';
-      iframe.style.width = '0';
-      iframe.style.height = '0';
-      iframe.style.border = '0';
-      document.body.appendChild(iframe);
+      const blob = await res.blob();
+      // Filnavn fra Content-Disposition, ellers et fornuftigt fallback.
+      const cd = res.headers.get('content-disposition') || '';
+      const match = cd.match(/filename="?([^"]+)"?/i);
+      const filename = match?.[1] || `bytogleg-data-${new Date().toISOString().slice(0, 10)}.html`;
 
-      const cleanup = () => { try { iframe.remove(); } catch {} };
-      iframe.onload = () => {
-        try {
-          const win = iframe.contentWindow;
-          win.focus();
-          win.print();
-          showToast('Vælg "Gem som PDF" i printdialogen ✓');
-        } catch {
-          showToast('Kunne ikke åbne printdialogen. Prøv igen', 'error');
-        }
-        // Ryd op efter at dialogen er håndteret.
-        setTimeout(cleanup, 60000);
-      };
-      iframe.srcdoc = html;
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      setTimeout(() => URL.revokeObjectURL(url), 10000);
+
+      showToast('Dine data er hentet ✓');
+      loadExportHistory(); // opdatér historikken med den nye hentning
     } catch {
       showToast('Kunne ikke hente data. Prøv igen', 'error');
     }
@@ -692,6 +704,25 @@ export default function IndstillingerPage() {
                         {exporting ? 'Henter…' : 'Download'}
                       </button>
                     </div>
+
+                    {/* Downloadhistorik */}
+                    {Array.isArray(exportHistory) && exportHistory.length > 0 && (
+                      <div style={{ marginTop:14 }}>
+                        <div style={{ fontSize:12, fontWeight:700, color:INK3, marginBottom:8 }}>Downloadhistorik</div>
+                        <div style={{ display:'flex', flexDirection:'column', gap:6 }}>
+                          {exportHistory.map(h => (
+                            <div key={h.id} style={{ display:'flex', alignItems:'center', justifyContent:'space-between', gap:12, padding:'9px 14px', background:PAPER2, borderRadius:10, border:`1px solid ${PAPER3}` }}>
+                              <span style={{ fontSize:12.5, color:INK }}>
+                                {new Date(h.created_at).toLocaleString('da-DK', { dateStyle:'long', timeStyle:'short' })}
+                              </span>
+                              <span style={{ fontSize:11, fontWeight:700, color:INK3, textTransform:'uppercase', letterSpacing:0.5, flexShrink:0 }}>
+                                {h.format === 'json' ? 'JSON' : 'HTML'}
+                              </span>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
                   </div>
                 </div>
               )}
