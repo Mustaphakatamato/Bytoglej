@@ -9,7 +9,7 @@
 
 ### Database (Supabase)
 
-- [ ] Kør `CO2_SETUP.sql` i Supabase SQL Editor (én gang pr. miljø)
+- [ ] Kør `supabase/CO2_SETUP.sql` i Supabase SQL Editor (én gang pr. miljø)
 - [ ] Verificér at alle 20 rækker er insertet i `co2_emission_factors`
 - [ ] Verificér at v1.0 er insertet i `co2_methodology_versions` og `active = true`
 - [ ] Verificér at `conversations`-tabellen har kolonnerne `co2_net_saved_kg` og `co2_breakdown`
@@ -21,7 +21,7 @@
 
 ### Kode
 
-- [ ] `lib/co2/emission-factors.js` — alle 20 faktorer korrekte og matcher `CO2_SETUP.sql`
+- [ ] `lib/co2/emission-factors.js` — alle 20 faktorer korrekte og matcher `supabase/CO2_SETUP.sql`
 - [ ] `lib/co2/calculator.js` — konstanter matcher metodologi-side og dokumentation
 - [ ] `lib/co2/geocoding.js` — DAWA og Nominatim-fallback virker
 - [ ] `__tests__/co2-calculator.test.js` — alle tests passerer (`npx jest` eller `bun test`)

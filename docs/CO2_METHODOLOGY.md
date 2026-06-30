@@ -13,7 +13,7 @@ lib/co2/
 ├── emission-factors.js   # Konstanter: CO2-faktorer + legacy mapping
 └── calculator.js         # Beregningslogik, aggregering, sammenligning
 
-CO2_SETUP.sql             # Supabase DDL for alle CO2-tabeller
+supabase/CO2_SETUP.sql    # Supabase DDL for alle CO2-tabeller
 app/baeredygtighed/
 └── metode/page.js        # Offentlig transparens-side
 app/admin/
