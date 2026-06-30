@@ -20,7 +20,7 @@ export async function GET(req) {
 
   const { data: orders } = await supa
     .from('orders')
-    .select('id, created_at, status, order_groups, buyer_name, buyer_email, paid_at')
+    .select('id, order_number, created_at, status, order_groups, buyer_name, buyer_email, paid_at')
     .in('status', ['paid', 'shipped', 'delivered'])
     .order('created_at', { ascending: false })
     .limit(200);

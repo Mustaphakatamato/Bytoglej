@@ -10,6 +10,7 @@ import {
 } from '@/lib/constants';
 import { useWindowWidth } from '@/lib/hooks';
 import AdminListingEditModal from '@/components/AdminListingEditModal';
+import { formatOrderNumber } from '@/lib/order-number';
 
 // ── Shared small components ────────────────────────────────────────────────────
 
@@ -1271,7 +1272,7 @@ function OrdersTab({ isMobile }) {
               <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '12px 14px', cursor: 'pointer' }} onClick={() => setExpanded(isOpen ? null : o.id)}>
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <div style={{ fontFamily: FONT, fontWeight: 700, fontSize: 14, color: INK, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{o.buyer_name || o.buyer_email || 'Ukendt køber'}</div>
-                  <div style={{ fontFamily: FONT, fontSize: 12, color: INK3 }}>{o.buyer_email} · {fmtDate(o.created_at)}</div>
+                  <div style={{ fontFamily: FONT, fontSize: 12, color: INK3 }}>{formatOrderNumber(o)} · {o.buyer_email} · {fmtDate(o.created_at)}</div>
                 </div>
                 <div style={{ fontFamily: FONT, fontWeight: 700, fontSize: 14, color: INK, flexShrink: 0 }}>{fmtKr(o.grand_total)}</div>
                 <OrderStatusBadge status={o.status} />

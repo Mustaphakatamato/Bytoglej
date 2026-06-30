@@ -5,6 +5,7 @@ import { createShipment } from '@/lib/shipmondo/client';
 import { escapeHtml } from '@/lib/escape-html';
 import { persistSwapCO2, persistTransactionCO2 } from '@/lib/co2/persist-server';
 import { notify } from '@/lib/notify';
+import { formatOrderNumber } from '@/lib/order-number';
 
 function getStripe() {
   if (!process.env.STRIPE_SECRET_KEY) throw new Error('STRIPE_SECRET_KEY er ikke sat');
@@ -100,6 +101,7 @@ export async function finalizePurchase(pi, supa) {
 
   const order = claimed;
   const groups = order.order_groups || [];
+  const orderNo = formatOrderNumber(order);
 
   // Bud-/tilbud-betalinger: markér bud/tilbud + samtale som gennemført.
   const bidMessageId = pi.metadata?.bid_message_id;
@@ -314,7 +316,7 @@ export async function finalizePurchase(pi, supa) {
               pickupPoint:    g.pickupPoint,
               labelUrl:       shipmentResult?.label_pdf_url || null,
               trackingNumber: shipmentResult?.tracking_number || null,
-              orderId:        order.id,
+              orderNo:        orderNo,
             }),
           }),
         });
@@ -366,7 +368,7 @@ export async function finalizePurchase(pi, supa) {
           html: buyerOrderEmailHtml({
             buyerName:  order.buyer_name,
             groups:     updatedGroups,
-            orderId:    order.id,
+            orderNo:    orderNo,
             grandTotal: updatedGroups.reduce((s, g) => s + (g.itemTotal || 0) + (g.shippingTotal || 0) + (g.serviceFee || 0), 0),
           }),
         }),
@@ -748,7 +750,7 @@ function fmtKr(n) {
   return `${Number(n || 0).toFixed(2).replace('.', ',')} kr.`;
 }
 
-function sellerOrderEmailHtml({ sellerName, items, itemTotal, shippingMethod, pickupPoint, labelUrl, trackingNumber, orderId }) {
+function sellerOrderEmailHtml({ sellerName, items, itemTotal, shippingMethod, pickupPoint, labelUrl, trackingNumber, orderNo }) {
   const base = process.env.NEXT_PUBLIC_BASE_URL || 'https://bytogleg.dk';
   const name = escapeHtml(String(sellerName || 'sælger'));
   const methodLabel = SHIPPING_LABELS[shippingMethod] || 'Forsendelse';
@@ -827,7 +829,7 @@ function sellerOrderEmailHtml({ sellerName, items, itemTotal, shippingMethod, pi
           <td style="padding:12px 0 0;font-size:15px;color:#2A7D4F;font-weight:800;text-align:right;white-space:nowrap;">${fmtKr(itemTotal)}</td>
         </tr>
       </table>
-      <p style="font-size:12px;color:#6B7570;margin:0 0 28px;">Ordrenummer: ${escapeHtml(String(orderId || ''))}${pickupPoint ? `<br>Afhentningssted: ${escapeHtml(String(pickupPoint.name || ''))}${pickupPoint.address ? `, ${escapeHtml(String(pickupPoint.address))}` : ''}` : ''}</p>
+      <p style="font-size:12px;color:#6B7570;margin:0 0 28px;">Ordrenummer: ${escapeHtml(String(orderNo || ''))}${pickupPoint ? `<br>Afhentningssted: ${escapeHtml(String(pickupPoint.name || ''))}${pickupPoint.address ? `, ${escapeHtml(String(pickupPoint.address))}` : ''}` : ''}</p>
 
       ${labelBox}
 
@@ -939,7 +941,7 @@ async function sendSwapNudgeEmail(to, name, deadline) {
   await sendSwapEmail(to, 'Din byttehandel afventer din betaling — byt&leg', html);
 }
 
-function buyerOrderEmailHtml({ buyerName, groups, orderId, grandTotal }) {
+function buyerOrderEmailHtml({ buyerName, groups, orderNo, grandTotal }) {
   const base = process.env.NEXT_PUBLIC_BASE_URL || 'https://bytogleg.dk';
   const name = escapeHtml(String(buyerName || 'køber'));
 
@@ -1005,7 +1007,7 @@ function buyerOrderEmailHtml({ buyerName, groups, orderId, grandTotal }) {
         <span style="font-size:15px;font-weight:800;color:#16221C;">I alt betalt</span>
         <span style="font-size:18px;font-weight:800;color:#2A7D4F;">${fmtKr(grandTotal)}</span>
       </div>
-      <p style="font-size:12px;color:#6B7570;margin:6px 0 28px;">Ordrenummer: ${escapeHtml(String(orderId || ''))}</p>
+      <p style="font-size:12px;color:#6B7570;margin:6px 0 28px;">Ordrenummer: ${escapeHtml(String(orderNo || ''))}</p>
 
       <!-- Beskyttelse -->
       <div style="background:#E8F1EC;border:1px solid #CFE3D8;border-radius:14px;padding:18px 20px;margin-bottom:28px;">

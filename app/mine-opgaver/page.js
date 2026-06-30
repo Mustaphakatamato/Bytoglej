@@ -6,6 +6,7 @@ import { PRIMARY, GREEN_TINT, PAPER2, PAPER3, INK, INK3, FONT } from '@/lib/cons
 import { useWindowWidth } from '@/lib/hooks';
 import { useApp } from '@/providers/AppProvider';
 import { Spinner } from '@/components/ui';
+import { formatOrderNumber } from '@/lib/order-number';
 
 // ── Stripe order card (automatic label) ───────────────────────
 
@@ -18,6 +19,11 @@ function StripeOrderCard({ order, myGroup, onMarkedSent }) {
   const isDone    = order.status === 'delivered';
   const labelUrl  = myGroup.label_pdf_url;
   const tracking  = myGroup.tracking_number;
+  // Leveringsmetode afgør hele kortets sprog. En afhentnings-/aftalt-ordre må
+  // ALDRIG vise "pakkemærkat genereres" (det modsiger købsmailen til sælger).
+  const method     = myGroup.shippingMethod;
+  const isShipping = !!method && method !== 'pickup' && method !== 'custom';
+  const orderNo    = formatOrderNumber(order);
 
   function fmtDate(iso) {
     if (!iso) return '';
@@ -52,20 +58,23 @@ function StripeOrderCard({ order, myGroup, onMarkedSent }) {
           <div style={{ fontFamily:FONT, fontSize:12, color:INK3, marginTop:1 }}>
             Køber: <strong style={{ color:INK }}>{order.buyer_name}</strong> · {fmtDate(order.paid_at)}
           </div>
+          {orderNo && (
+            <div style={{ fontFamily:FONT, fontSize:11, color:INK3, marginTop:1 }}>Ordre {orderNo}</div>
+          )}
         </div>
         {isPaid && (
           <span style={{ background:'#FEF9C3', color:'#92400E', borderRadius:99, fontSize:10, fontWeight:800, padding:'3px 8px', flexShrink:0 }}>
-            KLAR TIL AFSENDELSE
+            {isShipping ? 'KLAR TIL AFSENDELSE' : 'KLAR TIL AFHENTNING'}
           </span>
         )}
         {isShipped && (
           <span style={{ background:'#DBEAFE', color:'#1D4ED8', borderRadius:99, fontSize:10, fontWeight:800, padding:'3px 8px', flexShrink:0 }}>
-            LABEL KLAR: AFSEND
+            {isShipping ? 'LABEL KLAR: AFSEND' : 'AFVENTER KØBER'}
           </span>
         )}
         {isDone && (
           <span style={{ background:'#DCFCE7', color:'#166534', borderRadius:99, fontSize:10, fontWeight:800, padding:'3px 8px', flexShrink:0 }}>
-            LEVERET
+            {isShipping ? 'LEVERET' : 'AFHENTET'}
           </span>
         )}
       </button>
@@ -85,19 +94,25 @@ function StripeOrderCard({ order, myGroup, onMarkedSent }) {
           </div>
 
           <div style={{ marginTop:12, display:'flex', flexDirection:'column', gap:8 }}>
-            {labelUrl ? (
-              <a href={labelUrl} target="_blank" rel="noopener noreferrer" style={{
-                display:'block', textAlign:'center', padding:'11px', borderRadius:99,
-                background:PRIMARY, color:'#fff', fontFamily:FONT, fontWeight:700, fontSize:14,
-                textDecoration:'none',
-              }}>
-                🖨️ Download pakkemærkat (PDF)
-              </a>
-            ) : (isPaid || isShipped) ? (
-              <div style={{ background:'#FEF9C3', borderRadius:12, padding:'10px 14px', fontFamily:FONT, fontSize:13, color:'#92400E' }}>
-                📧 Pakkemærkaten genereres og sendes til institutionens e-mail. Tjek indbakke og spam.
+            {isShipping ? (
+              labelUrl ? (
+                <a href={labelUrl} target="_blank" rel="noopener noreferrer" style={{
+                  display:'block', textAlign:'center', padding:'11px', borderRadius:99,
+                  background:PRIMARY, color:'#fff', fontFamily:FONT, fontWeight:700, fontSize:14,
+                  textDecoration:'none',
+                }}>
+                  🖨️ Download pakkemærkat (PDF)
+                </a>
+              ) : (isPaid || isShipped) ? (
+                <div style={{ background:'#FEF9C3', borderRadius:12, padding:'10px 14px', fontFamily:FONT, fontSize:13, color:'#92400E' }}>
+                  📧 Pakkemærkaten genereres og sendes til institutionens e-mail. Tjek indbakke og spam.
+                </div>
+              ) : null
+            ) : (
+              <div style={{ background:'#E8F1EC', borderRadius:12, padding:'10px 14px', fontFamily:FONT, fontSize:13, color:'#133F2B' }}>
+                🤝 {method === 'custom' ? 'Aftalt levering' : 'Afhentning'}: Køberen henter varen hos jer — der oprettes ingen pakkemærkat. Aftal tid og sted via beskeder med køber.
               </div>
-            ) : null}
+            )}
 
             {tracking && (
               <div style={{ fontFamily:FONT, fontSize:12, color:INK3, textAlign:'center' }}>
@@ -105,7 +120,7 @@ function StripeOrderCard({ order, myGroup, onMarkedSent }) {
               </div>
             )}
 
-            {isShipped && (
+            {isShipping && isShipped && (
               <button
                 disabled={marking}
                 onClick={handleMarkSent}
@@ -116,6 +131,20 @@ function StripeOrderCard({ order, myGroup, onMarkedSent }) {
                   fontFamily:FONT, fontWeight:700, fontSize:13, cursor: marking ? 'default' : 'pointer',
                 }}>
                 {marking ? 'Gemmer…' : '🚚 Marker som afsendt'}
+              </button>
+            )}
+
+            {!isShipping && isPaid && (
+              <button
+                disabled={marking}
+                onClick={handleMarkSent}
+                style={{
+                  padding:'11px', borderRadius:99, border:`1.5px solid ${PRIMARY}`,
+                  background: marking ? PAPER2 : GREEN_TINT,
+                  color: marking ? INK3 : PRIMARY,
+                  fontFamily:FONT, fontWeight:700, fontSize:13, cursor: marking ? 'default' : 'pointer',
+                }}>
+                {marking ? 'Gemmer…' : '🤝 Marker som afhentet'}
               </button>
             )}
 
