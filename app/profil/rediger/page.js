@@ -297,15 +297,22 @@ export default function IndstillingerPage() {
       const { history } = await res.json();
       setExportHistory(history || []);
     } catch {
-      setExportHistory([]);
+      // Fejlede kaldet (fx session endnu ikke klar), bevar nuværende værdi —
+      // forbliver null hvis aldrig hentet, så effekten prøver igen næste gang
+      // fanen åbnes, frem for at låse fast på en tom liste.
+      setExportHistory(prev => prev);
     }
   }
 
-  // Hent historikken når fortroligheds-fanen åbnes.
+  // Hent historikken når fortroligheds-fanen åbnes — men først når
+  // institutionen er indlæst, så auth-sessionen er klar og kaldet ikke
+  // fejler i et race lige efter sideindlæsning.
   useEffect(() => {
-    if (section === 'fortrolighed' && exportHistory === null) loadExportHistory();
+    if (section === 'fortrolighed' && institution?.id && exportHistory === null) {
+      loadExportHistory();
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [section]);
+  }, [section, institution?.id]);
 
   async function handleDataExport() {
     setExporting(true);
