@@ -43,3 +43,27 @@ END $$;
 UPDATE co2_methodology_versions
 SET default_distance_km = 10
 WHERE version = '1.0' AND default_distance_km <> 10;
+
+-- ============================================================
+-- 4. METODE v1.1 — pakke-baseret transport + displacement 0,4
+-- ============================================================
+-- Transport modelleres nu som én konsolideret pakke (distance-uafhængig) i
+-- stedet for privatbil tur/retur pr. km. Ny kolonne holder pakke-emissionen i
+-- gram. Displacement sænkes til 0,4 på linje med Vinted/Vaayu (39–40%).
+ALTER TABLE co2_methodology_versions
+  ADD COLUMN IF NOT EXISTS parcel_emission_g integer;
+
+-- v1.0 var aktiv; deaktivér den og indsæt v1.1 som aktiv.
+UPDATE co2_methodology_versions SET active = false WHERE version = '1.0';
+
+INSERT INTO co2_methodology_versions
+  (version, displacement_rate, transport_emission_g_per_km, route_buffer_factor, default_distance_km, parcel_emission_g, notes, active)
+VALUES
+  ('1.1', 0.4, 0, 1.0, 0, 200,
+   'Transport modelleret som konsolideret pakke (~200 g/forsendelse, last-mile pakkedata S10) i stedet for privatbil tur/retur — trukket fra én gang pr. handel. Displacement sænket fra 0,6 til 0,4 på linje med Vinted/Vaayu (39–40%, S6/S9). Produktionsfaktorer uændrede fra v1.0.',
+   true)
+ON CONFLICT (version) DO UPDATE
+  SET displacement_rate = EXCLUDED.displacement_rate,
+      parcel_emission_g = EXCLUDED.parcel_emission_g,
+      notes             = EXCLUDED.notes,
+      active            = true;

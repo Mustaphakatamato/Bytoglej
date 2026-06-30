@@ -59,7 +59,7 @@ export default function CO2RapportPage() {
       if (!inst?.id) { setLoading(false); return; }
       const { data } = await db
         .from('transaction_co2_savings')
-        .select('net_saved_kg, calculated_at, listing_category_id, seller_institution_id, buyer_institution_id, breakdown')
+        .select('net_saved_kg, calculated_at, listing_category_id, seller_institution_id, buyer_institution_id, breakdown, methodology_version')
         .or(`seller_institution_id.eq.${inst.id},buyer_institution_id.eq.${inst.id}`)
         .order('calculated_at', { ascending: false });
       if (!cancelled) { setRows(data || []); setLoading(false); }
@@ -122,7 +122,7 @@ export default function CO2RapportPage() {
       const role = r.seller_institution_id === instId ? 'Solgt/byttet væk' : 'Købt/byttet til';
       const date = new Date(r.calculated_at).toLocaleDateString('da-DK');
       const cat = (EMISSION_FACTORS[r.listing_category_id]?.nameDA || r.listing_category_id || 'Andet').replace(/;/g, ',');
-      const ver = r.breakdown?.methodologyVersion || METHODOLOGY_VERSION;
+      const ver = r.methodology_version || r.breakdown?.methodologyVersion || METHODOLOGY_VERSION;
       return [date, cat, role, String(r.net_saved_kg ?? 0).replace('.', ','), ver].join(';');
     });
     const csv = '﻿' + [header.join(';'), ...lines].join('\n');

@@ -13,6 +13,8 @@ const SOURCES = [
   { id: 'S6', ref: 'Depop (2022). "Displacement rate research."', url: 'https://news.depop.com/company-news/depop-displacement-rate-research/' },
   { id: 'S7', ref: 'Klooster et al. (2024). "Do we save the environment by buying second-hand clothes?" Journal of Circular Economy.', url: 'https://circulareconomyjournal.org/wp-content/uploads/2024/07/Klooster_et_al_Do-we-save-the-environment-by-buying-second-hand-clothes-The-environmental-impacts-of-second-hand-textile-fashion-and-the-influence-of-consumer-choices.pdf' },
   { id: 'S8', ref: 'European Environment Agency (2024). "CO₂ performance of new passenger cars in Europe."', url: 'https://www.eea.europa.eu/en/analysis/indicators/co2-performance-of-new-passenger' },
+  { id: 'S9', ref: 'Vaayu × Vinted (2023). "Understanding the Avoided Emissions of Second-Hand Fashion." Uafhængig konsekvens-LCA — replacement rate 39–40%, netto ~1,25–1,8 kg CO₂e pr. vare.', url: 'https://press-center-static.vinted.com/Vaayu_x_Vinted_Full_Climate_Impact_Report_2023_9a4b6352d1.pdf' },
+  { id: 'S10', ref: 'Topsector Logistiek / Thuiswinkel.org (2024) & Statista (2021). Gennemsnitlig last-mile pakkeemission ~100–220 g CO₂e pr. pakke (faldende).', url: 'https://www.supplychainmovement.com/co2-emissions-per-parcel-down-56-over-last-five-years/' },
 ];
 
 export default function MetodePage() {
@@ -32,7 +34,7 @@ export default function MetodePage() {
         <div style={{ maxWidth: 760, margin: '0 auto', padding: '0 24px' }}>
           <button onClick={() => router.back()} style={{ background: 'rgba(255,255,255,0.12)', border: 'none', borderRadius: 99, padding: '7px 16px', color: 'rgba(255,255,255,0.8)', fontSize: 13, fontWeight: 600, cursor: 'pointer', fontFamily: FONT, marginBottom: 20 }}>← Tilbage</button>
           <div style={{ display: 'inline-flex', alignItems: 'center', gap: 8, background: 'rgba(255,255,255,0.15)', borderRadius: 99, padding: '5px 14px', marginBottom: 16 }}>
-            <span style={{ fontFamily: FONT, fontSize: 12, fontWeight: 700, color: 'rgba(255,255,255,0.9)', letterSpacing: '0.06em', textTransform: 'uppercase' }}>Metode v{METHODOLOGY_VERSION} · 2026-05-30</span>
+            <span style={{ fontFamily: FONT, fontSize: 12, fontWeight: 700, color: 'rgba(255,255,255,0.9)', letterSpacing: '0.06em', textTransform: 'uppercase' }}>Metode v{METHODOLOGY_VERSION} · 2026-06-30</span>
           </div>
           <h1 style={{ fontFamily: FONT, fontWeight: 800, fontSize: isMobile ? 28 : 40, color: '#fff', letterSpacing: '-0.04em', lineHeight: 1.1, marginBottom: 12 }}>
             Sådan beregner vi CO₂-besparelser på byt&amp;leg
@@ -48,7 +50,7 @@ export default function MetodePage() {
 
         {/* Formel */}
         <h2 style={h2}>Hovedformel</h2>
-        <p style={prose}>For hver gennemført byttehandel beregner vi:</p>
+        <p style={prose}>For hver gennemført handel (køb, bud eller bytte) beregner vi:</p>
         <div style={{ background: GREEN_TINT, border: `1px solid ${GREEN_SOFT}`, borderRadius: 16, padding: '20px 24px', marginBottom: 20 }}>
           <div style={{ fontFamily: "'Courier New', monospace", fontSize: 14, color: PRIMARY, fontWeight: 700, lineHeight: 2 }}>
             Sparet CO₂e = (Produktions-CO₂ × displacement rate) − Transport-CO₂
@@ -58,7 +60,7 @@ export default function MetodePage() {
           {[
             ['Produktions-CO₂', 'Det estimerede klimafodaftryk ved at producere et nyt tilsvarende produkt'],
             ['Displacement rate', 'Sandsynligheden for at en brugt vare faktisk erstatter et nyt køb (i stedet for blot at være ekstra forbrug)'],
-            ['Transport-CO₂', 'Udledning fra at flytte legetøjet mellem institutionerne (tur/retur, faktisk vejafstand via OpenStreetMap routing)'],
+            ['Transport-CO₂', 'Udledning fra at sende varen som pakke via pakkeshop — et fast, gennemsnitligt last-mile pakketal, trukket fra én gang pr. handel'],
           ].map(([term, def]) => (
             <div key={term} style={{ display: 'flex', gap: 12 }}>
               <span style={{ fontFamily: FONT, fontWeight: 700, fontSize: 14, color: PRIMARY, minWidth: 160, flexShrink: 0 }}>{term}</span>
@@ -93,17 +95,17 @@ export default function MetodePage() {
           </table>
         </div>
 
-        <h3 style={h3}>Displacement rate: 0,6</h3>
+        <h3 style={h3}>Displacement rate: 0,4</h3>
         <p style={prose}>
-          Akademisk litteratur for genbrugsmarkedspladser opererer typisk med displacement rates mellem 0,5 og 0,9 (S3, S6, S7). Vi har valgt 0,6 som konservativt estimat. Det betyder: vi antager at kun 60% af byttehandler reelt erstatter et nyt køb, mens 40% potentielt er ekstra forbrug (rebound-effekt). Denne værdi vil blive opdateret når vi har gennemført brugerundersøgelser.
+          Akademisk litteratur for genbrugsmarkedspladser opererer typisk med displacement rates mellem 0,4 og 0,9 (S3, S6, S7). Vi har valgt <strong>0,4</strong> — samme niveau som Vinted/Vaayu's uafhængige konsekvens-LCA, der måler en replacement rate på 39–40% (S6, S9). Det betyder: vi antager at kun 40% af handler reelt erstatter et nyt køb, mens resten potentielt er ekstra forbrug (rebound-effekt). Det er et bevidst konservativt valg, så vi hellere underdriver end overdriver jeres gevinst.
         </p>
 
-        <h3 style={h3}>Transport</h3>
+        <h3 style={h3}>Transport: pakke, ikke privatbil</h3>
         <p style={prose}>
-          Vi antager personbil-transport med en gennemsnitlig real-world emission på 170 g CO₂e/km (EEA 2024, S8). Afstanden beregnes som faktisk vejafstand via OpenStreetMap routing (OSRM) og fordobles for tur/retur. Hvis routing ikke er mulig, beregnes fugleflugt-distance (Haversine) med 1,3× rute-buffer. Hvis geocoding fejler helt, bruges 10 km som standard-estimat svarende til typisk afstand inden for samme kommune.
+          Varer på byt&amp;leg sendes som <strong>konsoliderede pakker</strong> via pakkeshop (PUDO), ikke med en privatbil. Vi bruger derfor et fast, gennemsnitligt last-mile pakketal på <strong>ca. 200 g CO₂e pr. forsendelse</strong> — i tråd med offentlige pakkedata, hvor gennemsnittet er faldet til ~100–220 g pr. pakke (S10). Pakkeshop-levering udleder typisk markant mindre end hjemmelevering.
         </p>
         <p style={prose}>
-          Hvis legetøjet flyttes med ladcykel, elcykel eller som del af eksisterende bilkørsel, er den faktiske besparelse <em>højere</em> end vores estimat viser.
+          Transporten trækkes fra <strong>én gang pr. handel</strong> — også når en kasse indeholder flere varer, da de sendes samlet. Tidligere (v1.0) modellerede vi transport som en privatbil tur/retur pr. vare; det overvurderede transporten kraftigt og nulstillede besparelsen for de fleste lette varer (bøger, spil, klodser). Pakke-modellen afspejler den faktiske forsendelse langt bedre.
         </p>
 
         {/* Hvad vi ikke tæller */}
@@ -127,7 +129,11 @@ export default function MetodePage() {
             <strong>Kritisk garanti:</strong> Historiske handler bevarer altid de tal, der blev beregnet på tidspunktet for handlen. Opdaterer vi metoden eller faktorerne, gælder ændringerne <em>kun</em> for fremtidige handler.
           </p>
         </div>
-        <p style={prose}>Denne metode er <strong>version {METHODOLOGY_VERSION}</strong> og blev implementeret den 2026-05-30. Tidligere versioner: ingen.</p>
+        <p style={prose}>Denne metode er <strong>version {METHODOLOGY_VERSION}</strong> og blev implementeret den 2026-06-30.</p>
+        <ul style={{ ...prose, paddingLeft: 24 }}>
+          <li style={{ marginBottom: 8 }}><strong>v1.1 (2026-06-30)</strong>: Transport ændret fra privatbil tur/retur (pr. km, pr. vare) til fast pakke-emission (~200 g pr. forsendelse, trukket fra én gang). Displacement sænket fra 0,6 til 0,4 på linje med Vinted/Vaayu. Produktionsfaktorer uændrede.</li>
+          <li style={{ marginBottom: 8 }}><strong>v1.0 (2026-05-30)</strong>: Første version. Bil-baseret transportmodel, displacement 0,6.</li>
+        </ul>
 
         {/* Sprogregler */}
         <h2 style={h2}>Sprogregler</h2>

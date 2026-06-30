@@ -3,14 +3,13 @@ import React, { useState, useEffect, useRef } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { db } from '@/lib/supabase';
 import { PRIMARY, GREEN_SOFT, GREEN_TINT, PAPER, PAPER2, PAPER3, INK, INK3, CORAL, FONT } from '@/lib/constants';
-import { useWindowWidth, relTime, haversine, geocodeAddress } from '@/lib/hooks';
+import { useWindowWidth, relTime, geocodeAddress } from '@/lib/hooks';
 import { useApp, useActiveUser } from '@/providers/AppProvider';
 import { Badge, Btn, Spinner, SkeletonMessageRow } from '@/components/ui';
 import { TradeProtectionPopup } from '@/components/ListingCard';
 import { authedFetch } from '@/lib/authed-fetch';
 import PullToRefresh from '@/components/PullToRefresh';
 import { calculateCO2Savings } from '@/lib/co2/calculator';
-import { geocodeForCO2, getRoutingDistanceKm } from '@/lib/co2/geocoding';
 const INK2 = '#3A473D';
 
 // Komprimer billede client-side før upload. Forhindrer "object exceeded the
@@ -747,55 +746,14 @@ export default function MessagesClient() {
         .maybeSingle();
       if (alreadyLogged) return;
 
-      let distanceKm = null;
-      const [ownerRes, initiatorRes] = await Promise.all([
-        conversation.owner_institution_id
-          ? db.from('institutions').select('latitude,longitude,address,zipcode,city').eq('id', conversation.owner_institution_id).maybeSingle()
-          : Promise.resolve({ data: null }),
-        conversation.initiator_institution_id
-          ? db.from('institutions').select('latitude,longitude,address,zipcode,city').eq('id', conversation.initiator_institution_id).maybeSingle()
-          : Promise.resolve({ data: null }),
-      ]);
-      let o = ownerRes.data;
-      let i = initiatorRes.data;
-      // Geocode if coordinates not cached
-      if (o && !o.latitude) {
-        const c = await geocodeForCO2(o.address, o.zipcode, o.city);
-        if (c) {
-          db.from('institutions').update({ latitude: c.lat, longitude: c.lon }).eq('id', conversation.owner_institution_id);
-          o = { ...o, latitude: c.lat, longitude: c.lon };
-        }
-      }
-      if (i && !i.latitude) {
-        const c = await geocodeForCO2(i.address, i.zipcode, i.city);
-        if (c) {
-          db.from('institutions').update({ latitude: c.lat, longitude: c.lon }).eq('id', conversation.initiator_institution_id);
-          i = { ...i, latitude: c.lat, longitude: c.lon };
-        }
-      }
-      let isRoutedDistance = false;
-      if (o?.latitude && i?.latitude) {
-        // Forsøg OSRM routing (faktisk kørselsafstand, ingen buffer nødvendig)
-        const routed = await getRoutingDistanceKm(
-          { lat: o.latitude, lon: o.longitude },
-          { lat: i.latitude, lon: i.longitude }
-        );
-        if (routed != null && routed >= 0.5) {
-          distanceKm = routed;
-          isRoutedDistance = true;
-        } else {
-          // Fallback: haversine — < 0.5 km = sandsynligvis samme postnummer-centroid → 3 km minimum
-          const raw = haversine(o.latitude, o.longitude, i.latitude, i.longitude);
-          distanceKm = raw >= 0.5 ? raw : 3;
-        }
-      }
-      // Fetch listing category if not provided
+      // Metode v1.1: transporten er en fast pakke-emission (distance-uafhængig),
+      // så vi behøver hverken geocoding eller routing her — kun varens kategori.
       let resolvedCategory = categoryId;
       if (!resolvedCategory && conversation.listing_id) {
         const { data: listing } = await db.from('listings').select('category').eq('id', conversation.listing_id).maybeSingle();
         resolvedCategory = listing?.category || null;
       }
-      const result = calculateCO2Savings({ categoryId: resolvedCategory, distanceKm, isRoutedDistance });
+      const result = calculateCO2Savings({ categoryId: resolvedCategory });
       await Promise.all([
         db.from('transaction_co2_savings').insert({
           transaction_id: conversation.id,
