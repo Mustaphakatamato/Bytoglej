@@ -3,13 +3,19 @@ import { requireAuth, UNAUTHORIZED } from '@/lib/api-auth';
 import { createServerClient } from '@/lib/supabase-server';
 import { resolveInstitution } from '@/lib/gdpr-institution';
 import { gdprExportHtml } from '@/lib/gdpr-export-html';
+import { gdprExportPdf } from '@/lib/gdpr-export-pdf';
+
+// @react-pdf/renderer kræver Node-runtime (ikke Edge).
+export const runtime = 'nodejs';
+export const maxDuration = 30;
 
 // GET /api/gdpr/export
 //
 // GDPR art. 15 (indsigt) + art. 20 (dataportabilitet): samler alle
 // personoplysninger byt&leg behandler om den indloggede brugers institution.
-// Standard-leverancen er en pæn, læsevenlig HTML-rapport, som klienten gemmer
-// som en fil (download). Maskinlæsbar JSON bevares via ?format=json.
+// Standard-leverancen er en pæn, læsevenlig PDF-rapport, som klienten gemmer
+// som en fil (download). HTML bevares via ?format=html og maskinlæsbar JSON
+// via ?format=json.
 //
 // Hver hentning logges i data_export_log, så institutionen kan se en historik
 // over hvornår data er hentet, og vi har en audit-trail på indsigtsanmodninger.
@@ -17,7 +23,8 @@ export async function GET(req) {
   const user = await requireAuth(req);
   if (!user) return UNAUTHORIZED();
 
-  const format = new URL(req.url).searchParams.get('format') === 'json' ? 'json' : 'html';
+  const fmtParam = new URL(req.url).searchParams.get('format');
+  const format = fmtParam === 'json' ? 'json' : fmtParam === 'html' ? 'html' : 'pdf';
 
   const supa = createServerClient();
 
@@ -106,13 +113,24 @@ export async function GET(req) {
     });
   }
 
-  // Standard: pæn HTML-rapport leveret som en fil, brugeren kan gemme og
-  // genåbne (i stedet for en flygtig printdialog).
-  return new NextResponse(gdprExportHtml(exportData), {
+  if (format === 'html') {
+    return new NextResponse(gdprExportHtml(exportData), {
+      status: 200,
+      headers: {
+        'Content-Type': 'text/html; charset=utf-8',
+        'Content-Disposition': `attachment; filename="${base}.html"`,
+      },
+    });
+  }
+
+  // Standard: ægte PDF-rapport leveret som en fil, brugeren kan gemme,
+  // genåbne og dele (i stedet for en flygtig printdialog).
+  const pdf = await gdprExportPdf(exportData);
+  return new NextResponse(pdf, {
     status: 200,
     headers: {
-      'Content-Type': 'text/html; charset=utf-8',
-      'Content-Disposition': `attachment; filename="${base}.html"`,
+      'Content-Type': 'application/pdf',
+      'Content-Disposition': `attachment; filename="${base}.pdf"`,
     },
   });
 }

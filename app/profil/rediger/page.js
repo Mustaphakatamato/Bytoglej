@@ -319,7 +319,7 @@ export default function IndstillingerPage() {
       // Filnavn fra Content-Disposition, ellers et fornuftigt fallback.
       const cd = res.headers.get('content-disposition') || '';
       const match = cd.match(/filename="?([^"]+)"?/i);
-      const filename = match?.[1] || `bytogleg-data-${new Date().toISOString().slice(0, 10)}.html`;
+      const filename = match?.[1] || `bytogleg-data-${new Date().toISOString().slice(0, 10)}.pdf`;
 
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
@@ -716,7 +716,7 @@ export default function IndstillingerPage() {
                                 {new Date(h.created_at).toLocaleString('da-DK', { dateStyle:'long', timeStyle:'short' })}
                               </span>
                               <span style={{ fontSize:11, fontWeight:700, color:INK3, textTransform:'uppercase', letterSpacing:0.5, flexShrink:0 }}>
-                                {h.format === 'json' ? 'JSON' : 'HTML'}
+                                {(h.format || 'pdf').toUpperCase()}
                               </span>
                             </div>
                           ))}
