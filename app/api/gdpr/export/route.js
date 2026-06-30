@@ -1,14 +1,18 @@
 import { NextResponse } from 'next/server';
 import { requireAuth, UNAUTHORIZED } from '@/lib/api-auth';
 import { createServerClient } from '@/lib/supabase-server';
+import { resolveInstitution } from '@/lib/gdpr-institution';
 import { gdprExportHtml } from '@/lib/gdpr-export-html';
 
 // GET /api/gdpr/export
 //
 // GDPR art. 15 (indsigt) + art. 20 (dataportabilitet): samler alle
 // personoplysninger byt&leg behandler om den indloggede brugers institution.
-// Standard-leverancen er en pæn, læsevenlig HTML-rapport (klienten gemmer den
-// som PDF). Maskinlæsbar JSON bevares via ?format=json.
+// Standard-leverancen er en pæn, læsevenlig HTML-rapport, som klienten gemmer
+// som en fil (download). Maskinlæsbar JSON bevares via ?format=json.
+//
+// Hver hentning logges i data_export_log, så institutionen kan se en historik
+// over hvornår data er hentet, og vi har en audit-trail på indsigtsanmodninger.
 export async function GET(req) {
   const user = await requireAuth(req);
   if (!user) return UNAUTHORIZED();
@@ -18,15 +22,7 @@ export async function GET(req) {
   const supa = createServerClient();
 
   // Find institutionen (ejer via email, ellers medlem).
-  const { data: ownInst } = await supa.from('institutions')
-    .select('*').ilike('email', user.email).maybeSingle();
-
-  let institution = ownInst;
-  if (!institution) {
-    const { data: mem } = await supa.from('institution_members')
-      .select('institutions(*)').ilike('email', user.email).maybeSingle();
-    institution = mem?.institutions || null;
-  }
+  const institution = await resolveInstitution(supa, user);
 
   if (!institution?.id) {
     return NextResponse.json({ error: 'Ingen institution fundet' }, { status: 403 });
@@ -86,6 +82,20 @@ export async function GET(req) {
 
   const base = `bytogleg-data-${instName?.replace(/[^a-z0-9]/gi, '-').toLowerCase() || 'eksport'}-${new Date().toISOString().slice(0, 10)}`;
 
+  // Registrér hentningen i downloadhistorikken (append-only, kan ikke
+  // forfalskes fra klienten). Fejler logningen, blokerer vi ikke selve
+  // eksporten — brugerens ret til indsigt vægter højere.
+  const ip = req.headers.get('x-forwarded-for')?.split(',')[0]?.trim() || null;
+  const userAgent = req.headers.get('user-agent')?.slice(0, 500) || null;
+  const { error: logErr } = await supa.from('data_export_log').insert({
+    institution_id: instId,
+    exported_by:    user.id,
+    format,
+    ip_address:     ip,
+    user_agent:     userAgent,
+  });
+  if (logErr) console.error('[gdpr/export] log-fejl:', logErr);
+
   if (format === 'json') {
     return new NextResponse(JSON.stringify(exportData, null, 2), {
       status: 200,
@@ -96,12 +106,13 @@ export async function GET(req) {
     });
   }
 
-  // Standard: pæn HTML-rapport (klienten renderer + udskriver til PDF).
+  // Standard: pæn HTML-rapport leveret som en fil, brugeren kan gemme og
+  // genåbne (i stedet for en flygtig printdialog).
   return new NextResponse(gdprExportHtml(exportData), {
     status: 200,
     headers: {
       'Content-Type': 'text/html; charset=utf-8',
-      'Content-Disposition': `inline; filename="${base}.html"`,
+      'Content-Disposition': `attachment; filename="${base}.html"`,
     },
   });
 }
