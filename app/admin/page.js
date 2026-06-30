@@ -1367,12 +1367,13 @@ const FB_STATUSES = [
   { key: 'fixed',               label: 'Løst',               emoji: '✅', bg: '#D1FAE5', color: '#065F46', border: '#6EE7B7' },
   { key: 'wont_fix',            label: 'Ikke relevant',      emoji: '❌', bg: '#FEF2F2', color: '#DC2626', border: '#FCA5A5' },
 ];
-const FB_CAT = { bug: { emoji: '🐛', label: 'Fejl' }, suggestion: { emoji: '💡', label: 'Forslag' }, general: { emoji: '⭐', label: 'Generel' } };
+const FB_CAT = { bug: { emoji: '🐛', label: 'Fejl' }, suggestion: { emoji: '💡', label: 'Forslag' }, general: { emoji: '⭐', label: 'Generel' }, help_article: { emoji: '📄', label: 'Artikel' } };
 
 function FeedbackTab({ isMobile, onNewCountChange }) {
   const [items, setItems] = useState([]);
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState('all');
+  const [catFilter, setCatFilter] = useState('all');
   const [expanded, setExpanded] = useState(null);
   const [lightbox, setLightbox] = useState(null);
   const [noteDraft, setNoteDraft] = useState({});
@@ -1414,8 +1415,10 @@ function FeedbackTab({ isMobile, onNewCountChange }) {
     setBulkBusy(false);
   }
 
-  const counts = Object.fromEntries(FB_STATUSES.map(s => [s.key, items.filter(i => (i.status || 'new') === s.key).length]));
-  const filtered = filter === 'all' ? items : items.filter(i => (i.status || 'new') === filter);
+  const catCounts = Object.fromEntries(Object.keys(FB_CAT).map(k => [k, items.filter(i => (i.category || 'general') === k).length]));
+  const byCat = catFilter === 'all' ? items : items.filter(i => (i.category || 'general') === catFilter);
+  const counts = Object.fromEntries(FB_STATUSES.map(s => [s.key, byCat.filter(i => (i.status || 'new') === s.key).length]));
+  const filtered = filter === 'all' ? byCat : byCat.filter(i => (i.status || 'new') === filter);
 
   return (
     <div>
@@ -1425,8 +1428,19 @@ function FeedbackTab({ isMobile, onNewCountChange }) {
         </div>
       )}
 
+      {/* Type-filter (kategori) */}
+      <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 10 }}>
+        <button onClick={() => setCatFilter('all')} style={{ padding: '6px 14px', borderRadius: 99, border: `1.5px solid ${catFilter === 'all' ? PRIMARY : PAPER3}`, background: catFilter === 'all' ? GREEN_TINT : PAPER2, color: catFilter === 'all' ? PRIMARY : INK3, fontFamily: FONT, fontWeight: 600, fontSize: 13, cursor: 'pointer' }}>Alle typer ({items.length})</button>
+        {Object.entries(FB_CAT).map(([key, c]) => (
+          <button key={key} onClick={() => setCatFilter(key)} style={{ padding: '6px 14px', borderRadius: 99, border: `1.5px solid ${catFilter === key ? PRIMARY : PAPER3}`, background: catFilter === key ? GREEN_TINT : PAPER2, color: catFilter === key ? PRIMARY : INK3, fontFamily: FONT, fontWeight: 600, fontSize: 13, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 5 }}>
+            <span>{c.emoji}</span> {c.label} ({catCounts[key] || 0})
+          </button>
+        ))}
+      </div>
+
+      {/* Status-filter */}
       <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 12 }}>
-        <button onClick={() => setFilter('all')} style={{ padding: '6px 14px', borderRadius: 99, border: `1.5px solid ${filter === 'all' ? PRIMARY : PAPER3}`, background: filter === 'all' ? GREEN_TINT : PAPER2, color: filter === 'all' ? PRIMARY : INK3, fontFamily: FONT, fontWeight: 600, fontSize: 13, cursor: 'pointer' }}>Alle ({items.length})</button>
+        <button onClick={() => setFilter('all')} style={{ padding: '6px 14px', borderRadius: 99, border: `1.5px solid ${filter === 'all' ? PRIMARY : PAPER3}`, background: filter === 'all' ? GREEN_TINT : PAPER2, color: filter === 'all' ? PRIMARY : INK3, fontFamily: FONT, fontWeight: 600, fontSize: 13, cursor: 'pointer' }}>Alle ({byCat.length})</button>
         {FB_STATUSES.map(s => (
           <button key={s.key} onClick={() => setFilter(s.key)} style={{ padding: '6px 14px', borderRadius: 99, border: `1.5px solid ${filter === s.key ? s.color : PAPER3}`, background: filter === s.key ? s.bg : PAPER2, color: filter === s.key ? s.color : INK3, fontFamily: FONT, fontWeight: 600, fontSize: 13, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 5 }}>
             <span>{s.emoji}</span> {s.label} ({counts[s.key]})

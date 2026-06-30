@@ -39,7 +39,7 @@ export async function POST(req) {
     // 2) Send notifikations-email (fejl her returnerer success — feedback er allerede gemt)
     if (process.env.RESEND_API_KEY) {
       const to = process.env.ADMIN_NOTIFICATION_EMAIL || 'admin@bytogleg.dk';
-      const categoryLabel = { bug: '🐛 Fejl/bug', suggestion: '💡 Forslag', general: '⭐ Generel feedback' }[category] || escapeHtml(category);
+      const categoryLabel = { bug: '🐛 Fejl/bug', suggestion: '💡 Forslag', general: '⭐ Generel feedback', help_article: '📄 Artikel-feedback' }[category] || escapeHtml(category);
       const screenshotRow = screenshotUrl
         ? `<tr><td style="padding:8px 0;color:#6B7570;width:120px;vertical-align:top;">Screenshot</td><td style="padding:8px 0;"><a href="${escapeHtml(screenshotUrl)}" style="color:#1B4332;">Se billede</a></td></tr>`
         : '';
