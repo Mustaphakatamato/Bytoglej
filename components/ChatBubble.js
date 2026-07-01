@@ -830,15 +830,24 @@ export default function ChatBubble() {
     setOpen(true);
     setTab('support');
     if (sup === 'uenig') {
+      // Byg en selvforklarende besked, så support med det samme kan se hvilket
+      // opslag og hvilken begrundelse institutionen er uenig i.
       const opslag = params.get('opslag');
-      setPrefill(opslag
-        ? `Hej! Jeg er uenig i afvisningen af mit opslag "${opslag}". Kan I kigge på det igen?`
-        : 'Hej! Jeg er uenig i afvisningen af mit opslag. Kan I kigge på det igen?');
+      const grund = params.get('grund');
+      const linjer = [
+        opslag
+          ? `Hej! Jeg er uenig i afvisningen af mit opslag "${opslag}".`
+          : 'Hej! Jeg er uenig i afvisningen af mit opslag.',
+      ];
+      if (grund) linjer.push(`Begrundelse I gav: "${grund}"`);
+      linjer.push('Jeg mener, afgørelsen bør genovervejes. Kan I kigge på det igen?');
+      setPrefill(linjer.join('\n'));
     }
     // Fjern query-parametrene, så chatten ikke genåbner ved refresh/navigation.
     const url = new URL(window.location.href);
     url.searchParams.delete('support');
     url.searchParams.delete('opslag');
+    url.searchParams.delete('grund');
     window.history.replaceState({}, '', url.pathname + url.search + url.hash);
   }, []);
 

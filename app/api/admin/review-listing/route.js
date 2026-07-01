@@ -72,8 +72,11 @@ export async function POST(req) {
     await supa.from('listings').delete().eq('id', listing_id);
 
     // Mail med mulighed for at være uenig → knap åbner supportchatten med en
-    // fortekst om det afviste opslag (?support=uenig&opslag=<titel>).
-    const supportUrl = `https://bytogleg.dk/?support=uenig&opslag=${encodeURIComponent(listing.title || '')}`;
+    // fortekst om det afviste opslag, så support med det samme kan se hvilket
+    // opslag og hvilken begrundelse institutionen er uenig i.
+    // (?support=uenig&opslag=<titel>&grund=<begrundelse>)
+    const grund = reason.trim().slice(0, 300);
+    const supportUrl = `https://bytogleg.dk/?support=uenig&opslag=${encodeURIComponent(listing.title || '')}&grund=${encodeURIComponent(grund)}`;
     const rejectHtml = brandedEmail({
       heading: 'Dit opslag kunne ikke godkendes',
       bodyHtml: `
