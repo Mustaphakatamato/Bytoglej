@@ -981,7 +981,7 @@ export default function OpretOpslagPage() {
                         <span style={{ fontSize:20, flexShrink:0 }}>🔍</span>
                         <div>
                           <div style={{ fontFamily:FONT, fontWeight:700, fontSize:13, color:'#92400E', marginBottom:4 }}>Send til manuel gennemgang</div>
-                          <div style={{ fontFamily:FONT, fontSize:12, color:'#78350F', lineHeight:1.5 }}>AI kan ikke bekræfte billedet. Udfyld opslaget og send det til godkendelse, så vender vi tilbage inden for 1–2 hverdage.</div>
+                          <div style={{ fontFamily:FONT, fontSize:12, color:'#78350F', lineHeight:1.5 }}>Hov… det lader til, at billedet ikke helt er legetøj eller institutionsudstyr. Udfyld opslaget og send det til godkendelse, så kigger vi på det manuelt og vender tilbage inden for 1–2 hverdage.</div>
                         </div>
                       </div>
                     )}
