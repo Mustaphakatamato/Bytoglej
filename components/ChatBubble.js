@@ -60,7 +60,7 @@ function SupportImage({ content }) {
   );
 }
 
-function SupportChat({ userId, userEmail, userName, institutionName, onNavigate }) {
+function SupportChat({ userId, userEmail, userName, institutionName, onNavigate, initialInput }) {
   const GREETING = { role: 'bot', content: 'Hej! Jeg er byt&legs AI-assistent. Hvad kan jeg hjælpe dig med?', created_at: null };
   const [messages, setMessages]   = useState([GREETING]);
   const [input, setInput]         = useState('');
@@ -138,6 +138,14 @@ function SupportChat({ userId, userEmail, userName, institutionName, onNavigate 
   }, []);
 
   useEffect(() => { setTimeout(() => bottomRef.current?.scrollIntoView({ behavior: 'smooth' }), 60); }, [messages, loading]);
+
+  // Forudfyld beskedfeltet når chatten åbnes fra fx afvisnings-mailen ("jeg er uenig").
+  // Brugeren kan redigere og selv trykke send.
+  useEffect(() => {
+    if (!initialInput) return;
+    setInput(initialInput);
+    setTimeout(() => inputRef.current?.focus(), 200);
+  }, [initialInput]);
 
   // D1: opdatér aktivitets-tidsstempel ved hver besked, så 30-min-reset måler korrekt.
   useEffect(() => {
@@ -809,6 +817,39 @@ export default function ChatBubble() {
 
   const [open, setOpen]   = useState(false);
   const [tab, setTab]     = useState('support'); // 'messages' | 'support'
+  const [prefill, setPrefill] = useState(''); // fortekst til supportchat (fx fra afvisnings-mail)
+
+  // Åbn supportchatten automatisk når man kommer fra et link med ?support=…
+  // (fx "Jeg er uenig"-knappen i afvisnings-mailen). ?support=uenig forudfylder
+  // en besked om det afviste opslag, som brugeren kan sende videre.
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const params = new URLSearchParams(window.location.search);
+    const sup = params.get('support');
+    if (!sup) return;
+    setOpen(true);
+    setTab('support');
+    if (sup === 'uenig') {
+      // Byg en selvforklarende besked, så support med det samme kan se hvilket
+      // opslag og hvilken begrundelse institutionen er uenig i.
+      const opslag = params.get('opslag');
+      const grund = params.get('grund');
+      const linjer = [
+        opslag
+          ? `Hej! Jeg er uenig i afvisningen af mit opslag "${opslag}".`
+          : 'Hej! Jeg er uenig i afvisningen af mit opslag.',
+      ];
+      if (grund) linjer.push(`Begrundelse I gav: "${grund}"`);
+      linjer.push('Jeg mener, afgørelsen bør genovervejes. Kan I kigge på det igen?');
+      setPrefill(linjer.join('\n'));
+    }
+    // Fjern query-parametrene, så chatten ikke genåbner ved refresh/navigation.
+    const url = new URL(window.location.href);
+    url.searchParams.delete('support');
+    url.searchParams.delete('opslag');
+    url.searchParams.delete('grund');
+    window.history.replaceState({}, '', url.pathname + url.search + url.hash);
+  }, []);
 
   const w = useWindowWidth();
   const isMobile = w > 0 && w < 768;
@@ -823,10 +864,12 @@ export default function ChatBubble() {
   // Hidden on beskeder and admin pages
   const hidden = !splashDone || !!pathname?.startsWith('/beskeder') || !!pathname?.startsWith('/admin');
 
-  // When logged in and has unread messages, default to messages tab
+  // When logged in and has unread messages, default to messages tab.
+  // Undtagelse: hvis chatten blev åbnet fra en "jeg er uenig"-mail (prefill sat),
+  // skal vi blive på support-fanen.
   useEffect(() => {
-    if (open && userId && unreadTotal > 0) setTab('messages');
-  }, [open, userId, unreadTotal]);
+    if (open && userId && unreadTotal > 0 && !prefill) setTab('messages');
+  }, [open, userId, unreadTotal, prefill]);
 
   if (hidden) return null;
 
@@ -899,6 +942,7 @@ export default function ChatBubble() {
                   userName={institution?.name || adminInstName || null}
                   institutionName={institution?.name || adminInstName || null}
                   onNavigate={(path) => { router.push(path); setOpen(false); }}
+                  initialInput={prefill}
                 />
               )}
               {isLoggedIn && tab === 'messages' && (
