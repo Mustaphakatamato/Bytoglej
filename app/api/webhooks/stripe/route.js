@@ -4,6 +4,7 @@ import { createServerClient } from '@/lib/supabase-server';
 import { createShipment } from '@/lib/shipmondo/client';
 import { escapeHtml } from '@/lib/escape-html';
 import { persistSwapCO2, persistTransactionCO2 } from '@/lib/co2/persist-server';
+import { isCashPurchaseProposal } from '@/lib/pricing';
 import { notify } from '@/lib/notify';
 import { formatOrderNumber } from '@/lib/order-number';
 import { addBusinessDays } from '@/lib/business-days';
@@ -618,7 +619,12 @@ export async function handleSwapProposalPayment(pi, supa) {
     : { data: null };
   const now = new Date().toISOString();
 
-  if (p.initiator_paid && p.owner_paid && p.escrow_status !== 'both_paid_released') {
+  // Rent kontant-tilbud = køb: handlen fuldføres på købers (initiator) betaling alene,
+  // sælger betaler intet.
+  const isPurchase = isCashPurchaseProposal(p);
+  const readyToComplete = isPurchase ? p.initiator_paid : (p.initiator_paid && p.owner_paid);
+
+  if (readyToComplete && p.escrow_status !== 'both_paid_released') {
     const [{ data: initInst }, { data: ownerInst }] = await Promise.all([
       p.initiator_institution_id ? supa.from('institutions').select('*').eq('id', p.initiator_institution_id).maybeSingle() : Promise.resolve({ data: null }),
       p.owner_institution_id     ? supa.from('institutions').select('*').eq('id', p.owner_institution_id).maybeSingle()     : Promise.resolve({ data: null }),
@@ -630,8 +636,9 @@ export async function handleSwapProposalPayment(pi, supa) {
     // så den bookes til EJERS valgte udleveringssted, og EJERS leveringsvalg afgør
     // om der overhovedet bookes en label (custom = aftalt levering, ingen label).
     // Shipment-id'et persisteres STRAKS, så et retry efter nedbrud ikke dobbelt-booker.
+    // Ved køb er der ingen tilbudte varer → ingen initiator→ejer-pakke bookes.
     let initShipmentId = p.initiator_shipment_id || null;
-    if (!initShipmentId && p.owner_delivery !== 'custom' && conv) {
+    if (!initShipmentId && offeredIds.length && p.owner_delivery !== 'custom' && conv) {
       initShipmentId = await bookSwapShipment(supa, conv, offeredIds[0], initInst, ownerInst, await swapBundleSize(supa, offeredIds), p.owner_pickup?.id || null, p.id);
       if (initShipmentId) await supa.from('swap_proposals').update({ initiator_shipment_id: initShipmentId }).eq('id', proposalId);
     }
@@ -676,24 +683,41 @@ export async function handleSwapProposalPayment(pi, supa) {
         await supa.from('orders').update({ order_groups: groups }).eq('id', orderId);
       }
     }
-    await Promise.all([
-      patchOrderShipment(p.initiator_order_id, shipById.get(initShipmentId)),
-      patchOrderShipment(p.owner_order_id, shipById.get(ownerShipmentId)),
-    ]);
+    // Ved køb har kun køberen (initiator) en ordre, og den pakke de MODTAGER er
+    // ejer→initiator-forsendelsen — skriv derfor dens tracking på købers ordre.
+    await Promise.all(isPurchase
+      ? [patchOrderShipment(p.initiator_order_id, shipById.get(ownerShipmentId))]
+      : [
+        patchOrderShipment(p.initiator_order_id, shipById.get(initShipmentId)),
+        patchOrderShipment(p.owner_order_id, shipById.get(ownerShipmentId)),
+      ]);
 
-    // CO2-besparelse for byttet (server-side, Trin 5).
+    // CO2-besparelse (server-side, Trin 5). Køb registreres som 'køb', bytte som byt.
     if (convId) {
       const { data: catRows } = tradedIds.length
         ? await supa.from('listings').select('category').in('id', tradedIds)
         : { data: [] };
-      await persistSwapCO2(supa, {
-        transactionId: convId,
-        ownerInstId: p.owner_institution_id,
-        initiatorInstId: p.initiator_institution_id,
-        ownerName: ownerInst?.name || null,
-        initiatorName: initInst?.name || null,
-        categoryIds: (catRows || []).map(r => r.category).filter(Boolean),
-      });
+      const categoryIds = (catRows || []).map(r => r.category).filter(Boolean);
+      if (isPurchase) {
+        await persistTransactionCO2(supa, {
+          transactionId: convId,
+          dealType: 'køb',
+          sellerInstId: p.owner_institution_id,
+          buyerInstId: p.initiator_institution_id,
+          sellerName: ownerInst?.name || null,
+          buyerName: initInst?.name || null,
+          categoryIds,
+        });
+      } else {
+        await persistSwapCO2(supa, {
+          transactionId: convId,
+          ownerInstId: p.owner_institution_id,
+          initiatorInstId: p.initiator_institution_id,
+          ownerName: ownerInst?.name || null,
+          initiatorName: initInst?.name || null,
+          categoryIds,
+        });
+      }
     }
 
     // Kontant mellemlag → sæt ind på modtagerens byt&leg-konto (idempotent).
@@ -709,7 +733,8 @@ export async function handleSwapProposalPayment(pi, supa) {
         if (receiverInstId) {
           const { error: cashErr } = await supa.rpc('wallet_credit', {
             _inst: receiverInstId, _amount: Number(p.cash_adjustment), _type: 'sale_credit',
-            _ref_type: 'swap', _ref_id: proposalId, _note: 'Kontant mellemlag fra byttehandel',
+            _ref_type: 'swap', _ref_id: proposalId,
+            _note: isPurchase ? 'Betaling for solgt vare' : 'Kontant mellemlag fra byttehandel',
           });
           if (cashErr) console.error('[stripe-webhook] cash-mellemlag credit fejl:', cashErr.message);
           else {
@@ -717,8 +742,10 @@ export async function handleSwapProposalPayment(pi, supa) {
               await notify(supa, {
                 institutionId: receiverInstId,
                 type: 'swap_cash_credit',
-                title: '💰 Kontant mellemlag modtaget',
-                body: `${Number(p.cash_adjustment).toFixed(2).replace('.', ',')} kr. fra byttehandlen er sat ind på jeres byt&leg-konto.`,
+                title: isPurchase ? '💰 Betaling modtaget' : '💰 Kontant mellemlag modtaget',
+                body: isPurchase
+                  ? `${Number(p.cash_adjustment).toFixed(2).replace('.', ',')} kr. for din solgte vare er sat ind på jeres byt&leg-konto.`
+                  : `${Number(p.cash_adjustment).toFixed(2).replace('.', ',')} kr. fra byttehandlen er sat ind på jeres byt&leg-konto.`,
                 data: { proposal_id: proposalId, conversation_id: convId || null },
                 url: '/min-konto',
               });
@@ -730,16 +757,21 @@ export async function handleSwapProposalPayment(pi, supa) {
 
     if (convId) {
       const cashLine = (Number(p.cash_adjustment) > 0)
-        ? ` Kontant mellemlag på ${p.cash_adjustment} kr. er sat ind på modtagerens byt&leg-konto.`
+        ? (isPurchase
+          ? ` Betaling på ${p.cash_adjustment} kr. er sat ind på sælgerens byt&leg-konto.`
+          : ` Kontant mellemlag på ${p.cash_adjustment} kr. er sat ind på modtagerens byt&leg-konto.`)
         : '';
       // Sig kun "pakkemærkater er klar" hvis der faktisk blev booket forsendelse(r).
       const deliveryLine = shipmentIds.length > 0
-        ? ' Pakkemærkater er klar.'
+        ? (isPurchase ? ' Pakkemærkat er klar.' : ' Pakkemærkater er klar.')
         : ' Aftal levering indbyrdes.';
+      const doneMsg = isPurchase
+        ? `🎉 Køb gennemført! Køberen har betalt —${deliveryLine}${cashLine}`
+        : `🎉 Byttehandel gennemført! Begge parter har betalt —${deliveryLine}${cashLine}`;
       await supa.from('conversations').update({
-        deal_completed: true, deal_completed_at: now, deal_type: 'byt',
+        deal_completed: true, deal_completed_at: now, deal_type: isPurchase ? 'køb' : 'byt',
         delivery_status: 'in_progress',
-        last_message: '🎉 Byttehandel gennemført! Begge parter har betalt.',
+        last_message: isPurchase ? '🎉 Køb gennemført!' : '🎉 Byttehandel gennemført! Begge parter har betalt.',
         last_message_at: now,
         owner_unread: (conv?.owner_unread || 0) + 1,
         initiator_unread: (conv?.initiator_unread || 0) + 1,
@@ -748,7 +780,7 @@ export async function handleSwapProposalPayment(pi, supa) {
         conversation_id: convId,
         sender_id: claimed.buyer_id,
         sender_name: 'System',
-        content: `🎉 Byttehandel gennemført! Begge parter har betalt —${deliveryLine}${cashLine}`,
+        content: doneMsg,
         message_type: 'swap_completed',
       });
     }

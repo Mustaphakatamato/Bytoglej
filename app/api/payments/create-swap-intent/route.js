@@ -4,7 +4,7 @@ import { requireAuth, UNAUTHORIZED } from '@/lib/api-auth';
 import { createServerClient } from '@/lib/supabase-server';
 import { getShippingPrice } from '@/lib/shipping-rates';
 import { getPriceQuote } from '@/lib/shipmondo/client';
-import { SWAP_PROTECTION_FEE } from '@/lib/pricing';
+import { SWAP_PROTECTION_FEE, isCashPurchaseProposal } from '@/lib/pricing';
 import { resolveCallerInstitution } from '@/lib/institution-server';
 
 function getStripe() {
@@ -232,6 +232,13 @@ async function handleProposalIntent(user, supa, body) {
   if (party === 'initiator' && proposal.initiator_paid) return NextResponse.json({ error: 'Du har allerede betalt' }, { status: 409 });
   if (party === 'owner' && proposal.owner_paid) return NextResponse.json({ error: 'Du har allerede betalt' }, { status: 409 });
 
+  // Rent kontant-tilbud = køb: kun køberen (initiator) betaler. Sælgeren modtager
+  // betalingen på sin byt&leg-konto ved levering og skal ikke betale noget.
+  const isPurchase = isCashPurchaseProposal(proposal);
+  if (isPurchase && party === 'owner') {
+    return NextResponse.json({ error: 'Som sælger betaler du ikke — du modtager betalingen på din byt&leg-konto ved levering.' }, { status: 403 });
+  }
+
   // Hver part betaler porto for den pakke de MODTAGER (modpartens udgående bundt).
   const incoming = party === 'initiator' ? (proposal.requested_items || []) : (proposal.offered_items || []);
   const senderInstId = party === 'initiator' ? proposal.owner_institution_id : proposal.initiator_institution_id;
@@ -308,11 +315,14 @@ async function handleProposalIntent(user, supa, body) {
   }
 
   const breakdown = [{
-    sellerName: deliveryMethod === 'shipping' ? 'Byttehandel — levering af varer til dig' : 'Byttehandel — aftalt levering',
+    sellerName: isPurchase
+      ? (deliveryMethod === 'shipping' ? 'Køb — levering af varer til dig' : 'Køb — aftalt levering')
+      : (deliveryMethod === 'shipping' ? 'Byttehandel — levering af varer til dig' : 'Byttehandel — aftalt levering'),
     items: incoming.map(i => ({ title: i.title, price: 0, emoji: i.emoji })),
     shippingTotal: porto,
     serviceFee: protection,
-    ...(cash > 0 ? { cashAdjustment: cash } : {}),
+    // Ved køb er "cash" varebetalingen; ved bytte et kontant mellemlag.
+    ...(cash > 0 ? { cashAdjustment: cash, cashIsItemPayment: isPurchase } : {}),
     groupTotal: grandTotal,
   }];
 

@@ -151,7 +151,7 @@ export default function BetalingPage() {
               </div>
               {g.cashAdjustment > 0 && (
                 <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 4 }}>
-                  <span style={{ fontFamily: FONT, fontSize: 12, color: INK3 }}>Kontant mellemlag</span>
+                  <span style={{ fontFamily: FONT, fontSize: 12, color: INK3 }}>{g.cashIsItemPayment ? 'Betaling for varen' : 'Kontant mellemlag'}</span>
                   <span style={{ fontFamily: FONT, fontSize: 12, color: INK3 }}>{g.cashAdjustment.toFixed(2)} kr.</span>
                 </div>
               )}

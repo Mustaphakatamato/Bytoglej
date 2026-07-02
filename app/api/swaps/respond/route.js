@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { requireAuth, UNAUTHORIZED } from '@/lib/api-auth';
 import { createServerClient } from '@/lib/supabase-server';
 import { userBelongsToInstitution } from '@/lib/institution-server';
+import { isCashPurchaseProposal } from '@/lib/pricing';
 
 // Begge parter skal betale inden for dette vindue efter accept (beslutning 2.6).
 const PAYMENT_DEADLINE_HOURS = 48;
@@ -76,10 +77,12 @@ export async function POST(req) {
   }
 
   // ---- ACCEPT ----
+  // Rent kontant-tilbud = køb → kun køberen (initiator) betaler.
+  const isPurchase = isCashPurchaseProposal(proposal);
   const deadline = new Date(Date.now() + PAYMENT_DEADLINE_HOURS * 3600 * 1000).toISOString();
   await supa.from('swap_proposals').update({
     status: 'accepted',
-    escrow_status: 'awaiting_both',
+    escrow_status: isPurchase ? 'awaiting_initiator' : 'awaiting_both',
     accepted_at: now,
     payment_deadline: deadline,
   }).eq('id', proposal.id);
@@ -94,8 +97,12 @@ export async function POST(req) {
     await supa.from('listings').update({ reserved_until: deadline }).in('id', involvedIds);
   }
 
-  await insertMessage('🔄 Bytteforslag godkendt — begge parter betaler forsendelse + beskyttelse inden 48 timer.');
-  await bumpInitiator('🔄 Bytteforslag godkendt — betal inden 48 timer', {
+  await insertMessage(isPurchase
+    ? '💰 Købstilbud godkendt — køberen betaler porto + købsbeskyttelse inden 48 timer.'
+    : '🔄 Bytteforslag godkendt — begge parter betaler forsendelse + beskyttelse inden 48 timer.');
+  await bumpInitiator(isPurchase
+    ? '💰 Købstilbud godkendt — betal inden 48 timer'
+    : '🔄 Bytteforslag godkendt — betal inden 48 timer', {
     is_handled: true, handled_at: now, handled_action: 'accepted',
   });
 
