@@ -696,10 +696,41 @@ export async function handleSwapProposalPayment(pi, supa) {
       });
     }
 
+    // Kontant mellemlag → sæt ind på modtagerens byt&leg-konto (idempotent).
+    // Betaleren (cash_payer) har betalt beløbet ved checkout; den ANDEN part
+    // modtager det. cash_settled-claim sikrer kun én kreditering selv ved retry.
+    if (Number(p.cash_adjustment) > 0 && p.cash_payer) {
+      const { data: cashClaim } = await supa.from('swap_proposals')
+        .update({ cash_settled: true })
+        .eq('id', proposalId).eq('cash_settled', false)
+        .select('id').maybeSingle();
+      if (cashClaim) {
+        const receiverInstId = p.cash_payer === 'initiator' ? p.owner_institution_id : p.initiator_institution_id;
+        if (receiverInstId) {
+          const { error: cashErr } = await supa.rpc('wallet_credit', {
+            _inst: receiverInstId, _amount: Number(p.cash_adjustment), _type: 'sale_credit',
+            _ref_type: 'swap', _ref_id: proposalId, _note: 'Kontant mellemlag fra byttehandel',
+          });
+          if (cashErr) console.error('[stripe-webhook] cash-mellemlag credit fejl:', cashErr.message);
+          else {
+            try {
+              await notify(supa, {
+                institutionId: receiverInstId,
+                type: 'swap_cash_credit',
+                title: '💰 Kontant mellemlag modtaget',
+                body: `${Number(p.cash_adjustment).toFixed(2).replace('.', ',')} kr. fra byttehandlen er sat ind på jeres byt&leg-konto.`,
+                data: { proposal_id: proposalId, conversation_id: convId || null },
+                url: '/min-konto',
+              });
+            } catch (e) { console.error('[stripe-webhook] cash-notify fejl:', e?.message); }
+          }
+        }
+      }
+    }
+
     if (convId) {
-      // Kontant mellemlag: byt&leg holder beløbet og udbetaler manuelt til modtageren.
       const cashLine = (Number(p.cash_adjustment) > 0)
-        ? ` Kontant mellemlag på ${p.cash_adjustment} kr. udbetales til modparten.`
+        ? ` Kontant mellemlag på ${p.cash_adjustment} kr. er sat ind på modtagerens byt&leg-konto.`
         : '';
       // Sig kun "pakkemærkater er klar" hvis der faktisk blev booket forsendelse(r).
       const deliveryLine = shipmentIds.length > 0
