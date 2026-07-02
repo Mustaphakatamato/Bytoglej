@@ -10,6 +10,7 @@ import { TradeProtectionPopup } from '@/components/ListingCard';
 import { authedFetch } from '@/lib/authed-fetch';
 import PullToRefresh from '@/components/PullToRefresh';
 import { calculateCO2Savings } from '@/lib/co2/calculator';
+import { isCashPurchaseProposal } from '@/lib/pricing';
 const INK2 = '#3A473D';
 
 // Komprimer billede client-side før upload. Forhindrer "object exceeded the
@@ -1086,7 +1087,7 @@ export default function MessagesClient() {
         [proposal.id]: {
           ...(prev[proposal.id] || proposal),
           status: action === 'accept' ? 'accepted' : 'rejected',
-          escrow_status: action === 'accept' ? 'awaiting_both' : 'none',
+          escrow_status: action === 'accept' ? (isCashPurchaseProposal(proposal) ? 'awaiting_initiator' : 'awaiting_both') : 'none',
           payment_deadline: data.paymentDeadline || prev[proposal.id]?.payment_deadline || null,
         },
       }));
@@ -2035,9 +2036,12 @@ export default function MessagesClient() {
                               const p = (proposalMsgData && proposalsById[proposalMsgData.proposal_id]) || null;
                               const krp = n => `${Number(n || 0).toFixed(2).replace('.', ',')} kr.`;
                               if (!p) return <div style={{ margin:'12px 0', fontFamily:FONT, fontSize:13, color:INK3 }}>🔄 Bytteforslag…</div>;
+                              const isPurchase = isCashPurchaseProposal(p);
                               const party = isOwnerInConv ? 'owner' : 'initiator';
                               const myPaid = party === 'owner' ? p.owner_paid : p.initiator_paid;
                               const otherPaid = party === 'owner' ? p.initiator_paid : p.owner_paid;
+                              // Ved køb betaler kun køberen (initiator); sælger betaler intet.
+                              const iMustPay = isPurchase ? party === 'initiator' : true;
                               const iAmCashPayer = Number(p.cash_adjustment) > 0 && p.cash_payer === party;
                               const otherIsCashPayer = Number(p.cash_adjustment) > 0 && p.cash_payer && p.cash_payer !== party;
                               const canRespond = p.status === 'pending' && isOwnerInConv;
@@ -2087,7 +2091,7 @@ export default function MessagesClient() {
                                 <div style={{ margin:'12px 0' }}>
                                   <div style={{ background: completed ? GREEN_TINT : cancelled ? '#FEF2F2' : '#fff', border:`2px solid ${completed ? PRIMARY : cancelled ? '#FCA5A5' : 'rgba(22,34,28,0.14)'}`, borderRadius:16, padding:'14px 16px' }}>
                                     <div style={{ fontFamily:FONT, fontWeight:800, fontSize:14, color:INK, marginBottom:10, display:'flex', alignItems:'center', gap:8, flexWrap:'wrap' }}>
-                                      🔄 Bytteforslag
+                                      {isPurchase ? '💰 Købstilbud' : '🔄 Bytteforslag'}
                                       {badge && <span style={{ fontSize:11, fontWeight:700, color:badge[1], background:badge[2], padding:'2px 8px', borderRadius:99 }}>{badge[0]}</span>}
                                     </div>
                                     {section('Du giver', iGive, iAmCashPayer, giveTotal)}
@@ -2095,7 +2099,7 @@ export default function MessagesClient() {
 
                                     {canRespond && (
                                       <div style={{ display:'flex', gap:8, marginTop:12 }}>
-                                        <button onClick={()=>handleSwapProposalRespond(p,'accept')} style={{ padding:'9px 16px', borderRadius:99, background:PRIMARY, border:'none', color:'#fff', fontSize:13, fontWeight:700, cursor:'pointer', fontFamily:FONT }}>Godkend bytte</button>
+                                        <button onClick={()=>handleSwapProposalRespond(p,'accept')} style={{ padding:'9px 16px', borderRadius:99, background:PRIMARY, border:'none', color:'#fff', fontSize:13, fontWeight:700, cursor:'pointer', fontFamily:FONT }}>{isPurchase ? 'Godkend køb' : 'Godkend bytte'}</button>
                                         <button onClick={()=>handleSwapProposalRespond(p,'reject')} style={{ padding:'9px 16px', borderRadius:99, background:'#FEF2F2', border:'1.5px solid #FCA5A5', color:'#e11d48', fontSize:13, fontWeight:700, cursor:'pointer', fontFamily:FONT }}>Afvis</button>
                                       </div>
                                     )}
@@ -2105,14 +2109,20 @@ export default function MessagesClient() {
 
                                     {inEscrow && (
                                       <div style={{ marginTop:12, borderTop:'1px solid rgba(22,34,28,0.1)', paddingTop:12 }}>
-                                        <div style={{ fontFamily:FONT, fontSize:12, color:INK2, marginBottom:8 }}>
-                                          Din andel: porto + {krp(p.protection_fee)} beskyttelse{iAmCashPayer ? ` + ${krp(p.cash_adjustment)} kontant` : ''}
-                                        </div>
-                                        {myPaid ? (
-                                          <div style={{ fontFamily:FONT, fontSize:13, fontWeight:700, color:PRIMARY }}>✓ Du har betalt{otherPaid ? '' : ', afventer modpart'}</div>
+                                        {iMustPay ? (
+                                          <div style={{ fontFamily:FONT, fontSize:12, color:INK2, marginBottom:8 }}>
+                                            Din andel: porto + {krp(p.protection_fee)} {isPurchase ? 'købsbeskyttelse' : 'beskyttelse'}{isPurchase ? ` + ${krp(p.cash_adjustment)} for varen` : (iAmCashPayer ? ` + ${krp(p.cash_adjustment)} kontant` : '')}
+                                          </div>
                                         ) : (
+                                          <div style={{ fontFamily:FONT, fontSize:12, color:INK2, marginBottom:8 }}>
+                                            Køberen betaler porto + købsbeskyttelse. Du modtager {krp(p.cash_adjustment)} for varen på din byt&leg-konto ved levering.
+                                          </div>
+                                        )}
+                                        {myPaid ? (
+                                          <div style={{ fontFamily:FONT, fontSize:13, fontWeight:700, color:PRIMARY }}>✓ Du har betalt{isPurchase || otherPaid ? '' : ', afventer modpart'}</div>
+                                        ) : iMustPay ? (
                                           <>
-                                            {otherPaid && (
+                                            {!isPurchase && otherPaid && (
                                               <div style={{ fontFamily:FONT, fontSize:13, fontWeight:700, color:PRIMARY, marginBottom:8 }}>✓ Modparten har betalt. Nu er det din tur.</div>
                                             )}
                                             <div style={{ display:'flex', gap:8, flexWrap:'wrap' }}>
@@ -2123,6 +2133,8 @@ export default function MessagesClient() {
                                               <div style={{ fontFamily:FONT, fontSize:11, color:INK3, marginTop:6 }}>Betal inden {new Date(p.payment_deadline).toLocaleString('da-DK', { day:'numeric', month:'short', hour:'2-digit', minute:'2-digit' })}</div>
                                             )}
                                           </>
+                                        ) : (
+                                          <div style={{ fontFamily:FONT, fontSize:13, fontWeight:700, color:INK3 }}>Afventer købers betaling…</div>
                                         )}
                                       </div>
                                     )}

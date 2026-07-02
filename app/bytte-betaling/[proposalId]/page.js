@@ -5,6 +5,7 @@ import { useApp, useActiveUser } from '@/providers/AppProvider';
 import { db } from '@/lib/supabase';
 import { authedFetch } from '@/lib/authed-fetch';
 import PickupPointPicker from '@/components/PickupPointPicker';
+import { isCashPurchaseProposal } from '@/lib/pricing';
 import { PRIMARY, GREEN_TINT, PAPER, PAPER2, PAPER3, INK, INK2, INK3, FONT } from '@/lib/constants';
 
 const kr = n => `${Number(n || 0).toFixed(2).replace('.', ',')} kr.`;
@@ -42,6 +43,9 @@ export default function SwapPaymentPage() {
     return party === 'initiator' ? (proposal.requested_items || []) : (proposal.offered_items || []);
   }, [proposal, party]);
 
+  // Rent kontant-tilbud = køb: kun køberen (initiator) betaler; sælger betaler intet.
+  const isPurchase = proposal ? isCashPurchaseProposal(proposal) : false;
+  const sellerBlocked = isPurchase && party === 'owner';
   const alreadyPaid = proposal && party && (party === 'owner' ? proposal.owner_paid : proposal.initiator_paid);
   const cash = proposal && party && proposal.cash_payer === party ? (Number(proposal.cash_adjustment) || 0) : 0;
   const protection = Number(proposal?.protection_fee) || 10;
@@ -124,7 +128,8 @@ export default function SwapPaymentPage() {
 
   if (loading) return <div style={{ maxWidth: 720, margin: '0 auto', paddingTop: 100, paddingLeft: 24, paddingRight: 24, fontFamily: FONT, color: INK3 }}>Henter byttehandel…</div>;
   if (!proposal || !party) return <div style={{ maxWidth: 720, margin: '0 auto', paddingTop: 100, paddingLeft: 24, paddingRight: 24, fontFamily: FONT, color: INK }}>Byttehandlen blev ikke fundet, eller du er ikke en del af den. <button onClick={() => router.push('/beskeder')} style={linkBtn}>← Til beskeder</button></div>;
-  if (alreadyPaid) return <div style={{ maxWidth: 720, margin: '0 auto', paddingTop: 100, paddingLeft: 24, paddingRight: 24, fontFamily: FONT, color: INK }}>✓ Du har allerede betalt din del af denne byttehandel. <button onClick={() => router.push('/beskeder')} style={linkBtn}>← Til beskeder</button></div>;
+  if (sellerBlocked) return <div style={{ maxWidth: 720, margin: '0 auto', paddingTop: 100, paddingLeft: 24, paddingRight: 24, fontFamily: FONT, color: INK }}>Som sælger betaler du ikke — du modtager betalingen på din byt&leg-konto ved levering. <button onClick={() => router.push('/beskeder')} style={linkBtn}>← Til beskeder</button></div>;
+  if (alreadyPaid) return <div style={{ maxWidth: 720, margin: '0 auto', paddingTop: 100, paddingLeft: 24, paddingRight: 24, fontFamily: FONT, color: INK }}>✓ Du har allerede betalt {isPurchase ? 'for dit køb' : 'din del af denne byttehandel'}. <button onClick={() => router.push('/beskeder')} style={linkBtn}>← Til beskeder</button></div>;
 
   const methodCard = (m, label, sub, price, onClick) => {
     const active = method === m;
@@ -142,7 +147,7 @@ export default function SwapPaymentPage() {
   return (
     <div style={{ maxWidth: 720, margin: '0 auto', paddingTop: 100, paddingLeft: 16, paddingRight: 16, paddingBottom: 60, fontFamily: FONT }}>
       <button onClick={() => router.push('/beskeder')} style={linkBtn}>← Tilbage til beskeder</button>
-      <h1 style={{ fontFamily: FONT, fontWeight: 800, fontSize: 24, color: INK, margin: '8px 0 4px' }}>Betal din del af byttet</h1>
+      <h1 style={{ fontFamily: FONT, fontWeight: 800, fontSize: 24, color: INK, margin: '8px 0 4px' }}>{isPurchase ? 'Betal for dit køb' : 'Betal din del af byttet'}</h1>
       <p style={{ fontFamily: FONT, fontSize: 14, color: INK3, marginTop: 0 }}>Du modtager varer fra {counterparty?.name || 'modparten'}. Vælg hvor du vil afhente pakken.</p>
 
       {/* Varer du modtager — udleveringsstedet gælder DENNE pakke */}
@@ -172,8 +177,8 @@ export default function SwapPaymentPage() {
       <div style={{ background: '#fff', border: `1px solid ${PAPER2}`, borderRadius: 16, padding: 16, marginBottom: 16 }}>
         <div style={{ fontFamily: FONT, fontWeight: 800, fontSize: 13, color: INK2, marginBottom: 10 }}>Din andel</div>
         <Row label="Levering" value={method === 'custom' ? 'Gratis' : (pickupPoint ? kr(porto) : 'Vælg metode')} />
-        <Row label="Bytogleg beskyttelse" value={kr(protection)} />
-        {cash > 0 && <Row label="Kontant mellemlag" value={kr(cash)} />}
+        <Row label={isPurchase ? 'Købsbeskyttelse' : 'Bytogleg beskyttelse'} value={kr(protection)} />
+        {cash > 0 && <Row label={isPurchase ? 'Betaling for varen' : 'Kontant mellemlag'} value={kr(cash)} />}
         <div style={{ borderTop: `1px solid ${PAPER2}`, marginTop: 10, paddingTop: 10, display: 'flex', justifyContent: 'space-between' }}>
           <span style={{ fontFamily: FONT, fontWeight: 800, fontSize: 15, color: INK }}>I alt</span>
           <span style={{ fontFamily: FONT, fontWeight: 800, fontSize: 18, color: PRIMARY }}>{kr(total)}</span>

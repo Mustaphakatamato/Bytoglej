@@ -5,6 +5,7 @@ import { db } from '@/lib/supabase';
 import { PRIMARY, GREEN_TINT, PAPER, PAPER2, PAPER3, INK, INK3, CORAL, FONT } from '@/lib/constants';
 import { useApp, useActiveUser } from '@/providers/AppProvider';
 import { useWindowWidth } from '@/lib/hooks';
+import { isCashPurchaseProposal } from '@/lib/pricing';
 
 const PANEL_W = 340;
 const SUPPORT_CONV_KEY = 'bl_support_conv_id';
@@ -659,7 +660,7 @@ function ConvsPanel({ userId, institutionId, institution, isAdminView, adminInst
       return (
         <div style={{ minWidth: 180 }}>
           <div style={{ fontSize: 12, fontWeight: 800, color: INK, marginBottom: 8, display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap', fontFamily: FONT }}>
-            Bytteforslag
+            {isCashPurchaseProposal(p) ? 'Købstilbud' : 'Bytteforslag'}
             {badge && <span style={{ fontSize: 9, fontWeight: 700, color: badge[1], background: badge[2], padding: '1px 6px', borderRadius: 99 }}>{badge[0]}</span>}
           </div>
           {section('Du giver', iGive, iAmCash, sum(iGive) + (iAmCash ? cash : 0))}

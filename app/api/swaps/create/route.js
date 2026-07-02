@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 import { requireAuth, UNAUTHORIZED } from '@/lib/api-auth';
 import { createServerClient } from '@/lib/supabase-server';
 import { resolveCallerInstitution, resolveInstitutionByName } from '@/lib/institution-server';
-import { SWAP_PROTECTION_FEE } from '@/lib/pricing';
+import { SWAP_PROTECTION_FEE, calcServiceFee } from '@/lib/pricing';
 import { notify } from '@/lib/notify';
 
 // Køb-opslag bærer værdien i price; byt-opslag i estimated_value.
@@ -33,8 +33,14 @@ export async function POST(req) {
   const offeredIds = Array.isArray(body.offeredListingIds) ? body.offeredListingIds.filter(Boolean) : [];
   const requestedIds = Array.isArray(body.requestedListingIds) ? body.requestedListingIds.filter(Boolean) : [];
   const cashAdjustment = Math.round(Number(body.cashAdjustment || 0) * 100) / 100;
-  const cashPayer = body.cashPayer === 'initiator' || body.cashPayer === 'owner' ? body.cashPayer : null;
   const note = typeof body.note === 'string' ? body.note.slice(0, 500) : null;
+
+  // Rent kontant-tilbud (ingen tilbudte varer) = KØB: anmoderen er køber og
+  // betaler altid — cash_payer tvinges til 'initiator'.
+  const isPurchase = offeredIds.length === 0 && cashAdjustment > 0;
+  const cashPayer = isPurchase
+    ? 'initiator'
+    : (body.cashPayer === 'initiator' || body.cashPayer === 'owner' ? body.cashPayer : null);
 
   if (!requestedIds.length) {
     return NextResponse.json({ error: 'Vælg mindst én vare du vil bytte til dig' }, { status: 400 });
@@ -142,7 +148,9 @@ export async function POST(req) {
     requested_value: requestedValue,
     cash_adjustment: cashAdjustment,
     cash_payer: cashPayer,
-    protection_fee: SWAP_PROTECTION_FEE,
+    // Ved køb er beskyttelsen standard købsbeskyttelse (5% + 5 kr) af beløbet;
+    // ved bytte den faste byttebeskyttelse pr. part.
+    protection_fee: isPurchase ? calcServiceFee(cashAdjustment) : SWAP_PROTECTION_FEE,
     status: 'pending',
     escrow_status: 'none',
   }).select().single();
@@ -153,7 +161,9 @@ export async function POST(req) {
   }
 
   // Tråd-boble i beskeder (swap_proposals er sandhedskilden; beskeden er kun visning).
-  const preview = `🔄 Bytteforslag: ${offered.length} vare(r)${cashAdjustment > 0 ? ` + ${cashAdjustment} kr.` : ''} for ${requested.length} vare(r)`;
+  const preview = isPurchase
+    ? `💰 Købstilbud: ${cashAdjustment} kr. for ${requested.length} vare(r)`
+    : `🔄 Bytteforslag: ${offered.length} vare(r)${cashAdjustment > 0 ? ` + ${cashAdjustment} kr.` : ''} for ${requested.length} vare(r)`;
   if (convId) {
     await supa.from('chat_messages').insert({
       conversation_id: convId,
@@ -179,8 +189,10 @@ export async function POST(req) {
         institutionId: ownerInst?.id || null,
         institutionName: ownerInst?.name || ownerName || null,
         type: 'swap_proposal_received',
-        title: 'Nyt bytteforslag 🔄',
-        body: `${initiatorInst?.name || 'En institution'} har sendt dig et bytteforslag${cashAdjustment > 0 ? ` (+ ${cashAdjustment} kr. kontant)` : ''}.`,
+        title: isPurchase ? 'Nyt købstilbud 💰' : 'Nyt bytteforslag 🔄',
+        body: isPurchase
+          ? `${initiatorInst?.name || 'En institution'} vil købe ${requested.length} vare(r) for ${cashAdjustment} kr.`
+          : `${initiatorInst?.name || 'En institution'} har sendt dig et bytteforslag${cashAdjustment > 0 ? ` (+ ${cashAdjustment} kr. kontant)` : ''}.`,
         data: { proposal_id: proposal.id, conversation_id: convId },
         url: '/beskeder',
       });
