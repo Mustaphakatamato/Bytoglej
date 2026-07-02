@@ -2335,9 +2335,16 @@ export default function MessagesClient() {
                                     </a>
                                   )}
                                   {!paymentData.tracking?.label_pdf_url && isOwnerInConv && paymentData.shippingMethod && paymentData.shippingMethod !== 'pickup' && paymentData.shippingMethod !== 'custom' && (
-                                    <div style={{ marginTop:10, background:'rgba(42,125,79,0.07)', borderRadius:10, padding:'10px 12px', fontFamily:FONT, fontSize:12, color:INK2 }}>
-                                      Pakkemærkaten er sendt til din e-mail. Tjek din indbakke.
-                                    </div>
+                                    <a href={`/mine-opgaver`}
+                                      style={{ display:'flex', alignItems:'center', justifyContent:'center', gap:6, marginTop:12, padding:'10px 14px', borderRadius:99, background:PRIMARY, color:'#fff', fontFamily:FONT, fontWeight:700, fontSize:13, textDecoration:'none' }}>
+                                      🖨️ Hent pakkemærkat under Skal sendes →
+                                    </a>
+                                  )}
+                                  {paymentData.tracking?.tracking_url && !isOwnerInConv && (
+                                    <a href={paymentData.tracking.tracking_url} target="_blank" rel="noreferrer"
+                                      style={{ display:'flex', alignItems:'center', justifyContent:'center', gap:6, marginTop:12, padding:'10px 14px', borderRadius:99, background:PRIMARY, color:'#fff', fontFamily:FONT, fontWeight:700, fontSize:13, textDecoration:'none' }}>
+                                      📦 Spor pakken
+                                    </a>
                                   )}
                                 </div>
                               </div>

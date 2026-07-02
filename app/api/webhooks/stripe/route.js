@@ -162,12 +162,17 @@ export async function finalizePurchase(pi, supa) {
 
   for (const g of groups) {
     let shipmentResult = null;
+    let groupLabelError = null;
+    let carrierCode = null;
+    let serviceType = null;
+    let sizeCategory = null;
+    const isShippingGroup = !!(g.shippingMethod && (g.shippingMethod.startsWith('parcel_shop_') || g.shippingMethod.startsWith('home_')));
 
     // Create Shipmondo label if shipping (not pickup/custom)
-    if (g.shippingMethod && (g.shippingMethod.startsWith('parcel_shop_') || g.shippingMethod.startsWith('home_'))) {
-      const carrierCode = g.shippingMethod.replace('parcel_shop_', '').replace('home_', '');
-      const serviceType = g.shippingMethod.startsWith('parcel_shop_') ? 'parcel_shop' : 'home_delivery';
-      const sizeCategory = g.items?.[0]?.sizeCategory || 'medium';
+    if (isShippingGroup) {
+      carrierCode = g.shippingMethod.replace('parcel_shop_', '').replace('home_', '');
+      serviceType = g.shippingMethod.startsWith('parcel_shop_') ? 'parcel_shop' : 'home_delivery';
+      sizeCategory = g.items?.[0]?.sizeCategory || 'medium';
 
       try {
         shipmentResult = await createShipment({
@@ -199,6 +204,7 @@ export async function finalizePurchase(pi, supa) {
       } catch (err) {
         console.error('[stripe-webhook] Shipmondo fejl:', err.message);
         shipmentError = err.message;
+        groupLabelError = err.message;
       }
     }
 
@@ -295,6 +301,37 @@ export async function finalizePurchase(pi, supa) {
       });
     }
 
+    // Registrér forsendelsen i shipments-tabellen, så Shipmondo-webhooken
+    // (der slår op via shipmondo_shipment_id) kan opdatere ordre-status
+    // ved in_transit/delivered. Fragten er forudbetalt af køberen ved
+    // checkout, så sælger må ikke faktureres igen af månedscron'en.
+    if (shipmentResult && convId) {
+      const carrierEnum = { pdk: 'postnord', gls: 'gls', dao: 'dao' }[carrierCode] || null;
+      const { error: shipRowErr } = await supa.from('shipments').insert({
+        order_id:              order.id,
+        conversation_id:       convId,
+        seller_institution_id: g.sellerInstitutionId || null,
+        buyer_institution_id:  order.buyer_institution_id || null,
+        shipmondo_shipment_id: shipmentResult.shipmondo_shipment_id,
+        carrier:               carrierEnum,
+        service_type:          serviceType,
+        size_category:         sizeCategory,
+        cost_dkk:              shipmentResult.price_dkk,
+        markup_dkk:            0,
+        total_charged_to_seller_dkk: 0,
+        prepaid:               true,
+        tracking_number:       shipmentResult.tracking_number,
+        tracking_url:          shipmentResult.tracking_url,
+        label_pdf_url:         shipmentResult.label_pdf_url,
+        pickup_point_id:       g.pickupPoint?.id || null,
+        pickup_point_name:     g.pickupPoint?.name || null,
+        pickup_point_address:  g.pickupPoint?.address || null,
+        status:                'booked',
+        booked_at:             new Date().toISOString(),
+      });
+      if (shipRowErr) console.error('[stripe-webhook] shipments-række fejl:', shipRowErr.message);
+    }
+
     // Send bekræftelses-email til sælger via Resend
     if (g.sellerEmail) {
       try {
@@ -328,16 +365,41 @@ export async function finalizePurchase(pi, supa) {
       }
     }
 
-    updatedGroups.push(shipmentResult ? {
+    // In-app notifikation til sælger (bekræftelses-e-mailen er sendt ovenfor).
+    try {
+      const titles = (g.items || []).map(i => i.title).join(', ');
+      await notify(supa, {
+        institutionId: g.sellerInstitutionId,
+        institutionName: g.sellerName,
+        sendEmail: false,
+        type: 'order_paid',
+        title: '🎉 Du har solgt!',
+        body: isShippingGroup
+          ? `${titles} er betalt. Hent pakkemærkaten under "Skal sendes" og send varen.`
+          : `${titles} er betalt. Aftal overdragelse med køberen i beskeder.`,
+        data: { order_id: order.id, conversation_id: convId || null },
+        url: '/mine-opgaver',
+      });
+    } catch (e) { console.error('[stripe-webhook] sælger-notify fejl:', e?.message); }
+
+    updatedGroups.push({
       ...g,
-      shipmondo_shipment_id: shipmentResult.shipmondo_shipment_id,
-      tracking_number:       shipmentResult.tracking_number,
-      tracking_url:          shipmentResult.tracking_url,
-      label_pdf_url:         shipmentResult.label_pdf_url,
-    } : g);
+      ...(convId ? { conversationId: convId } : {}),
+      ...(shipmentResult ? {
+        shipmondo_shipment_id: shipmentResult.shipmondo_shipment_id,
+        tracking_number:       shipmentResult.tracking_number,
+        tracking_url:          shipmentResult.tracking_url,
+        label_pdf_url:         shipmentResult.label_pdf_url,
+        label_error:           null,
+      } : isShippingGroup ? {
+        label_error: groupLabelError || 'Pakkemærkat kunne ikke oprettes',
+      } : {}),
+    });
   }
 
-  // Gem tracking-info per gruppe (og på ordren for bagudkompatibilitet)
+  // Gem tracking-info per gruppe (og på ordren for bagudkompatibilitet).
+  // VIGTIGT: status forbliver 'paid' — 'shipped' sættes først når sælger
+  // markerer pakken afsendt (seller-mark-sent) eller Shipmondo melder in_transit.
   const firstShipped = updatedGroups.find(g => g.shipmondo_shipment_id);
   await supa.from('orders').update({
     order_groups: updatedGroups,
@@ -347,8 +409,6 @@ export async function finalizePurchase(pi, supa) {
       tracking_number:       firstShipped.tracking_number,
       tracking_url:          firstShipped.tracking_url,
       label_pdf_url:         firstShipped.label_pdf_url,
-      status:                'shipped',
-      shipped_at:            new Date().toISOString(),
     } : {}),
   }).eq('id', order.id);
 
@@ -774,10 +834,11 @@ function sellerOrderEmailHtml({ sellerName, items, itemTotal, shippingMethod, pi
       </div>`
       : `
       <div style="background:#E8F1EC;border:1px solid #CFE3D8;border-radius:14px;padding:18px 20px;margin:0 0 28px;">
-        <div style="font-weight:800;font-size:14px;color:#133F2B;margin-bottom:6px;">📦 Pakkemærkat er på vej</div>
-        <p style="font-size:13px;color:#3A473D;line-height:1.6;margin:0;">
-          Din pakkemærkat til ${escapeHtml(methodLabel)} sendes snarest til denne e-mail. Du kan pakke varen, mens du venter.
+        <div style="font-weight:800;font-size:14px;color:#133F2B;margin-bottom:6px;">📦 Hent din pakkemærkat på byt&amp;leg</div>
+        <p style="font-size:13px;color:#3A473D;line-height:1.6;margin:0 0 14px;">
+          Din pakkemærkat til ${escapeHtml(methodLabel)} kunne ikke oprettes automatisk. Gå til "Skal sendes" på byt&amp;leg og tryk "Generér pakkemærkat" — så er den klar med det samme.
         </p>
+        <a href="${base}/mine-opgaver" style="display:inline-block;background:#2A7D4F;color:#fff;text-decoration:none;font-weight:700;font-size:13px;padding:10px 22px;border-radius:99px;">Gå til Skal sendes →</a>
       </div>`)
     : `
       <div style="background:#E8F1EC;border:1px solid #CFE3D8;border-radius:14px;padding:18px 20px;margin:0 0 28px;">

@@ -156,11 +156,16 @@ function OrderCard({ order, onUpdate, autoOpen }) {
 
   async function handleConfirmReceived() {
     setConfirming(true);
-    const { error } = await db.from('orders')
-      .update({ status: 'delivered', delivered_at: new Date().toISOString() })
-      .eq('id', order.id);
+    try {
+      // Via API-route (service role) — købere har ikke UPDATE-adgang til orders via RLS.
+      const res = await fetch('/api/orders/confirm-received', {
+        method: 'POST', credentials: 'same-origin',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ orderId: order.id }),
+      });
+      if (res.ok) onUpdate(order.id, 'delivered');
+    } catch {}
     setConfirming(false);
-    if (!error) onUpdate(order.id, 'delivered');
   }
 
   return (
@@ -265,7 +270,10 @@ function OrderCard({ order, onUpdate, autoOpen }) {
               </button>
             )}
             <button
-              onClick={() => router.push('/beskeder')}
+              onClick={() => {
+                const convId = groups.find(g => g.conversationId)?.conversationId;
+                router.push(convId ? `/beskeder?conv=${convId}` : '/beskeder');
+              }}
               style={{
                 padding: '11px', borderRadius: 99, background: PAPER2, border: 'none',
                 fontFamily: FONT, fontWeight: 600, fontSize: 13, color: INK3, cursor: 'pointer',

@@ -28,7 +28,7 @@ export async function POST(req) {
   if (order.buyer_id !== user.id) return NextResponse.json({ error: 'Ingen adgang til denne ordre' }, { status: 403 });
 
   // Allerede finaliseret (af webhooken eller et tidligere kald) → intet at gøre.
-  if (order.status === 'paid' || order.status === 'shipped') {
+  if (['paid', 'shipped', 'delivered'].includes(order.status)) {
     return NextResponse.json({ ok: true, status: order.status });
   }
   if (!order.payment_intent_id) return NextResponse.json({ ok: false, status: order.status });

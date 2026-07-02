@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { createServerClient } from '@/lib/supabase-server';
 import { handleWebhook } from '@/lib/shipmondo/client';
+import { notify } from '@/lib/notify';
 
 export async function POST(req) {
   const supa = createServerClient();
@@ -26,7 +27,7 @@ export async function POST(req) {
 
     // Idempotency: look up shipment by shipmondo_shipment_id
     const { data: shipment } = await supa.from('shipments')
-      .select('id,status,conversation_id')
+      .select('id,status,conversation_id,order_id,buyer_institution_id')
       .eq('shipmondo_shipment_id', shipmondo_shipment_id)
       .maybeSingle();
 
@@ -58,6 +59,41 @@ export async function POST(req) {
     const shipmentUpdate = { status: mapped.status, updated_at: new Date().toISOString() };
     if (mapped.col) shipmentUpdate[mapped.col] = new Date().toISOString();
     await supa.from('shipments').update(shipmentUpdate).eq('id', shipment.id);
+
+    // Købs-ordrer: følg ordre-status med tracking-events.
+    // in_transit → 'shipped' (hvis sælger ikke allerede har markeret afsendt),
+    // delivered  → 'delivered' + notifikation til køber.
+    if (shipment.order_id) {
+      const nowIso = new Date().toISOString();
+      if (mapped.status === 'in_transit') {
+        await supa.from('orders')
+          .update({ status: 'shipped', shipped_at: nowIso })
+          .eq('id', shipment.order_id)
+          .eq('status', 'paid');
+      } else if (mapped.status === 'delivered') {
+        const { data: updatedOrder } = await supa.from('orders')
+          .update({ status: 'delivered', delivered_at: nowIso })
+          .eq('id', shipment.order_id)
+          .in('status', ['paid', 'shipped'])
+          .select('id, buyer_institution_id, buyer_name, order_groups')
+          .maybeSingle();
+        if (updatedOrder) {
+          try {
+            const titles = (updatedOrder.order_groups || [])
+              .flatMap(g => (g.items || []).map(i => i.title)).join(', ');
+            await notify(supa, {
+              institutionId: updatedOrder.buyer_institution_id,
+              institutionName: updatedOrder.buyer_name,
+              type: 'order_delivered',
+              title: '📦 Din pakke er leveret',
+              body: `${titles || 'Din ordre'} er leveret. God fornøjelse!`,
+              data: { order_id: updatedOrder.id },
+              url: `/mine-ordrer?order=${updatedOrder.id}`,
+            });
+          } catch (e) { console.error('shipmondo-webhook notify fejl:', e?.message); }
+        }
+      }
+    }
 
     // Update conversation delivery_status
     if (shipment.conversation_id) {
