@@ -395,10 +395,86 @@ function ChatTaskCard({ conv, onAction, actionLoading }) {
 }
 
 // ── Bytte: min udgående bundt (med pakkemærkat) ───────────────
+//
+// Samme model som købs-kortet: hent/gengenerér label, marker afsendt,
+// følg om modparten har bekræftet modtagelse.
 
-function SwapSendCard({ s, router }) {
-  const labelUrl = s.shipment?.label_pdf_url;
-  const ready = !!labelUrl;
+function SwapSendCard({ s, router, onPatch }) {
+  const { showToast } = useApp();
+  const [marking, setMarking] = useState(false);
+  const [booking, setBooking] = useState(false);
+
+  const labelUrl  = s.shipment?.label_pdf_url;
+  const tracking  = s.shipment?.tracking_number;
+  const trackingUrl = s.shipment?.tracking_url;
+  const isCustom  = s.recipientDelivery === 'custom';   // aftalt levering, ingen label
+  const paidBoth  = s.completed;                         // begge har betalt
+  const sent      = s.sent;
+  const received  = s.recipientReceived;
+  const needsLabel = paidBoth && !isCustom && !labelUrl;
+
+  async function handleMarkSent() {
+    setMarking(true);
+    try {
+      const res = await fetch('/api/swaps/mark-sent', {
+        method: 'POST', credentials: 'same-origin',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ proposalId: s.id }),
+      });
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(json.error || 'Noget gik galt');
+      onPatch(s.id, { sent: true });
+      showToast?.('Markeret som afsendt — modparten har fået besked!');
+    } catch (e) {
+      showToast?.(e.message || 'Kunne ikke markere som afsendt', 'error');
+    }
+    setMarking(false);
+  }
+
+  async function handleBookLabel() {
+    setBooking(true);
+    try {
+      const res = await fetch('/api/swaps/book-label', {
+        method: 'POST', credentials: 'same-origin',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ proposalId: s.id }),
+      });
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(json.error || 'Pakkemærkat kunne ikke oprettes');
+      onPatch(s.id, { shipment: { ...(s.shipment || {}), label_pdf_url: json.label_pdf_url, tracking_number: json.tracking_number, tracking_url: json.tracking_url } });
+      showToast?.('Pakkemærkaten er klar!');
+      if (json.label_pdf_url) window.open(json.label_pdf_url, '_blank', 'noopener');
+    } catch (e) {
+      showToast?.(e.message || 'Pakkemærkat kunne ikke oprettes', 'error');
+    }
+    setBooking(false);
+  }
+
+  const badge = !paidBoth
+    ? { text: 'AFVENTER BETALING', bg: '#FEF9C3', color: '#92400E' }
+    : received
+      ? { text: 'MODTAGET', bg: '#DCFCE7', color: '#166534' }
+      : sent
+        ? { text: 'AFSENDT', bg: '#DBEAFE', color: '#1D4ED8' }
+        : isCustom
+          ? { text: 'SKAL LEVERES', bg: '#FEF9C3', color: '#92400E' }
+          : labelUrl
+            ? { text: 'SKAL SENDES', bg: '#FEF9C3', color: '#92400E' }
+            : { text: 'LABEL MANGLER', bg: '#FEE2E2', color: '#B91C1C' };
+
+  const steps = isCustom
+    ? [
+        { done: paidBoth,          label: 'Begge har betalt' },
+        { done: sent,              label: 'Overdraget' },
+        { done: received,          label: 'Modtaget' },
+      ]
+    : [
+        { done: paidBoth,          label: 'Begge har betalt' },
+        { done: !!labelUrl,        label: 'Pakkemærkat klar' },
+        { done: sent,              label: 'Afsendt' },
+        { done: received,          label: 'Modtaget' },
+      ];
+
   return (
     <div style={{ background:'#fff', borderRadius:16, border:`1px solid ${PAPER3}`, marginBottom:10, padding:'14px 16px' }}>
       <div style={{ display:'flex', alignItems:'center', gap:10, marginBottom:10 }}>
@@ -407,8 +483,8 @@ function SwapSendCard({ s, router }) {
           <div style={{ fontFamily:FONT, fontWeight:700, fontSize:14, color:INK }}>🔄 Bytte · til {s.otherName}</div>
           <div style={{ fontFamily:FONT, fontSize:12, color:INK3, marginTop:1 }}>Du sender {s.items.length} vare(r)</div>
         </div>
-        <span style={{ background: ready ? '#DBEAFE' : '#FEF9C3', color: ready ? '#1D4ED8' : '#92400E', borderRadius:99, fontSize:10, fontWeight:800, padding:'3px 8px', flexShrink:0 }}>
-          {ready ? 'PAKKEMÆRKAT KLAR' : 'AFVENTER BETALING'}
+        <span style={{ background:badge.bg, color:badge.color, borderRadius:99, fontSize:10, fontWeight:800, padding:'3px 8px', flexShrink:0 }}>
+          {badge.text}
         </span>
       </div>
       {s.items.map((it, i) => (
@@ -417,13 +493,68 @@ function SwapSendCard({ s, router }) {
           <span style={{ fontFamily:FONT, fontSize:13, color:INK }}>{it.title}</span>
         </div>
       ))}
+
+      {/* Trin-oversigt */}
+      {paidBoth && (
+        <div style={{ marginTop:12, background:PAPER2, borderRadius:12, padding:'12px 14px' }}>
+          {steps.map((st, i) => (
+            <div key={i} style={{ display:'flex', alignItems:'center', gap:10, marginBottom: i < steps.length - 1 ? 8 : 0 }}>
+              <div style={{
+                width:20, height:20, borderRadius:'50%', flexShrink:0,
+                background: st.done ? PRIMARY : '#fff',
+                border: `2px solid ${st.done ? PRIMARY : PAPER3}`,
+                display:'flex', alignItems:'center', justifyContent:'center',
+                fontSize:11, color:'#fff', fontWeight:800,
+              }}>{st.done ? '✓' : ''}</div>
+              <span style={{ fontFamily:FONT, fontSize:12, fontWeight: st.done ? 700 : 500, color: st.done ? INK : INK3 }}>{st.label}</span>
+            </div>
+          ))}
+        </div>
+      )}
+
       <div style={{ marginTop:12, display:'flex', flexDirection:'column', gap:8 }}>
-        {ready ? (
-          <a href={labelUrl} target="_blank" rel="noopener noreferrer" style={{ display:'block', textAlign:'center', padding:'11px', borderRadius:99, background:PRIMARY, color:'#fff', fontFamily:FONT, fontWeight:700, fontSize:14, textDecoration:'none' }}>🖨️ Download pakkemærkat (PDF)</a>
-        ) : (
+        {!paidBoth && (
           <div style={{ background:'#FEF9C3', borderRadius:12, padding:'10px 14px', fontFamily:FONT, fontSize:13, color:'#92400E' }}>Pakkemærkaten oprettes når begge parter har betalt deres del.</div>
         )}
-        {s.shipment?.tracking_number && <div style={{ fontFamily:FONT, fontSize:12, color:INK3, textAlign:'center' }}>Tracking: {s.shipment.tracking_number}</div>}
+
+        {paidBoth && isCustom && (
+          <div style={{ background:'#E8F1EC', borderRadius:12, padding:'10px 14px', fontFamily:FONT, fontSize:13, color:'#133F2B' }}>
+            🤝 Aftalt levering: I leverer selv varen til {s.otherName}. Aftal tid og sted via beskeder.
+          </div>
+        )}
+
+        {paidBoth && !isCustom && labelUrl && (
+          <a href={labelUrl} target="_blank" rel="noopener noreferrer" style={{ display:'block', textAlign:'center', padding:'11px', borderRadius:99, background:PRIMARY, color:'#fff', fontFamily:FONT, fontWeight:700, fontSize:14, textDecoration:'none' }}>🖨️ Download pakkemærkat (PDF)</a>
+        )}
+
+        {needsLabel && (
+          <>
+            <div style={{ background:'#FEE2E2', borderRadius:12, padding:'10px 14px', fontFamily:FONT, fontSize:13, color:'#B91C1C' }}>
+              Pakkemærkaten er ikke klar endnu. Generér den her — det tager få sekunder.
+            </div>
+            <button disabled={booking} onClick={handleBookLabel} style={{ padding:'11px', borderRadius:99, border:'none', background: booking ? PAPER2 : PRIMARY, color: booking ? INK3 : '#fff', fontFamily:FONT, fontWeight:700, fontSize:14, cursor: booking ? 'default' : 'pointer' }}>
+              {booking ? 'Genererer…' : '🔄 Generér pakkemærkat'}
+            </button>
+          </>
+        )}
+
+        {tracking && <div style={{ fontFamily:FONT, fontSize:12, color:INK3, textAlign:'center' }}>Tracking: {tracking}</div>}
+        {trackingUrl && (sent || received) && (
+          <a href={trackingUrl} target="_blank" rel="noopener noreferrer" style={{ display:'block', textAlign:'center', padding:'11px', borderRadius:99, background:GREEN_TINT, color:PRIMARY, border:`1.5px solid ${PRIMARY}`, fontFamily:FONT, fontWeight:700, fontSize:13, textDecoration:'none' }}>📦 Spor pakken</a>
+        )}
+
+        {paidBoth && !sent && (isCustom || labelUrl) && (
+          <button disabled={marking} onClick={handleMarkSent} style={{ padding:'11px', borderRadius:99, border:`1.5px solid ${PRIMARY}`, background: marking ? PAPER2 : GREEN_TINT, color: marking ? INK3 : PRIMARY, fontFamily:FONT, fontWeight:700, fontSize:13, cursor: marking ? 'default' : 'pointer' }}>
+            {marking ? 'Gemmer…' : isCustom ? '🤝 Marker som overdraget' : '🚚 Marker som afsendt'}
+          </button>
+        )}
+        {sent && !received && (
+          <div style={{ textAlign:'center', fontFamily:FONT, fontSize:12, color:INK3 }}>Venter på at {s.otherName} bekræfter modtagelse.</div>
+        )}
+        {received && (
+          <div style={{ textAlign:'center', fontFamily:FONT, fontSize:13, fontWeight:700, color:PRIMARY }}>✓ {s.otherName} har modtaget din del</div>
+        )}
+
         <button onClick={() => router.push(s.conversation_id ? `/beskeder?conv=${s.conversation_id}` : '/beskeder')} style={{ padding:'11px', borderRadius:99, background:PAPER2, border:'none', fontFamily:FONT, fontWeight:600, fontSize:13, color:INK3, cursor:'pointer' }}>💬 Åbn byttehandel</button>
       </div>
     </div>
@@ -492,7 +623,7 @@ export default function MineOpgaverPage() {
     // 3. Bytte — du sender (din udgående bundt + din pakkemærkat)
     if (instId) {
       const { data: props } = await db.from('swap_proposals')
-        .select('id, conversation_id, escrow_status, initiator_institution_id, owner_institution_id, offered_items, requested_items, initiator_shipment_id, owner_shipment_id')
+        .select('id, conversation_id, escrow_status, initiator_institution_id, owner_institution_id, offered_items, requested_items, initiator_shipment_id, owner_shipment_id, initiator_sent, owner_sent, initiator_delivery, owner_delivery, initiator_received, owner_received')
         .or(`initiator_institution_id.eq.${instId},owner_institution_id.eq.${instId}`)
         .eq('status', 'accepted')
         .order('created_at', { ascending: false });
@@ -514,6 +645,11 @@ export default function MineOpgaverPage() {
             otherName: nameById[meInit ? p.owner_institution_id : p.initiator_institution_id] || 'Modpart',
             shipment: shipById[meInit ? p.initiator_shipment_id : p.owner_shipment_id] || null,
             completed: p.escrow_status === 'both_paid_released',
+            // Min udgående status: mit sent-flag, om modparten har bekræftet modtagelse,
+            // og modpartens leveringsvalg der afgør om der er en label.
+            sent:            meInit ? p.initiator_sent : p.owner_sent,
+            recipientReceived: meInit ? p.owner_received : p.initiator_received,
+            recipientDelivery: meInit ? p.owner_delivery : p.initiator_delivery,
           };
         }).filter(s => s.items.length));
       } else {
@@ -565,9 +701,12 @@ export default function MineOpgaverPage() {
   const doneChatTasks   = chatTasks.filter(t => t.deal_completed);
   const activeStripe    = stripeOrders.filter(o => o.status === 'paid' || o.status === 'shipped');
   const doneStripe      = stripeOrders.filter(o => o.status === 'delivered');
+  // Bytter, hvor modparten har bekræftet modtagelse, er gennemført.
+  const activeSwapSends = swapSends.filter(s => !s.recipientReceived);
+  const doneSwapSends   = swapSends.filter(s => s.recipientReceived);
 
-  const totalActive  = activeStripe.length + activeChatTasks.length + swapSends.length;
-  const totalDone    = doneStripe.length + doneChatTasks.length;
+  const totalActive  = activeStripe.length + activeChatTasks.length + activeSwapSends.length;
+  const totalDone    = doneStripe.length + doneChatTasks.length + doneSwapSends.length;
 
   return (
     <div style={{ minHeight:'100vh', background:'#F6F2EA', paddingTop:isMobile?60:80, paddingBottom:90 }}>
@@ -601,14 +740,15 @@ export default function MineOpgaverPage() {
             <>
               {filter === 'aktive' && (
                 <>
-                  {activeStripe.length === 0 && activeChatTasks.length === 0 && swapSends.length === 0 && (
+                  {activeStripe.length === 0 && activeChatTasks.length === 0 && activeSwapSends.length === 0 && (
                     <div style={{ padding:'60px 20px', textAlign:'center', background:'#fff', borderRadius:16 }}>
                       <div style={{ fontSize:48, marginBottom:12 }}>🎉</div>
                       <div style={{ fontFamily:FONT, fontWeight:700, fontSize:16, color:INK, marginBottom:6 }}>Intet at sende lige nu</div>
                       <div style={{ fontFamily:FONT, fontSize:13, color:INK3 }}>Alt er klaret, godt gået!</div>
                     </div>
                   )}
-                  {swapSends.map(s => <SwapSendCard key={s.id} s={s} router={router} />)}
+                  {activeSwapSends.map(s => <SwapSendCard key={s.id} s={s} router={router}
+                    onPatch={(id, patch) => setSwapSends(list => list.map(x => x.id === id ? { ...x, ...patch } : x))} />)}
                   {activeStripe.map(order =>
                     order.myGroups.map((g, gi) => (
                       <StripeOrderCard key={`${order.id}-${gi}`} order={order} myGroup={g}
@@ -625,13 +765,15 @@ export default function MineOpgaverPage() {
               )}
               {filter === 'gennemforte' && (
                 <>
-                  {doneStripe.length === 0 && doneChatTasks.length === 0 && (
+                  {doneStripe.length === 0 && doneChatTasks.length === 0 && doneSwapSends.length === 0 && (
                     <div style={{ padding:'60px 20px', textAlign:'center', background:'#fff', borderRadius:16 }}>
                       <div style={{ fontSize:48, marginBottom:12 }}>📭</div>
                       <div style={{ fontFamily:FONT, fontWeight:700, fontSize:16, color:INK, marginBottom:6 }}>Ingen gennemførte handler endnu</div>
                       <div style={{ fontFamily:FONT, fontSize:13, color:INK3 }}>Handler vises her når de er afsluttet</div>
                     </div>
                   )}
+                  {doneSwapSends.map(s => <SwapSendCard key={s.id} s={s} router={router}
+                    onPatch={(id, patch) => setSwapSends(list => list.map(x => x.id === id ? { ...x, ...patch } : x))} />)}
                   {doneStripe.map(order =>
                     order.myGroups.map((g, gi) => (
                       <StripeOrderCard key={`${order.id}-${gi}`} order={order} myGroup={g} onMarkedSent={() => {}} onGroupPatch={() => {}} />

@@ -616,14 +616,14 @@ export async function handleSwapProposalPayment(pi, supa) {
     // Shipment-id'et persisteres STRAKS, så et retry efter nedbrud ikke dobbelt-booker.
     let initShipmentId = p.initiator_shipment_id || null;
     if (!initShipmentId && p.owner_delivery !== 'custom' && conv) {
-      initShipmentId = await bookSwapShipment(supa, conv, offeredIds[0], initInst, ownerInst, await swapBundleSize(supa, offeredIds), p.owner_pickup?.id || null);
+      initShipmentId = await bookSwapShipment(supa, conv, offeredIds[0], initInst, ownerInst, await swapBundleSize(supa, offeredIds), p.owner_pickup?.id || null, p.id);
       if (initShipmentId) await supa.from('swap_proposals').update({ initiator_shipment_id: initShipmentId }).eq('id', proposalId);
     }
     // Forsendelse 2: ejer → initiator (ejers bundt). INITIATOR modtager denne pakke,
     // så den bookes til INITIATORS valgte udleveringssted + initiators leveringsvalg.
     let ownerShipmentId = p.owner_shipment_id || null;
     if (!ownerShipmentId && p.initiator_delivery !== 'custom' && conv) {
-      ownerShipmentId = await bookSwapShipment(supa, conv, requestedIds[0], ownerInst, initInst, await swapBundleSize(supa, requestedIds), p.initiator_pickup?.id || null);
+      ownerShipmentId = await bookSwapShipment(supa, conv, requestedIds[0], ownerInst, initInst, await swapBundleSize(supa, requestedIds), p.initiator_pickup?.id || null, p.id);
       if (ownerShipmentId) await supa.from('swap_proposals').update({ owner_shipment_id: ownerShipmentId }).eq('id', proposalId);
     }
 
@@ -655,7 +655,9 @@ export async function handleSwapProposalPayment(pi, supa) {
       const groups = Array.isArray(ord?.order_groups) ? ord.order_groups : [];
       if (groups[0]) {
         groups[0] = { ...groups[0], tracking_number: shipment.tracking_number, tracking_url: shipment.tracking_url, label_pdf_url: shipment.label_pdf_url };
-        await supa.from('orders').update({ order_groups: groups, status: 'shipped' }).eq('id', orderId);
+        // Porto-ordren forbliver 'paid' — selve bytte-status styres af swap_proposals
+        // (sent/received), parallelt med at køb-ordrer først bliver 'shipped' ved afsendelse.
+        await supa.from('orders').update({ order_groups: groups }).eq('id', orderId);
       }
     }
     await Promise.all([
@@ -754,7 +756,7 @@ export async function handleSwapProposalPayment(pi, supa) {
 }
 
 // Booker én forsendelse i en byttehandel og returnerer shipments.id (eller null).
-async function bookSwapShipment(supa, conv, listingId, senderInst, receiverInst, sizeOverride, pickupPointId) {
+async function bookSwapShipment(supa, conv, listingId, senderInst, receiverInst, sizeOverride, pickupPointId, proposalId) {
   if (!senderInst || !receiverInst) return null;
   try {
     let sizeCategory = sizeOverride || 'medium';
@@ -773,6 +775,7 @@ async function bookSwapShipment(supa, conv, listingId, senderInst, receiverInst,
     });
     const { data: shipment } = await supa.from('shipments').insert({
       conversation_id: conv.id,
+      swap_proposal_id: proposalId || null,
       seller_institution_id: senderInst.id,
       buyer_institution_id: receiverInst.id,
       shipmondo_shipment_id: result.shipmondo_shipment_id,

@@ -27,7 +27,7 @@ export async function POST(req) {
 
     // Idempotency: look up shipment by shipmondo_shipment_id
     const { data: shipment } = await supa.from('shipments')
-      .select('id,status,conversation_id,order_id,buyer_institution_id')
+      .select('id,status,conversation_id,order_id,swap_proposal_id,buyer_institution_id')
       .eq('shipmondo_shipment_id', shipmondo_shipment_id)
       .maybeSingle();
 
@@ -91,6 +91,33 @@ export async function POST(req) {
               url: `/mine-ordrer?order=${updatedOrder.id}`,
             });
           } catch (e) { console.error('shipmondo-webhook notify fejl:', e?.message); }
+        }
+      }
+    }
+
+    // Bytte-forsendelser: ved levering bekræftes MODTAGERENS received-flag
+    // automatisk (modtageren = shipment.buyer_institution_id). Parallelt med
+    // at køb-ordrer auto-leveres. Modtageren kan stadig selv bekræfte manuelt.
+    if (shipment.swap_proposal_id && mapped.status === 'delivered') {
+      const { data: p } = await supa.from('swap_proposals')
+        .select('id, initiator_institution_id, owner_institution_id, initiator_received, owner_received')
+        .eq('id', shipment.swap_proposal_id)
+        .maybeSingle();
+      if (p) {
+        const recipientIsInit = shipment.buyer_institution_id === p.initiator_institution_id;
+        const field = recipientIsInit ? 'initiator_received' : 'owner_received';
+        if (!p[field]) {
+          await supa.from('swap_proposals').update({ [field]: true }).eq('id', p.id);
+          try {
+            await notify(supa, {
+              institutionId: shipment.buyer_institution_id,
+              type: 'swap_delivered',
+              title: '📦 Din byttepakke er leveret',
+              body: 'Din del af byttehandlen er leveret. God fornøjelse!',
+              data: { proposal_id: p.id },
+              url: '/mine-ordrer',
+            });
+          } catch (e) { console.error('shipmondo-webhook swap-notify fejl:', e?.message); }
         }
       }
     }

@@ -21,9 +21,18 @@ function SwapReceiveCard({ r, router, onReceived }) {
     setMarking(false);
     if (res.ok) onReceived(r.id);
   }
-  const status = r.completed
-    ? (sh ? '🚚 På vej til dig' : '🤝 Aftalt levering')
-    : '⏳ Afventer betaling';
+  const isCustom = r.myDelivery === 'custom';
+  // Status drives af om AFSENDEREN faktisk har markeret sin del afsendt —
+  // ikke bare om begge har betalt (så modtageren ikke ser "på vej" for tidligt).
+  const status = !r.completed
+    ? '⏳ Afventer betaling'
+    : r.received
+      ? '✅ Modtaget'
+      : isCustom
+        ? '🤝 Aftalt levering'
+        : r.senderSent
+          ? '🚚 På vej til dig'
+          : '⏳ Afventer afsendelse';
   return (
     <div style={{ background: '#fff', borderRadius: 16, border: `1.5px solid ${PAPER3}`, padding: '16px 18px', marginBottom: 12 }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
@@ -37,13 +46,16 @@ function SwapReceiveCard({ r, router, onReceived }) {
         </div>
       ))}
       <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginTop: 12 }}>
-        {sh?.tracking_url && (
+        {r.completed && !isCustom && !r.senderSent && !r.received && (
+          <div style={{ textAlign: 'center', fontFamily: FONT, fontSize: 12, color: INK3 }}>{r.otherName} har endnu ikke afsendt sin del. Du får besked, når pakken er på vej.</div>
+        )}
+        {r.senderSent && sh?.tracking_url && (
           <a href={sh.tracking_url} target="_blank" rel="noopener noreferrer" style={{ display: 'block', textAlign: 'center', padding: '11px', borderRadius: 99, background: PRIMARY, color: '#fff', fontFamily: FONT, fontWeight: 700, fontSize: 13, textDecoration: 'none' }}>📦 Spor pakken</a>
         )}
-        {sh?.tracking_number && !sh?.tracking_url && (
+        {r.senderSent && sh?.tracking_number && !sh?.tracking_url && (
           <div style={{ textAlign: 'center', fontFamily: FONT, fontSize: 12, color: INK3 }}>Tracking: {sh.tracking_number}</div>
         )}
-        {r.completed && !sh && (
+        {r.completed && isCustom && !r.received && (
           <div style={{ textAlign: 'center', fontFamily: FONT, fontSize: 12, color: INK3 }}>I aftaler selv afhentning/levering.</div>
         )}
         {!r.completed && (
@@ -51,7 +63,7 @@ function SwapReceiveCard({ r, router, onReceived }) {
         )}
         {r.completed && (r.received ? (
           <div style={{ textAlign: 'center', fontFamily: FONT, fontSize: 13, fontWeight: 700, color: PRIMARY }}>✓ Du har bekræftet modtagelse</div>
-        ) : (
+        ) : (isCustom || r.senderSent) && (
           <button disabled={marking} onClick={markReceived} style={{ padding: '11px', borderRadius: 99, border: `1.5px solid ${PRIMARY}`, background: marking ? PAPER2 : GREEN_TINT, color: marking ? INK3 : PRIMARY, fontFamily: FONT, fontWeight: 700, fontSize: 13, cursor: marking ? 'default' : 'pointer' }}>{marking ? 'Gemmer…' : '✅ Marker som modtaget'}</button>
         ))}
         <button onClick={() => router.push(r.conversation_id ? `/beskeder?conv=${r.conversation_id}` : '/beskeder')} style={{ padding: '11px', borderRadius: 99, background: PAPER2, border: 'none', fontFamily: FONT, fontWeight: 600, fontSize: 13, color: INK3, cursor: 'pointer' }}>💬 Åbn byttehandel</button>
@@ -330,7 +342,7 @@ function MineOrdrerContent() {
     let cancelled = false;
     (async () => {
       const { data: props } = await db.from('swap_proposals')
-        .select('id, conversation_id, escrow_status, initiator_institution_id, owner_institution_id, offered_items, requested_items, initiator_shipment_id, owner_shipment_id, initiator_received, owner_received')
+        .select('id, conversation_id, escrow_status, initiator_institution_id, owner_institution_id, offered_items, requested_items, initiator_shipment_id, owner_shipment_id, initiator_received, owner_received, initiator_sent, owner_sent, initiator_delivery, owner_delivery')
         .or(`initiator_institution_id.eq.${institutionId},owner_institution_id.eq.${institutionId}`)
         .eq('status', 'accepted')
         .order('created_at', { ascending: false });
@@ -353,6 +365,10 @@ function MineOrdrerContent() {
           shipment: shipById[meInit ? p.owner_shipment_id : p.initiator_shipment_id] || null,
           completed: p.escrow_status === 'both_paid_released',
           received: meInit ? p.initiator_received : p.owner_received,
+          // Har AFSENDEREN (modparten) markeret sin del afsendt? Styrer "på vej til dig".
+          senderSent: meInit ? p.owner_sent : p.initiator_sent,
+          // Mit eget leveringsvalg afgør om modpartens bundt til mig har label/tracking.
+          myDelivery: meInit ? p.initiator_delivery : p.owner_delivery,
         };
       }).filter(r => r.items.length);
       if (!cancelled) setSwapReceives(receives);
