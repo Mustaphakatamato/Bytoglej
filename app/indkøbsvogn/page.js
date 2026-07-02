@@ -123,11 +123,25 @@ export default function CartPage() {
   const [livePricesLoading, setLivePricesLoading] = useState({}); // { [sellerName]: bool }
   const [sellerInfo, setSellerInfo] = useState({}); // { [name]: { address, zipcode, city } } til afhentnings-adresse
 
+  // Wallet-saldo: brug (dele af) institutionens konto til betaling.
+  const [walletBalance, setWalletBalance] = useState(0);
+  const [useWallet, setUseWallet] = useState(false);
+
   // Pickup points: sellerName → { loading, points, chosen }
   const [pickupState, setPickupState] = useState({});
   // Vinted-lignende kort-vælger: hvilken sælger er åben + cachede punkter på tværs af carriers
   const [pickerFor, setPickerFor] = useState(null);
   const [pickerData, setPickerData] = useState({}); // { [sellerName]: { loading, points, cheapest_carrier, error } }
+
+  // Hent institutionens wallet-saldo (til "betal med konto").
+  useEffect(() => {
+    if (!institutionId) { setWalletBalance(0); return; }
+    let cancelled = false;
+    authedFetch('/api/wallet').then(r => r.ok ? r.json() : null).then(j => {
+      if (!cancelled && j) setWalletBalance(Number(j.balance || 0));
+    }).catch(() => {});
+    return () => { cancelled = true; };
+  }, [institutionId]);
 
   // Load shipping_options + listings.can_ship + price quotes
   useEffect(() => {
@@ -342,6 +356,16 @@ export default function CartPage() {
 
   const grandTotal = itemsTotal - discountTotal + shippingTotal + serviceFeeTotal;
 
+  // Forhåndsvisning af saldo-betaling (matcher serverens beregning i create-intent).
+  const walletApplied = (() => {
+    if (!useWallet || walletBalance <= 0) return 0;
+    let a = Math.min(walletBalance, grandTotal);
+    const rem = Math.round((grandTotal - a) * 100) / 100;
+    if (rem > 0 && rem < 2.5) a = grandTotal - 2.5;   // efterlad Stripe-minimum til kortet
+    return Math.max(0, Math.round(a * 100) / 100);
+  })();
+  const walletRemaining = Math.round((grandTotal - walletApplied) * 100) / 100;
+
   async function handleCheckout() {
     if (!userId) { router.push('/login'); return; }
     if (selectedGroups.length === 0) { showToast('Vælg mindst én sælger', 'error'); return; }
@@ -402,7 +426,7 @@ export default function CartPage() {
       const res = await authedFetch('/api/payments/create-intent', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ groups: groupsPayload, buyerInstitutionId: institutionId }),
+        body: JSON.stringify({ groups: groupsPayload, buyerInstitutionId: institutionId, useWallet }),
       });
       const data = await res.json();
 
@@ -419,6 +443,12 @@ export default function CartPage() {
         const pendingIds = selectedGroups.flatMap(g => g.items.map(i => i.listingId)).filter(Boolean);
         sessionStorage.setItem('pending_cart_ids', JSON.stringify(pendingIds));
       } catch { /* sessionStorage utilgængelig — kurven beholdes blot */ }
+
+      // Saldoen dækkede hele beløbet → ingen Stripe-betaling, gå direkte til kvittering.
+      if (data.walletPaid) {
+        router.push(`/betaling/success?order_id=${data.orderId}&redirect_status=succeeded`);
+        return;
+      }
 
       // Redirect to payment page with client secret
       const params = new URLSearchParams({
@@ -754,7 +784,29 @@ export default function CartPage() {
               }) && (
                 <div style={{ fontFamily: FONT, fontSize: 11, color: INK3, marginTop: 4 }}>Ekskl. levering</div>
               )}
+              {useWallet && walletApplied > 0 && (
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 8 }}>
+                  <span style={{ fontFamily: FONT, fontSize: 13, color: PRIMARY, fontWeight: 600 }}>Betalt fra konto</span>
+                  <span style={{ fontFamily: FONT, fontSize: 13, color: PRIMARY, fontWeight: 700 }}>−{walletApplied.toFixed(2).replace('.', ',')} kr.</span>
+                </div>
+              )}
             </div>
+
+            {/* Brug byt&leg-saldo */}
+            {walletBalance > 0 && (
+              <button type="button" onClick={() => setUseWallet(v => !v)} style={{
+                width: '100%', display: 'flex', alignItems: 'center', gap: 12, textAlign: 'left',
+                background: useWallet ? GREEN_TINT : '#fff', border: `1.5px solid ${useWallet ? PRIMARY : PAPER3}`,
+                borderRadius: 14, padding: '13px 16px', marginBottom: 12, cursor: 'pointer',
+              }}>
+                <div style={{ fontSize: 20 }}>💰</div>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ fontFamily: FONT, fontWeight: 700, fontSize: 14, color: INK }}>Brug min konto</div>
+                  <div style={{ fontFamily: FONT, fontSize: 12, color: INK3 }}>Saldo: {walletBalance.toFixed(2).replace('.', ',')} kr.</div>
+                </div>
+                <div style={{ width: 22, height: 22, borderRadius: '50%', border: `2px solid ${useWallet ? PRIMARY : PAPER3}`, background: useWallet ? PRIMARY : '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontSize: 12, fontWeight: 800 }}>{useWallet ? '✓' : ''}</div>
+              </button>
+            )}
 
             <button onClick={handleCheckout} disabled={sending || selectedGroups.length === 0} style={{
               width: '100%', padding: '15px', borderRadius: 99,
@@ -764,7 +816,10 @@ export default function CartPage() {
               cursor: (sending || selectedGroups.length === 0) ? 'not-allowed' : 'pointer',
               transition: 'all 0.2s', marginBottom: 10,
             }}>
-              {sending ? 'Opretter betaling…' : `Betal ${grandTotal.toFixed(2).replace('.', ',')} kr. →`}
+              {sending ? 'Opretter betaling…'
+                : walletRemaining === 0 && useWallet && walletApplied > 0
+                  ? `Betal ${walletApplied.toFixed(2).replace('.', ',')} kr. fra konto →`
+                  : `Betal ${walletRemaining.toFixed(2).replace('.', ',')} kr. →`}
             </button>
 
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}>

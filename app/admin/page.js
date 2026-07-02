@@ -133,6 +133,7 @@ const TABS = [
   { id: 'feedback',     label: 'Feedback',      emoji: '🐛' },
   { id: 'users',        label: 'Brugere',       emoji: '👥' },
   { id: 'economy',      label: 'Økonomi',       emoji: '💰' },
+  { id: 'payouts',      label: 'Udbetalinger',  emoji: '💸' },
   { id: 'log',          label: 'Log',           emoji: '📝' },
   { id: 'ai-bot',       label: 'AI Bot',        emoji: '🤖' },
   { id: 'support',      label: 'Support',       emoji: '💬' },
@@ -357,6 +358,7 @@ export default function AdminPage() {
         {tab === 'feedback'     && <FeedbackTab isMobile={isMobile} onNewCountChange={setFeedbackNewCount} />}
         {tab === 'users'        && <UsersTab isMobile={isMobile} />}
         {tab === 'economy'      && <EconomyTab isMobile={isMobile} />}
+        {tab === 'payouts'      && <PayoutsTab isMobile={isMobile} />}
         {tab === 'log'          && <LogTab isMobile={isMobile} />}
         {tab === 'ai-bot'       && <AiBotTab isMobile={isMobile} />}
         {tab === 'support'      && <SupportTab isMobile={isMobile} />}
@@ -1681,6 +1683,103 @@ function EconomyTab({ isMobile }) {
                     <td style={{ padding: '12px 16px', fontWeight: 700, color: INK }}>{fmtKr(inv.total_amount_dkk)}</td>
                     <td style={{ padding: '12px 16px' }}><Badge bg={c.bg} color={c.color}>{c.label}</Badge></td>
                     <td style={{ padding: '12px 16px', color: INK3, whiteSpace: 'nowrap' }}>{inv.due_date ? fmtDate(inv.due_date) : '—'}</td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ── SECTION 9b: Udbetalinger ────────────────────────────────────────────────────
+
+const PAYOUT_STATUS_CFG = {
+  pending:  { bg: '#FEF9C3', color: '#92400E', label: 'Afventer' },
+  paid:     { bg: '#D1FAE5', color: '#065F46', label: 'Udbetalt' },
+  rejected: { bg: '#FEE2E2', color: '#991B1B', label: 'Afvist' },
+};
+
+function PayoutsTab({ isMobile }) {
+  const [payouts, setPayouts] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [busy, setBusy] = useState(null);
+  const [filter, setFilter] = useState('pending');
+
+  const load = useCallback(async () => {
+    setLoading(true);
+    const res = await fetch('/api/admin/payouts', { headers: await authHeaders() });
+    const json = await res.json().catch(() => ({}));
+    setPayouts(json.payouts || []);
+    setLoading(false);
+  }, []);
+
+  useEffect(() => { load(); }, [load]);
+
+  async function process(payoutId, action) {
+    if (action === 'rejected' && !confirm('Afvis udbetalingen? Beløbet føres tilbage til institutionens konto.')) return;
+    setBusy(payoutId);
+    const res = await fetch('/api/admin/payouts', {
+      method: 'POST', headers: await authHeaders(),
+      body: JSON.stringify({ payoutId, action }),
+    });
+    setBusy(null);
+    if (res.ok) load();
+    else { const j = await res.json().catch(() => ({})); alert(j.error || 'Handlingen fejlede'); }
+  }
+
+  const filtered = payouts.filter(p => !filter || p.status === filter);
+  const pendingTotal = payouts.filter(p => p.status === 'pending').reduce((s, p) => s + Number(p.amount || 0), 0);
+  const paidTotal    = payouts.filter(p => p.status === 'paid').reduce((s, p) => s + Number(p.amount || 0), 0);
+
+  if (loading) return <Spinner />;
+
+  return (
+    <div>
+      <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr 1fr' : 'repeat(3, 1fr)', gap: 12, marginBottom: 20 }}>
+        <Stat label="Afventer udbetaling" value={fmtKr(pendingTotal)} color={CORAL} />
+        <Stat label="Udbetalt i alt" value={fmtKr(paidTotal)} color={PRIMARY} />
+        <Stat label="Anmodninger" value={payouts.length} color={INK2} />
+      </div>
+
+      <div style={{ display: 'flex', gap: 8, marginBottom: 16, flexWrap: 'wrap', alignItems: 'center' }}>
+        <select value={filter} onChange={e => setFilter(e.target.value)} style={{ padding: '10px 12px', border: `1.5px solid ${PAPER3}`, borderRadius: 10, fontFamily: FONT, fontSize: 13, background: PAPER2, color: INK, cursor: 'pointer' }}>
+          <option value="">Alle</option>
+          {Object.entries(PAYOUT_STATUS_CFG).map(([k, v]) => <option key={k} value={k}>{v.label}</option>)}
+        </select>
+        <span style={{ fontFamily: FONT, fontSize: 12, color: INK3 }}>{filtered.length} anmodninger</span>
+      </div>
+
+      {filtered.length === 0 ? <Empty text="Ingen udbetalinger" /> : (
+        <div style={{ background: PAPER2, border: `1px solid rgba(22,34,28,0.08)`, borderRadius: 16, overflow: 'auto' }}>
+          <table style={{ width: '100%', borderCollapse: 'collapse', fontFamily: FONT, fontSize: 13, minWidth: 640 }}>
+            <thead>
+              <tr style={{ borderBottom: `1px solid ${PAPER3}` }}>
+                {['Institution', 'Beløb', 'Reg./konto', 'Anmodet', 'Status', ''].map(h => (
+                  <th key={h} style={{ padding: '12px 16px', textAlign: 'left', color: INK3, fontWeight: 700, fontSize: 12, whiteSpace: 'nowrap' }}>{h}</th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {filtered.map((p, i) => {
+                const c = PAYOUT_STATUS_CFG[p.status] || { bg: PAPER3, color: INK3, label: p.status };
+                return (
+                  <tr key={p.id} style={{ borderBottom: i < filtered.length - 1 ? `1px solid ${PAPER3}` : 'none' }}>
+                    <td style={{ padding: '12px 16px', fontWeight: 600, color: INK }}>{p.institution?.name || '—'}<div style={{ fontSize: 11, color: INK3, fontWeight: 400 }}>{p.institution?.email || ''}</div></td>
+                    <td style={{ padding: '12px 16px', fontWeight: 800, color: INK, whiteSpace: 'nowrap' }}>{fmtKr(p.amount)}</td>
+                    <td style={{ padding: '12px 16px', color: INK2, fontFamily: 'monospace', fontSize: 12, whiteSpace: 'nowrap' }}>{p.bank_reg_nr || '—'} / {p.bank_account_nr || '—'}</td>
+                    <td style={{ padding: '12px 16px', color: INK3, whiteSpace: 'nowrap' }}>{p.requested_at ? fmtDate(p.requested_at) : '—'}</td>
+                    <td style={{ padding: '12px 16px' }}><Badge bg={c.bg} color={c.color}>{c.label}</Badge></td>
+                    <td style={{ padding: '12px 16px', whiteSpace: 'nowrap' }}>
+                      {p.status === 'pending' && (
+                        <div style={{ display: 'flex', gap: 6 }}>
+                          <button disabled={busy === p.id} onClick={() => process(p.id, 'paid')} style={{ padding: '7px 12px', borderRadius: 8, border: 'none', background: PRIMARY, color: '#fff', fontFamily: FONT, fontWeight: 700, fontSize: 12, cursor: 'pointer' }}>Markér udbetalt</button>
+                          <button disabled={busy === p.id} onClick={() => process(p.id, 'rejected')} style={{ padding: '7px 12px', borderRadius: 8, border: `1.5px solid ${PAPER3}`, background: '#fff', color: CORAL, fontFamily: FONT, fontWeight: 700, fontSize: 12, cursor: 'pointer' }}>Afvis</button>
+                        </div>
+                      )}
+                    </td>
                   </tr>
                 );
               })}

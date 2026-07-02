@@ -1,10 +1,12 @@
 import { NextResponse } from 'next/server';
 import Stripe from 'stripe';
+import { randomUUID } from 'crypto';
 import { requireAuth, UNAUTHORIZED } from '@/lib/api-auth';
 import { createServerClient } from '@/lib/supabase-server';
 import { getShippingPrice } from '@/lib/shipping-rates';
 import { getPriceQuote } from '@/lib/shipmondo/client';
 import { calcServiceFee } from '@/lib/pricing';
+import { finalizePurchase } from '@/app/api/webhooks/stripe/route';
 
 function getStripe() {
   if (!process.env.STRIPE_SECRET_KEY) throw new Error('STRIPE_SECRET_KEY er ikke sat');
@@ -287,30 +289,92 @@ export async function POST(req) {
 
   grandTotal = Math.round(grandTotal * 100) / 100;
 
-  // Create Stripe PaymentIntent (amount in øre)
-  const amountOre = Math.round(grandTotal * 100);
+  const buyerFields = {
+    buyer_id: user.id,
+    buyer_institution_id: buyer?.id || null,
+    buyer_name: buyer?.name || null,
+    buyer_email: buyer?.email || user.email || null,
+    buyer_phone: buyer?.phone || null,
+    buyer_address: buyer?.address || null,
+    buyer_zip: buyer?.zipcode || null,
+    buyer_city: buyer?.city || null,
+  };
+  const orderMeta = {
+    buyer_id: user.id,
+    buyer_institution_id: buyer?.id || '',
+    buyer_name: buyer?.name || '',
+    group_count: String(groups.length),
+    bid_message_id: metaBidMsgId,
+    offer_id: metaOfferId,
+    conversation_id: metaConvId,
+    delivery_method: metaDelivery,
+  };
+
+  // ── Wallet: valgfri brug af institutionens saldo ────────────────────
+  // walletApplied trækkes fra grandTotal; resten betales med kort/MobilePay.
+  let walletApplied = 0;
+  if (body.useWallet === true && buyer?.id) {
+    const { data: acct } = await supa.from('wallet_accounts').select('balance').eq('institution_id', buyer.id).maybeSingle();
+    const balance = Number(acct?.balance || 0);
+    if (balance > 0) {
+      walletApplied = Math.min(balance, grandTotal);
+      const remainder = Math.round((grandTotal - walletApplied) * 100) / 100;
+      // Stripe-minimum er 2,50 kr: undgå en kort-rest under minimum ved at
+      // efterlade præcis 2,50 kr til kortet, hvis saldoen ellers næsten dækker alt.
+      if (remainder > 0 && remainder < 2.5) walletApplied = grandTotal - 2.5;
+      walletApplied = Math.max(0, Math.round(walletApplied * 100) / 100);
+    }
+  }
+  const remaining = Math.round((grandTotal - walletApplied) * 100) / 100;
+
+  const stripe = getStripe();
+
+  // ── Sti A: saldoen dækker hele beløbet → ingen Stripe-betaling ──────
+  if (walletApplied > 0 && remaining === 0) {
+    const syntheticPi = `wallet_${randomUUID()}`;
+    const { data: order, error } = await supa.from('orders').insert({
+      payment_intent_id: syntheticPi,
+      ...buyerFields,
+      grand_total: grandTotal,
+      status: 'pending',
+      order_groups: orderGroups,
+      wallet_applied: walletApplied,
+    }).select().single();
+    if (error) {
+      console.error('[create-intent] DB fejl (wallet-only):', error);
+      return NextResponse.json({ error: 'Kunne ikke oprette ordre' }, { status: 500 });
+    }
+    // Træk beløbet fra saldoen (atomisk — fejler hvis saldoen er brugt et andet sted).
+    const { error: debitErr } = await supa.rpc('wallet_debit', {
+      _inst: buyer.id, _amount: walletApplied, _type: 'purchase_debit',
+      _ref_type: 'order', _ref_id: order.id, _note: 'Køb betalt fra konto',
+    });
+    if (debitErr) {
+      await supa.from('orders').delete().eq('id', order.id);
+      return NextResponse.json({ error: 'Din saldo dækker ikke længere købet' }, { status: 400 });
+    }
+    // Finaliser med det samme (samme idempotente logik som Stripe-betaling).
+    try {
+      await finalizePurchase({ id: syntheticPi, status: 'succeeded', metadata: orderMeta }, supa);
+    } catch (e) {
+      console.error('[create-intent] wallet-only finalisering fejlede:', e.message);
+    }
+    return NextResponse.json({ walletPaid: true, orderId: order.id, grandTotal, walletApplied });
+  }
+
+  // ── Sti B: kort/MobilePay (evt. delvist dækket af saldo) ────────────
+  const amountOre = Math.round(remaining * 100);
   if (!Number.isInteger(amountOre) || amountOre < 250) {
-    // Stripe minimum for DKK er 2,50 kr.
     return NextResponse.json({ error: 'Beløbet er for lavt til online betaling' }, { status: 400 });
   }
 
-  const stripe = getStripe();
   let paymentIntent;
   try {
     paymentIntent = await stripe.paymentIntents.create({
       amount: amountOre,
       currency: 'dkk',
       payment_method_types: ['card', 'mobilepay'],
-      metadata: {
-        buyer_id: user.id,
-        buyer_institution_id: buyer?.id || '',
-        buyer_name: buyer?.name || '',
-        group_count: String(groups.length),
-        bid_message_id: metaBidMsgId,
-        offer_id: metaOfferId,
-        conversation_id: metaConvId,
-        delivery_method: metaDelivery,
-      },
+      metadata: { ...orderMeta, wallet_applied: String(walletApplied) },
       description: `Bytogleg ordre: ${orderGroups.map(g => g.sellerName).join(', ')}`,
     });
   } catch (err) {
@@ -318,37 +382,44 @@ export async function POST(req) {
     return NextResponse.json({ error: 'Betalingen kunne ikke oprettes. Prøv igen' }, { status: 502 });
   }
 
-  // Insert order record
   const { data: order, error } = await supa
     .from('orders')
     .insert({
       payment_intent_id: paymentIntent.id,
-      buyer_id: user.id,
-      buyer_institution_id: buyer?.id || null,
-      buyer_name: buyer?.name || null,
-      buyer_email: buyer?.email || user.email || null,
-      buyer_phone: buyer?.phone || null,
-      buyer_address: buyer?.address || null,
-      buyer_zip: buyer?.zipcode || null,
-      buyer_city: buyer?.city || null,
+      ...buyerFields,
       grand_total: grandTotal,
       status: 'pending',
       order_groups: orderGroups,
+      wallet_applied: walletApplied,
     })
     .select()
     .single();
 
   if (error) {
     console.error('[create-intent] DB fejl:', error);
-    // Annullér det forældreløse PaymentIntent så det ikke kan gennemføres uden ordre
     try { await stripe.paymentIntents.cancel(paymentIntent.id); } catch {}
     return NextResponse.json({ error: 'Kunne ikke oprette ordre' }, { status: 500 });
+  }
+
+  // Reservér saldo-andelen nu. Ved fejlet/annulleret betaling føres den tilbage
+  // (stripe-webhook), og forladte pending-ordrer ryddes af cancel-unshipped-cron.
+  if (walletApplied > 0) {
+    const { error: debitErr } = await supa.rpc('wallet_debit', {
+      _inst: buyer.id, _amount: walletApplied, _type: 'purchase_debit',
+      _ref_type: 'order', _ref_id: order.id, _note: 'Køb — delvist betalt fra konto',
+    });
+    if (debitErr) {
+      try { await stripe.paymentIntents.cancel(paymentIntent.id); } catch {}
+      await supa.from('orders').delete().eq('id', order.id);
+      return NextResponse.json({ error: 'Din saldo dækker ikke længere din andel af købet' }, { status: 400 });
+    }
   }
 
   return NextResponse.json({
     clientSecret: paymentIntent.client_secret,
     orderId: order.id,
     grandTotal,
+    walletApplied,
     breakdown: orderGroups.map(({ sellerBankRegNr, sellerBankAccountNr, ...rest }) => rest),
   });
 }

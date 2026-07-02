@@ -352,6 +352,7 @@ export default function ProfilPage() {
             </MenuSection>
             <div style={{ fontFamily:FONT, fontWeight:700, fontSize:11, color:INK3, textTransform:'uppercase', letterSpacing:'0.08em', padding:'4px 20px 0' }}>Konto</div>
             <MenuSection>
+              <MenuItem icon="💰" label="Min konto" onClick={() => router.push('/min-konto')} />
               <MenuItem icon="👥" label="Medarbejdere" onClick={() => router.push('/medarbejdere')} />
             </MenuSection>
             <MenuSection>
@@ -543,6 +544,12 @@ export default function ProfilPage() {
               badge={pendingCount}
               highlight={pendingCount > 0}
               onClick={() => router.push('/mine-opgaver')}
+            />
+            <ActivityCard
+              icon="💰"
+              label="Min konto"
+              sublabel="Saldo & udbetaling"
+              onClick={() => router.push('/min-konto')}
             />
           </div>
 

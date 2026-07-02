@@ -32,6 +32,8 @@ function StripeOrderCard({ order, myGroup, onMarkedSent, onGroupPatch }) {
   const tracking   = myGroup.tracking_number;
   const trackingUrl = myGroup.tracking_url;
   const orderNo    = formatOrderNumber(order);
+  // Frist inden for 2 dage → fremhæv rødt.
+  const shipBySoon = order.ship_by && (new Date(order.ship_by).getTime() - Date.now()) < 2 * 24 * 60 * 60 * 1000;
 
   function fmtDate(iso) {
     if (!iso) return '';
@@ -166,8 +168,10 @@ function StripeOrderCard({ order, myGroup, onMarkedSent, onGroupPatch }) {
           </div>
 
           {isPaid && isShipping && (
-            <div style={{ marginTop:10, fontFamily:FONT, fontSize:11, color:INK3 }}>
-              ⏱ Send helst pakken inden 5 hverdage, så køberen ikke venter unødigt.
+            <div style={{ marginTop:10, fontFamily:FONT, fontSize:11, color: shipBySoon ? '#B91C1C' : INK3, fontWeight: shipBySoon ? 700 : 400 }}>
+              {order.ship_by
+                ? `⏱ Send inden ${new Date(order.ship_by).toLocaleDateString('da-DK', { day:'numeric', month:'short' })} — ellers annulleres handlen automatisk, og køberen refunderes.`
+                : '⏱ Send helst pakken inden 5 hverdage, så køberen ikke venter unødigt.'}
             </div>
           )}
 

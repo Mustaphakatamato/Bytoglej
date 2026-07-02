@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { createServerClient } from '@/lib/supabase-server';
 import { handleWebhook } from '@/lib/shipmondo/client';
 import { notify } from '@/lib/notify';
+import { creditOrderOnDelivery } from '@/lib/wallet';
 
 export async function POST(req) {
   const supa = createServerClient();
@@ -78,6 +79,8 @@ export async function POST(req) {
           .select('id, buyer_institution_id, buyer_name, order_groups')
           .maybeSingle();
         if (updatedOrder) {
+          // Sæt sælgers indtjening ind på deres byt&leg-konto (idempotent).
+          await creditOrderOnDelivery(supa, updatedOrder.id);
           try {
             const titles = (updatedOrder.order_groups || [])
               .flatMap(g => (g.items || []).map(i => i.title)).join(', ');

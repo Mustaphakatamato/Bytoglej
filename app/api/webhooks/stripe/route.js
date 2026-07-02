@@ -6,6 +6,7 @@ import { escapeHtml } from '@/lib/escape-html';
 import { persistSwapCO2, persistTransactionCO2 } from '@/lib/co2/persist-server';
 import { notify } from '@/lib/notify';
 import { formatOrderNumber } from '@/lib/order-number';
+import { addBusinessDays } from '@/lib/business-days';
 
 function getStripe() {
   if (!process.env.STRIPE_SECRET_KEY) throw new Error('STRIPE_SECRET_KEY er ikke sat');
@@ -32,14 +33,25 @@ export async function POST(req) {
 
   const supa = createServerClient();
 
-  // ── Fejlede betalinger: markér ordren som failed ──────────────
+  // ── Fejlede betalinger: markér ordren som failed + tilbagefør wallet ──
   if (event.type === 'payment_intent.payment_failed' || event.type === 'payment_intent.canceled') {
     const pi = event.data.object;
-    await supa
+    const { data: failedOrder } = await supa
       .from('orders')
       .update({ status: event.type === 'payment_intent.canceled' ? 'cancelled' : 'failed' })
       .eq('payment_intent_id', pi.id)
-      .eq('status', 'pending');
+      .eq('status', 'pending')
+      .select('id, buyer_institution_id, wallet_applied')
+      .maybeSingle();
+    // Kun hvis DENNE opdatering faktisk overgik ordren (idempotent): før den
+    // reserverede saldo-andel tilbage til køberens konto.
+    if (failedOrder && Number(failedOrder.wallet_applied) > 0 && failedOrder.buyer_institution_id) {
+      await supa.rpc('wallet_credit', {
+        _inst: failedOrder.buyer_institution_id, _amount: Number(failedOrder.wallet_applied),
+        _type: 'refund_credit', _ref_type: 'order', _ref_id: failedOrder.id,
+        _note: 'Betaling ikke gennemført — saldo ført tilbage',
+      }).then(({ error }) => { if (error) console.error('[stripe-webhook] wallet-tilbageførsel fejl:', error.message); });
+    }
     return NextResponse.json({ received: true });
   }
 
@@ -401,9 +413,13 @@ export async function finalizePurchase(pi, supa) {
   // VIGTIGT: status forbliver 'paid' — 'shipped' sættes først når sælger
   // markerer pakken afsendt (seller-mark-sent) eller Shipmondo melder in_transit.
   const firstShipped = updatedGroups.find(g => g.shipmondo_shipment_id);
+  // Afsendelsesfrist: 5 hverdage for forsendelses-ordrer. Afhentnings-/aftalt-
+  // ordrer får ingen frist (koordineres manuelt) og auto-annulleres ikke.
+  const hasShipping = updatedGroups.some(g => g.shippingMethod && (g.shippingMethod.startsWith('parcel_shop_') || g.shippingMethod.startsWith('home_')));
   await supa.from('orders').update({
     order_groups: updatedGroups,
     shipment_error: firstShipped ? null : shipmentError,
+    ...(hasShipping ? { ship_by: addBusinessDays(new Date(), 5).toISOString() } : {}),
     ...(firstShipped ? {
       shipmondo_shipment_id: firstShipped.shipmondo_shipment_id,
       tracking_number:       firstShipped.tracking_number,

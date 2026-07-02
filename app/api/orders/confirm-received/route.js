@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { requireAuth, UNAUTHORIZED } from '@/lib/api-auth';
 import { createServerClient } from '@/lib/supabase-server';
 import { notify } from '@/lib/notify';
+import { creditOrderOnDelivery } from '@/lib/wallet';
 
 // Køber bekræfter modtagelse af en ordre. Kører med service role, fordi
 // købere ikke har (og ikke skal have) UPDATE-adgang til orders via RLS.
@@ -34,6 +35,9 @@ export async function POST(req) {
     .update({ status: 'delivered', delivered_at: now })
     .eq('id', orderId);
 
+  // Sæt sælgers indtjening ind på deres byt&leg-konto (idempotent).
+  await creditOrderOnDelivery(supa, orderId);
+
   // Besked i samtalen + notifikation til hver sælger på ordren.
   const buyerName = order.buyer_name || 'Køber';
   const notifiedConvs = new Set();
@@ -61,7 +65,7 @@ export async function POST(req) {
         institutionName: g.sellerName,
         type: 'order_delivered',
         title: '✅ Køber har modtaget varen',
-        body: `${buyerName} har bekræftet modtagelse af ${(g.items || []).map(i => i.title).join(', ')}. Udbetalingen er på vej.`,
+        body: `${buyerName} har bekræftet modtagelse af ${(g.items || []).map(i => i.title).join(', ')}. Beløbet er sat ind på jeres byt&leg-konto.`,
         data: { order_id: orderId, conversation_id: convId || null },
         url: '/mine-opgaver',
       });
