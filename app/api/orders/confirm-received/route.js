@@ -3,6 +3,7 @@ import { requireAuth, UNAUTHORIZED } from '@/lib/api-auth';
 import { createServerClient } from '@/lib/supabase-server';
 import { notify } from '@/lib/notify';
 import { creditOrderOnDelivery } from '@/lib/wallet';
+import { issueAfregningForDelivery } from '@/lib/documents';
 
 // Køber bekræfter modtagelse af en ordre. Kører med service role, fordi
 // købere ikke har (og ikke skal have) UPDATE-adgang til orders via RLS.
@@ -37,6 +38,8 @@ export async function POST(req) {
 
   // Sæt sælgers indtjening ind på deres byt&leg-konto (idempotent).
   await creditOrderOnDelivery(supa, orderId);
+  // Udsted afregningsbilag til hver sælger (best-effort, idempotent).
+  await issueAfregningForDelivery(supa, orderId).catch(e => console.error('[confirm-received] afregning-fejl:', e?.message));
 
   // Besked i samtalen + notifikation til hver sælger på ordren.
   const buyerName = order.buyer_name || 'Køber';
