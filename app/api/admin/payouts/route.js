@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { createServerClient } from '@/lib/supabase-server';
 import { requireAuth, UNAUTHORIZED } from '@/lib/api-auth';
 import { notify } from '@/lib/notify';
+import { issueUdbetalingsbilag } from '@/lib/documents';
 
 async function requireAdmin(req) {
   const user = await requireAuth(req);
@@ -69,6 +70,11 @@ export async function POST(req) {
     status: action, processed_by: user.id, processed_at: now,
     note: typeof note === 'string' ? note.slice(0, 500) : payout.note,
   }).eq('id', payoutId);
+
+  // Udbetalingsbilag til institutionen ved gennemført bankoverførsel (best-effort, idempotent).
+  if (action === 'paid') {
+    await issueUdbetalingsbilag(supa, payout).catch(e => console.error('[admin/payouts] udbetalingsbilag-fejl:', e?.message));
+  }
 
   // Notificér institutionen.
   try {

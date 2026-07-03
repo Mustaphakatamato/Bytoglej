@@ -99,8 +99,11 @@ export default function IndstillingerPage() {
     contact_name:          institution?.contact_name          || '',
     bank_reg_nr:           institution?.bank_reg_nr           || '',
     bank_account_nr:       institution?.bank_account_nr       || '',
+    ean:                   institution?.ean                   || '',
+    vat_registered:        institution?.vat_registered        ?? false,
   });
   const [saving, setSaving] = useState(false);
+  const [selfBillingOk, setSelfBillingOk] = useState(!!institution?.self_billing_accepted_at);
 
   const DEFAULT_TIERS = [
     { min_items: 2, percent: 5 },
@@ -142,7 +145,10 @@ export default function IndstillingerPage() {
       contact_name:          institution.contact_name          || '',
       bank_reg_nr:           institution.bank_reg_nr           || '',
       bank_account_nr:       institution.bank_account_nr       || '',
+      ean:                   institution.ean                   || '',
+      vat_registered:        institution.vat_registered        ?? false,
     });
+    setSelfBillingOk(!!institution.self_billing_accepted_at);
     setBundleEnabled(institution.bundle_discount_enabled ?? false);
     setBundleTiers(institution.bundle_discount_tiers ?? DEFAULT_TIERS);
     setMarketingConsent(institution.marketing_consent ?? false);
@@ -186,6 +192,10 @@ export default function IndstillingerPage() {
       contact_name:         form.contact_name,
       bank_reg_nr:          form.bank_reg_nr || null,
       bank_account_nr:      form.bank_account_nr || null,
+      ean:                  form.ean || null,
+      vat_registered:       !!form.vat_registered,
+      self_billing_accepted_at:   selfBillingOk ? (institution.self_billing_accepted_at || new Date().toISOString()) : null,
+      self_billing_terms_version: selfBillingOk ? (institution.self_billing_terms_version || 'v1-udkast') : null,
     }).eq('email', institution.email);
     setSaving(false);
     if (error) { showToast('Noget gik galt', 'error'); return; }
@@ -535,6 +545,25 @@ export default function IndstillingerPage() {
                         <label style={{ display:'block', fontSize:13, fontWeight:700, marginBottom:6 }}>Kontonummer</label>
                         <input value={form.bank_account_nr} onChange={e=>setForm(f=>({...f,bank_account_nr:e.target.value.replace(/\D/g,'').slice(0,10)}))} placeholder="12345678" maxLength={10} style={INP} />
                       </div>
+                    </div>
+                  </div>
+
+                  <div style={{ borderTop:'1px solid #f0eeeb', paddingTop:20 }}>
+                    <div style={{ fontSize:12, fontWeight:700, color:'#aaa', textTransform:'uppercase', letterSpacing:0.8, marginBottom:14 }}>Fakturering</div>
+                    <div style={{ display:'grid', gridTemplateColumns:'minmax(0,1fr)', gap:14 }}>
+                      <div>
+                        <label style={{ display:'block', fontSize:13, fontWeight:700, marginBottom:6 }}>EAN-nummer <span style={{ fontWeight:400, color:'#888' }}>(offentlige institutioner)</span></label>
+                        <input value={form.ean} onChange={e=>setForm(f=>({...f,ean:e.target.value.replace(/\D/g,'').slice(0,13)}))} placeholder="5790000000000" maxLength={13} style={INP} />
+                        <div style={{ fontSize:11, color:'#888', marginTop:5 }}>Bruges til elektronisk fakturering (EAN/NemHandel). 13 cifre.</div>
+                      </div>
+                      <label style={{ display:'flex', alignItems:'flex-start', gap:10, cursor:'pointer' }}>
+                        <input type="checkbox" checked={!!form.vat_registered} onChange={e=>setForm(f=>({...f,vat_registered:e.target.checked}))} style={{ marginTop:3, width:16, height:16, accentColor:PRIMARY, flexShrink:0 }} />
+                        <span style={{ fontSize:13, color:INK2, lineHeight:1.5 }}>Institutionen er momsregistreret</span>
+                      </label>
+                      <label style={{ display:'flex', alignItems:'flex-start', gap:10, cursor:'pointer' }}>
+                        <input type="checkbox" checked={selfBillingOk} onChange={e=>setSelfBillingOk(e.target.checked)} style={{ marginTop:3, width:16, height:16, accentColor:PRIMARY, flexShrink:0 }} />
+                        <span style={{ fontSize:13, color:INK2, lineHeight:1.5 }}>Jeg accepterer, at byt&amp;leg udsteder afregningsbilag (selvfakturering, jf. momsloven § 52 a) på vores vegne for salg via platformen, og at vi ikke selv fakturerer for disse salg.</span>
+                      </label>
                     </div>
                   </div>
 

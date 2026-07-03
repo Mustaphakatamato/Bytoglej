@@ -25,6 +25,77 @@ const PAYOUT_CFG = {
   paid:     { label: 'Udbetalt', bg: '#DCFCE7', color: '#166534' },
   rejected: { label: 'Afvist',   bg: '#FEE2E2', color: '#B91C1C' },
 };
+const DOC_CFG = {
+  koebsfaktura:     { label: 'Købsfaktura',      icon: '🧾' },
+  afregningsbilag:  { label: 'Afregningsbilag',  icon: '📄' },
+  udbetalingsbilag: { label: 'Udbetalingsbilag', icon: '💸' },
+  kreditnota:       { label: 'Kreditnota',       icon: '↩️' },
+  byttebevis:       { label: 'Byttebevis',       icon: '🔄' },
+};
+const DOC_FILTERS = [['', 'Alle'], ['koebsfaktura', 'Købsfakturaer'], ['afregningsbilag', 'Afregningsbilag'], ['udbetalingsbilag', 'Udbetalinger']];
+
+function BilagPanel() {
+  const [docs, setDocs] = useState(null);
+  const [filter, setFilter] = useState('');
+
+  useEffect(() => {
+    (async () => {
+      try {
+        const res = await authedFetch('/api/account/documents');
+        const json = await res.json();
+        setDocs(res.ok ? (json.documents || []) : []);
+      } catch { setDocs([]); }
+    })();
+  }, []);
+
+  if (docs === null) return <div style={{ textAlign: 'center', padding: 40, fontFamily: FONT, color: INK3 }}>Henter bilag…</div>;
+
+  const filtered = docs.filter(d => !filter || d.docType === filter);
+
+  return (
+    <>
+      <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 16 }}>
+        {DOC_FILTERS.map(([k, lab]) => (
+          <button key={k} onClick={() => setFilter(k)}
+            style={{ padding: '6px 14px', borderRadius: 99, cursor: 'pointer', fontFamily: FONT, fontWeight: 700, fontSize: 12,
+              border: `1.5px solid ${filter === k ? PRIMARY : PAPER3}`, background: filter === k ? GREEN_TINT : '#fff', color: filter === k ? PRIMARY : INK2 }}>
+            {lab}
+          </button>
+        ))}
+      </div>
+
+      {filtered.length === 0 ? (
+        <div style={{ textAlign: 'center', padding: '40px 0', fontFamily: FONT, fontSize: 13, color: INK3 }}>
+          Ingen bilag endnu. Når du køber eller sælger, dukker dine fakturaer og afregninger op her.
+        </div>
+      ) : (
+        <div style={{ background: '#fff', borderRadius: 16, border: `1px solid ${PAPER3}`, overflow: 'hidden' }}>
+          {filtered.map((d, i) => {
+            const cfg = DOC_CFG[d.docType] || { label: d.docType, icon: '📄' };
+            return (
+              <div key={d.id} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '13px 16px', borderTop: i > 0 ? `1px solid ${PAPER2}` : 'none' }}>
+                <span style={{ fontSize: 20, flexShrink: 0 }}>{cfg.icon}</span>
+                <div style={{ minWidth: 0, flex: 1 }}>
+                  <div style={{ fontFamily: FONT, fontWeight: 600, fontSize: 13, color: INK, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                    {cfg.label}{d.counterpartyName ? ` · ${d.counterpartyName}` : ''}
+                  </div>
+                  <div style={{ fontFamily: 'monospace', fontSize: 11, color: INK3 }}>{d.docNumber} · {fmtDate(d.issuedAt)}</div>
+                </div>
+                <div style={{ fontFamily: FONT, fontWeight: 700, fontSize: 13, color: INK, whiteSpace: 'nowrap' }}>{fmtKr(d.amount)}</div>
+                {d.downloadUrl ? (
+                  <a href={d.downloadUrl} target="_blank" rel="noopener noreferrer" title="Download PDF"
+                    style={{ fontSize: 18, textDecoration: 'none', color: PRIMARY, flexShrink: 0 }}>⬇</a>
+                ) : (
+                  <span style={{ fontSize: 12, color: INK3, flexShrink: 0 }}>—</span>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </>
+  );
+}
 
 export default function MinKontoPage() {
   const router = useRouter();
@@ -34,6 +105,7 @@ export default function MinKontoPage() {
   const [withdrawing, setWithdrawing] = useState(false);
   const [showConfirm, setShowConfirm] = useState(false);
   const [msg, setMsg] = useState(null);
+  const [tab, setTab] = useState('konto');
 
   const load = useCallback(async () => {
     try {
@@ -84,12 +156,26 @@ export default function MinKontoPage() {
           Tilbage
         </button>
         <h1 style={{ fontFamily: FONT, fontWeight: 800, fontSize: 26, color: INK, letterSpacing: '-0.03em', marginBottom: 6 }}>Min konto</h1>
-        <p style={{ fontFamily: FONT, fontSize: 13, color: INK3, marginBottom: 24 }}>Penge du har tjent ved salg. Brug dem i din næste handel eller hæv dem til jeres bankkonto.</p>
+        <p style={{ fontFamily: FONT, fontSize: 13, color: INK3, marginBottom: 18 }}>Din saldo, udbetalinger og alle dine bilag (fakturaer og afregninger) samlet ét sted.</p>
+
+        {!loading && !error && data && (
+          <div style={{ display: 'inline-flex', background: PAPER2, border: `1px solid ${PAPER3}`, borderRadius: 12, padding: 3, marginBottom: 22 }}>
+            {[['konto', 'Konto'], ['bilag', 'Bilag']].map(([k, lab]) => (
+              <button key={k} onClick={() => setTab(k)}
+                style={{ padding: '7px 20px', borderRadius: 9, border: 'none', cursor: 'pointer', fontFamily: FONT, fontWeight: 700, fontSize: 13,
+                  background: tab === k ? '#fff' : 'transparent', color: tab === k ? INK : INK3, boxShadow: tab === k ? '0 1px 2px rgba(0,0,0,0.06)' : 'none' }}>
+                {lab}
+              </button>
+            ))}
+          </div>
+        )}
 
         {loading && <div style={{ textAlign: 'center', padding: 40, fontFamily: FONT, color: INK3 }}>Henter konto…</div>}
         {error && <div style={{ background: '#FEE2E2', borderRadius: 12, padding: '14px 16px', fontFamily: FONT, fontSize: 13, color: '#DC2626' }}>{error}</div>}
 
-        {!loading && !error && data && (
+        {!loading && !error && data && tab === 'bilag' && <BilagPanel />}
+
+        {!loading && !error && data && tab === 'konto' && (
           <>
             {/* Saldo-kort */}
             <div style={{ background: `linear-gradient(160deg, ${GREEN_DEEP} 0%, ${PRIMARY} 100%)`, borderRadius: 20, padding: '28px 24px', color: '#fff', marginBottom: 20 }}>

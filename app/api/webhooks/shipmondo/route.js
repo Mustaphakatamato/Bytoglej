@@ -3,6 +3,7 @@ import { createServerClient } from '@/lib/supabase-server';
 import { handleWebhook } from '@/lib/shipmondo/client';
 import { notify } from '@/lib/notify';
 import { creditOrderOnDelivery } from '@/lib/wallet';
+import { issueAfregningForDelivery } from '@/lib/documents';
 
 export async function POST(req) {
   const supa = createServerClient();
@@ -81,6 +82,7 @@ export async function POST(req) {
         if (updatedOrder) {
           // Sæt sælgers indtjening ind på deres byt&leg-konto (idempotent).
           await creditOrderOnDelivery(supa, updatedOrder.id);
+          await issueAfregningForDelivery(supa, updatedOrder.id).catch(e => console.error('[shipmondo] afregning-fejl:', e?.message));
           try {
             const titles = (updatedOrder.order_groups || [])
               .flatMap(g => (g.items || []).map(i => i.title)).join(', ');

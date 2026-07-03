@@ -5,6 +5,7 @@ import { createShipment } from '@/lib/shipmondo/client';
 import { escapeHtml } from '@/lib/escape-html';
 import { persistSwapCO2, persistTransactionCO2 } from '@/lib/co2/persist-server';
 import { isCashPurchaseProposal } from '@/lib/pricing';
+import { issueKoebsfakturaForOrder, issueAfregningSimple } from '@/lib/documents';
 import { notify } from '@/lib/notify';
 import { formatOrderNumber } from '@/lib/order-number';
 import { addBusinessDays } from '@/lib/business-days';
@@ -458,6 +459,9 @@ export async function finalizePurchase(pi, supa) {
     }
   }
 
+  // Købsfaktura til køber (best-effort, idempotent). byt&leg står som sælger (Model B).
+  await issueKoebsfakturaForOrder(supa, order.id).catch(e => console.error('[stripe-webhook] købsfaktura-fejl:', e?.message));
+
   return NextResponse.json({ received: true, shipments_created: anyShipment });
 }
 
@@ -750,9 +754,23 @@ export async function handleSwapProposalPayment(pi, supa) {
                 url: '/min-konto',
               });
             } catch (e) { console.error('[stripe-webhook] cash-notify fejl:', e?.message); }
+            // Afregningsbilag til modtageren (selvfakturering) for pengedelen.
+            await issueAfregningSimple(supa, {
+              sellerInstId: receiverInstId,
+              counterpartyId: p.cash_payer === 'initiator' ? p.initiator_institution_id : p.owner_institution_id,
+              referenceId: proposalId,
+              amount: Number(p.cash_adjustment),
+              description: isPurchase ? 'Solgt vare (kontant-køb via byt&leg)' : 'Kontant mellemlag fra byttehandel',
+              buyerName: p.cash_payer === 'initiator' ? (initInst?.name || null) : (ownerInst?.name || null),
+            }).catch(e => console.error('[stripe-webhook] cash-afregning-fejl:', e?.message));
           }
         }
       }
+    }
+
+    // Kontant-køb: købsfaktura til køberen (initiator) for portoen/gebyret/varen.
+    if (isPurchase && p.initiator_order_id) {
+      await issueKoebsfakturaForOrder(supa, p.initiator_order_id).catch(e => console.error('[stripe-webhook] kontant-køb faktura-fejl:', e?.message));
     }
 
     if (convId) {

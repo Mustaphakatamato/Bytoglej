@@ -71,14 +71,6 @@ const SHIPMENT_STATUS_CFG = {
   cancelled:  { bg: PAPER3, color: INK3, label: 'Annulleret' },
 };
 
-const INVOICE_STATUS_CFG = {
-  draft:     { bg: PAPER3, color: INK3, label: 'Kladde' },
-  sent:      { bg: '#DBEAFE', color: '#1E40AF', label: 'Sendt' },
-  paid:      { bg: '#D1FAE5', color: '#065F46', label: 'Betalt' },
-  overdue:   { bg: '#FEE2E2', color: '#991B1B', label: 'Forfalden' },
-  cancelled: { bg: PAPER3, color: INK3, label: 'Annulleret' },
-};
-
 function TypeBadge({ type }) {
   const map = {
     'sælges': { label: 'Sælges', bg: GREEN_TINT, color: PRIMARY },
@@ -132,7 +124,6 @@ const TABS = [
   { id: 'shipping',     label: 'Forsendelser',  emoji: '🚚' },
   { id: 'feedback',     label: 'Feedback',      emoji: '🐛' },
   { id: 'users',        label: 'Brugere',       emoji: '👥' },
-  { id: 'economy',      label: 'Økonomi',       emoji: '💰' },
   { id: 'payouts',      label: 'Udbetalinger',  emoji: '💸' },
   { id: 'log',          label: 'Log',           emoji: '📝' },
   { id: 'ai-bot',       label: 'AI Bot',        emoji: '🤖' },
@@ -357,7 +348,6 @@ export default function AdminPage() {
         {tab === 'shipping'     && <ShippingTab isMobile={isMobile} />}
         {tab === 'feedback'     && <FeedbackTab isMobile={isMobile} onNewCountChange={setFeedbackNewCount} />}
         {tab === 'users'        && <UsersTab isMobile={isMobile} />}
-        {tab === 'economy'      && <EconomyTab isMobile={isMobile} />}
         {tab === 'payouts'      && <PayoutsTab isMobile={isMobile} />}
         {tab === 'log'          && <LogTab isMobile={isMobile} />}
         {tab === 'ai-bot'       && <AiBotTab isMobile={isMobile} />}
@@ -1602,99 +1592,7 @@ function UsersTab({ isMobile }) {
   );
 }
 
-// ── SECTION 9: Economy ──────────────────────────────────────────────────────────
-
-function EconomyTab({ isMobile }) {
-  const [invoices, setInvoices] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [filter, setFilter] = useState('');
-
-  useEffect(() => {
-    db.from('shipping_invoices').select('*, institutions(name, email)').order('created_at', { ascending: false }).limit(100).then(({ data }) => {
-      setInvoices(data || []);
-      setLoading(false);
-    });
-  }, []);
-
-  const filtered = invoices.filter(inv => !filter || inv.status === filter);
-  const totalRevenue = invoices.filter(i => i.status === 'paid').reduce((s, i) => s + (i.total_amount_dkk || 0), 0);
-  const outstanding = invoices.filter(i => ['sent', 'overdue'].includes(i.status)).reduce((s, i) => s + (i.total_amount_dkk || 0), 0);
-
-  function exportCsv() {
-    const rows = [['Institution', 'Fakturanr', 'Periode start', 'Periode slut', 'Beløb (DKK)', 'Status', 'Forfald']];
-    filtered.forEach(inv => {
-      rows.push([
-        (inv.institutions?.name || ''),
-        inv.invoice_number || '',
-        inv.period_start || '',
-        inv.period_end || '',
-        inv.total_amount_dkk ?? '',
-        inv.status || '',
-        inv.due_date || '',
-      ]);
-    });
-    const csv = rows.map(r => r.map(c => `"${String(c).replace(/"/g, '""')}"`).join(',')).join('\n');
-    const blob = new Blob(['﻿' + csv], { type: 'text/csv;charset=utf-8;' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `fakturaer_${new Date().toISOString().slice(0, 10)}.csv`;
-    a.click();
-    URL.revokeObjectURL(url);
-  }
-
-  if (loading) return <Spinner />;
-
-  return (
-    <div>
-      <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr 1fr' : 'repeat(3, 1fr)', gap: 12, marginBottom: 20 }}>
-        <Stat label="Betalt omsætning" value={fmtKr(totalRevenue)} color={PRIMARY} />
-        <Stat label="Udestående" value={fmtKr(outstanding)} color={CORAL} />
-        <Stat label="Fakturaer" value={invoices.length} color={INK2} />
-      </div>
-
-      <div style={{ display: 'flex', gap: 8, marginBottom: 16, flexWrap: 'wrap', alignItems: 'center' }}>
-        <select value={filter} onChange={e => setFilter(e.target.value)} style={{ padding: '10px 12px', border: `1.5px solid ${PAPER3}`, borderRadius: 10, fontFamily: FONT, fontSize: 13, background: PAPER2, color: INK, cursor: 'pointer' }}>
-          <option value="">Alle</option>
-          {Object.entries(INVOICE_STATUS_CFG).map(([k, v]) => <option key={k} value={k}>{v.label}</option>)}
-        </select>
-        <button onClick={exportCsv} style={{ padding: '9px 16px', borderRadius: 10, border: `1.5px solid ${PAPER3}`, background: '#fff', color: INK, fontFamily: FONT, fontWeight: 700, fontSize: 13, cursor: 'pointer' }}>⬇ Eksporter CSV</button>
-        <span style={{ fontFamily: FONT, fontSize: 12, color: INK3 }}>{filtered.length} fakturaer</span>
-      </div>
-
-      {filtered.length === 0 ? <Empty text="Ingen fakturaer" /> : (
-        <div style={{ background: PAPER2, border: `1px solid rgba(22,34,28,0.08)`, borderRadius: 16, overflow: 'auto' }}>
-          <table style={{ width: '100%', borderCollapse: 'collapse', fontFamily: FONT, fontSize: 13, minWidth: 600 }}>
-            <thead>
-              <tr style={{ borderBottom: `1px solid ${PAPER3}` }}>
-                {['Institution', 'Fakturanr', 'Periode', 'Beløb', 'Status', 'Forfald'].map(h => (
-                  <th key={h} style={{ padding: '12px 16px', textAlign: 'left', color: INK3, fontWeight: 700, fontSize: 12, whiteSpace: 'nowrap' }}>{h}</th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {filtered.map((inv, i) => {
-                const c = INVOICE_STATUS_CFG[inv.status] || { bg: PAPER3, color: INK3, label: inv.status };
-                return (
-                  <tr key={inv.id} style={{ borderBottom: i < filtered.length - 1 ? `1px solid ${PAPER3}` : 'none' }}>
-                    <td style={{ padding: '12px 16px', fontWeight: 600, color: INK }}>{inv.institutions?.name || '—'}</td>
-                    <td style={{ padding: '12px 16px', color: INK2, fontFamily: 'monospace', fontSize: 12 }}>{inv.invoice_number || '—'}</td>
-                    <td style={{ padding: '12px 16px', color: INK3, whiteSpace: 'nowrap' }}>{inv.period_start ? fmtDate(inv.period_start) : '—'} – {inv.period_end ? fmtDate(inv.period_end) : '—'}</td>
-                    <td style={{ padding: '12px 16px', fontWeight: 700, color: INK }}>{fmtKr(inv.total_amount_dkk)}</td>
-                    <td style={{ padding: '12px 16px' }}><Badge bg={c.bg} color={c.color}>{c.label}</Badge></td>
-                    <td style={{ padding: '12px 16px', color: INK3, whiteSpace: 'nowrap' }}>{inv.due_date ? fmtDate(inv.due_date) : '—'}</td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-        </div>
-      )}
-    </div>
-  );
-}
-
-// ── SECTION 9b: Udbetalinger ────────────────────────────────────────────────────
+// ── SECTION 9: Udbetalinger ─────────────────────────────────────────────────────
 
 const PAYOUT_STATUS_CFG = {
   pending:  { bg: '#FEF9C3', color: '#92400E', label: 'Afventer' },
