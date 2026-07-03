@@ -195,7 +195,7 @@ export default function IndstillingerPage() {
       ean:                  form.ean || null,
       vat_registered:       !!form.vat_registered,
       self_billing_accepted_at:   selfBillingOk ? (institution.self_billing_accepted_at || new Date().toISOString()) : null,
-      self_billing_terms_version: selfBillingOk ? (institution.self_billing_terms_version || 'v1-udkast') : null,
+      self_billing_terms_version: selfBillingOk ? (institution.self_billing_terms_version || 'v1-2026-07') : null,
     }).eq('email', institution.email);
     setSaving(false);
     if (error) { showToast('Noget gik galt', 'error'); return; }
