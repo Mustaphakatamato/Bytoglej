@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { waitUntil } from '@vercel/functions';
 import Stripe from 'stripe';
 import { createServerClient } from '@/lib/supabase-server';
 import { createShipment } from '@/lib/shipmondo/client';
@@ -14,6 +15,11 @@ function getStripe() {
   if (!process.env.STRIPE_SECRET_KEY) throw new Error('STRIPE_SECRET_KEY er ikke sat');
   return new Stripe(process.env.STRIPE_SECRET_KEY);
 }
+
+// Kør på Node-runtime og giv fulfillment (Shipmondo/Resend/PDF) god tid i
+// baggrunden. Stripe-svaret sendes uanset straks (se waitUntil nedenfor).
+export const runtime = 'nodejs';
+export const maxDuration = 60;
 
 export async function POST(req) {
   const body = await req.text();
@@ -33,8 +39,26 @@ export async function POST(req) {
     return NextResponse.json({ error: 'Ugyldig webhook-signatur' }, { status: 400 });
   }
 
+  // Kvittér straks (2xx) til Stripe og kør fulfillment i baggrunden. Fulfillment
+  // kan kalde Shipmondo, Resend og PDF-generering, der tilsammen let overskrider
+  // Stripes ~20s-timeout — netop det gav "other errors" og fik Stripe til at
+  // deaktivere endpointet efter 9 dage. waitUntil holder funktionen i live til
+  // arbejdet er færdigt, uden at Stripe skal vente på svaret. Idempotensen (den
+  // atomiske pending→paid-claim) ligger inde i handlerne, så det er sikkert selv
+  // hvis klientens /api/payments/finalize kører samtidig.
   const supa = createServerClient();
+  waitUntil(
+    processStripeEvent(event, supa).catch(err =>
+      console.error('[stripe-webhook] baggrundsbehandling fejlede:', err?.message)
+    )
+  );
+  return NextResponse.json({ received: true });
+}
 
+// Udfører den faktiske fulfillment for et Stripe-event. Kaldes i baggrunden efter
+// at Stripe har fået sin 200, så en langsom Shipmondo-/Resend-/PDF-operation aldrig
+// får selve webhook-leveringen til at time ud.
+async function processStripeEvent(event, supa) {
   // ── Fejlede betalinger: markér ordren som failed + tilbagefør wallet ──
   if (event.type === 'payment_intent.payment_failed' || event.type === 'payment_intent.canceled') {
     const pi = event.data.object;
