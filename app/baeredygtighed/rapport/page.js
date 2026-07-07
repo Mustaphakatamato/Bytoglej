@@ -226,9 +226,9 @@ export default function CO2RapportPage() {
                 </div>
                 {comparison && <div style={{ fontFamily: FONT, fontSize: 13, color: PRIMARY, fontWeight: 600, marginTop: 6 }}>{comparison}</div>}
               </div>
-              <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
-                <button onClick={exportCSV} style={{ background: PRIMARY, color: '#fff', border: 'none', borderRadius: 99, fontFamily: FONT, fontWeight: 700, fontSize: 13, padding: '10px 18px', cursor: 'pointer' }}>⬇ Download CSV</button>
-                <button onClick={downloadPDF} disabled={pdfBusy} style={{ background: 'none', color: PRIMARY, border: `1.5px solid ${PRIMARY}`, borderRadius: 99, fontFamily: FONT, fontWeight: 700, fontSize: 13, padding: '10px 18px', cursor: pdfBusy ? 'default' : 'pointer', opacity: pdfBusy ? 0.6 : 1 }}>{pdfBusy ? 'Genererer…' : '⬇ Download PDF'}</button>
+              <div style={{ display: 'flex', gap: 10, flexWrap: 'nowrap', width: isMobile ? '100%' : 'auto' }}>
+                <button onClick={exportCSV} style={{ flex: isMobile ? 1 : 'none', whiteSpace: 'nowrap', textAlign: 'center', background: PRIMARY, color: '#fff', border: 'none', borderRadius: 99, fontFamily: FONT, fontWeight: 700, fontSize: 13, padding: '10px 16px', cursor: 'pointer' }}>⬇ Download CSV</button>
+                <button onClick={downloadPDF} disabled={pdfBusy} style={{ flex: isMobile ? 1 : 'none', whiteSpace: 'nowrap', textAlign: 'center', background: 'none', color: PRIMARY, border: `1.5px solid ${PRIMARY}`, borderRadius: 99, fontFamily: FONT, fontWeight: 700, fontSize: 13, padding: '10px 16px', cursor: pdfBusy ? 'default' : 'pointer', opacity: pdfBusy ? 0.6 : 1 }}>{pdfBusy ? 'Genererer…' : '⬇ Download PDF'}</button>
               </div>
             </div>
 
