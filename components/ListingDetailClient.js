@@ -578,13 +578,6 @@ export default function ListingDetailClient() {
                 {listing.brand && <span style={{ fontSize:12, color:INK2, fontFamily:FONT, fontWeight:700 }}>{listing.brand}</span>}
               </div>
             )}
-            {/* "Dit eget opslag" + rediger on mobile only */}
-            {isOwn && isMobile && (
-              <div style={{ background:GREEN_TINT, borderRadius:16, padding:'14px 18px', marginTop:16 }}>
-                <div style={{ fontFamily:FONT, fontWeight:700, fontSize:13, color:PRIMARY, marginBottom:10, textAlign:'center' }}>Dit eget opslag</div>
-                <button onClick={()=>router.push(`/rediger-opslag/${listing.id}`)} style={{ width:'100%', padding:'11px', borderRadius:14, background:PRIMARY, border:'none', color:'#fff', fontFamily:FONT, fontWeight:700, fontSize:14, cursor:'pointer' }}>Rediger opslag</button>
-              </div>
-            )}
             {/* Bundttilbud hint (not own, not mobile) */}
             {!isOwn && !isMobile && (
               <div style={{ background:PAPER2, borderRadius:14, padding:'12px 16px', display:'flex', alignItems:'center', gap:12, border:`1px solid ${PAPER3}`, marginTop:16 }}>
