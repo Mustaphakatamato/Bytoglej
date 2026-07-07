@@ -116,8 +116,9 @@ export default function FeedbackWidget({ loggedIn, institutionName, userEmail })
         .from('feedback-screenshots')
         .upload(path, screenshot, { contentType: screenshot.type || 'image/jpeg', upsert: false });
       if (error) { console.warn('[feedback] screenshot upload fejl:', error.message); return null; }
-      const { data: { publicUrl } } = db.storage.from('feedback-screenshots').getPublicUrl(path);
-      return publicUrl;
+      // Bucket'en er privat — gem objekt-stien (ikke en public-URL). Admin henter
+      // et signed link via /api/admin/feedback-screenshot ved visning.
+      return path;
     } catch { return null; }
   }
 

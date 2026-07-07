@@ -40,8 +40,17 @@ export async function POST(req) {
     if (process.env.RESEND_API_KEY) {
       const to = process.env.ADMIN_NOTIFICATION_EMAIL || 'admin@bytogleg.dk';
       const categoryLabel = { bug: '🐛 Fejl/bug', suggestion: '💡 Forslag', general: '⭐ Generel feedback', help_article: '📄 Artikel-feedback' }[category] || escapeHtml(category);
-      const screenshotRow = screenshotUrl
-        ? `<tr><td style="padding:8px 0;color:#6B7570;width:120px;vertical-align:top;">Screenshot</td><td style="padding:8px 0;"><a href="${escapeHtml(screenshotUrl)}" style="color:#1B4332;">Se billede</a></td></tr>`
+      // Bucket'en er privat: gem stien i DB, men lav en (kortere-levende) signed URL
+      // til visning i admin-mailen.
+      let screenshotDisplayUrl = null;
+      if (screenshotUrl) {
+        const { data: signed } = await adminDb.storage
+          .from('feedback-screenshots')
+          .createSignedUrl(screenshotUrl, 60 * 60 * 24 * 7);
+        screenshotDisplayUrl = signed?.signedUrl || null;
+      }
+      const screenshotRow = screenshotDisplayUrl
+        ? `<tr><td style="padding:8px 0;color:#6B7570;width:120px;vertical-align:top;">Screenshot</td><td style="padding:8px 0;"><a href="${escapeHtml(screenshotDisplayUrl)}" style="color:#1B4332;">Se billede</a></td></tr>`
         : '';
 
       const emailRes = await fetch('https://api.resend.com/emails', {
@@ -65,7 +74,7 @@ export async function POST(req) {
                 <tr><td style="padding:8px 0;color:#6B7570;vertical-align:top;">Besked</td><td style="padding:8px 0;white-space:pre-wrap;">${escapeHtml(message)}</td></tr>
                 ${screenshotRow}
               </table>
-              ${screenshotUrl ? `<img src="${escapeHtml(screenshotUrl)}" alt="Screenshot" style="margin-top:16px;max-width:100%;border-radius:8px;border:1px solid #e5e7eb;" />` : ''}
+              ${screenshotDisplayUrl ? `<img src="${escapeHtml(screenshotDisplayUrl)}" alt="Screenshot" style="margin-top:16px;max-width:100%;border-radius:8px;border:1px solid #e5e7eb;" />` : ''}
             `,
           }),
         }),

@@ -1,0 +1,13 @@
+-- ================================================================
+-- GDPR: gør shipping-labels + feedback-screenshots til private buckets (2026-07-07)
+-- Anvendt i prod via MCP; committet her så repo og prod matcher.
+--
+-- Fragtlabels indeholder navne+adresser og var i en public bucket (læsbar af
+-- enhver med den direkte URL). Feedback-screenshots ligeså. De gøres private og
+-- forbruges nu via autoriserede app-routes der laver kortlivede signed URLs:
+--   labels    → GET /api/shipping/label/<shipmondo_id>   (afsender-institution/admin)
+--   feedback  → GET /api/admin/feedback-screenshot?path= (kun admin)
+-- Upload sker via service role (labels) / authenticated INSERT-policy (feedback)
+-- og er uændret.
+-- ================================================================
+UPDATE storage.buckets SET public = false WHERE id IN ('shipping-labels','feedback-screenshots');

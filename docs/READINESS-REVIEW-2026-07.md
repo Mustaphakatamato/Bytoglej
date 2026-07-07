@@ -145,6 +145,11 @@ Advisoren blev kørt mod prod. Følgende er **rettet og verificeret** (migration
 
 **Manuelle punkter (kan ikke sættes via SQL):**
 - [ ] **Aktivér "Leaked Password Protection"** i Supabase → Auth (HaveIBeenPwned-tjek).
-- [ ] **Follow-up (kræver kodeændring):** gør `shipping-labels` + `feedback-screenshots`
-  til *private* buckets + signed URLs (`lib/shipmondo/client.js`, `FeedbackWidget.js`).
-  Listing er nu lukket, men public buckets er stadig læsbare med direkte URL.
+- [x] ~~**Follow-up (kræver kodeændring):** gør `shipping-labels` + `feedback-screenshots`
+  til *private* buckets + signed URLs.~~ **GJORT (2026-07-07):** begge buckets er nu
+  private. Labels serveres via `GET /api/shipping/label/<id>` (autoriseret til afsender-
+  institutionen/admin → kortlivet signed URL); feedback-screenshots via
+  `GET /api/admin/feedback-screenshot` (kun admin). `lib/shipmondo/client.js` og
+  `FeedbackWidget.js` gemmer nu objekt-stier i stedet for public-URL'er. `shipments`
+  havde 0 rækker, så ingen eksisterende data brød. (`listing-images`/`chat-images`
+  forbliver public som tiltænkt — listing-hullet er lukket.)
