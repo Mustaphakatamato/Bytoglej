@@ -109,3 +109,42 @@ Disse er ikke fejl, men **ukendte** der skal kvitteres før live:
 
 Når 1–5 er kvitteret: **go for en lille, overvåget pilot** (få kendte institutioner,
 tæt opfølgning). Bred, uovervåget onboarding først når hele listen er grøn.
+
+---
+
+## Tillæg (2026-07-07): Supabase security advisor — kørt + rettet
+
+Advisoren blev kørt mod prod. Følgende er **rettet og verificeret** (migration
+`20260707_security_advisor_hardening.sql`, anvendt i prod):
+
+- 🛑→✅ **Wallet-RPC-hul (show-stopper):** `wallet_credit` / `wallet_debit`
+  (saldo-mutation) + `next_doc_number` var eksekverbare af `anon`/`authenticated`
+  via PostgREST RPC — enhver kunne kreditere sig selv saldo med anon-nøglen.
+  EXECUTE trukket fra anon/authenticated/public; `service_role` beholdt. Verificeret
+  `anon=false, authed=false, service_role=true`.
+- 🔴→✅ **Storage-listing (GDPR):** fjernet brede SELECT-policies på de fire public
+  buckets (fragtlabels m. navne+adresser, chat-billeder, feedback-screenshots,
+  listing-billeder) — stopper `list()`-enumerering. Visning via `getPublicUrl` uberørt.
+- 🟡→✅ **`notifications` INSERT-spoofing:** droppet den permissive `WITH CHECK(true)`
+  INSERT-policy; notifikationer laves kun server-side.
+- 🟢 **`institutions_public`-view (advisor: ERROR):** gennemgået — eksponerer kun
+  kuraterede offentlige felter (navn, by, postnr, kommune, logo, koordinater, børnetal)
+  og kun for `profile_public = true`. Ingen e-mail/adresse/CVR/bank. Bevidst, sikkert
+  mønster — bevaret.
+
+**Resterende advisor-punkter (bevidste / lavrisiko — ikke blokerende):**
+- SECURITY DEFINER RLS-hjælpefunktioner (`conv_is_participant`, `user_can_manage_members`,
+  `user_in_institution`, `user_institution_approved`) er RPC-kaldbare, men returnerer kun
+  bool ud fra kalderens egen identitet og **skal** kunne kaldes af `authenticated` (bruges
+  i RLS-policies). `match_listings` (søgning), `institution_email_exists` (signup),
+  `get_listing_favorites_for_owner`, `bump_conv_unread` er legitime klient-RPC'er.
+- Åbne INSERT-policies på `feedback`, `listing_reports`, `scan_rejection_logs`,
+  `transaction_co2_savings` — indsendelses-/log-endpoints, lav risiko (spam/dataintegritet).
+- `data_export_log` / `document_counters`: RLS uden policies = **deny-all** (sikkert).
+- Hardening: `set_updated_at` mangler `search_path`; `vector`-extension i public-schema.
+
+**Manuelle punkter (kan ikke sættes via SQL):**
+- [ ] **Aktivér "Leaked Password Protection"** i Supabase → Auth (HaveIBeenPwned-tjek).
+- [ ] **Follow-up (kræver kodeændring):** gør `shipping-labels` + `feedback-screenshots`
+  til *private* buckets + signed URLs (`lib/shipmondo/client.js`, `FeedbackWidget.js`).
+  Listing er nu lukket, men public buckets er stadig læsbare med direkte URL.
