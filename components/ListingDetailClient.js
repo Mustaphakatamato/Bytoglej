@@ -30,19 +30,41 @@ import OfferModal from '@/components/OfferModal';
 import SwapProposalModal from '@/components/SwapProposalModal';
 import { authedFetch } from '@/lib/authed-fetch';
 
-function ImageGallery({ images, color, emoji, title }) {
+function ImageGallery({ images, color, emoji, title, isFav, favCount, onToggleFav }) {
   const [active, setActive] = useState(0);
   const [lightbox, setLightbox] = useState(false);
   const w = useWindowWidth();
-  const imgH = w < 500 ? 260 : w < 768 ? 320 : 380;
+  const mobile = w < 768;
+  const imgH = w < 500 ? 400 : mobile ? 440 : 380;
+  // Kant-til-kant på mobil (bryd ud af sidens 16px padding), afrundet kort på desktop.
+  const outerStyle = mobile
+    ? { margin:'0 -16px 12px', position:'relative' }
+    : { marginBottom:20 };
+  const frameStyle = { position:'relative', height:imgH, borderRadius: mobile ? 0 : 20, overflow:'hidden', background:'#f5f5f5' };
+  // Flydende hjerte-pille (Vinted-stil) — kun på mobil hvor billedet er kant-til-kant.
+  const HeartPill = mobile && onToggleFav ? (
+    <button onClick={(e)=>{ e.stopPropagation(); onToggleFav(); }}
+      style={{ position:'absolute', bottom:14, right:14, background:'#fff', border:'none', borderRadius:99, padding:'9px 14px', display:'flex', alignItems:'center', gap:7, cursor:'pointer', boxShadow:'0 2px 10px rgba(0,0,0,0.18)', zIndex:3 }}>
+      <span style={{ fontSize:17, lineHeight:1 }}>{isFav ? '❤️' : '🤍'}</span>
+      {favCount > 0 && <span style={{ fontFamily:FONT, fontSize:14, fontWeight:700, color:INK }}>{favCount}</span>}
+    </button>
+  ) : null;
   if (!images || images.length === 0) {
-    return <div style={{ height:imgH, background:color||'#FFD166', borderRadius:20, display:'flex', alignItems:'center', justifyContent:'center', marginBottom:20, fontSize:100 }}>{emoji||'🧸'}</div>;
+    return (
+      <div style={outerStyle}>
+        <div style={{ ...frameStyle, background:color||'#FFD166', display:'flex', alignItems:'center', justifyContent:'center', fontSize:100 }}>
+          {emoji||'🧸'}
+          {HeartPill}
+        </div>
+      </div>
+    );
   }
   return (
-    <div style={{ marginBottom:20 }}>
-      <div style={{ position:'relative', height:imgH, borderRadius:20, overflow:'hidden', background:'#f5f5f5' }}>
+    <div style={outerStyle}>
+      <div style={frameStyle}>
         <img src={images[active]} alt={title || ''} onClick={()=>setLightbox(true)} style={{ width:'100%', height:'100%', objectFit:'contain', display:'block', cursor:'zoom-in' }} />
-        <div style={{ position:'absolute', bottom:12, right:12, background:'rgba(0,0,0,0.48)', color:'#fff', borderRadius:8, padding:'4px 10px', fontSize:11, fontWeight:600, pointerEvents:'none' }}>🔍 Klik for fuld visning</div>
+        {!mobile && <div style={{ position:'absolute', bottom:12, right:12, background:'rgba(0,0,0,0.48)', color:'#fff', borderRadius:8, padding:'4px 10px', fontSize:11, fontWeight:600, pointerEvents:'none' }}>🔍 Klik for fuld visning</div>}
+        {HeartPill}
         {images.length > 1 && <>
           <button onClick={()=>setActive(i=>(i-1+images.length)%images.length)}
             style={{ position:'absolute', left:12, top:'50%', transform:'translateY(-50%)', width:40, height:40, borderRadius:'50%', background:'rgba(255,255,255,0.92)', border:'none', fontSize:18, cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center', boxShadow:'0 2px 8px rgba(0,0,0,0.15)' }}>‹</button>
@@ -53,7 +75,7 @@ function ImageGallery({ images, color, emoji, title }) {
           </div>
         </>}
       </div>
-      {images.length > 1 && (
+      {images.length > 1 && !mobile && (
         <div style={{ display:'flex', gap:8, marginTop:10, overflowX:'auto', paddingBottom:4 }}>
           {images.map((src,i)=>(
             <div key={i} onClick={()=>setActive(i)} style={{ width:72, height:72, borderRadius:12, overflow:'hidden', flexShrink:0, cursor:'pointer', border:`2.5px solid ${i===active?PRIMARY:'transparent'}`, transition:'border-color 0.15s' }}>
@@ -544,6 +566,59 @@ export default function ListingDetailClient() {
     );
   })();
 
+  // Grå sektionsbånd (Vinted-stil) — kant-til-kant på mobil.
+  const bandStyle = { height:8, background:PAPER2, margin: isMobile ? '18px -16px' : '22px 0', borderRadius: isMobile ? 0 : 8, border:`1px solid ${PAPER3}`, borderLeft:'none', borderRight:'none' };
+  const Band = () => <div style={bandStyle} aria-hidden />;
+
+  // Kan varen sendes? (bruges til badge i seller-kortet)
+  const _so = listing.shipping_options?.[0];
+  const canShipSeller = _so?.allow_shipping || (!_so && listing.can_ship);
+
+  // Sælger-/institutionskort (Vinted-stil): avatar, navn, rating, tryghedsbadges, kontakt.
+  const sellerCard = (
+    <div style={{ background:'#fff', borderRadius:18, padding:'16px 18px', border:`1px solid ${PAPER3}` }}>
+      <div style={{ display:'flex', alignItems:'center', gap:12 }}>
+        <div onClick={()=>goToInstitution(listing.institution_name)}
+          style={{ width:46, height:46, borderRadius:14, background:PRIMARY, display:'flex', alignItems:'center', justifyContent:'center', color:'#fff', fontFamily:FONT, fontWeight:800, fontSize:19, flexShrink:0, cursor:'pointer' }}>
+          {(listing.institution_name||'?').charAt(0).toUpperCase()}
+        </div>
+        <div style={{ flex:1, minWidth:0 }}>
+          <div onClick={()=>goToInstitution(listing.institution_name)}
+            style={{ fontFamily:FONT, fontWeight:800, fontSize:15, color:INK, cursor:'pointer', whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis' }}>
+            {listing.institution_name}
+          </div>
+          {trustScore ? (
+            <div style={{ display:'flex', alignItems:'center', gap:5, marginTop:2 }}>
+              <span style={{ color:'#F5A623', fontSize:13, letterSpacing:1 }}>
+                {'★★★★★'.slice(0, Math.round(trustScore.pct/20))}{'☆☆☆☆☆'.slice(0, 5-Math.round(trustScore.pct/20))}
+              </span>
+              <span style={{ fontSize:12, color:INK3, fontFamily:FONT }}>({trustScore.count})</span>
+            </div>
+          ) : listing.city ? (
+            <div style={{ fontSize:12, color:INK3, fontFamily:FONT, marginTop:2 }}>📍 {listing.city}</div>
+          ) : null}
+        </div>
+        {!isOwn && (
+          <button onClick={handleFollow} disabled={followLoading}
+            style={{ padding:'6px 14px', borderRadius:99, border:`1.5px solid ${isFollowing ? PRIMARY : '#ccc'}`, background: isFollowing ? GREEN_TINT : '#fff', color: isFollowing ? PRIMARY : INK3, fontSize:12, fontWeight:700, cursor:'pointer', fontFamily:FONT, transition:'all 0.2s', flexShrink:0 }}>
+            {isFollowing ? '✓ Følger' : '+ Følg'}
+          </button>
+        )}
+      </div>
+      <div style={{ display:'flex', gap:8, flexWrap:'wrap', marginTop:14 }}>
+        {['✓ CVR-verificeret', '✓ Sikker handel', canShipSeller ? '✓ Sender med pakkepost' : null].filter(Boolean).map((b,i) => (
+          <span key={i} style={{ fontSize:11, fontWeight:700, color:PRIMARY, background:GREEN_TINT, borderRadius:99, padding:'5px 12px', fontFamily:FONT }}>{b}</span>
+        ))}
+      </div>
+      {!isOwn && (
+        <button onClick={()=>onStartConv && onStartConv(listing)}
+          style={{ width:'100%', marginTop:14, padding:'12px', borderRadius:14, border:`1.5px solid ${PRIMARY}`, background:'#fff', color:PRIMARY, fontSize:14, fontWeight:700, cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center', gap:8, fontFamily:FONT }}>
+          💬 Skriv til sælger
+        </button>
+      )}
+    </div>
+  );
+
   return (
     <>
     <div style={{ minHeight:'100vh', paddingTop: isMobile ? 80 : 124, background:PAPER }} className="page-enter">
@@ -561,7 +636,8 @@ export default function ListingDetailClient() {
                 Rapportér opslag
               </button>
             )}
-            <ImageGallery images={listing.images} color={listing.color} emoji={listing.emoji} title={listing.title} />
+            <ImageGallery images={listing.images} color={listing.color} emoji={listing.emoji} title={listing.title}
+              isFav={isFav} favCount={localFavCount} onToggleFav={isMobile && !isOwn ? handleToggleFav : undefined} />
             {/* Category path + brand under image */}
             {(listing.brand || listing.category) && (
               <div style={{ display:'flex', alignItems:'center', gap:6, marginBottom:12, flexWrap:'wrap' }}>
@@ -607,19 +683,13 @@ export default function ListingDetailClient() {
 
           {/* RIGHT: Info + Actions */}
           <div style={{ position: isMobile ? 'static' : 'sticky', top: 96 }}>
-            {/* Institution name + follow */}
+            {/* Institution (kort link — det fulde sælgerkort vises længere nede) */}
             <div style={{ fontSize:12, color:INK3, fontFamily:FONT, marginBottom:8, display:'flex', alignItems:'center', gap:6, flexWrap:'wrap' }}>
               <span onClick={()=>goToInstitution(listing.institution_name)} style={{ color:PRIMARY, cursor:'pointer', fontWeight:600, textDecoration:'underline', textDecorationColor:'transparent' }}
                 onMouseEnter={e=>e.target.style.textDecorationColor=PRIMARY} onMouseLeave={e=>e.target.style.textDecorationColor='transparent'}>
                 {listing.institution_name}
               </span>
               {listing.city && <span>· {listing.city}</span>}
-              {!isOwn && (
-                <button onClick={handleFollow} disabled={followLoading}
-                  style={{ marginLeft:'auto', padding:'3px 10px', borderRadius:99, border:`1.5px solid ${isFollowing ? PRIMARY : '#ccc'}`, background: isFollowing ? GREEN_TINT : '#fff', color: isFollowing ? PRIMARY : INK3, fontSize:11, fontWeight:700, cursor:'pointer', fontFamily:FONT, transition:'all 0.2s', flexShrink:0 }}>
-                  {isFollowing ? '✓ Følger' : '+ Følg'}
-                </button>
-              )}
             </div>
 
             {/* Title */}
@@ -700,8 +770,9 @@ export default function ListingDetailClient() {
                 : null}
             </div>
 
-            {/* Action buttons */}
+            {/* Action buttons (desktop inline; på mobil ligger de i den faste bundbjælke) */}
             {!isOwn ? (
+              (!isMobile || isReservedForOther || isReservedForMe) && (
               <div style={{ display:'flex', flexDirection:'column', gap:10, marginBottom:20 }}>
                 {isReservedForOther && (
                   <div style={{ background:'#FEF3C7', border:'1.5px solid #F59E0B', borderRadius:14, padding:'12px 16px', fontSize:13, fontFamily:FONT, color:'#92400E', fontWeight:600 }}>
@@ -714,6 +785,7 @@ export default function ListingDetailClient() {
                     🎉 Du har et accepteret tilbud på denne vare. Gå til beskeder for at betale →
                   </button>
                 )}
+                {!isMobile && <>
                 {listing.type==='køb' && !reservedActive && <Btn variant="primary" color={PRIMARY} radius={22} onClick={handleAddToCart} style={{ justifyContent:'center', padding:'15px', fontSize:16 }}>{inCart ? '🛒 Gå til kurv →' : (() => { const so = listing.shipping_options?.[0]; const canShip = so?.allow_shipping || (!so && listing.can_ship); const tag = canShip ? (so?.shipping_included_in_price ? ' inkl. fragt' : ' + fragt') : ''; const total = listing.price + calcServiceFee(listing.price); return `🛒 Læg i kurv (${total.toFixed(2).replace('.',',')} kr.${tag})`; })()}</Btn>}
                 {listing.type==='køb' && !reservedActive && <Btn variant="outline" radius={22} onClick={()=>{ if(!loggedIn){ router.push('/login'); return; } setOfferModal(true); }} style={{ justifyContent:'center', padding:'13px', fontSize:15 }}>🏷️ Giv et tilbud</Btn>}
                 {listing.type==='byt' && !reservedActive && <Btn variant="primary" color={ACCENT} radius={22} onClick={()=>{ if(!loggedIn){ router.push('/login'); return; } setSwapProposalModal(true); }} style={{ justifyContent:'center', padding:'15px', fontSize:16 }}>🔄 Foreslå bytte</Btn>}
@@ -725,7 +797,9 @@ export default function ListingDetailClient() {
                   style={{ width:'100%', padding:'13px', borderRadius:22, border:`1.5px solid ${PRIMARY}`, background:'#fff', color:PRIMARY, fontSize:14, fontWeight:700, cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center', gap:8, fontFamily:FONT, transition:'all 0.2s' }}>
                   💬 Skriv til sælger
                 </button>
+                </>}
               </div>
+              )
             ) : (
               <div style={{ background:GREEN_TINT, borderRadius:16, padding:'16px 20px', marginBottom:20 }}>
                 <div style={{ fontFamily:FONT, fontWeight:700, fontSize:13, color:PRIMARY, marginBottom:12, textAlign:'center' }}>Dit eget opslag</div>
@@ -763,24 +837,20 @@ export default function ListingDetailClient() {
               onSubmitted={(data)=>{ if (data?.conversationId && setSelectedConvId) setSelectedConvId(data.conversationId); router.push('/beskeder'); }}
             />
 
-            {/* Trust checkmarks */}
-            <div style={{ display:'flex', gap:isMobile?10:16, flexWrap:'wrap', marginBottom:16 }}>
-              {[
-                '✓ CVR-verificeret',
-                '✓ Sikker handel',
-                listing.created_at ? `✓ ${timeAgo(listing.created_at)}` : null,
-              ].filter(Boolean).map((item, i) => (
-                <span key={i} style={{ fontSize:11, color:PRIMARY, fontWeight:700, fontFamily:FONT }}>{item}</span>
-              ))}
-            </div>
+            {/* Grå bånd + sælger-/institutionskort (Vinted-stil) */}
+            <Band />
+            {sellerCard}
+            <Band />
 
             {/* Heart + share */}
             <div style={{ display:'flex', gap:8, marginBottom:20 }}>
+              {!isMobile && (
               <button onClick={handleToggleFav}
                 style={{ flex:2, padding:'11px 8px', borderRadius:16, border:`1.5px solid ${isFav?'#fca5a5':'#e5e5e5'}`, background:isFav?'#fff0f3':'#fff', color:isFav?'#e11d48':'#555', fontSize:13, fontWeight:700, cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center', gap:5, fontFamily:FONT, transition:'all 0.2s' }}>
                 {isFav ? '❤️ Gemt' : '🤍 Gem'}
                 {localFavCount > 0 && <span style={{ background:isFav?'#fca5a5':'#eee', color:isFav?'#c0392b':'#888', borderRadius:99, padding:'1px 7px', fontSize:11 }}>{localFavCount}</span>}
               </button>
+              )}
               <button onClick={()=>{ navigator.clipboard.writeText(window.location.href).catch(()=>{}); setLinkCopied(true); setTimeout(()=>setLinkCopied(false),2200); }}
                 style={{ flex:1, padding:'11px 8px', borderRadius:16, border:'1.5px solid #e5e5e5', background:'#fff', color:linkCopied?PRIMARY:'#555', fontSize:12, fontWeight:700, cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center', gap:4, fontFamily:FONT, transition:'all 0.2s' }}>
                 {linkCopied ? '✓' : '🔗'}
@@ -800,7 +870,6 @@ export default function ListingDetailClient() {
             {/* Metadata box */}
             <div style={{ background:PAPER2, borderRadius:18, padding:'16px 20px', border:`1px solid ${PAPER3}`, marginBottom:14 }}>
               {[
-                ['Institution', listing.institution_name, 'inst'],
                 ['By', listing.city],
                 ['Aldersgruppe', listing.age_group],
                 ['Stand', listing.condition],
@@ -845,28 +914,14 @@ export default function ListingDetailClient() {
               );
             })()}
 
-            {/* CVR badge */}
-            <div style={{ background:GREEN_TINT, borderRadius:14, padding:'12px 16px', display:'flex', gap:10, alignItems:'center', borderLeft:`3px solid ${PRIMARY}`, marginBottom: trustScore ? 10 : 0 }}>
-              <div style={{ width:8, height:8, borderRadius:'50%', background:PRIMARY, flexShrink:0 }} />
+            {/* Tryghedsboks — sikker handel via platformen */}
+            <div style={{ background:GREEN_TINT, borderRadius:14, padding:'14px 16px', display:'flex', gap:12, alignItems:'flex-start', marginTop:14 }}>
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" style={{ flexShrink:0, marginTop:1 }}><path d="M12 2L4 6v6c0 5.25 3.5 10.15 8 11.35C16.5 22.15 20 17.25 20 12V6L12 2z" fill={PRIMARY} opacity="0.9"/><path d="M9 12l2 2 4-4" stroke="#fff" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"/></svg>
               <div>
-                <div style={{ fontFamily:FONT, fontWeight:700, fontSize:12, color:PRIMARY }}>CVR-verificeret institution</div>
-                <div style={{ fontSize:11, color:INK3, fontFamily:FONT }}>Handler sker sikkert via platformen</div>
+                <div style={{ fontFamily:FONT, fontWeight:700, fontSize:13, color:PRIMARY }}>Køb og sælg sikkert</div>
+                <div style={{ fontSize:12, color:INK3, fontFamily:FONT, marginTop:2, lineHeight:1.5 }}>Alle handler går gennem CVR-verificerede institutioner med sikker betaling og køberbeskyttelse via platformen.</div>
               </div>
             </div>
-
-            {/* Trust score */}
-            {trustScore && (
-              <div style={{ background:PAPER2, borderRadius:14, padding:'12px 16px', border:`1px solid ${PAPER3}`, display:'flex', alignItems:'center', gap:12 }}>
-                <div style={{ width:44, height:44, borderRadius:12, background:PRIMARY, display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center', flexShrink:0 }}>
-                  <div style={{ fontFamily:FONT, fontWeight:800, fontSize:15, color:'#fff', lineHeight:1 }}>{trustScore.pct}%</div>
-                  <div style={{ fontSize:9, color:'rgba(255,255,255,0.75)', fontFamily:FONT, fontWeight:600 }}>Tillid</div>
-                </div>
-                <div>
-                  <div style={{ fontFamily:FONT, fontWeight:700, fontSize:13, color:INK }}>Tillidsrating</div>
-                  <div style={{ fontSize:11, color:INK3, fontFamily:FONT }}>Baseret på {trustScore.count} anmeldelse{trustScore.count!==1?'r':''}</div>
-                </div>
-              </div>
-            )}
 
             {/* Mobile: bundttilbud */}
             {!isOwn && isMobile && (
@@ -886,6 +941,39 @@ export default function ListingDetailClient() {
 
       {/* På mobil: relaterede opslag i bunden (fuld bredde) */}
       {isMobile && relatedSection}
+
+      {/* Plads så sidste indhold ikke skjules bag den faste bundbjælke */}
+      {isMobile && !isOwn && <div style={{ height:72 }} aria-hidden />}
+
+      {/* Fast CTA-bundbjælke på mobil (Vinted-stil) — sidder oven over bundnavigationen */}
+      {isMobile && !isOwn && (() => {
+        const barStyle = { position:'fixed', left:0, right:0, bottom:'calc(84px + env(safe-area-inset-bottom, 0px))', zIndex:850, background:'#fff', borderTop:`1px solid ${PAPER3}`, boxShadow:'0 -4px 20px rgba(22,34,28,0.08)', padding:'10px 16px', display:'flex', gap:10 };
+        const outlineBtn = { flex:1, padding:'14px 8px', borderRadius:16, border:`1.5px solid ${PRIMARY}`, background:'#fff', color:PRIMARY, fontSize:14, fontWeight:700, cursor:'pointer', fontFamily:FONT, display:'flex', alignItems:'center', justifyContent:'center', gap:6 };
+        const fillBtn = (color) => ({ flex:1.4, padding:'14px 8px', borderRadius:16, border:'none', background:color, color:'#fff', fontSize:15, fontWeight:700, cursor:'pointer', fontFamily:FONT, display:'flex', alignItems:'center', justifyContent:'center', gap:6 });
+        if (isReservedForMe) {
+          return <div style={barStyle}><button onClick={()=>{ setSelectedConvId && setSelectedConvId(null); router.push('/beskeder'); }} style={fillBtn(PRIMARY)}>🎉 Gå til beskeder for at betale →</button></div>;
+        }
+        if (isReservedForOther) {
+          return <div style={barStyle}><button disabled style={{ ...fillBtn('#cbd5c7'), cursor:'default' }}>⏳ Reserveret til anden køber</button></div>;
+        }
+        if (listing.type === 'byt') {
+          return <div style={barStyle}>
+            <button onClick={()=>onStartConv && onStartConv(listing)} style={outlineBtn}>💬 Skriv</button>
+            <button onClick={()=>{ if(!loggedIn){ router.push('/login'); return; } setSwapProposalModal(true); }} style={fillBtn(ACCENT)}>🔄 Foreslå bytte</button>
+          </div>;
+        }
+        if (listing.type === 'søges') {
+          return <div style={barStyle}>
+            <button onClick={()=>onStartConv && onStartConv(listing)} style={outlineBtn}>💬 Skriv</button>
+            <button onClick={()=>setSøgesModal(true)} style={fillBtn('#7C3AED')}>🎯 Jeg har noget</button>
+          </div>;
+        }
+        // køb
+        return <div style={barStyle}>
+          <button onClick={()=>{ if(!loggedIn){ router.push('/login'); return; } setOfferModal(true); }} style={outlineBtn}>🏷️ Giv et tilbud</button>
+          <button onClick={handleAddToCart} style={fillBtn(PRIMARY)}>{inCart ? '🛒 Gå til kurv →' : '🛒 Læg i kurv'}</button>
+        </div>;
+      })()}
 
       <Modal open={shareModal} onClose={()=>{ setShareModal(false); setSelectedEmails([]); setShareNote(''); }} title="Del med medarbejder">
         <div style={{ display:'flex', flexDirection:'column', gap:14 }}>
