@@ -1480,9 +1480,11 @@ function FeedbackTab({ isMobile, onNewCountChange }) {
                   <div style={{ borderTop: `1px solid ${PAPER3}`, padding: '16px 18px', background: '#fafaf9' }}>
                     <div style={{ fontFamily: FONT, fontSize: 14, color: INK, lineHeight: 1.6, whiteSpace: 'pre-wrap', marginBottom: 14 }}>{item.message}</div>
 
-                    {item.screenshot_url && (
-                      <img src={item.screenshot_url} alt="Screenshot" onClick={() => setLightbox(item.screenshot_url)} style={{ maxWidth: '100%', maxHeight: 200, objectFit: 'cover', borderRadius: 10, border: `1px solid ${PAPER3}`, cursor: 'zoom-in', display: 'block', marginBottom: 16 }} />
-                    )}
+                    {item.screenshot_url && (() => {
+                      // Privat bucket: hent screenshottet via en admin-gated signed-URL-route.
+                      const shotUrl = `/api/admin/feedback-screenshot?path=${encodeURIComponent(item.screenshot_url)}`;
+                      return <img src={shotUrl} alt="Screenshot" onClick={() => setLightbox(shotUrl)} style={{ maxWidth: '100%', maxHeight: 200, objectFit: 'cover', borderRadius: 10, border: `1px solid ${PAPER3}`, cursor: 'zoom-in', display: 'block', marginBottom: 16 }} />;
+                    })()}
 
                     <div style={{ marginBottom: 14 }}>
                       <div style={{ fontFamily: FONT, fontSize: 11, fontWeight: 700, color: INK3, textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 8 }}>Status</div>

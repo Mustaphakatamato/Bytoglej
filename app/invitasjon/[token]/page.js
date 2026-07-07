@@ -36,18 +36,22 @@ export default function InvitasjonPage() {
 
   useEffect(() => {
     async function load() {
-      const { data, error } = await db
-        .from('institution_invitations')
-        .select('*')
-        .eq('token', token)
-        .maybeSingle();
+      try {
+        const res = await fetch('/api/invite/lookup', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ token }),
+        });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok || data?.status === 'invalid' || !data?.status) { setStatus('invalid'); return; }
+        if (data.status === 'used')    { setStatus('used');    return; }
+        if (data.status === 'expired') { setStatus('expired'); return; }
 
-      if (error || !data)     { setStatus('invalid');  return; }
-      if (data.accepted_at)   { setStatus('used');     return; }
-      if (new Date(data.expires_at) < new Date()) { setStatus('expired'); return; }
-
-      setInvitation(data);
-      setStatus('valid');
+        setInvitation({ email: data.email, institution_name: data.institution_name });
+        setStatus('valid');
+      } catch {
+        setStatus('invalid');
+      }
     }
     if (token) load();
   }, [token]);
@@ -64,36 +68,42 @@ export default function InvitasjonPage() {
     setSubmitting(true);
     setErr('');
 
-    const { data: signUpData, error: signUpErr } = await db.auth.signUp({
-      email: invitation.email,
-      password,
-    });
-
-    const alreadyExists = signUpErr?.message?.toLowerCase().includes('already registered');
-    if (signUpErr && !alreadyExists) {
-      setErr(signUpErr.message);
-      setSubmitting(false);
+    // Oprettelse + tilknytning sker server-side (service role), så RLS ikke
+    // blokerer medarbejder-linkningen. Token'et er beviset på adgang.
+    let data;
+    try {
+      const res = await fetch('/api/invite/accept', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ token, password }),
+      });
+      data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        // Invitationen kan være nået at blive brugt/udløbet i mellemtiden.
+        if (data?.status === 'used')    { setStatus('used');    return; }
+        if (data?.status === 'expired') { setStatus('expired'); return; }
+        if (data?.status === 'invalid') { setStatus('invalid'); return; }
+        setErr(data?.error || 'Noget gik galt. Prøv igen.');
+        return;
+      }
+    } catch {
+      setErr('Noget gik galt. Prøv igen.');
       return;
+    } finally {
+      setSubmitting(false);
     }
 
-    // Link to institution regardless of whether account was new or existing
-    await db.from('institution_members').upsert({
-      institution_id: invitation.institution_id,
-      email: invitation.email,
-      role: 'member',
-    }, { onConflict: 'institution_id,email', ignoreDuplicates: true });
-
-    // Mark accepted
-    await db.from('institution_invitations')
-      .update({ accepted_at: new Date().toISOString() })
-      .eq('token', token);
-
-    setSubmitting(false);
-    setDone(true);
-
-    // If auto-confirmed (Supabase email confirm disabled), redirect after short delay
-    if (signUpData?.session) {
-      setTimeout(() => router.push('/profil'), 2000);
+    // Ny konto: log ind med den netop valgte adgangskode og gå til dashboardet.
+    // Eksisterende konto: adgangskoden blev ikke ændret → bed brugeren logge ind.
+    if (!data.existing) {
+      const { data: signIn } = await db.auth.signInWithPassword({
+        email: invitation.email,
+        password,
+      });
+      setDone({ session: !!signIn?.session });
+      if (signIn?.session) setTimeout(() => router.push('/profil'), 2000);
+    } else {
+      setDone({ session: false });
     }
   }
 
@@ -130,7 +140,7 @@ export default function InvitasjonPage() {
           </h1>
           <p style={{ fontFamily:FONT, fontSize:15, color:INK3, lineHeight:1.65, marginBottom:28 }}>
             {needsConfirm
-              ? `Vi har sendt en bekræftelsesmail til ${invitation.email}. Bekræft din e-mail, og log derefter ind.`
+              ? `Din konto er klar, og du er tilknyttet ${invitation.institution_name}. Log ind med din e-mail og adgangskode for at komme i gang.`
               : 'Din konto er oprettet og du er nu tilknyttet institutionen. Du videresendes til dashboardet…'}
           </p>
           <Link href="/login" style={{ display:'inline-block', background:PRIMARY, color:'#fff', fontFamily:FONT, fontWeight:700, fontSize:15, padding:'14px 32px', borderRadius:99, textDecoration:'none' }}>
