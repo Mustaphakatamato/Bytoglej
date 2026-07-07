@@ -116,6 +116,40 @@ export default function CO2RapportPage() {
 
   const comparison = agg.total ? getCO2Comparison(agg.total) : null;
 
+  const [pdfBusy, setPdfBusy] = useState(false);
+  async function downloadPDF() {
+    if (pdfBusy) return;
+    setPdfBusy(true);
+    try {
+      const { downloadCO2ReportPdf } = await import('@/lib/co2/report-pdf');
+      await downloadCO2ReportPdf({
+        institutionName: institution?.name || 'Din institution',
+        generatedAt: new Date().toISOString(),
+        methodologyVersion: METHODOLOGY_VERSION,
+        totalLabel: fmtKg(agg.total),
+        count: agg.count,
+        comparison,
+        thisYear: new Date().getFullYear(),
+        lastYear: new Date().getFullYear() - 1,
+        thisYearLabel: fmtKg(agg.thisYear),
+        lastYearLabel: fmtKg(agg.lastYear),
+        soldLabel: fmtKg(soldKg),
+        boughtLabel: fmtKg(boughtKg),
+        categories: byCategory.map(c => ({
+          name: c.name,
+          kgLabel: fmtKg(c.kg),
+          count: c.count,
+          pct: agg.total > 0 ? (c.kg / agg.total) * 100 : 0,
+        })),
+      });
+    } catch (e) {
+      console.error('PDF-generering fejlede', e);
+      alert('Kunne ikke generere PDF. Prøv igen.');
+    } finally {
+      setPdfBusy(false);
+    }
+  }
+
   function exportCSV() {
     const header = ['Dato', 'Kategori', 'Rolle', 'kg CO2e sparet', 'Metode-version'];
     const lines = rows.map(r => {
@@ -194,7 +228,7 @@ export default function CO2RapportPage() {
               </div>
               <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
                 <button onClick={exportCSV} style={{ background: PRIMARY, color: '#fff', border: 'none', borderRadius: 99, fontFamily: FONT, fontWeight: 700, fontSize: 13, padding: '10px 18px', cursor: 'pointer' }}>⬇ Download CSV</button>
-                <button onClick={() => window.print()} style={{ background: 'none', color: PRIMARY, border: `1.5px solid ${PRIMARY}`, borderRadius: 99, fontFamily: FONT, fontWeight: 700, fontSize: 13, padding: '10px 18px', cursor: 'pointer' }}>🖨 Print / PDF</button>
+                <button onClick={downloadPDF} disabled={pdfBusy} style={{ background: 'none', color: PRIMARY, border: `1.5px solid ${PRIMARY}`, borderRadius: 99, fontFamily: FONT, fontWeight: 700, fontSize: 13, padding: '10px 18px', cursor: pdfBusy ? 'default' : 'pointer', opacity: pdfBusy ? 0.6 : 1 }}>{pdfBusy ? 'Genererer…' : '⬇ Download PDF'}</button>
               </div>
             </div>
 
