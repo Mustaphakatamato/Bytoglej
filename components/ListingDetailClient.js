@@ -214,7 +214,10 @@ export default function ListingDetailClient() {
 
   const isOwn = !!(
     (ctxInstitution && listing?.institution_name?.toLowerCase() === ctxInstitution.name?.toLowerCase()) ||
-    (currentUserId && listing?.user_id === currentUserId)
+    (currentUserId && listing?.user_id === currentUserId) ||
+    // Fanger også offentlig visning af egen profil og holdmedlemmer, hvor
+    // ctxInstitution kan være tom og user_id kan tilhøre en anden i institutionen.
+    (myInstName && listing?.institution_name?.toLowerCase() === myInstName.toLowerCase())
   );
 
   const reservedActive = !!(
@@ -346,6 +349,7 @@ export default function ListingDetailClient() {
   }
 
   async function onStartConv(listing) {
+    if (isOwn) { showToast('Dette er dit eget opslag.', 'info'); return; }
     const { data:{ user } } = await db.auth.getUser();
     if (!user) { router.push('/login'); return; }
     const { data: myInst } = await db.from('institutions').select('id,name').ilike('email', user.email).maybeSingle();
