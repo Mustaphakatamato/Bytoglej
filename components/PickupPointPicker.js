@@ -22,14 +22,21 @@ function fmtDist(m) {
 // hvor markers stadig tegnes. MapTiler kræver en nøgle, men rate-limiter ikke på
 // samme måde. Nøglen sættes i .env.local og på Vercel, aldrig i koden.
 // Uden nøgle bruges CARTO, så kortet stadig virker uden opsætning.
+// Bemærk tileSize/zoomOffset på MapTiler: deres anbefalede raster-endpoint leverer
+// 512×512-tiles, mens Leaflet som udgangspunkt antager 256×256. Uden de to options
+// bliver zoom-niveauerne forskudt og labels dobbelt så store. 512 er valgt frem for
+// MapTilers 256-variant, fordi det er 4× færre tile-requests pr. viewport.
+// Optionen sættes pr. lag — CARTO-fallbacken leverer 256×256.
 const MAPTILER_KEY = process.env.NEXT_PUBLIC_MAPTILER_KEY;
 const TILES_PRIMARY = MAPTILER_KEY ? {
   url: `https://api.maptiler.com/maps/streets-v4/{z}/{x}/{y}{r}.png?key=${MAPTILER_KEY}`,
   attribution: '© <a href="https://www.maptiler.com/copyright/">MapTiler</a> © <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
+  options: { tileSize: 512, zoomOffset: -1 },
 } : null;
 const TILES_FALLBACK = {
   url: 'https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png',
   attribution: '© OpenStreetMap © CARTO',
+  options: {},
 };
 const TILE_ERRORS_BEFORE_FALLBACK = 4;
 
@@ -99,7 +106,7 @@ export default function PickupPointPicker({ points, cheapestCarrier, buyerCoords
       // Tile-lag med fallback: fejler den primære udbyder gentagne gange (throttling,
       // netværk, blokeret domæne), skiftes der én gang til CARTO frem for at stå
       // tilbage med et gråt kort.
-      const addTiles = (cfg) => L.tileLayer(cfg.url, { attribution: cfg.attribution, maxZoom: 19 })
+      const addTiles = (cfg) => L.tileLayer(cfg.url, { attribution: cfg.attribution, maxZoom: 19, ...cfg.options })
         .addTo(mapInstanceRef.current);
       tilesRef.current = addTiles(TILES_PRIMARY || TILES_FALLBACK);
       if (TILES_PRIMARY) {
