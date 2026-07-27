@@ -16,6 +16,23 @@ function fmtDist(m) {
   return m < 1000 ? `${m} m` : `${(m / 1000).toFixed(1).replace('.', ',')} km`;
 }
 
+// ── Tile-udbyder ─────────────────────────────────────────────────────────────
+// CARTO's basemaps er gratis uden nøgle, men er tiltænkt lav, ikke-kommerciel
+// trafik og throttler anonyme klienter uden varsel — det giver et helt gråt kort
+// hvor markers stadig tegnes. MapTiler kræver en nøgle, men rate-limiter ikke på
+// samme måde. Nøglen sættes i .env.local og på Vercel, aldrig i koden.
+// Uden nøgle bruges CARTO, så kortet stadig virker uden opsætning.
+const MAPTILER_KEY = process.env.NEXT_PUBLIC_MAPTILER_KEY;
+const TILES_PRIMARY = MAPTILER_KEY ? {
+  url: `https://api.maptiler.com/maps/streets-v2/{z}/{x}/{y}{r}.png?key=${MAPTILER_KEY}`,
+  attribution: '© <a href="https://www.maptiler.com/copyright/">MapTiler</a> © <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
+} : null;
+const TILES_FALLBACK = {
+  url: 'https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png',
+  attribution: '© OpenStreetMap © CARTO',
+};
+const TILE_ERRORS_BEFORE_FALLBACK = 4;
+
 const MARK = { pdk: { bg: '#005CB9', txt: 'pn' }, gls: { bg: '#06038D', txt: 'GLS' }, dao: { bg: '#E2001A', txt: 'dao' } };
 function makeMarkerIcon(L, p, active) {
   const m = MARK[p.carrier_code] || { bg: PRIMARY, txt: p.carrier_name };
@@ -46,9 +63,13 @@ export default function PickupPointPicker({ points, cheapestCarrier, buyerCoords
   const mapInstanceRef = useRef(null);
   const markersRef = useRef(null);
   const resizeObsRef = useRef(null);
-  const tilesRef = useRef(null);     // tile-laget, så det kan gentegnes uden for init
+  const resizeRafRef = useRef(0);    // coalescer ResizeObserver-kald til én pr. frame
+  const tilesRef = useRef(null);     // aktivt tile-lag (kan udskiftes ved fallback)
+  const didFallbackRef = useRef(false); // sandt når vi er skiftet til fallback-tiles
   const pointsRef = useRef(points);  // seneste punkter (init fanger ellers tom liste)
-  const fixRef = useRef(null);       // size/zoom-fix kaldbar fra andre effekter
+  const sizeFixRef = useRef(null);   // størrelses-fix kaldbar fra andre effekter
+  const fitRef = useRef(null);       // zoom-til-punkter kaldbar fra andre effekter
+  const didFitRef = useRef(false);   // sandt når kortet er zoomet til punkterne mindst én gang
   const retryIvRef = useRef(null);   // retry-interval indtil containeren har reel størrelse
   pointsRef.current = points;        // hold altid seneste punkter (async-ankomst)
 
@@ -74,16 +95,32 @@ export default function PickupPointPicker({ points, cheapestCarrier, buyerCoords
         ? [init.reduce((s, p) => s + p.lat, 0) / init.length, init.reduce((s, p) => s + p.lng, 0) / init.length]
         : [55.67, 12.56];
       mapInstanceRef.current = L.map(mapRef.current, { center, zoom: 12, zoomControl: true, scrollWheelZoom: true });
-      tilesRef.current = L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
-        attribution: '© OpenStreetMap © CARTO', maxZoom: 19,
-      }).addTo(mapInstanceRef.current);
+
+      // Tile-lag med fallback: fejler den primære udbyder gentagne gange (throttling,
+      // netværk, blokeret domæne), skiftes der én gang til CARTO frem for at stå
+      // tilbage med et gråt kort.
+      const addTiles = (cfg) => L.tileLayer(cfg.url, { attribution: cfg.attribution, maxZoom: 19 })
+        .addTo(mapInstanceRef.current);
+      tilesRef.current = addTiles(TILES_PRIMARY || TILES_FALLBACK);
+      if (TILES_PRIMARY) {
+        let tileErrors = 0;
+        tilesRef.current.on('tileerror', () => {
+          if (didFallbackRef.current || ++tileErrors < TILE_ERRORS_BEFORE_FALLBACK) return;
+          didFallbackRef.current = true;
+          if (tilesRef.current) mapInstanceRef.current?.removeLayer(tilesRef.current);
+          tilesRef.current = addTiles(TILES_FALLBACK);
+        });
+      }
       markersRef.current = L.layerGroup().addTo(mapInstanceRef.current);
 
-      // Robust størrelses-/zoom-fix. Læser ALTID seneste punkter (async-ankomst),
-      // sætter eksplicit højde fra forælderen (Safari resolver ikke altid højden på
-      // et position:absolute element), invalidate'r størrelsen og zoomer til punkterne.
-      // Returnerer true når containeren har en reel størrelse (modal færdig-animeret).
-      const fix = () => {
+      // Sætter eksplicit højde/bredde fra forælderen (Safari resolver ikke altid
+      // højden på et position:absolute element) og lader Leaflet genberegne sit
+      // viewport. Returnerer true når containeren har reel størrelse.
+      // Bevidst UDEN redraw(): den smider alle tiles væk og henter dem forfra, og
+      // kaldt fra både retry-intervallet og ResizeObserver'en udløste det en byge
+      // af tile-requests under modal-animationen — nok til at ramme et rate-limit.
+      // invalidateSize() henter selv de tiles der mangler.
+      const sizeFix = () => {
         const map = mapInstanceRef.current, el = mapRef.current;
         if (!map || !el) return false;
         let sized = true;
@@ -94,39 +131,58 @@ export default function PickupPointPicker({ points, cheapestCarrier, buyerCoords
           if (w > 0) el.style.width = w + 'px';
         }
         map.invalidateSize();
+        return sized;
+      };
+      sizeFixRef.current = sizeFix;
+
+      // Zoom til punkterne. Læser ALTID seneste punkter (async-ankomst). Kaldes kun
+      // når punkterne ændrer sig og ved første måling — ikke ved hver resize, så
+      // brugerens eget pan/zoom ikke bliver overskrevet.
+      const fitToPoints = () => {
+        const map = mapInstanceRef.current;
+        if (!map) return;
         const valid = pointsRef.current.filter(p => p.lat != null && p.lng != null);
         if (valid.length > 1) {
           map.fitBounds(L.latLngBounds(valid.map(p => [p.lat, p.lng])), { padding: [40, 40] });
         } else if (valid.length === 1) {
           map.setView([valid[0].lat, valid[0].lng], 13);
         }
-        tilesRef.current?.redraw();
-        return sized;
       };
-      fixRef.current = fix;
+      fitRef.current = fitToPoints;
 
       // Retry indtil containeren faktisk har størrelse (modal-animation kan tage tid),
-      // maks ~3s. Erstatter de skrøbelige faste timeouts der ikke ramte hver gang.
-      requestAnimationFrame(fix);
+      // maks ~3s. Zoomer til punkterne så snart der ér en størrelse at zoome indenfor.
+      const sizeThenFit = () => {
+        const sized = sizeFix();
+        if (sized && !didFitRef.current) { fitToPoints(); didFitRef.current = true; }
+        return sized;
+      };
+      requestAnimationFrame(sizeThenFit);
       let tries = 0;
       retryIvRef.current = setInterval(() => {
-        const sized = fix();
-        if (sized || ++tries >= 20) { clearInterval(retryIvRef.current); retryIvRef.current = null; }
+        if (sizeThenFit() || ++tries >= 20) { clearInterval(retryIvRef.current); retryIvRef.current = null; }
       }, 150);
 
       // Observér forælder-wrapperen (konkret flex-størrelse) frem for det absolutte
-      // element, da Safari ikke pålideligt rapporterer sidstnævnte.
+      // element, da Safari ikke pålideligt rapporterer sidstnævnte. Kun størrelses-
+      // fix — coalesced til ét kald pr. frame, så en løbende animation ikke udløser
+      // ét invalidateSize pr. observeret ændring.
       if (typeof ResizeObserver !== 'undefined' && mapRef.current?.parentElement) {
-        const ro = new ResizeObserver(() => fix());
+        const ro = new ResizeObserver(() => {
+          if (resizeRafRef.current) return;
+          resizeRafRef.current = requestAnimationFrame(() => { resizeRafRef.current = 0; sizeFix(); });
+        });
         ro.observe(mapRef.current.parentElement);
         resizeObsRef.current = ro;
       }
     }
     return () => {
       if (retryIvRef.current) { clearInterval(retryIvRef.current); retryIvRef.current = null; }
+      if (resizeRafRef.current) { cancelAnimationFrame(resizeRafRef.current); resizeRafRef.current = 0; }
       if (resizeObsRef.current) { resizeObsRef.current.disconnect(); resizeObsRef.current = null; }
       if (mapInstanceRef.current) { mapInstanceRef.current.remove(); mapInstanceRef.current = null; }
-      tilesRef.current = null; fixRef.current = null;
+      tilesRef.current = null; sizeFixRef.current = null; fitRef.current = null;
+      didFitRef.current = false; didFallbackRef.current = false;
     };
   }, [mounted]); // eslint-disable-line
 
@@ -160,18 +216,11 @@ export default function PickupPointPicker({ points, cheapestCarrier, buyerCoords
   }, [points, selectedId, mounted, buyerCoords]);
 
   // Refit når punkterne (eller køber-koordinaten) ankommer asynkront EFTER at
-  // kortet er oprettet — ellers står kortet på default-center med grå/blanke tiles.
+  // kortet er oprettet — ellers står kortet på default-center.
   useEffect(() => {
-    if (mapInstanceRef.current && fixRef.current) fixRef.current();
+    if (!mapInstanceRef.current || !sizeFixRef.current) return;
+    if (sizeFixRef.current()) { fitRef.current?.(); didFitRef.current = true; }
   }, [points, buyerCoords]); // eslint-disable-line
-
-  // På mobil oprettes kortet mens kort-fanen kan være skjult (0 størrelse).
-  // Refit når man skifter til kort-fanen, så tiles tegnes korrekt.
-  useEffect(() => {
-    if (mobileTab === 'kort' && mapInstanceRef.current && fixRef.current) {
-      requestAnimationFrame(() => fixRef.current && fixRef.current());
-    }
-  }, [mobileTab]); // eslint-disable-line
 
   // Hover-fremhævning (desktop)
   useEffect(() => {
@@ -193,14 +242,17 @@ export default function PickupPointPicker({ points, cheapestCarrier, buyerCoords
     mapInstanceRef.current.panTo([selected.lat, selected.lng]);
   }, [selectedId]); // eslint-disable-line
 
-  // Når mobil-tab skifter til "kort": invalidate så tiles vises korrekt
+  // På mobil oprettes kortet mens kort-fanen kan være skjult (0 størrelse).
+  // Genberegn viewport når man skifter til kort-fanen, så tiles tegnes korrekt.
   useEffect(() => {
-    if (mobileTab === 'kort' && mapInstanceRef.current) {
-      const fix = () => mapInstanceRef.current?.invalidateSize();
-      requestAnimationFrame(fix);
-      setTimeout(fix, 100);
-      setTimeout(fix, 300);
-    }
+    if (mobileTab !== 'kort' || !mapInstanceRef.current) return;
+    const run = () => {
+      if (!sizeFixRef.current?.()) return;
+      if (!didFitRef.current) { fitRef.current?.(); didFitRef.current = true; }
+    };
+    const raf = requestAnimationFrame(run);
+    const t = setTimeout(run, 200); // efter tab-overgangen er faldet på plads
+    return () => { cancelAnimationFrame(raf); clearTimeout(t); };
   }, [mobileTab]);
 
   if (!mounted) return null;
