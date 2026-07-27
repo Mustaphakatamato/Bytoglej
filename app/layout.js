@@ -16,11 +16,14 @@ export default function RootLayout({ children }) {
     <html lang="da" style={{ background: '#F6F2EA' }}>
       <head>
         <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
-        {/* Inline splash CSS — paper bg matches browser default so no white flash, slide-up exit */}
+        {/* Inline splash CSS — kun mobil. Papirfarvet bg matcher browserens default, så der ikke blinker hvidt. */}
         <style dangerouslySetInnerHTML={{ __html: `
-          #__splash{position:fixed;inset:0;z-index:9999;background:#F6F2EA;display:flex;align-items:center;justify-content:center;animation:splashExit 0.5s cubic-bezier(0.4,0,0.2,1) 0.85s forwards}
+          #__splash{display:none}
+          @media (max-width:767px){
+            #__splash{position:fixed;inset:0;z-index:9999;background:#F6F2EA;display:flex;align-items:center;justify-content:center;animation:splashExit 0.5s cubic-bezier(0.4,0,0.2,1) 0.85s forwards}
+            #__sl{display:flex;align-items:center;gap:14px;animation:logoIn 0.5s cubic-bezier(0.34,1.56,0.64,1) 0.05s both}
+          }
           @keyframes splashExit{from{transform:translateY(0)}to{transform:translateY(-100%);visibility:hidden}}
-          #__sl{display:flex;align-items:center;gap:14px;animation:logoIn 0.5s cubic-bezier(0.34,1.56,0.64,1) 0.05s both}
           @keyframes logoIn{from{opacity:0;transform:scale(0.72) translateY(18px)}to{opacity:1;transform:scale(1) translateY(0)}}
         `}} />
 
@@ -47,7 +50,7 @@ export default function RootLayout({ children }) {
         <link href="https://fonts.googleapis.com/css2?family=Sora:wght@400;500;600;700;800&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet" />
       </head>
       <body>
-        {/* Splash — paper bg = invisible transition from browser default, logo springs in, splash slides up */}
+        {/* Splash (kun mobil, jf. media query ovenfor) — logo springer ind, hvorefter splashen glider op */}
         <div id="__splash" aria-hidden="true">
           <div id="__sl">
             <svg width="58" height="58" viewBox="0 0 64 64">

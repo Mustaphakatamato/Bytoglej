@@ -857,8 +857,13 @@ export default function ChatBubble() {
   const bubbleBottom = isMobile ? 'calc(84px + env(safe-area-inset-bottom, 0px) + 14px)' : '20px';
   const panelBottom  = isMobile ? 'calc(84px + env(safe-area-inset-bottom, 0px) + 78px)' : '80px';
 
+  // Splashen vises kun under 768px (se app/layout.js) — på desktop er der intet at vente på.
   const [splashDone, setSplashDone] = useState(false);
-  useEffect(() => { const t = setTimeout(() => setSplashDone(true), 1400); return () => clearTimeout(t); }, []);
+  useEffect(() => {
+    if (!window.matchMedia('(max-width:767px)').matches) { setSplashDone(true); return; }
+    const t = setTimeout(() => setSplashDone(true), 1400);
+    return () => clearTimeout(t);
+  }, []);
 
   const userId = realUserId || ctxUserId;
 
