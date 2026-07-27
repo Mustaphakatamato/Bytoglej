@@ -24,7 +24,7 @@ function fmtDist(m) {
 // Uden nøgle bruges CARTO, så kortet stadig virker uden opsætning.
 const MAPTILER_KEY = process.env.NEXT_PUBLIC_MAPTILER_KEY;
 const TILES_PRIMARY = MAPTILER_KEY ? {
-  url: `https://api.maptiler.com/maps/streets-v2/{z}/{x}/{y}{r}.png?key=${MAPTILER_KEY}`,
+  url: `https://api.maptiler.com/maps/streets-v4/{z}/{x}/{y}{r}.png?key=${MAPTILER_KEY}`,
   attribution: '© <a href="https://www.maptiler.com/copyright/">MapTiler</a> © <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
 } : null;
 const TILES_FALLBACK = {
