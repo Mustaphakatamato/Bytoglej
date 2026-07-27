@@ -954,9 +954,6 @@ export default function ListingDetailClient() {
       {/* På mobil: relaterede opslag i bunden (fuld bredde) */}
       {isMobile && relatedSection}
 
-      {/* Plads så sidste indhold ikke skjules bag den faste bundbjælke */}
-      {isMobile && !isOwn && <div style={{ height:72 }} aria-hidden />}
-
       <Modal open={shareModal} onClose={()=>{ setShareModal(false); setSelectedEmails([]); setShareNote(''); }} title="Del med medarbejder">
         <div style={{ display:'flex', flexDirection:'column', gap:14 }}>
           <div style={{ background:'#f8f7f5', borderRadius:12, padding:14, display:'flex', gap:12, alignItems:'center' }}>
@@ -1003,39 +1000,6 @@ export default function ListingDetailClient() {
       </Modal>
 
     </div>
-
-    {/* Fast CTA-bundbjælke på mobil (Vinted-stil) — sidder oven over bundnavigationen.
-        VIGTIGT: skal ligge uden for .page-enter, da dens animation efterlader en
-        transform, og en transform på et forfaderelement gør position:fixed relativ
-        til forfaderen i stedet for viewporten (bjælken endte derfor i bunden af siden). */}
-    {isMobile && !isOwn && (() => {
-      const barStyle = { position:'fixed', left:0, right:0, bottom:'calc(84px + env(safe-area-inset-bottom, 0px))', zIndex:850, background:'#fff', borderTop:`1px solid ${PAPER3}`, boxShadow:'0 -4px 20px rgba(22,34,28,0.08)', padding:'10px 16px', display:'flex', gap:10 };
-      const outlineBtn = { flex:1, padding:'14px 8px', borderRadius:16, border:`1.5px solid ${PRIMARY}`, background:'#fff', color:PRIMARY, fontSize:14, fontWeight:700, cursor:'pointer', fontFamily:FONT, display:'flex', alignItems:'center', justifyContent:'center', gap:6 };
-      const fillBtn = (color) => ({ flex:1.4, padding:'14px 8px', borderRadius:16, border:'none', background:color, color:'#fff', fontSize:15, fontWeight:700, cursor:'pointer', fontFamily:FONT, display:'flex', alignItems:'center', justifyContent:'center', gap:6 });
-      if (isReservedForMe) {
-        return <div style={barStyle}><button onClick={()=>{ setSelectedConvId && setSelectedConvId(null); router.push('/beskeder'); }} style={fillBtn(PRIMARY)}>🎉 Gå til beskeder for at betale →</button></div>;
-      }
-      if (isReservedForOther) {
-        return <div style={barStyle}><button disabled style={{ ...fillBtn('#cbd5c7'), cursor:'default' }}>⏳ Reserveret til anden køber</button></div>;
-      }
-      if (listing.type === 'byt') {
-        return <div style={barStyle}>
-          <button onClick={()=>onStartConv && onStartConv(listing)} style={outlineBtn}>💬 Skriv</button>
-          <button onClick={()=>{ if(!loggedIn){ router.push('/login'); return; } setSwapProposalModal(true); }} style={fillBtn(ACCENT)}>🔄 Foreslå bytte</button>
-        </div>;
-      }
-      if (listing.type === 'søges') {
-        return <div style={barStyle}>
-          <button onClick={()=>onStartConv && onStartConv(listing)} style={outlineBtn}>💬 Skriv</button>
-          <button onClick={()=>setSøgesModal(true)} style={fillBtn('#7C3AED')}>🎯 Jeg har noget</button>
-        </div>;
-      }
-      // køb
-      return <div style={barStyle}>
-        <button onClick={()=>{ if(!loggedIn){ router.push('/login'); return; } setOfferModal(true); }} style={outlineBtn}>🏷️ Giv et tilbud</button>
-        <button onClick={handleAddToCart} style={fillBtn(PRIMARY)}>{inCart ? '🛒 Gå til kurv →' : '🛒 Læg i kurv'}</button>
-      </div>;
-    })()}
 
     {/* Rapport modal */}
     <Modal open={reportModal} onClose={()=>{ setReportModal(false); setReportReason(''); setReportNote(''); }} title="Rapportér opslag">
