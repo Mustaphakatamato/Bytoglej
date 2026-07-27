@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import Stripe from 'stripe';
+import { getStripe, isStripePaymentIntentId } from '@/lib/stripe';
 import { createServerClient } from '@/lib/supabase-server';
 import { notify } from '@/lib/notify';
 
@@ -8,11 +8,6 @@ import { notify } from '@/lib/notify';
 //  2. Annullering: er fristen (5 hverdage, sat i finalizePurchase) overskredet
 //     uden afsendelse (status stadig 'paid'), refunderes køber, varen genaktiveres,
 //     og sælgeren får talt en manglende afsendelse. Beskyttet af CRON_SECRET.
-
-function getStripe() {
-  if (!process.env.STRIPE_SECRET_KEY) throw new Error('STRIPE_SECRET_KEY er ikke sat');
-  return new Stripe(process.env.STRIPE_SECRET_KEY);
-}
 
 export async function GET(req) {
   const auth = req.headers.get('authorization');
@@ -105,7 +100,9 @@ export async function GET(req) {
         });
       } catch (e) { console.error('[cancel-unshipped] wallet-refusion fejl:', e?.message); }
     }
-    if (o.payment_intent_id) {
+    // Kun ægte Stripe-betalinger refunderes her — wallet-ordrer har et syntetisk
+    // `wallet_…`-id og er allerede ført tilbage til saldoen ovenfor.
+    if (isStripePaymentIntentId(o.payment_intent_id)) {
       try {
         await stripe.refunds.create({ payment_intent: o.payment_intent_id });
         refunded++;

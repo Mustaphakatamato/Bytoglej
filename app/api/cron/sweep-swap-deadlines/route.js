@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import Stripe from 'stripe';
+import { getStripe, isStripePaymentIntentId } from '@/lib/stripe';
 import { createServerClient } from '@/lib/supabase-server';
 import { notifyFollowersAvailable } from '@/lib/follow-notify';
 
@@ -8,11 +8,6 @@ import { notifyFollowersAvailable } from '@/lib/follow-notify';
 // inden for ét døgn. Annullerer bytteforslag hvor betalingsfristen (48t) er
 // overskredet uden at begge parter har betalt, og refunderer den part der
 // nåede at betale. Beskyttet af CRON_SECRET.
-
-function getStripe() {
-  if (!process.env.STRIPE_SECRET_KEY) throw new Error('STRIPE_SECRET_KEY er ikke sat');
-  return new Stripe(process.env.STRIPE_SECRET_KEY);
-}
 
 export async function GET(req) {
   const auth = req.headers.get('authorization');
@@ -41,7 +36,7 @@ export async function GET(req) {
     // Refundér den/de part(er) der nåede at betale.
     for (const orderId of [p.initiator_order_id, p.owner_order_id].filter(Boolean)) {
       const { data: o } = await supa.from('orders').select('payment_intent_id, status').eq('id', orderId).maybeSingle();
-      if (o?.payment_intent_id && o.status === 'paid') {
+      if (isStripePaymentIntentId(o?.payment_intent_id) && o.status === 'paid') {
         try {
           await stripe.refunds.create({ payment_intent: o.payment_intent_id });
           // Markér ordren som refunded med det samme — afhæng ikke af at

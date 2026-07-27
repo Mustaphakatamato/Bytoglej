@@ -1,16 +1,11 @@
 import { NextResponse } from 'next/server';
-import Stripe from 'stripe';
+import { getStripe, createPaymentIntent } from '@/lib/stripe';
 import { requireAuth, UNAUTHORIZED } from '@/lib/api-auth';
 import { createServerClient } from '@/lib/supabase-server';
 import { getShippingPrice } from '@/lib/shipping-rates';
 import { getPriceQuote } from '@/lib/shipmondo/client';
 import { SWAP_PROTECTION_FEE, isCashPurchaseProposal } from '@/lib/pricing';
 import { resolveCallerInstitution } from '@/lib/institution-server';
-
-function getStripe() {
-  if (!process.env.STRIPE_SECRET_KEY) throw new Error('STRIPE_SECRET_KEY er ikke sat');
-  return new Stripe(process.env.STRIPE_SECRET_KEY);
-}
 
 const SIZE_RANK = { small: 1, medium: 2, large: 3 };
 
@@ -139,13 +134,18 @@ export async function POST(req) {
     return NextResponse.json({ error: 'Beløbet er for lavt til online betaling' }, { status: 400 });
   }
 
-  const stripe = getStripe();
+  let stripe;
+  try {
+    stripe = getStripe();
+  } catch (e) {
+    console.error('[create-swap-intent] Stripe-konfiguration:', e.message);
+    return NextResponse.json({ error: 'Betaling er ikke tilgængelig lige nu. Kontakt support.' }, { status: 503 });
+  }
   let paymentIntent;
   try {
-    paymentIntent = await stripe.paymentIntents.create({
+    paymentIntent = await createPaymentIntent(stripe, {
       amount: amountOre,
       currency: 'dkk',
-      payment_method_types: ['card', 'mobilepay'],
       metadata: {
         type: 'swap',
         conversation_id: conversationId,
@@ -155,7 +155,7 @@ export async function POST(req) {
         buyer_id: user.id,
       },
       description: `Bytogleg byttehandel: ${conv.listing_title || ''}`,
-    });
+    }, '[create-swap-intent]');
   } catch (err) {
     console.error('[create-swap-intent] Stripe fejl:', err.message);
     return NextResponse.json({ error: 'Betalingen kunne ikke oprettes. Prøv igen' }, { status: 502 });
@@ -289,13 +289,18 @@ async function handleProposalIntent(user, supa, body) {
     return NextResponse.json({ error: 'Beløbet er for lavt til online betaling' }, { status: 400 });
   }
 
-  const stripe = getStripe();
+  let stripe;
+  try {
+    stripe = getStripe();
+  } catch (e) {
+    console.error('[create-swap-intent] Stripe-konfiguration:', e.message);
+    return NextResponse.json({ error: 'Betaling er ikke tilgængelig lige nu. Kontakt support.' }, { status: 503 });
+  }
   let paymentIntent;
   try {
-    paymentIntent = await stripe.paymentIntents.create({
+    paymentIntent = await createPaymentIntent(stripe, {
       amount: amountOre,
       currency: 'dkk',
-      payment_method_types: ['card', 'mobilepay'],
       metadata: {
         type: 'swap',
         swap_proposal_id: proposal.id,
@@ -308,7 +313,7 @@ async function handleProposalIntent(user, supa, body) {
         buyer_id: user.id,
       },
       description: 'Bytogleg byttehandel',
-    });
+    }, '[create-swap-intent]');
   } catch (err) {
     console.error('[create-swap-intent] proposal Stripe fejl:', err.message);
     return NextResponse.json({ error: 'Betalingen kunne ikke oprettes — prøv igen' }, { status: 502 });

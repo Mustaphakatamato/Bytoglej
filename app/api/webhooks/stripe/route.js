@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { waitUntil } from '@vercel/functions';
-import Stripe from 'stripe';
+import { getStripe, constructWebhookEvent, stripeMode, webhookSecrets } from '@/lib/stripe';
 import { createServerClient } from '@/lib/supabase-server';
 import { createShipment } from '@/lib/shipmondo/client';
 import { escapeHtml } from '@/lib/escape-html';
@@ -11,11 +11,6 @@ import { notify } from '@/lib/notify';
 import { formatOrderNumber } from '@/lib/order-number';
 import { addBusinessDays } from '@/lib/business-days';
 
-function getStripe() {
-  if (!process.env.STRIPE_SECRET_KEY) throw new Error('STRIPE_SECRET_KEY er ikke sat');
-  return new Stripe(process.env.STRIPE_SECRET_KEY);
-}
-
 // Kør på Node-runtime og giv fulfillment (Shipmondo/Resend/PDF) god tid i
 // baggrunden. Stripe-svaret sendes uanset straks (se waitUntil nedenfor).
 export const runtime = 'nodejs';
@@ -25,18 +20,31 @@ export async function POST(req) {
   const body = await req.text();
   const sig = req.headers.get('stripe-signature');
 
-  const stripe = getStripe();
-  const WEBHOOK_SECRET = process.env.STRIPE_WEBHOOK_SECRET;
-  if (!WEBHOOK_SECRET) {
+  let stripe;
+  try {
+    stripe = getStripe();
+  } catch (err) {
+    console.error('[stripe-webhook] Stripe ikke konfigureret:', err.message);
+    return NextResponse.json({ error: 'Stripe ikke konfigureret' }, { status: 500 });
+  }
+  if (!webhookSecrets().length) {
     console.error('[stripe-webhook] STRIPE_WEBHOOK_SECRET er ikke sat');
     return NextResponse.json({ error: 'Webhook ikke konfigureret' }, { status: 500 });
   }
   let event;
   try {
-    event = stripe.webhooks.constructEvent(body, sig, WEBHOOK_SECRET);
+    event = constructWebhookEvent(stripe, body, sig);
   } catch (err) {
     console.error('[stripe-webhook] Ugyldig signatur:', err.message);
     return NextResponse.json({ error: 'Ugyldig webhook-signatur' }, { status: 400 });
+  }
+
+  // Live/test-guard: kører vi med live-nøgler, må et test-event ALDRIG fuldføre en
+  // ordre — så ville varer blive sendt uden at der er trukket penge. Relevant fordi
+  // STRIPE_WEBHOOK_SECRET kan indeholde både test- og live-nøgle under skiftet.
+  if (stripeMode() === 'live' && event.livemode === false) {
+    console.error('[stripe-webhook] Test-event modtaget i live-mode — ignoreret:', event.type, event.id);
+    return NextResponse.json({ received: true, ignored: 'test_event_in_live_mode' });
   }
 
   // Kvittér straks (2xx) til Stripe og kør fulfillment i baggrunden. Fulfillment

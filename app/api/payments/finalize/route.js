@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import Stripe from 'stripe';
+import { getStripe, isStripePaymentIntentId } from '@/lib/stripe';
 import { requireAuth, UNAUTHORIZED } from '@/lib/api-auth';
 import { createServerClient } from '@/lib/supabase-server';
 import { finalizePurchase, handleSwapPayment, handleSwapProposalPayment } from '@/app/api/webhooks/stripe/route';
@@ -32,11 +32,18 @@ export async function POST(req) {
     return NextResponse.json({ ok: true, status: order.status });
   }
   if (!order.payment_intent_id) return NextResponse.json({ ok: false, status: order.status });
+  // Wallet-ordrer (syntetisk `wallet_…`-id) finaliseres allerede i create-intent.
+  if (!isStripePaymentIntentId(order.payment_intent_id)) {
+    return NextResponse.json({ ok: false, status: order.status });
+  }
 
-  if (!process.env.STRIPE_SECRET_KEY) {
+  let stripe;
+  try {
+    stripe = getStripe();
+  } catch (e) {
+    console.error('[finalize] Stripe-konfiguration:', e.message);
     return NextResponse.json({ error: 'Stripe ikke konfigureret' }, { status: 500 });
   }
-  const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
 
   let pi;
   try {

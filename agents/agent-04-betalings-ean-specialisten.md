@@ -118,7 +118,9 @@ For kommunale institutioner er EAN-fakturering LOVPLIGTIG — de kan ikke modtag
 - **EAN-validering server-side**: Valider EAN-nummer i API-route, ikke kun i frontend
 - **Kommunal faktura krav**: OIOUBL-format er lovkrav, ikke ønskværdigt
 - **Refund via Stripe**: Brug `stripe.refunds.create()` — aldrig manuel overførsel
-- **Test mode**: `sk_test_*` keys i development, `sk_live_*` i production
+- **Test mode**: `sk_test_*` keys i development, `sk_live_*` i production. Nøgler og guards
+  er samlet i `lib/stripe.js`; skiftet til live er beskrevet trin for trin i
+  `docs/STRIPE-GO-LIVE.md`
 
 ---
 
