@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import Stripe from 'stripe';
+import { getStripe, createPaymentIntent } from '@/lib/stripe';
 import { randomUUID } from 'crypto';
 import { requireAuth, UNAUTHORIZED } from '@/lib/api-auth';
 import { createServerClient } from '@/lib/supabase-server';
@@ -7,11 +7,6 @@ import { getShippingPrice } from '@/lib/shipping-rates';
 import { getPriceQuote } from '@/lib/shipmondo/client';
 import { calcServiceFee } from '@/lib/pricing';
 import { finalizePurchase } from '@/app/api/webhooks/stripe/route';
-
-function getStripe() {
-  if (!process.env.STRIPE_SECRET_KEY) throw new Error('STRIPE_SECRET_KEY er ikke sat');
-  return new Stripe(process.env.STRIPE_SECRET_KEY);
-}
 
 // Bundle discount: find highest applicable tier by item count
 function calcBundleDiscount(itemTotal, itemCount, seller) {
@@ -327,7 +322,13 @@ export async function POST(req) {
   }
   const remaining = Math.round((grandTotal - walletApplied) * 100) / 100;
 
-  const stripe = getStripe();
+  let stripe;
+  try {
+    stripe = getStripe();
+  } catch (e) {
+    console.error('[create-intent] Stripe-konfiguration:', e.message);
+    return NextResponse.json({ error: 'Betaling er ikke tilgængelig lige nu. Kontakt support.' }, { status: 503 });
+  }
 
   // ── Sti A: saldoen dækker hele beløbet → ingen Stripe-betaling ──────
   if (walletApplied > 0 && remaining === 0) {
@@ -370,13 +371,12 @@ export async function POST(req) {
 
   let paymentIntent;
   try {
-    paymentIntent = await stripe.paymentIntents.create({
+    paymentIntent = await createPaymentIntent(stripe, {
       amount: amountOre,
       currency: 'dkk',
-      payment_method_types: ['card', 'mobilepay'],
       metadata: { ...orderMeta, wallet_applied: String(walletApplied) },
       description: `Bytogleg ordre: ${orderGroups.map(g => g.sellerName).join(', ')}`,
-    });
+    }, '[create-intent]');
   } catch (err) {
     console.error('[create-intent] Stripe fejl:', err.message);
     return NextResponse.json({ error: 'Betalingen kunne ikke oprettes. Prøv igen' }, { status: 502 });
