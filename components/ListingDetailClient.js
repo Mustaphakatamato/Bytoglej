@@ -35,7 +35,8 @@ function ImageGallery({ images, color, emoji, title, isFav, favCount, onToggleFa
   const [lightbox, setLightbox] = useState(false);
   const w = useWindowWidth();
   const mobile = w < 768;
-  const imgH = w < 500 ? 400 : mobile ? 440 : 380;
+  // Lidt lavere billede på mobil, så pris + købsknapper når over folden.
+  const imgH = w < 500 ? 340 : mobile ? 380 : 380;
   // Kant-til-kant på mobil (bryd ud af sidens 16px padding), afrundet kort på desktop.
   const outerStyle = mobile
     ? { margin:'0 -16px 12px', position:'relative' }
@@ -623,6 +624,24 @@ export default function ListingDetailClient() {
     </div>
   );
 
+  // Beskrivelse — på desktop står den over prisen, på mobil under købsknapperne,
+  // så knapperne ligger umiddelbart efter billedet i stedet for langt nede.
+  const descriptionBlock = listing.description ? (
+    <div style={{ marginBottom:16 }}>
+      <p style={{ color:INK2, fontSize:14, lineHeight:1.7, fontFamily:FONT, margin:0,
+        display: expandDesc ? 'block' : '-webkit-box',
+        WebkitLineClamp: expandDesc ? undefined : 3,
+        WebkitBoxOrient: 'vertical',
+        overflow: expandDesc ? 'visible' : 'hidden',
+      }}>{listing.description}</p>
+      {listing.description.length > 160 && (
+        <button onClick={()=>setExpandDesc(e=>!e)} style={{ background:'none', border:'none', color:PRIMARY, fontSize:13, fontWeight:700, cursor:'pointer', padding:'4px 0', fontFamily:FONT }}>
+          {expandDesc ? 'Læs mindre ↑' : 'Læs mere ↓'}
+        </button>
+      )}
+    </div>
+  ) : null;
+
   return (
     <>
     <div style={{ minHeight:'100vh', paddingTop: isMobile ? 80 : 124, background:PAPER }} className="page-enter">
@@ -716,22 +735,8 @@ export default function ListingDetailClient() {
             </div>
 
 
-            {/* Description with expand */}
-            {listing.description && (
-              <div style={{ marginBottom:16 }}>
-                <p style={{ color:INK2, fontSize:14, lineHeight:1.7, fontFamily:FONT, margin:0,
-                  display: expandDesc ? 'block' : '-webkit-box',
-                  WebkitLineClamp: expandDesc ? undefined : 3,
-                  WebkitBoxOrient: 'vertical',
-                  overflow: expandDesc ? 'visible' : 'hidden',
-                }}>{listing.description}</p>
-                {listing.description.length > 160 && (
-                  <button onClick={()=>setExpandDesc(e=>!e)} style={{ background:'none', border:'none', color:PRIMARY, fontSize:13, fontWeight:700, cursor:'pointer', padding:'4px 0', fontFamily:FONT }}>
-                    {expandDesc ? 'Læs mindre ↑' : 'Læs mere ↓'}
-                  </button>
-                )}
-              </div>
-            )}
+            {/* Description with expand (desktop — på mobil ligger den under knapperne) */}
+            {!isMobile && descriptionBlock}
 
             {/* Price */}
             <div style={{ marginBottom:16 }}>
@@ -774,9 +779,9 @@ export default function ListingDetailClient() {
                 : null}
             </div>
 
-            {/* Action buttons (desktop inline; på mobil ligger de i den faste bundbjælke) */}
+            {/* Action buttons — vises inline lige efter prisen, også på mobil
+                (bundbjælken er stadig der som genvej når man scroller). */}
             {!isOwn ? (
-              (!isMobile || isReservedForOther || isReservedForMe) && (
               <div style={{ display:'flex', flexDirection:'column', gap:10, marginBottom:20 }}>
                 {isReservedForOther && (
                   <div style={{ background:'#FEF3C7', border:'1.5px solid #F59E0B', borderRadius:14, padding:'12px 16px', fontSize:13, fontFamily:FONT, color:'#92400E', fontWeight:600 }}>
@@ -789,7 +794,6 @@ export default function ListingDetailClient() {
                     🎉 Du har et accepteret tilbud på denne vare. Gå til beskeder for at betale →
                   </button>
                 )}
-                {!isMobile && <>
                 {listing.type==='køb' && !reservedActive && <Btn variant="primary" color={PRIMARY} radius={22} onClick={handleAddToCart} style={{ justifyContent:'center', padding:'15px', fontSize:16 }}>{inCart ? '🛒 Gå til kurv →' : (() => { const so = listing.shipping_options?.[0]; const canShip = so?.allow_shipping || (!so && listing.can_ship); const tag = canShip ? (so?.shipping_included_in_price ? ' inkl. fragt' : ' + fragt') : ''; const total = listing.price + calcServiceFee(listing.price); return `🛒 Læg i kurv (${total.toFixed(2).replace('.',',')} kr.${tag})`; })()}</Btn>}
                 {listing.type==='køb' && !reservedActive && <Btn variant="outline" radius={22} onClick={()=>{ if(!loggedIn){ router.push('/login'); return; } setOfferModal(true); }} style={{ justifyContent:'center', padding:'13px', fontSize:15 }}>🏷️ Giv et tilbud</Btn>}
                 {listing.type==='byt' && !reservedActive && <Btn variant="primary" color={ACCENT} radius={22} onClick={()=>{ if(!loggedIn){ router.push('/login'); return; } setSwapProposalModal(true); }} style={{ justifyContent:'center', padding:'15px', fontSize:16 }}>🔄 Foreslå bytte</Btn>}
@@ -797,13 +801,14 @@ export default function ListingDetailClient() {
                   style={{ width:'100%', padding:'15px', borderRadius:22, border:'none', background:'#7C3AED', color:'#fff', fontSize:15, fontWeight:700, cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center', gap:8, fontFamily:FONT, transition:'all 0.2s' }}>
                   🎯 Jeg har noget der matcher
                 </button>}
+                {/* På mobil ligger "Skriv til sælger" i sælgerkortet og i bundbjælken */}
+                {!isMobile && (
                 <button onClick={()=>onStartConv && onStartConv(listing)}
                   style={{ width:'100%', padding:'13px', borderRadius:22, border:`1.5px solid ${PRIMARY}`, background:'#fff', color:PRIMARY, fontSize:14, fontWeight:700, cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center', gap:8, fontFamily:FONT, transition:'all 0.2s' }}>
                   💬 Skriv til sælger
                 </button>
-                </>}
+                )}
               </div>
-              )
             ) : (
               <div style={{ background:GREEN_TINT, borderRadius:16, padding:'16px 20px', marginBottom:20 }}>
                 <div style={{ fontFamily:FONT, fontWeight:700, fontSize:13, color:PRIMARY, marginBottom:12, textAlign:'center' }}>Dit eget opslag</div>
@@ -823,6 +828,9 @@ export default function ListingDetailClient() {
                 )}
               </div>
             )}
+
+            {/* Beskrivelse på mobil — under knapperne */}
+            {isMobile && descriptionBlock}
 
             <OfferModal
               open={offerModal}
@@ -949,36 +957,6 @@ export default function ListingDetailClient() {
       {/* Plads så sidste indhold ikke skjules bag den faste bundbjælke */}
       {isMobile && !isOwn && <div style={{ height:72 }} aria-hidden />}
 
-      {/* Fast CTA-bundbjælke på mobil (Vinted-stil) — sidder oven over bundnavigationen */}
-      {isMobile && !isOwn && (() => {
-        const barStyle = { position:'fixed', left:0, right:0, bottom:'calc(84px + env(safe-area-inset-bottom, 0px))', zIndex:850, background:'#fff', borderTop:`1px solid ${PAPER3}`, boxShadow:'0 -4px 20px rgba(22,34,28,0.08)', padding:'10px 16px', display:'flex', gap:10 };
-        const outlineBtn = { flex:1, padding:'14px 8px', borderRadius:16, border:`1.5px solid ${PRIMARY}`, background:'#fff', color:PRIMARY, fontSize:14, fontWeight:700, cursor:'pointer', fontFamily:FONT, display:'flex', alignItems:'center', justifyContent:'center', gap:6 };
-        const fillBtn = (color) => ({ flex:1.4, padding:'14px 8px', borderRadius:16, border:'none', background:color, color:'#fff', fontSize:15, fontWeight:700, cursor:'pointer', fontFamily:FONT, display:'flex', alignItems:'center', justifyContent:'center', gap:6 });
-        if (isReservedForMe) {
-          return <div style={barStyle}><button onClick={()=>{ setSelectedConvId && setSelectedConvId(null); router.push('/beskeder'); }} style={fillBtn(PRIMARY)}>🎉 Gå til beskeder for at betale →</button></div>;
-        }
-        if (isReservedForOther) {
-          return <div style={barStyle}><button disabled style={{ ...fillBtn('#cbd5c7'), cursor:'default' }}>⏳ Reserveret til anden køber</button></div>;
-        }
-        if (listing.type === 'byt') {
-          return <div style={barStyle}>
-            <button onClick={()=>onStartConv && onStartConv(listing)} style={outlineBtn}>💬 Skriv</button>
-            <button onClick={()=>{ if(!loggedIn){ router.push('/login'); return; } setSwapProposalModal(true); }} style={fillBtn(ACCENT)}>🔄 Foreslå bytte</button>
-          </div>;
-        }
-        if (listing.type === 'søges') {
-          return <div style={barStyle}>
-            <button onClick={()=>onStartConv && onStartConv(listing)} style={outlineBtn}>💬 Skriv</button>
-            <button onClick={()=>setSøgesModal(true)} style={fillBtn('#7C3AED')}>🎯 Jeg har noget</button>
-          </div>;
-        }
-        // køb
-        return <div style={barStyle}>
-          <button onClick={()=>{ if(!loggedIn){ router.push('/login'); return; } setOfferModal(true); }} style={outlineBtn}>🏷️ Giv et tilbud</button>
-          <button onClick={handleAddToCart} style={fillBtn(PRIMARY)}>{inCart ? '🛒 Gå til kurv →' : '🛒 Læg i kurv'}</button>
-        </div>;
-      })()}
-
       <Modal open={shareModal} onClose={()=>{ setShareModal(false); setSelectedEmails([]); setShareNote(''); }} title="Del med medarbejder">
         <div style={{ display:'flex', flexDirection:'column', gap:14 }}>
           <div style={{ background:'#f8f7f5', borderRadius:12, padding:14, display:'flex', gap:12, alignItems:'center' }}>
@@ -1025,6 +1003,39 @@ export default function ListingDetailClient() {
       </Modal>
 
     </div>
+
+    {/* Fast CTA-bundbjælke på mobil (Vinted-stil) — sidder oven over bundnavigationen.
+        VIGTIGT: skal ligge uden for .page-enter, da dens animation efterlader en
+        transform, og en transform på et forfaderelement gør position:fixed relativ
+        til forfaderen i stedet for viewporten (bjælken endte derfor i bunden af siden). */}
+    {isMobile && !isOwn && (() => {
+      const barStyle = { position:'fixed', left:0, right:0, bottom:'calc(84px + env(safe-area-inset-bottom, 0px))', zIndex:850, background:'#fff', borderTop:`1px solid ${PAPER3}`, boxShadow:'0 -4px 20px rgba(22,34,28,0.08)', padding:'10px 16px', display:'flex', gap:10 };
+      const outlineBtn = { flex:1, padding:'14px 8px', borderRadius:16, border:`1.5px solid ${PRIMARY}`, background:'#fff', color:PRIMARY, fontSize:14, fontWeight:700, cursor:'pointer', fontFamily:FONT, display:'flex', alignItems:'center', justifyContent:'center', gap:6 };
+      const fillBtn = (color) => ({ flex:1.4, padding:'14px 8px', borderRadius:16, border:'none', background:color, color:'#fff', fontSize:15, fontWeight:700, cursor:'pointer', fontFamily:FONT, display:'flex', alignItems:'center', justifyContent:'center', gap:6 });
+      if (isReservedForMe) {
+        return <div style={barStyle}><button onClick={()=>{ setSelectedConvId && setSelectedConvId(null); router.push('/beskeder'); }} style={fillBtn(PRIMARY)}>🎉 Gå til beskeder for at betale →</button></div>;
+      }
+      if (isReservedForOther) {
+        return <div style={barStyle}><button disabled style={{ ...fillBtn('#cbd5c7'), cursor:'default' }}>⏳ Reserveret til anden køber</button></div>;
+      }
+      if (listing.type === 'byt') {
+        return <div style={barStyle}>
+          <button onClick={()=>onStartConv && onStartConv(listing)} style={outlineBtn}>💬 Skriv</button>
+          <button onClick={()=>{ if(!loggedIn){ router.push('/login'); return; } setSwapProposalModal(true); }} style={fillBtn(ACCENT)}>🔄 Foreslå bytte</button>
+        </div>;
+      }
+      if (listing.type === 'søges') {
+        return <div style={barStyle}>
+          <button onClick={()=>onStartConv && onStartConv(listing)} style={outlineBtn}>💬 Skriv</button>
+          <button onClick={()=>setSøgesModal(true)} style={fillBtn('#7C3AED')}>🎯 Jeg har noget</button>
+        </div>;
+      }
+      // køb
+      return <div style={barStyle}>
+        <button onClick={()=>{ if(!loggedIn){ router.push('/login'); return; } setOfferModal(true); }} style={outlineBtn}>🏷️ Giv et tilbud</button>
+        <button onClick={handleAddToCart} style={fillBtn(PRIMARY)}>{inCart ? '🛒 Gå til kurv →' : '🛒 Læg i kurv'}</button>
+      </div>;
+    })()}
 
     {/* Rapport modal */}
     <Modal open={reportModal} onClose={()=>{ setReportModal(false); setReportReason(''); setReportNote(''); }} title="Rapportér opslag">

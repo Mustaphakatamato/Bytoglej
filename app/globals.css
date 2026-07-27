@@ -45,7 +45,10 @@ html, body { max-width: 100vw; }
   .blob-float, .blob-float-2 { animation: none !important; }
 }
 
-.page-enter { animation: fadeSlideIn 0.35s ease both; }
+/* fill-mode: backwards (ikke both) — "both" efterlader transform:translateY(0) på
+   elementet, og en transform på et forfaderelement gør position:fixed relativ til
+   forfaderen i stedet for viewporten. Slutresultatet ser ens ud. */
+.page-enter { animation: fadeSlideIn 0.35s ease backwards; }
 
 @media (max-width: 767px) {
   .hide-mobile { display: none !important; }
