@@ -16,7 +16,9 @@ const securityHeaders = [
       "default-src 'self'",
       "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://js.stripe.com",
       "style-src 'self' 'unsafe-inline' https://unpkg.com",
-      "img-src 'self' data: blob: https://fhnizihpdensqfdpgcgn.supabase.co https://images.unsplash.com https://*.stripe.com https://*.basemaps.cartocdn.com https://server.arcgisonline.com",
+      // api.maptiler.com leverer kort-tiles i pakkeshop-vælgeren; cartocdn er fallback.
+      // Uden begge på listen blokerer browseren tiles og kortet står gråt.
+      "img-src 'self' data: blob: https://fhnizihpdensqfdpgcgn.supabase.co https://images.unsplash.com https://*.stripe.com https://api.maptiler.com https://*.basemaps.cartocdn.com https://server.arcgisonline.com",
       "font-src 'self'",
       "connect-src 'self' https://*.supabase.co wss://*.supabase.co https://api.stripe.com https://r.stripe.com https://api.shipmondo.com",
       "frame-src https://js.stripe.com https://hooks.stripe.com",
