@@ -92,6 +92,9 @@ VAPID_PRIVATE_KEY
 GROQ_API_KEY
 GOOGLE_AI_API_KEY  # fallback
 
+# Kort (pakkeshop-vælgeren)
+NEXT_PUBLIC_MAPTILER_KEY  # valgfri — uden nøgle bruges CARTO's gratis tiles, som throttler
+
 # App
 NEXT_PUBLIC_BASE_URL=https://bytogleg.dk
 ```

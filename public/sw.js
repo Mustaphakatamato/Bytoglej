@@ -5,13 +5,16 @@
 // should bust existing caches (e.g. after major UI updates).
 // Format: 'bytleg-vN'  →  bump N by 1.
 // ─────────────────────────────────────────────────────────────
-const CACHE_VERSION = 'bytleg-v1';
+const CACHE_VERSION = 'bytleg-v2';
 
 const STATIC_CACHE = `${CACHE_VERSION}-static`;
 const IMAGE_CACHE  = `${CACHE_VERSION}-images`;
 const API_CACHE    = `${CACHE_VERSION}-api`;
 
 const MAX_IMAGE_ENTRIES = 50;
+
+// Kort-tiles håndteres IKKE af service workeren — se fetch-handleren.
+const TILE_HOSTS = ['api.maptiler.com', 'basemaps.cartocdn.com'];
 
 const PRECACHE_URLS = [
   '/',
@@ -50,6 +53,18 @@ self.addEventListener('fetch', e => {
   if (request.method !== 'GET') return;
   if (url.protocol === 'chrome-extension:') return;
   if (url.pathname.startsWith('/auth/') || url.hostname.includes('realtime')) return;
+
+  // Kort-tiles → lad browseren håndtere dem direkte, uden om alle strategier.
+  // De ville ellers ryge i image-grenen nedenfor, og det er skadeligt på tre måder:
+  //  1. Ét kortopslag henter snesevis af tiles og fortrænger rigtige billeder i
+  //     IMAGE_CACHE, som kun rummer MAX_IMAGE_ENTRIES og smider én ad gangen ud.
+  //  2. Tiles er cross-origin, så svarene er opaque (response.ok === false) og
+  //     bliver aldrig cachet alligevel — strategien koster kun overhead.
+  //  3. Vigtigst: fejler fetch, returnerer staleWhileRevalidate en syntetisk
+  //     503 'Offline'. Den når <img> som et gyldigt svar, så tilen fejler, og
+  //     den ægte netværksfejl (fx 429 eller en CSP-blokering) bliver skjult i
+  //     DevTools bag service worker-svaret.
+  if (TILE_HOSTS.some(h => url.hostname === h || url.hostname.endsWith(`.${h}`))) return;
 
   // Supabase API or own API routes → network-first
   if (url.hostname.includes('supabase.co') || url.pathname.startsWith('/api/')) {
